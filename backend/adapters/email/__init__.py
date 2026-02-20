@@ -1,0 +1,2 @@
+# Email Adapters
+# Resend integration

@@ -1,0 +1,2 @@
+# CMS Adapters
+# WordPress integration

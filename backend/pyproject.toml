@@ -1,0 +1,83 @@
+[project]
+name = "astats-engine"
+version = "2.0.0"
+description = "A-Stats Content SaaS - AI-Powered Content Generation & SEO Platform"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "A-Stats Team"}
+]
+
+dependencies = [
+    # Web Framework
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "python-multipart>=0.0.6",
+
+    # Database
+    "sqlalchemy[asyncio]>=2.0.25",
+    "asyncpg>=0.29.0",
+    "alembic>=1.13.1",
+
+    # Validation & Settings
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+
+    # Authentication
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "httpx>=0.26.0",
+
+    # AI & ML
+    "anthropic>=0.18.0",
+    "replicate>=0.23.0",
+    "chromadb>=0.4.22",
+
+    # External Services
+    "stripe>=7.0.0",
+    "resend>=0.7.0",
+    "google-auth>=2.27.0",
+    "google-auth-oauthlib>=1.2.0",
+    "google-api-python-client>=2.115.0",
+
+    # Utilities
+    "python-dotenv>=1.0.0",
+    "rich>=13.7.0",
+    "pillow>=10.2.0",
+    "aiofiles>=23.2.1",
+
+    # Background Tasks
+    "arq>=0.25.0",
+    "redis>=5.0.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.4",
+    "pytest-asyncio>=0.23.3",
+    "pytest-cov>=4.1.0",
+    "httpx>=0.26.0",
+    "ruff>=0.1.14",
+    "mypy>=1.8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true

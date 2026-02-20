@@ -1,0 +1,2 @@
+# Payment Adapters
+# Stripe integration
