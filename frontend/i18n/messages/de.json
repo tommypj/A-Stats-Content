@@ -1,0 +1,398 @@
+{
+  "common": {
+    "appName": "A-Stats Content",
+    "loading": "Laden...",
+    "error": "Ein Fehler ist aufgetreten",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Loschen",
+    "edit": "Bearbeiten",
+    "create": "Erstellen",
+    "submit": "Absenden",
+    "back": "Zuruck",
+    "next": "Weiter",
+    "previous": "Zuruck",
+    "search": "Suchen",
+    "filter": "Filtern",
+    "sort": "Sortieren",
+    "view": "Ansehen",
+    "download": "Herunterladen",
+    "upload": "Hochladen",
+    "close": "Schliessen",
+    "confirm": "Bestatigen",
+    "yes": "Ja",
+    "no": "Nein",
+    "or": "oder",
+    "and": "und"
+  },
+  "nav": {
+    "home": "Startseite",
+    "dashboard": "Dashboard",
+    "outlines": "Gliederungen",
+    "articles": "Artikel",
+    "images": "Bilder",
+    "analytics": "Analysen",
+    "settings": "Einstellungen",
+    "help": "Hilfe & Support",
+    "signIn": "Anmelden",
+    "signOut": "Abmelden",
+    "getStarted": "Loslegen"
+  },
+  "landing": {
+    "hero": {
+      "badge": "KI-gestutzte Inhaltserstellung",
+      "title": "Erstellen Sie heilenden Content, der",
+      "titleHighlight": "rankt und konvertiert",
+      "description": "Generieren Sie SEO-optimierte therapeutische Inhalte mit KI. Von Gliederungen bis zu vollstandigen Artikeln und personalisierten Bildern - bauen Sie Ihre Wellness-Marke muhelos auf.",
+      "cta": "Kostenlose Testversion starten",
+      "secondaryCta": "Wie es funktioniert"
+    },
+    "features": {
+      "title": "Alles was Sie fur Content-Erfolg brauchen",
+      "description": "Unsere KI versteht therapeutische Sprache und SEO-Best-Practices, um Ihnen zu helfen, Inhalte zu erstellen, die resonieren und ranken.",
+      "outlines": {
+        "title": "KI-gestutzte Gliederungen",
+        "description": "Generieren Sie umfassende Artikelgliederungen basierend auf Ihren Keywords und Ihrer Zielgruppe."
+      },
+      "content": {
+        "title": "Intelligente Inhaltsgenerierung",
+        "description": "Erstellen Sie SEO-optimierte Artikel mit therapeutischer, heilungsorientierter Sprache."
+      },
+      "images": {
+        "title": "KI-Bilderstellung",
+        "description": "Generieren Sie personalisierte Bilder, die zu Ihrem Inhalt und Ihrer Markenasthetik passen."
+      },
+      "analytics": {
+        "title": "SEO-Analysen",
+        "description": "Verfolgen Sie die Leistung mit Google Search Console-Integration und Einblicken."
+      }
+    },
+    "pricing": {
+      "title": "Einfache, transparente Preise",
+      "description": "Wahlen Sie den Plan, der zu Ihren Content-Bedurfnissen passt. Jederzeit upgraden oder downgraden.",
+      "monthly": "/Monat",
+      "popular": "Am beliebtesten",
+      "starter": {
+        "name": "Starter",
+        "price": "$29",
+        "description": "Perfekt fur kleine Wellness-Blogs",
+        "features": {
+          "articles": "10 Artikel pro Monat",
+          "seo": "Basis-SEO-Optimierung",
+          "images": "5 KI-Bilder",
+          "support": "E-Mail-Support"
+        }
+      },
+      "professional": {
+        "name": "Professional",
+        "price": "$79",
+        "description": "Fur wachsende therapeutische Praxen",
+        "features": {
+          "articles": "50 Artikel pro Monat",
+          "seo": "Erweiterte SEO-Tools",
+          "images": "25 KI-Bilder",
+          "wordpress": "WordPress-Integration",
+          "support": "Prioritats-Support"
+        }
+      },
+      "enterprise": {
+        "name": "Enterprise",
+        "price": "$199",
+        "description": "Fur Wellness-Content-Agenturen",
+        "features": {
+          "articles": "Unbegrenzte Artikel",
+          "seo": "Vollstandige SEO-Suite",
+          "images": "Unbegrenzte KI-Bilder",
+          "integrations": "Individuelle Integrationen",
+          "support": "Dedizierter Support",
+          "api": "API-Zugang"
+        }
+      }
+    },
+    "cta": {
+      "title": "Bereit, Ihren Content zu transformieren?",
+      "description": "Schliessen Sie sich Hunderten von Wellness-Profis an, die mit KI besseren Content erstellen.",
+      "button": "Kostenlose Testversion starten"
+    },
+    "footer": {
+      "rights": "Alle Rechte vorbehalten."
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Willkommen zuruck",
+      "description": "Melden Sie sich an, um fortzufahren",
+      "email": "E-Mail-Adresse",
+      "password": "Passwort",
+      "rememberMe": "Angemeldet bleiben",
+      "forgotPassword": "Passwort vergessen?",
+      "submit": "Anmelden",
+      "noAccount": "Kein Konto?",
+      "signUp": "Registrieren"
+    },
+    "register": {
+      "title": "Konto erstellen",
+      "description": "Starten Sie heute Ihre kostenlose Testversion",
+      "name": "Vollstandiger Name",
+      "email": "E-Mail-Adresse",
+      "password": "Passwort",
+      "confirmPassword": "Passwort bestatigen",
+      "terms": "Ich stimme den",
+      "termsLink": "Nutzungsbedingungen",
+      "privacyLink": "Datenschutzrichtlinie",
+      "submit": "Konto erstellen",
+      "hasAccount": "Bereits ein Konto?",
+      "signIn": "Anmelden"
+    },
+    "forgotPassword": {
+      "title": "Passwort zurucksetzen",
+      "description": "Geben Sie Ihre E-Mail ein und wir senden Ihnen einen Reset-Link",
+      "email": "E-Mail-Adresse",
+      "submit": "Reset-Link senden",
+      "backToLogin": "Zuruck zur Anmeldung",
+      "sent": {
+        "title": "E-Mail uberprufen",
+        "description": "Wir haben einen Passwort-Reset-Link an {email} gesendet"
+      }
+    },
+    "resetPassword": {
+      "title": "Neues Passwort festlegen",
+      "description": "Geben Sie unten Ihr neues Passwort ein",
+      "password": "Neues Passwort",
+      "confirmPassword": "Neues Passwort bestatigen",
+      "submit": "Passwort zurucksetzen",
+      "success": "Passwort erfolgreich zuruckgesetzt"
+    },
+    "verifyEmail": {
+      "title": "E-Mail bestatigen",
+      "description": "Wir haben einen Bestatigungs-Link an {email} gesendet",
+      "resend": "Bestatigungs-E-Mail erneut senden",
+      "sent": "Bestatigungs-E-Mail gesendet!"
+    },
+    "errors": {
+      "invalidCredentials": "Ungultige E-Mail oder Passwort",
+      "emailExists": "Ein Konto mit dieser E-Mail existiert bereits",
+      "weakPassword": "Passwort muss mindestens 8 Zeichen haben",
+      "passwordMismatch": "Passworter stimmen nicht uberein",
+      "invalidEmail": "Bitte geben Sie eine gultige E-Mail-Adresse ein",
+      "required": "Dieses Feld ist erforderlich",
+      "tokenExpired": "Dieser Link ist abgelaufen. Bitte fordern Sie einen neuen an.",
+      "serverError": "Etwas ist schief gelaufen. Bitte versuchen Sie es erneut."
+    }
+  },
+  "dashboard": {
+    "welcome": "Willkommen zuruck!",
+    "overview": "Hier ist eine Ubersicht Ihrer Content-Erstellungsaktivitaten.",
+    "stats": {
+      "totalArticles": "Artikel gesamt",
+      "outlinesCreated": "Gliederungen erstellt",
+      "imagesGenerated": "Bilder generiert",
+      "seoScore": "SEO-Score Durchschnitt"
+    },
+    "quickActions": {
+      "title": "Schnellaktionen",
+      "createOutline": {
+        "title": "Gliederung erstellen",
+        "description": "Beginnen Sie mit KI-generierter Struktur"
+      },
+      "writeArticle": {
+        "title": "Artikel schreiben",
+        "description": "SEO-optimierten Content generieren"
+      },
+      "generateImage": {
+        "title": "Bild generieren",
+        "description": "Personalisierte KI-Bilder erstellen"
+      },
+      "getStarted": "Loslegen"
+    },
+    "recentOutlines": {
+      "title": "Letzte Gliederungen",
+      "viewAll": "Alle ansehen",
+      "empty": "Noch keine Gliederungen",
+      "createFirst": "Erstellen Sie Ihre erste Gliederung"
+    },
+    "recentArticles": {
+      "title": "Letzte Artikel",
+      "viewAll": "Alle ansehen",
+      "empty": "Noch keine Artikel",
+      "createFirst": "Erstellen Sie Ihren ersten Artikel"
+    },
+    "usage": {
+      "title": "Nutzung diesen Monat",
+      "upgrade": "Plan upgraden",
+      "articles": "Artikel",
+      "outlines": "Gliederungen",
+      "images": "Bilder"
+    }
+  },
+  "outlines": {
+    "title": "Gliederungen",
+    "description": "Erstellen und verwalten Sie Ihre Artikelgliederungen",
+    "create": "Neue Gliederung",
+    "empty": {
+      "title": "Noch keine Gliederungen",
+      "description": "Erstellen Sie Ihre erste Gliederung, um mit KI-generierter Content-Struktur zu beginnen."
+    },
+    "form": {
+      "keyword": "Ziel-Keyword",
+      "keywordPlaceholder": "z.B. Meditation bei Angst",
+      "audience": "Zielgruppe",
+      "audiencePlaceholder": "z.B. Erwachsene mit Stress",
+      "tone": "Content-Ton",
+      "tones": {
+        "professional": "Professionell",
+        "friendly": "Freundlich",
+        "empathetic": "Empathisch",
+        "informative": "Informativ"
+      },
+      "generate": "Gliederung generieren",
+      "generating": "Wird generiert..."
+    },
+    "status": {
+      "draft": "Entwurf",
+      "generating": "Wird generiert",
+      "completed": "Abgeschlossen",
+      "failed": "Fehlgeschlagen"
+    }
+  },
+  "articles": {
+    "title": "Artikel",
+    "description": "Erstellen und verwalten Sie Ihre SEO-optimierten Artikel",
+    "create": "Neuer Artikel",
+    "empty": {
+      "title": "Noch keine Artikel",
+      "description": "Erstellen Sie Ihren ersten Artikel oder generieren Sie einen aus einer Gliederung."
+    },
+    "form": {
+      "title": "Artikeltitel",
+      "titlePlaceholder": "Geben Sie einen uberzeugenden Titel ein",
+      "fromOutline": "Aus Gliederung generieren",
+      "selectOutline": "Gliederung auswahlen",
+      "generate": "Artikel generieren",
+      "generating": "Wird generiert..."
+    },
+    "status": {
+      "draft": "Entwurf",
+      "generating": "Wird generiert",
+      "completed": "Abgeschlossen",
+      "published": "Veroffentlicht"
+    },
+    "editor": {
+      "preview": "Vorschau",
+      "edit": "Bearbeiten",
+      "publish": "Veroffentlichen",
+      "unpublish": "Veroffentlichung aufheben",
+      "wordCount": "Worter",
+      "seoScore": "SEO-Score"
+    }
+  },
+  "images": {
+    "title": "KI-Bilder",
+    "description": "Generieren Sie personalisierte Bilder fur Ihren Content",
+    "create": "Bild generieren",
+    "empty": {
+      "title": "Noch keine Bilder",
+      "description": "Generieren Sie Ihr erstes KI-Bild, um Ihren Content zu verbessern."
+    },
+    "form": {
+      "prompt": "Bildbeschreibung",
+      "promptPlaceholder": "Beschreiben Sie das Bild, das Sie erstellen mochten...",
+      "style": "Stil",
+      "styles": {
+        "realistic": "Realistisch",
+        "artistic": "Kunstlerisch",
+        "minimal": "Minimalistisch",
+        "vintage": "Vintage"
+      },
+      "generate": "Bild generieren",
+      "generating": "Wird generiert..."
+    }
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "profile": {
+      "title": "Profil",
+      "description": "Verwalten Sie Ihre personlichen Informationen",
+      "name": "Vollstandiger Name",
+      "email": "E-Mail-Adresse",
+      "avatar": "Profilbild",
+      "changeAvatar": "Andern",
+      "save": "Anderungen speichern"
+    },
+    "password": {
+      "title": "Passwort",
+      "description": "Aktualisieren Sie Ihr Passwort",
+      "current": "Aktuelles Passwort",
+      "new": "Neues Passwort",
+      "confirm": "Neues Passwort bestatigen",
+      "update": "Passwort aktualisieren"
+    },
+    "notifications": {
+      "title": "Benachrichtigungen",
+      "description": "Verwalten Sie Ihre Benachrichtigungseinstellungen",
+      "email": {
+        "title": "E-Mail-Benachrichtigungen",
+        "marketing": "Marketing-E-Mails",
+        "product": "Produkt-Updates",
+        "security": "Sicherheitswarnungen"
+      }
+    },
+    "billing": {
+      "title": "Abrechnung",
+      "description": "Verwalten Sie Ihr Abonnement und die Abrechnung",
+      "currentPlan": "Aktueller Plan",
+      "upgrade": "Upgrade",
+      "cancel": "Abonnement kundigen",
+      "paymentMethod": "Zahlungsmethode",
+      "updatePayment": "Aktualisieren",
+      "invoices": "Rechnungen",
+      "viewInvoices": "Alle Rechnungen ansehen"
+    },
+    "integrations": {
+      "title": "Integrationen",
+      "description": "Externe Dienste verbinden",
+      "wordpress": {
+        "title": "WordPress",
+        "description": "Direkt auf Ihrer WordPress-Seite veroffentlichen",
+        "connect": "Verbinden",
+        "disconnect": "Trennen"
+      },
+      "gsc": {
+        "title": "Google Search Console",
+        "description": "Ihre SEO-Leistung verfolgen",
+        "connect": "Verbinden",
+        "disconnect": "Trennen"
+      }
+    },
+    "language": {
+      "title": "Sprache",
+      "description": "Wahlen Sie Ihre bevorzugte Sprache"
+    },
+    "danger": {
+      "title": "Gefahrenzone",
+      "deleteAccount": {
+        "title": "Konto loschen",
+        "description": "Ihr Konto und alle Daten dauerhaft loschen",
+        "button": "Konto loschen",
+        "confirm": "Sind Sie sicher? Diese Aktion kann nicht ruckgangig gemacht werden."
+      }
+    }
+  },
+  "errors": {
+    "notFound": {
+      "title": "Seite nicht gefunden",
+      "description": "Die gesuchte Seite existiert nicht.",
+      "backHome": "Zur Startseite"
+    },
+    "serverError": {
+      "title": "Serverfehler",
+      "description": "Auf unserer Seite ist etwas schief gelaufen.",
+      "retry": "Erneut versuchen"
+    },
+    "unauthorized": {
+      "title": "Nicht autorisiert",
+      "description": "Sie mussen sich anmelden, um auf diese Seite zuzugreifen.",
+      "signIn": "Anmelden"
+    }
+  }
+}

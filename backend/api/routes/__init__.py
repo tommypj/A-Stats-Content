@@ -2,15 +2,16 @@
 from fastapi import APIRouter
 
 from .health import router as health_router
+from .auth import router as auth_router
 
 # Create main API router
 api_router = APIRouter()
 
 # Include route modules
 api_router.include_router(health_router, tags=["Health"])
+api_router.include_router(auth_router)
 
 # Future routes will be added here:
-# api_router.include_router(auth_router, prefix="/auth", tags=["Authentication"])
 # api_router.include_router(content_router, prefix="/content", tags=["Content"])
 # api_router.include_router(social_router, prefix="/social", tags=["Social"])
 # api_router.include_router(images_router, prefix="/images", tags=["Images"])

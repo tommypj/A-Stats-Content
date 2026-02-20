@@ -1,0 +1,398 @@
+{
+  "common": {
+    "appName": "A-Stats Content",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "submit": "Submit",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "search": "Search",
+    "filter": "Filter",
+    "sort": "Sort",
+    "view": "View",
+    "download": "Download",
+    "upload": "Upload",
+    "close": "Close",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No",
+    "or": "or",
+    "and": "and"
+  },
+  "nav": {
+    "home": "Home",
+    "dashboard": "Dashboard",
+    "outlines": "Outlines",
+    "articles": "Articles",
+    "images": "Images",
+    "analytics": "Analytics",
+    "settings": "Settings",
+    "help": "Help & Support",
+    "signIn": "Sign In",
+    "signOut": "Sign Out",
+    "getStarted": "Get Started"
+  },
+  "landing": {
+    "hero": {
+      "badge": "AI-Powered Content Creation",
+      "title": "Create Healing Content That",
+      "titleHighlight": "Ranks & Converts",
+      "description": "Generate SEO-optimized therapeutic content with AI. From outlines to full articles and custom images, build your wellness brand effortlessly.",
+      "cta": "Start Free Trial",
+      "secondaryCta": "See How It Works"
+    },
+    "features": {
+      "title": "Everything You Need for Content Success",
+      "description": "Our AI understands therapeutic language and SEO best practices to help you create content that resonates and ranks.",
+      "outlines": {
+        "title": "AI-Powered Outlines",
+        "description": "Generate comprehensive article outlines based on your keywords and target audience."
+      },
+      "content": {
+        "title": "Smart Content Generation",
+        "description": "Create SEO-optimized articles with therapeutic, healing-focused language."
+      },
+      "images": {
+        "title": "AI Image Creation",
+        "description": "Generate custom images that match your content and brand aesthetic."
+      },
+      "analytics": {
+        "title": "SEO Analytics",
+        "description": "Track performance with Google Search Console integration and insights."
+      }
+    },
+    "pricing": {
+      "title": "Simple, Transparent Pricing",
+      "description": "Choose the plan that fits your content needs. Upgrade or downgrade anytime.",
+      "monthly": "/month",
+      "popular": "Most Popular",
+      "starter": {
+        "name": "Starter",
+        "price": "$29",
+        "description": "Perfect for small wellness blogs",
+        "features": {
+          "articles": "10 articles per month",
+          "seo": "Basic SEO optimization",
+          "images": "5 AI images",
+          "support": "Email support"
+        }
+      },
+      "professional": {
+        "name": "Professional",
+        "price": "$79",
+        "description": "For growing therapeutic practices",
+        "features": {
+          "articles": "50 articles per month",
+          "seo": "Advanced SEO tools",
+          "images": "25 AI images",
+          "wordpress": "WordPress integration",
+          "support": "Priority support"
+        }
+      },
+      "enterprise": {
+        "name": "Enterprise",
+        "price": "$199",
+        "description": "For wellness content agencies",
+        "features": {
+          "articles": "Unlimited articles",
+          "seo": "Full SEO suite",
+          "images": "Unlimited AI images",
+          "integrations": "Custom integrations",
+          "support": "Dedicated support",
+          "api": "API access"
+        }
+      }
+    },
+    "cta": {
+      "title": "Ready to Transform Your Content?",
+      "description": "Join hundreds of wellness professionals creating better content with AI.",
+      "button": "Start Your Free Trial"
+    },
+    "footer": {
+      "rights": "All rights reserved."
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Welcome back",
+      "description": "Sign in to your account to continue",
+      "email": "Email address",
+      "password": "Password",
+      "rememberMe": "Remember me",
+      "forgotPassword": "Forgot password?",
+      "submit": "Sign In",
+      "noAccount": "Don't have an account?",
+      "signUp": "Sign up"
+    },
+    "register": {
+      "title": "Create your account",
+      "description": "Start your free trial today",
+      "name": "Full name",
+      "email": "Email address",
+      "password": "Password",
+      "confirmPassword": "Confirm password",
+      "terms": "I agree to the",
+      "termsLink": "Terms of Service",
+      "privacyLink": "Privacy Policy",
+      "submit": "Create Account",
+      "hasAccount": "Already have an account?",
+      "signIn": "Sign in"
+    },
+    "forgotPassword": {
+      "title": "Reset your password",
+      "description": "Enter your email and we'll send you a reset link",
+      "email": "Email address",
+      "submit": "Send Reset Link",
+      "backToLogin": "Back to login",
+      "sent": {
+        "title": "Check your email",
+        "description": "We've sent a password reset link to {email}"
+      }
+    },
+    "resetPassword": {
+      "title": "Set new password",
+      "description": "Enter your new password below",
+      "password": "New password",
+      "confirmPassword": "Confirm new password",
+      "submit": "Reset Password",
+      "success": "Password reset successfully"
+    },
+    "verifyEmail": {
+      "title": "Verify your email",
+      "description": "We've sent a verification link to {email}",
+      "resend": "Resend verification email",
+      "sent": "Verification email sent!"
+    },
+    "errors": {
+      "invalidCredentials": "Invalid email or password",
+      "emailExists": "An account with this email already exists",
+      "weakPassword": "Password must be at least 8 characters",
+      "passwordMismatch": "Passwords do not match",
+      "invalidEmail": "Please enter a valid email address",
+      "required": "This field is required",
+      "tokenExpired": "This link has expired. Please request a new one.",
+      "serverError": "Something went wrong. Please try again."
+    }
+  },
+  "dashboard": {
+    "welcome": "Welcome back!",
+    "overview": "Here's an overview of your content creation activity.",
+    "stats": {
+      "totalArticles": "Total Articles",
+      "outlinesCreated": "Outlines Created",
+      "imagesGenerated": "Images Generated",
+      "seoScore": "SEO Score Avg"
+    },
+    "quickActions": {
+      "title": "Quick Actions",
+      "createOutline": {
+        "title": "Create Outline",
+        "description": "Start with AI-generated structure"
+      },
+      "writeArticle": {
+        "title": "Write Article",
+        "description": "Generate SEO-optimized content"
+      },
+      "generateImage": {
+        "title": "Generate Image",
+        "description": "Create custom AI images"
+      },
+      "getStarted": "Get started"
+    },
+    "recentOutlines": {
+      "title": "Recent Outlines",
+      "viewAll": "View all",
+      "empty": "No outlines yet",
+      "createFirst": "Create your first outline"
+    },
+    "recentArticles": {
+      "title": "Recent Articles",
+      "viewAll": "View all",
+      "empty": "No articles yet",
+      "createFirst": "Create your first article"
+    },
+    "usage": {
+      "title": "Usage This Month",
+      "upgrade": "Upgrade Plan",
+      "articles": "Articles",
+      "outlines": "Outlines",
+      "images": "Images"
+    }
+  },
+  "outlines": {
+    "title": "Outlines",
+    "description": "Create and manage your article outlines",
+    "create": "New Outline",
+    "empty": {
+      "title": "No outlines yet",
+      "description": "Create your first outline to get started with AI-powered content structure."
+    },
+    "form": {
+      "keyword": "Target Keyword",
+      "keywordPlaceholder": "e.g., meditation for anxiety",
+      "audience": "Target Audience",
+      "audiencePlaceholder": "e.g., adults dealing with stress",
+      "tone": "Content Tone",
+      "tones": {
+        "professional": "Professional",
+        "friendly": "Friendly",
+        "empathetic": "Empathetic",
+        "informative": "Informative"
+      },
+      "generate": "Generate Outline",
+      "generating": "Generating..."
+    },
+    "status": {
+      "draft": "Draft",
+      "generating": "Generating",
+      "completed": "Completed",
+      "failed": "Failed"
+    }
+  },
+  "articles": {
+    "title": "Articles",
+    "description": "Create and manage your SEO-optimized articles",
+    "create": "New Article",
+    "empty": {
+      "title": "No articles yet",
+      "description": "Create your first article or generate one from an outline."
+    },
+    "form": {
+      "title": "Article Title",
+      "titlePlaceholder": "Enter a compelling title",
+      "fromOutline": "Generate from Outline",
+      "selectOutline": "Select an outline",
+      "generate": "Generate Article",
+      "generating": "Generating..."
+    },
+    "status": {
+      "draft": "Draft",
+      "generating": "Generating",
+      "completed": "Completed",
+      "published": "Published"
+    },
+    "editor": {
+      "preview": "Preview",
+      "edit": "Edit",
+      "publish": "Publish",
+      "unpublish": "Unpublish",
+      "wordCount": "words",
+      "seoScore": "SEO Score"
+    }
+  },
+  "images": {
+    "title": "AI Images",
+    "description": "Generate custom images for your content",
+    "create": "Generate Image",
+    "empty": {
+      "title": "No images yet",
+      "description": "Generate your first AI image to enhance your content."
+    },
+    "form": {
+      "prompt": "Image Description",
+      "promptPlaceholder": "Describe the image you want to create...",
+      "style": "Style",
+      "styles": {
+        "realistic": "Realistic",
+        "artistic": "Artistic",
+        "minimal": "Minimal",
+        "vintage": "Vintage"
+      },
+      "generate": "Generate Image",
+      "generating": "Generating..."
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "profile": {
+      "title": "Profile",
+      "description": "Manage your personal information",
+      "name": "Full name",
+      "email": "Email address",
+      "avatar": "Profile picture",
+      "changeAvatar": "Change",
+      "save": "Save Changes"
+    },
+    "password": {
+      "title": "Password",
+      "description": "Update your password",
+      "current": "Current password",
+      "new": "New password",
+      "confirm": "Confirm new password",
+      "update": "Update Password"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "description": "Manage your notification preferences",
+      "email": {
+        "title": "Email Notifications",
+        "marketing": "Marketing emails",
+        "product": "Product updates",
+        "security": "Security alerts"
+      }
+    },
+    "billing": {
+      "title": "Billing",
+      "description": "Manage your subscription and billing",
+      "currentPlan": "Current Plan",
+      "upgrade": "Upgrade",
+      "cancel": "Cancel Subscription",
+      "paymentMethod": "Payment Method",
+      "updatePayment": "Update",
+      "invoices": "Invoices",
+      "viewInvoices": "View all invoices"
+    },
+    "integrations": {
+      "title": "Integrations",
+      "description": "Connect external services",
+      "wordpress": {
+        "title": "WordPress",
+        "description": "Publish directly to your WordPress site",
+        "connect": "Connect",
+        "disconnect": "Disconnect"
+      },
+      "gsc": {
+        "title": "Google Search Console",
+        "description": "Track your SEO performance",
+        "connect": "Connect",
+        "disconnect": "Disconnect"
+      }
+    },
+    "language": {
+      "title": "Language",
+      "description": "Choose your preferred language"
+    },
+    "danger": {
+      "title": "Danger Zone",
+      "deleteAccount": {
+        "title": "Delete Account",
+        "description": "Permanently delete your account and all data",
+        "button": "Delete Account",
+        "confirm": "Are you sure? This action cannot be undone."
+      }
+    }
+  },
+  "errors": {
+    "notFound": {
+      "title": "Page Not Found",
+      "description": "The page you're looking for doesn't exist.",
+      "backHome": "Go back home"
+    },
+    "serverError": {
+      "title": "Server Error",
+      "description": "Something went wrong on our end.",
+      "retry": "Try again"
+    },
+    "unauthorized": {
+      "title": "Unauthorized",
+      "description": "You need to sign in to access this page.",
+      "signIn": "Sign in"
+    }
+  }
+}

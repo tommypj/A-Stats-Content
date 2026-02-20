@@ -1,0 +1,398 @@
+{
+  "common": {
+    "appName": "A-Stats Content",
+    "loading": "Chargement...",
+    "error": "Une erreur s'est produite",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "create": "Creer",
+    "submit": "Soumettre",
+    "back": "Retour",
+    "next": "Suivant",
+    "previous": "Precedent",
+    "search": "Rechercher",
+    "filter": "Filtrer",
+    "sort": "Trier",
+    "view": "Voir",
+    "download": "Telecharger",
+    "upload": "Importer",
+    "close": "Fermer",
+    "confirm": "Confirmer",
+    "yes": "Oui",
+    "no": "Non",
+    "or": "ou",
+    "and": "et"
+  },
+  "nav": {
+    "home": "Accueil",
+    "dashboard": "Tableau de bord",
+    "outlines": "Plans",
+    "articles": "Articles",
+    "images": "Images",
+    "analytics": "Analyses",
+    "settings": "Parametres",
+    "help": "Aide et Support",
+    "signIn": "Se connecter",
+    "signOut": "Se deconnecter",
+    "getStarted": "Commencer"
+  },
+  "landing": {
+    "hero": {
+      "badge": "Creation de contenu par IA",
+      "title": "Creez du contenu therapeutique qui",
+      "titleHighlight": "se positionne et convertit",
+      "description": "Generez du contenu SEO optimise pour le bien-etre avec l'IA. Des plans aux articles complets et images personnalisees, construisez votre marque wellness sans effort.",
+      "cta": "Commencer l'essai gratuit",
+      "secondaryCta": "Voir comment ca fonctionne"
+    },
+    "features": {
+      "title": "Tout ce dont vous avez besoin pour reussir votre contenu",
+      "description": "Notre IA comprend le langage therapeutique et les meilleures pratiques SEO pour vous aider a creer du contenu qui resonne et se positionne.",
+      "outlines": {
+        "title": "Plans generes par IA",
+        "description": "Generez des plans d'articles complets bases sur vos mots-cles et votre audience cible."
+      },
+      "content": {
+        "title": "Generation intelligente de contenu",
+        "description": "Creez des articles optimises SEO avec un langage therapeutique et axe sur la guerison."
+      },
+      "images": {
+        "title": "Creation d'images par IA",
+        "description": "Generez des images personnalisees qui correspondent a votre contenu et a l'esthetique de votre marque."
+      },
+      "analytics": {
+        "title": "Analyses SEO",
+        "description": "Suivez les performances avec l'integration Google Search Console et les insights."
+      }
+    },
+    "pricing": {
+      "title": "Tarifs simples et transparents",
+      "description": "Choisissez le plan qui correspond a vos besoins de contenu. Passez a un niveau superieur ou inferieur a tout moment.",
+      "monthly": "/mois",
+      "popular": "Le plus populaire",
+      "starter": {
+        "name": "Starter",
+        "price": "$29",
+        "description": "Parfait pour les petits blogs wellness",
+        "features": {
+          "articles": "10 articles par mois",
+          "seo": "Optimisation SEO de base",
+          "images": "5 images IA",
+          "support": "Support par email"
+        }
+      },
+      "professional": {
+        "name": "Professionnel",
+        "price": "$79",
+        "description": "Pour les pratiques therapeutiques en croissance",
+        "features": {
+          "articles": "50 articles par mois",
+          "seo": "Outils SEO avances",
+          "images": "25 images IA",
+          "wordpress": "Integration WordPress",
+          "support": "Support prioritaire"
+        }
+      },
+      "enterprise": {
+        "name": "Entreprise",
+        "price": "$199",
+        "description": "Pour les agences de contenu wellness",
+        "features": {
+          "articles": "Articles illimites",
+          "seo": "Suite SEO complete",
+          "images": "Images IA illimitees",
+          "integrations": "Integrations personnalisees",
+          "support": "Support dedie",
+          "api": "Acces API"
+        }
+      }
+    },
+    "cta": {
+      "title": "Pret a transformer votre contenu?",
+      "description": "Rejoignez des centaines de professionnels du bien-etre qui creent un meilleur contenu avec l'IA.",
+      "button": "Commencer l'essai gratuit"
+    },
+    "footer": {
+      "rights": "Tous droits reserves."
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Bon retour",
+      "description": "Connectez-vous a votre compte pour continuer",
+      "email": "Adresse email",
+      "password": "Mot de passe",
+      "rememberMe": "Se souvenir de moi",
+      "forgotPassword": "Mot de passe oublie?",
+      "submit": "Se connecter",
+      "noAccount": "Pas de compte?",
+      "signUp": "S'inscrire"
+    },
+    "register": {
+      "title": "Creez votre compte",
+      "description": "Commencez votre essai gratuit aujourd'hui",
+      "name": "Nom complet",
+      "email": "Adresse email",
+      "password": "Mot de passe",
+      "confirmPassword": "Confirmer le mot de passe",
+      "terms": "J'accepte les",
+      "termsLink": "Conditions d'utilisation",
+      "privacyLink": "Politique de confidentialite",
+      "submit": "Creer un compte",
+      "hasAccount": "Deja un compte?",
+      "signIn": "Se connecter"
+    },
+    "forgotPassword": {
+      "title": "Reinitialiser le mot de passe",
+      "description": "Entrez votre email et nous vous enverrons un lien de reinitialisation",
+      "email": "Adresse email",
+      "submit": "Envoyer le lien",
+      "backToLogin": "Retour a la connexion",
+      "sent": {
+        "title": "Verifiez votre email",
+        "description": "Nous avons envoye un lien de reinitialisation a {email}"
+      }
+    },
+    "resetPassword": {
+      "title": "Definir un nouveau mot de passe",
+      "description": "Entrez votre nouveau mot de passe ci-dessous",
+      "password": "Nouveau mot de passe",
+      "confirmPassword": "Confirmer le nouveau mot de passe",
+      "submit": "Reinitialiser le mot de passe",
+      "success": "Mot de passe reinitialise avec succes"
+    },
+    "verifyEmail": {
+      "title": "Verifiez votre email",
+      "description": "Nous avons envoye un lien de verification a {email}",
+      "resend": "Renvoyer l'email de verification",
+      "sent": "Email de verification envoye!"
+    },
+    "errors": {
+      "invalidCredentials": "Email ou mot de passe invalide",
+      "emailExists": "Un compte avec cet email existe deja",
+      "weakPassword": "Le mot de passe doit avoir au moins 8 caracteres",
+      "passwordMismatch": "Les mots de passe ne correspondent pas",
+      "invalidEmail": "Veuillez entrer une adresse email valide",
+      "required": "Ce champ est requis",
+      "tokenExpired": "Ce lien a expire. Veuillez en demander un nouveau.",
+      "serverError": "Quelque chose s'est mal passe. Veuillez reessayer."
+    }
+  },
+  "dashboard": {
+    "welcome": "Bon retour!",
+    "overview": "Voici un apercu de votre activite de creation de contenu.",
+    "stats": {
+      "totalArticles": "Total d'articles",
+      "outlinesCreated": "Plans crees",
+      "imagesGenerated": "Images generees",
+      "seoScore": "Score SEO moyen"
+    },
+    "quickActions": {
+      "title": "Actions rapides",
+      "createOutline": {
+        "title": "Creer un plan",
+        "description": "Commencez avec une structure generee par IA"
+      },
+      "writeArticle": {
+        "title": "Ecrire un article",
+        "description": "Generez du contenu optimise SEO"
+      },
+      "generateImage": {
+        "title": "Generer une image",
+        "description": "Creez des images IA personnalisees"
+      },
+      "getStarted": "Commencer"
+    },
+    "recentOutlines": {
+      "title": "Plans recents",
+      "viewAll": "Voir tout",
+      "empty": "Pas encore de plans",
+      "createFirst": "Creez votre premier plan"
+    },
+    "recentArticles": {
+      "title": "Articles recents",
+      "viewAll": "Voir tout",
+      "empty": "Pas encore d'articles",
+      "createFirst": "Creez votre premier article"
+    },
+    "usage": {
+      "title": "Utilisation ce mois",
+      "upgrade": "Mettre a niveau",
+      "articles": "Articles",
+      "outlines": "Plans",
+      "images": "Images"
+    }
+  },
+  "outlines": {
+    "title": "Plans",
+    "description": "Creez et gerez vos plans d'articles",
+    "create": "Nouveau plan",
+    "empty": {
+      "title": "Pas encore de plans",
+      "description": "Creez votre premier plan pour commencer avec une structure de contenu generee par IA."
+    },
+    "form": {
+      "keyword": "Mot-cle cible",
+      "keywordPlaceholder": "ex: meditation pour l'anxiete",
+      "audience": "Audience cible",
+      "audiencePlaceholder": "ex: adultes stresses",
+      "tone": "Ton du contenu",
+      "tones": {
+        "professional": "Professionnel",
+        "friendly": "Amical",
+        "empathetic": "Empathique",
+        "informative": "Informatif"
+      },
+      "generate": "Generer le plan",
+      "generating": "Generation..."
+    },
+    "status": {
+      "draft": "Brouillon",
+      "generating": "En generation",
+      "completed": "Termine",
+      "failed": "Echoue"
+    }
+  },
+  "articles": {
+    "title": "Articles",
+    "description": "Creez et gerez vos articles optimises SEO",
+    "create": "Nouvel article",
+    "empty": {
+      "title": "Pas encore d'articles",
+      "description": "Creez votre premier article ou generez-en un a partir d'un plan."
+    },
+    "form": {
+      "title": "Titre de l'article",
+      "titlePlaceholder": "Entrez un titre accrocheur",
+      "fromOutline": "Generer a partir du plan",
+      "selectOutline": "Selectionner un plan",
+      "generate": "Generer l'article",
+      "generating": "Generation..."
+    },
+    "status": {
+      "draft": "Brouillon",
+      "generating": "En generation",
+      "completed": "Termine",
+      "published": "Publie"
+    },
+    "editor": {
+      "preview": "Apercu",
+      "edit": "Modifier",
+      "publish": "Publier",
+      "unpublish": "Depublier",
+      "wordCount": "mots",
+      "seoScore": "Score SEO"
+    }
+  },
+  "images": {
+    "title": "Images IA",
+    "description": "Generez des images personnalisees pour votre contenu",
+    "create": "Generer une image",
+    "empty": {
+      "title": "Pas encore d'images",
+      "description": "Generez votre premiere image IA pour ameliorer votre contenu."
+    },
+    "form": {
+      "prompt": "Description de l'image",
+      "promptPlaceholder": "Decrivez l'image que vous voulez creer...",
+      "style": "Style",
+      "styles": {
+        "realistic": "Realiste",
+        "artistic": "Artistique",
+        "minimal": "Minimaliste",
+        "vintage": "Vintage"
+      },
+      "generate": "Generer l'image",
+      "generating": "Generation..."
+    }
+  },
+  "settings": {
+    "title": "Parametres",
+    "profile": {
+      "title": "Profil",
+      "description": "Gerez vos informations personnelles",
+      "name": "Nom complet",
+      "email": "Adresse email",
+      "avatar": "Photo de profil",
+      "changeAvatar": "Changer",
+      "save": "Enregistrer les modifications"
+    },
+    "password": {
+      "title": "Mot de passe",
+      "description": "Mettez a jour votre mot de passe",
+      "current": "Mot de passe actuel",
+      "new": "Nouveau mot de passe",
+      "confirm": "Confirmer le nouveau mot de passe",
+      "update": "Mettre a jour le mot de passe"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "description": "Gerez vos preferences de notification",
+      "email": {
+        "title": "Notifications par email",
+        "marketing": "Emails marketing",
+        "product": "Mises a jour produit",
+        "security": "Alertes de securite"
+      }
+    },
+    "billing": {
+      "title": "Facturation",
+      "description": "Gerez votre abonnement et facturation",
+      "currentPlan": "Plan actuel",
+      "upgrade": "Mettre a niveau",
+      "cancel": "Annuler l'abonnement",
+      "paymentMethod": "Methode de paiement",
+      "updatePayment": "Mettre a jour",
+      "invoices": "Factures",
+      "viewInvoices": "Voir toutes les factures"
+    },
+    "integrations": {
+      "title": "Integrations",
+      "description": "Connecter des services externes",
+      "wordpress": {
+        "title": "WordPress",
+        "description": "Publiez directement sur votre site WordPress",
+        "connect": "Connecter",
+        "disconnect": "Deconnecter"
+      },
+      "gsc": {
+        "title": "Google Search Console",
+        "description": "Suivez vos performances SEO",
+        "connect": "Connecter",
+        "disconnect": "Deconnecter"
+      }
+    },
+    "language": {
+      "title": "Langue",
+      "description": "Choisissez votre langue preferee"
+    },
+    "danger": {
+      "title": "Zone dangereuse",
+      "deleteAccount": {
+        "title": "Supprimer le compte",
+        "description": "Supprimez definitivement votre compte et toutes vos donnees",
+        "button": "Supprimer le compte",
+        "confirm": "Etes-vous sur? Cette action ne peut pas etre annulee."
+      }
+    }
+  },
+  "errors": {
+    "notFound": {
+      "title": "Page non trouvee",
+      "description": "La page que vous recherchez n'existe pas.",
+      "backHome": "Retour a l'accueil"
+    },
+    "serverError": {
+      "title": "Erreur serveur",
+      "description": "Quelque chose s'est mal passe de notre cote.",
+      "retry": "Reessayer"
+    },
+    "unauthorized": {
+      "title": "Non autorise",
+      "description": "Vous devez vous connecter pour acceder a cette page.",
+      "signIn": "Se connecter"
+    }
+  }
+}

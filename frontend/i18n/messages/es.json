@@ -1,0 +1,398 @@
+{
+  "common": {
+    "appName": "A-Stats Content",
+    "loading": "Cargando...",
+    "error": "Ha ocurrido un error",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "create": "Crear",
+    "submit": "Enviar",
+    "back": "Atras",
+    "next": "Siguiente",
+    "previous": "Anterior",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "sort": "Ordenar",
+    "view": "Ver",
+    "download": "Descargar",
+    "upload": "Subir",
+    "close": "Cerrar",
+    "confirm": "Confirmar",
+    "yes": "Si",
+    "no": "No",
+    "or": "o",
+    "and": "y"
+  },
+  "nav": {
+    "home": "Inicio",
+    "dashboard": "Panel de control",
+    "outlines": "Esquemas",
+    "articles": "Articulos",
+    "images": "Imagenes",
+    "analytics": "Analiticas",
+    "settings": "Configuracion",
+    "help": "Ayuda y Soporte",
+    "signIn": "Iniciar sesion",
+    "signOut": "Cerrar sesion",
+    "getStarted": "Comenzar"
+  },
+  "landing": {
+    "hero": {
+      "badge": "Creacion de contenido con IA",
+      "title": "Crea contenido terapeutico que",
+      "titleHighlight": "Posiciona y Convierte",
+      "description": "Genera contenido SEO optimizado para bienestar con IA. Desde esquemas hasta articulos completos e imagenes personalizadas, construye tu marca de bienestar sin esfuerzo.",
+      "cta": "Comenzar prueba gratuita",
+      "secondaryCta": "Ver como funciona"
+    },
+    "features": {
+      "title": "Todo lo que necesitas para el exito del contenido",
+      "description": "Nuestra IA entiende el lenguaje terapeutico y las mejores practicas de SEO para ayudarte a crear contenido que resuena y posiciona.",
+      "outlines": {
+        "title": "Esquemas con IA",
+        "description": "Genera esquemas completos de articulos basados en tus palabras clave y audiencia objetivo."
+      },
+      "content": {
+        "title": "Generacion inteligente de contenido",
+        "description": "Crea articulos SEO optimizados con lenguaje terapeutico y enfocado en la sanacion."
+      },
+      "images": {
+        "title": "Creacion de imagenes con IA",
+        "description": "Genera imagenes personalizadas que coinciden con tu contenido y estetica de marca."
+      },
+      "analytics": {
+        "title": "Analiticas SEO",
+        "description": "Rastrea el rendimiento con integracion de Google Search Console e insights."
+      }
+    },
+    "pricing": {
+      "title": "Precios simples y transparentes",
+      "description": "Elige el plan que se adapte a tus necesidades de contenido. Actualiza o degrada en cualquier momento.",
+      "monthly": "/mes",
+      "popular": "Mas popular",
+      "starter": {
+        "name": "Inicial",
+        "price": "$29",
+        "description": "Perfecto para blogs pequenos de bienestar",
+        "features": {
+          "articles": "10 articulos por mes",
+          "seo": "Optimizacion SEO basica",
+          "images": "5 imagenes IA",
+          "support": "Soporte por email"
+        }
+      },
+      "professional": {
+        "name": "Profesional",
+        "price": "$79",
+        "description": "Para practicas terapeuticas en crecimiento",
+        "features": {
+          "articles": "50 articulos por mes",
+          "seo": "Herramientas SEO avanzadas",
+          "images": "25 imagenes IA",
+          "wordpress": "Integracion WordPress",
+          "support": "Soporte prioritario"
+        }
+      },
+      "enterprise": {
+        "name": "Empresarial",
+        "price": "$199",
+        "description": "Para agencias de contenido de bienestar",
+        "features": {
+          "articles": "Articulos ilimitados",
+          "seo": "Suite SEO completa",
+          "images": "Imagenes IA ilimitadas",
+          "integrations": "Integraciones personalizadas",
+          "support": "Soporte dedicado",
+          "api": "Acceso API"
+        }
+      }
+    },
+    "cta": {
+      "title": "¿Listo para transformar tu contenido?",
+      "description": "Unete a cientos de profesionales del bienestar creando mejor contenido con IA.",
+      "button": "Comenzar prueba gratuita"
+    },
+    "footer": {
+      "rights": "Todos los derechos reservados."
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Bienvenido de nuevo",
+      "description": "Inicia sesion en tu cuenta para continuar",
+      "email": "Correo electronico",
+      "password": "Contrasena",
+      "rememberMe": "Recordarme",
+      "forgotPassword": "¿Olvidaste tu contrasena?",
+      "submit": "Iniciar sesion",
+      "noAccount": "¿No tienes cuenta?",
+      "signUp": "Registrate"
+    },
+    "register": {
+      "title": "Crea tu cuenta",
+      "description": "Comienza tu prueba gratuita hoy",
+      "name": "Nombre completo",
+      "email": "Correo electronico",
+      "password": "Contrasena",
+      "confirmPassword": "Confirmar contrasena",
+      "terms": "Acepto los",
+      "termsLink": "Terminos de servicio",
+      "privacyLink": "Politica de privacidad",
+      "submit": "Crear cuenta",
+      "hasAccount": "¿Ya tienes cuenta?",
+      "signIn": "Inicia sesion"
+    },
+    "forgotPassword": {
+      "title": "Restablecer contrasena",
+      "description": "Ingresa tu correo y te enviaremos un enlace de restablecimiento",
+      "email": "Correo electronico",
+      "submit": "Enviar enlace",
+      "backToLogin": "Volver a iniciar sesion",
+      "sent": {
+        "title": "Revisa tu correo",
+        "description": "Hemos enviado un enlace de restablecimiento a {email}"
+      }
+    },
+    "resetPassword": {
+      "title": "Establecer nueva contrasena",
+      "description": "Ingresa tu nueva contrasena abajo",
+      "password": "Nueva contrasena",
+      "confirmPassword": "Confirmar nueva contrasena",
+      "submit": "Restablecer contrasena",
+      "success": "Contrasena restablecida exitosamente"
+    },
+    "verifyEmail": {
+      "title": "Verifica tu correo",
+      "description": "Hemos enviado un enlace de verificacion a {email}",
+      "resend": "Reenviar correo de verificacion",
+      "sent": "¡Correo de verificacion enviado!"
+    },
+    "errors": {
+      "invalidCredentials": "Correo o contrasena invalidos",
+      "emailExists": "Ya existe una cuenta con este correo",
+      "weakPassword": "La contrasena debe tener al menos 8 caracteres",
+      "passwordMismatch": "Las contrasenas no coinciden",
+      "invalidEmail": "Por favor ingresa un correo valido",
+      "required": "Este campo es requerido",
+      "tokenExpired": "Este enlace ha expirado. Por favor solicita uno nuevo.",
+      "serverError": "Algo salio mal. Por favor intenta de nuevo."
+    }
+  },
+  "dashboard": {
+    "welcome": "¡Bienvenido de nuevo!",
+    "overview": "Aqui tienes un resumen de tu actividad de creacion de contenido.",
+    "stats": {
+      "totalArticles": "Total de articulos",
+      "outlinesCreated": "Esquemas creados",
+      "imagesGenerated": "Imagenes generadas",
+      "seoScore": "Puntuacion SEO promedio"
+    },
+    "quickActions": {
+      "title": "Acciones rapidas",
+      "createOutline": {
+        "title": "Crear esquema",
+        "description": "Comienza con una estructura generada por IA"
+      },
+      "writeArticle": {
+        "title": "Escribir articulo",
+        "description": "Genera contenido optimizado para SEO"
+      },
+      "generateImage": {
+        "title": "Generar imagen",
+        "description": "Crea imagenes IA personalizadas"
+      },
+      "getStarted": "Comenzar"
+    },
+    "recentOutlines": {
+      "title": "Esquemas recientes",
+      "viewAll": "Ver todos",
+      "empty": "Sin esquemas aun",
+      "createFirst": "Crea tu primer esquema"
+    },
+    "recentArticles": {
+      "title": "Articulos recientes",
+      "viewAll": "Ver todos",
+      "empty": "Sin articulos aun",
+      "createFirst": "Crea tu primer articulo"
+    },
+    "usage": {
+      "title": "Uso este mes",
+      "upgrade": "Mejorar plan",
+      "articles": "Articulos",
+      "outlines": "Esquemas",
+      "images": "Imagenes"
+    }
+  },
+  "outlines": {
+    "title": "Esquemas",
+    "description": "Crea y gestiona tus esquemas de articulos",
+    "create": "Nuevo esquema",
+    "empty": {
+      "title": "Sin esquemas aun",
+      "description": "Crea tu primer esquema para comenzar con la estructura de contenido generada por IA."
+    },
+    "form": {
+      "keyword": "Palabra clave objetivo",
+      "keywordPlaceholder": "ej: meditacion para ansiedad",
+      "audience": "Audiencia objetivo",
+      "audiencePlaceholder": "ej: adultos con estres",
+      "tone": "Tono del contenido",
+      "tones": {
+        "professional": "Profesional",
+        "friendly": "Amigable",
+        "empathetic": "Empatico",
+        "informative": "Informativo"
+      },
+      "generate": "Generar esquema",
+      "generating": "Generando..."
+    },
+    "status": {
+      "draft": "Borrador",
+      "generating": "Generando",
+      "completed": "Completado",
+      "failed": "Fallido"
+    }
+  },
+  "articles": {
+    "title": "Articulos",
+    "description": "Crea y gestiona tus articulos optimizados para SEO",
+    "create": "Nuevo articulo",
+    "empty": {
+      "title": "Sin articulos aun",
+      "description": "Crea tu primer articulo o genera uno desde un esquema."
+    },
+    "form": {
+      "title": "Titulo del articulo",
+      "titlePlaceholder": "Ingresa un titulo atractivo",
+      "fromOutline": "Generar desde esquema",
+      "selectOutline": "Selecciona un esquema",
+      "generate": "Generar articulo",
+      "generating": "Generando..."
+    },
+    "status": {
+      "draft": "Borrador",
+      "generating": "Generando",
+      "completed": "Completado",
+      "published": "Publicado"
+    },
+    "editor": {
+      "preview": "Vista previa",
+      "edit": "Editar",
+      "publish": "Publicar",
+      "unpublish": "Despublicar",
+      "wordCount": "palabras",
+      "seoScore": "Puntuacion SEO"
+    }
+  },
+  "images": {
+    "title": "Imagenes IA",
+    "description": "Genera imagenes personalizadas para tu contenido",
+    "create": "Generar imagen",
+    "empty": {
+      "title": "Sin imagenes aun",
+      "description": "Genera tu primera imagen IA para mejorar tu contenido."
+    },
+    "form": {
+      "prompt": "Descripcion de la imagen",
+      "promptPlaceholder": "Describe la imagen que quieres crear...",
+      "style": "Estilo",
+      "styles": {
+        "realistic": "Realista",
+        "artistic": "Artistico",
+        "minimal": "Minimalista",
+        "vintage": "Vintage"
+      },
+      "generate": "Generar imagen",
+      "generating": "Generando..."
+    }
+  },
+  "settings": {
+    "title": "Configuracion",
+    "profile": {
+      "title": "Perfil",
+      "description": "Gestiona tu informacion personal",
+      "name": "Nombre completo",
+      "email": "Correo electronico",
+      "avatar": "Foto de perfil",
+      "changeAvatar": "Cambiar",
+      "save": "Guardar cambios"
+    },
+    "password": {
+      "title": "Contrasena",
+      "description": "Actualiza tu contrasena",
+      "current": "Contrasena actual",
+      "new": "Nueva contrasena",
+      "confirm": "Confirmar nueva contrasena",
+      "update": "Actualizar contrasena"
+    },
+    "notifications": {
+      "title": "Notificaciones",
+      "description": "Gestiona tus preferencias de notificaciones",
+      "email": {
+        "title": "Notificaciones por correo",
+        "marketing": "Correos de marketing",
+        "product": "Actualizaciones de producto",
+        "security": "Alertas de seguridad"
+      }
+    },
+    "billing": {
+      "title": "Facturacion",
+      "description": "Gestiona tu suscripcion y facturacion",
+      "currentPlan": "Plan actual",
+      "upgrade": "Mejorar",
+      "cancel": "Cancelar suscripcion",
+      "paymentMethod": "Metodo de pago",
+      "updatePayment": "Actualizar",
+      "invoices": "Facturas",
+      "viewInvoices": "Ver todas las facturas"
+    },
+    "integrations": {
+      "title": "Integraciones",
+      "description": "Conecta servicios externos",
+      "wordpress": {
+        "title": "WordPress",
+        "description": "Publica directamente en tu sitio WordPress",
+        "connect": "Conectar",
+        "disconnect": "Desconectar"
+      },
+      "gsc": {
+        "title": "Google Search Console",
+        "description": "Rastrea tu rendimiento SEO",
+        "connect": "Conectar",
+        "disconnect": "Desconectar"
+      }
+    },
+    "language": {
+      "title": "Idioma",
+      "description": "Elige tu idioma preferido"
+    },
+    "danger": {
+      "title": "Zona peligrosa",
+      "deleteAccount": {
+        "title": "Eliminar cuenta",
+        "description": "Elimina permanentemente tu cuenta y todos los datos",
+        "button": "Eliminar cuenta",
+        "confirm": "¿Estas seguro? Esta accion no se puede deshacer."
+      }
+    }
+  },
+  "errors": {
+    "notFound": {
+      "title": "Pagina no encontrada",
+      "description": "La pagina que buscas no existe.",
+      "backHome": "Volver al inicio"
+    },
+    "serverError": {
+      "title": "Error del servidor",
+      "description": "Algo salio mal de nuestro lado.",
+      "retry": "Intentar de nuevo"
+    },
+    "unauthorized": {
+      "title": "No autorizado",
+      "description": "Necesitas iniciar sesion para acceder a esta pagina.",
+      "signIn": "Iniciar sesion"
+    }
+  }
+}

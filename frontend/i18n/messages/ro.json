@@ -1,0 +1,398 @@
+{
+  "common": {
+    "appName": "A-Stats Content",
+    "loading": "Se incarca...",
+    "error": "A aparut o eroare",
+    "save": "Salveaza",
+    "cancel": "Anuleaza",
+    "delete": "Sterge",
+    "edit": "Editeaza",
+    "create": "Creeaza",
+    "submit": "Trimite",
+    "back": "Inapoi",
+    "next": "Urmatorul",
+    "previous": "Anterior",
+    "search": "Cauta",
+    "filter": "Filtreaza",
+    "sort": "Sorteaza",
+    "view": "Vizualizeaza",
+    "download": "Descarca",
+    "upload": "Incarca",
+    "close": "Inchide",
+    "confirm": "Confirma",
+    "yes": "Da",
+    "no": "Nu",
+    "or": "sau",
+    "and": "si"
+  },
+  "nav": {
+    "home": "Acasa",
+    "dashboard": "Panou de control",
+    "outlines": "Schite",
+    "articles": "Articole",
+    "images": "Imagini",
+    "analytics": "Analize",
+    "settings": "Setari",
+    "help": "Ajutor si Suport",
+    "signIn": "Autentificare",
+    "signOut": "Deconectare",
+    "getStarted": "Incepe acum"
+  },
+  "landing": {
+    "hero": {
+      "badge": "Creare de continut cu AI",
+      "title": "Creeaza continut terapeutic care",
+      "titleHighlight": "se pozitioneaza si converteste",
+      "description": "Genereaza continut SEO optimizat pentru wellness cu AI. De la schite la articole complete si imagini personalizate, construieste-ti brandul de wellness fara efort.",
+      "cta": "Incepe perioada de proba",
+      "secondaryCta": "Vezi cum functioneaza"
+    },
+    "features": {
+      "title": "Tot ce ai nevoie pentru succes in continut",
+      "description": "AI-ul nostru intelege limbajul terapeutic si cele mai bune practici SEO pentru a te ajuta sa creezi continut care rezoneza si se pozitioneaza.",
+      "outlines": {
+        "title": "Schite generate cu AI",
+        "description": "Genereaza schite complete de articole bazate pe cuvintele cheie si publicul tinta."
+      },
+      "content": {
+        "title": "Generare inteligenta de continut",
+        "description": "Creeaza articole SEO optimizate cu limbaj terapeutic si orientat spre vindecare."
+      },
+      "images": {
+        "title": "Creare de imagini cu AI",
+        "description": "Genereaza imagini personalizate care se potrivesc continutului si esteticii brandului tau."
+      },
+      "analytics": {
+        "title": "Analize SEO",
+        "description": "Urmareste performanta cu integrarea Google Search Console si insight-uri."
+      }
+    },
+    "pricing": {
+      "title": "Preturi simple si transparente",
+      "description": "Alege planul care se potriveste nevoilor tale de continut. Poti face upgrade sau downgrade oricand.",
+      "monthly": "/luna",
+      "popular": "Cel mai popular",
+      "starter": {
+        "name": "Starter",
+        "price": "$29",
+        "description": "Perfect pentru bloguri mici de wellness",
+        "features": {
+          "articles": "10 articole pe luna",
+          "seo": "Optimizare SEO de baza",
+          "images": "5 imagini AI",
+          "support": "Suport prin email"
+        }
+      },
+      "professional": {
+        "name": "Profesional",
+        "price": "$79",
+        "description": "Pentru practici terapeutice in crestere",
+        "features": {
+          "articles": "50 articole pe luna",
+          "seo": "Unelte SEO avansate",
+          "images": "25 imagini AI",
+          "wordpress": "Integrare WordPress",
+          "support": "Suport prioritar"
+        }
+      },
+      "enterprise": {
+        "name": "Enterprise",
+        "price": "$199",
+        "description": "Pentru agentii de continut wellness",
+        "features": {
+          "articles": "Articole nelimitate",
+          "seo": "Suita SEO completa",
+          "images": "Imagini AI nelimitate",
+          "integrations": "Integrari personalizate",
+          "support": "Suport dedicat",
+          "api": "Acces API"
+        }
+      }
+    },
+    "cta": {
+      "title": "Pregatit sa-ti transformi continutul?",
+      "description": "Alatura-te sutelor de profesionisti wellness care creeaza continut mai bun cu AI.",
+      "button": "Incepe perioada de proba"
+    },
+    "footer": {
+      "rights": "Toate drepturile rezervate."
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Bine ai revenit",
+      "description": "Autentifica-te in cont pentru a continua",
+      "email": "Adresa de email",
+      "password": "Parola",
+      "rememberMe": "Tine-ma minte",
+      "forgotPassword": "Ai uitat parola?",
+      "submit": "Autentificare",
+      "noAccount": "Nu ai un cont?",
+      "signUp": "Inregistreaza-te"
+    },
+    "register": {
+      "title": "Creeaza-ti contul",
+      "description": "Incepe perioada de proba gratuita astazi",
+      "name": "Nume complet",
+      "email": "Adresa de email",
+      "password": "Parola",
+      "confirmPassword": "Confirma parola",
+      "terms": "Sunt de acord cu",
+      "termsLink": "Termenii si conditiile",
+      "privacyLink": "Politica de confidentialitate",
+      "submit": "Creeaza cont",
+      "hasAccount": "Ai deja un cont?",
+      "signIn": "Autentifica-te"
+    },
+    "forgotPassword": {
+      "title": "Reseteaza parola",
+      "description": "Introdu email-ul si iti vom trimite un link de resetare",
+      "email": "Adresa de email",
+      "submit": "Trimite link de resetare",
+      "backToLogin": "Inapoi la autentificare",
+      "sent": {
+        "title": "Verifica email-ul",
+        "description": "Am trimis un link de resetare a parolei la {email}"
+      }
+    },
+    "resetPassword": {
+      "title": "Seteaza parola noua",
+      "description": "Introdu noua ta parola mai jos",
+      "password": "Parola noua",
+      "confirmPassword": "Confirma parola noua",
+      "submit": "Reseteaza parola",
+      "success": "Parola a fost resetata cu succes"
+    },
+    "verifyEmail": {
+      "title": "Verifica-ti email-ul",
+      "description": "Am trimis un link de verificare la {email}",
+      "resend": "Retrimite email de verificare",
+      "sent": "Email de verificare trimis!"
+    },
+    "errors": {
+      "invalidCredentials": "Email sau parola invalida",
+      "emailExists": "Un cont cu acest email exista deja",
+      "weakPassword": "Parola trebuie sa aiba cel putin 8 caractere",
+      "passwordMismatch": "Parolele nu se potrivesc",
+      "invalidEmail": "Te rugam sa introduci o adresa de email valida",
+      "required": "Acest camp este obligatoriu",
+      "tokenExpired": "Acest link a expirat. Te rugam sa soliciti unul nou.",
+      "serverError": "Ceva nu a mers bine. Te rugam sa incerci din nou."
+    }
+  },
+  "dashboard": {
+    "welcome": "Bine ai revenit!",
+    "overview": "Iata o prezentare generala a activitatii tale de creare de continut.",
+    "stats": {
+      "totalArticles": "Total articole",
+      "outlinesCreated": "Schite create",
+      "imagesGenerated": "Imagini generate",
+      "seoScore": "Scor SEO mediu"
+    },
+    "quickActions": {
+      "title": "Actiuni rapide",
+      "createOutline": {
+        "title": "Creeaza schita",
+        "description": "Incepe cu o structura generata de AI"
+      },
+      "writeArticle": {
+        "title": "Scrie articol",
+        "description": "Genereaza continut SEO optimizat"
+      },
+      "generateImage": {
+        "title": "Genereaza imagine",
+        "description": "Creeaza imagini AI personalizate"
+      },
+      "getStarted": "Incepe"
+    },
+    "recentOutlines": {
+      "title": "Schite recente",
+      "viewAll": "Vezi toate",
+      "empty": "Nicio schita inca",
+      "createFirst": "Creeaza prima ta schita"
+    },
+    "recentArticles": {
+      "title": "Articole recente",
+      "viewAll": "Vezi toate",
+      "empty": "Niciun articol inca",
+      "createFirst": "Creeaza primul tau articol"
+    },
+    "usage": {
+      "title": "Utilizare luna aceasta",
+      "upgrade": "Upgrade plan",
+      "articles": "Articole",
+      "outlines": "Schite",
+      "images": "Imagini"
+    }
+  },
+  "outlines": {
+    "title": "Schite",
+    "description": "Creeaza si gestioneaza schitele articolelor tale",
+    "create": "Schita noua",
+    "empty": {
+      "title": "Nicio schita inca",
+      "description": "Creeaza prima ta schita pentru a incepe cu structura de continut generata de AI."
+    },
+    "form": {
+      "keyword": "Cuvant cheie tinta",
+      "keywordPlaceholder": "ex: meditatie pentru anxietate",
+      "audience": "Public tinta",
+      "audiencePlaceholder": "ex: adulti care se confrunta cu stresul",
+      "tone": "Tonul continutului",
+      "tones": {
+        "professional": "Profesional",
+        "friendly": "Prietenos",
+        "empathetic": "Empatic",
+        "informative": "Informativ"
+      },
+      "generate": "Genereaza schita",
+      "generating": "Se genereaza..."
+    },
+    "status": {
+      "draft": "Ciorna",
+      "generating": "Se genereaza",
+      "completed": "Finalizat",
+      "failed": "Esuat"
+    }
+  },
+  "articles": {
+    "title": "Articole",
+    "description": "Creeaza si gestioneaza articolele tale SEO optimizate",
+    "create": "Articol nou",
+    "empty": {
+      "title": "Niciun articol inca",
+      "description": "Creeaza primul tau articol sau genereaza unul dintr-o schita."
+    },
+    "form": {
+      "title": "Titlul articolului",
+      "titlePlaceholder": "Introdu un titlu captivant",
+      "fromOutline": "Genereaza din schita",
+      "selectOutline": "Selecteaza o schita",
+      "generate": "Genereaza articol",
+      "generating": "Se genereaza..."
+    },
+    "status": {
+      "draft": "Ciorna",
+      "generating": "Se genereaza",
+      "completed": "Finalizat",
+      "published": "Publicat"
+    },
+    "editor": {
+      "preview": "Previzualizare",
+      "edit": "Editeaza",
+      "publish": "Publica",
+      "unpublish": "Anuleaza publicarea",
+      "wordCount": "cuvinte",
+      "seoScore": "Scor SEO"
+    }
+  },
+  "images": {
+    "title": "Imagini AI",
+    "description": "Genereaza imagini personalizate pentru continutul tau",
+    "create": "Genereaza imagine",
+    "empty": {
+      "title": "Nicio imagine inca",
+      "description": "Genereaza prima ta imagine AI pentru a-ti imbunatati continutul."
+    },
+    "form": {
+      "prompt": "Descrierea imaginii",
+      "promptPlaceholder": "Descrie imaginea pe care vrei sa o creezi...",
+      "style": "Stil",
+      "styles": {
+        "realistic": "Realist",
+        "artistic": "Artistic",
+        "minimal": "Minimal",
+        "vintage": "Vintage"
+      },
+      "generate": "Genereaza imagine",
+      "generating": "Se genereaza..."
+    }
+  },
+  "settings": {
+    "title": "Setari",
+    "profile": {
+      "title": "Profil",
+      "description": "Gestioneaza-ti informatiile personale",
+      "name": "Nume complet",
+      "email": "Adresa de email",
+      "avatar": "Poza de profil",
+      "changeAvatar": "Schimba",
+      "save": "Salveaza modificarile"
+    },
+    "password": {
+      "title": "Parola",
+      "description": "Actualizeaza-ti parola",
+      "current": "Parola curenta",
+      "new": "Parola noua",
+      "confirm": "Confirma parola noua",
+      "update": "Actualizeaza parola"
+    },
+    "notifications": {
+      "title": "Notificari",
+      "description": "Gestioneaza preferintele de notificari",
+      "email": {
+        "title": "Notificari prin email",
+        "marketing": "Email-uri de marketing",
+        "product": "Actualizari de produs",
+        "security": "Alerte de securitate"
+      }
+    },
+    "billing": {
+      "title": "Facturare",
+      "description": "Gestioneaza-ti abonamentul si facturarea",
+      "currentPlan": "Planul curent",
+      "upgrade": "Upgrade",
+      "cancel": "Anuleaza abonamentul",
+      "paymentMethod": "Metoda de plata",
+      "updatePayment": "Actualizeaza",
+      "invoices": "Facturi",
+      "viewInvoices": "Vezi toate facturile"
+    },
+    "integrations": {
+      "title": "Integrari",
+      "description": "Conecteaza servicii externe",
+      "wordpress": {
+        "title": "WordPress",
+        "description": "Publica direct pe site-ul tau WordPress",
+        "connect": "Conecteaza",
+        "disconnect": "Deconecteaza"
+      },
+      "gsc": {
+        "title": "Google Search Console",
+        "description": "Urmareste-ti performanta SEO",
+        "connect": "Conecteaza",
+        "disconnect": "Deconecteaza"
+      }
+    },
+    "language": {
+      "title": "Limba",
+      "description": "Alege limba preferata"
+    },
+    "danger": {
+      "title": "Zona periculoasa",
+      "deleteAccount": {
+        "title": "Sterge contul",
+        "description": "Sterge permanent contul si toate datele",
+        "button": "Sterge contul",
+        "confirm": "Esti sigur? Aceasta actiune nu poate fi anulata."
+      }
+    }
+  },
+  "errors": {
+    "notFound": {
+      "title": "Pagina nu a fost gasita",
+      "description": "Pagina pe care o cauti nu exista.",
+      "backHome": "Inapoi acasa"
+    },
+    "serverError": {
+      "title": "Eroare de server",
+      "description": "Ceva nu a mers bine la noi.",
+      "retry": "Incearca din nou"
+    },
+    "unauthorized": {
+      "title": "Neautorizat",
+      "description": "Trebuie sa te autentifici pentru a accesa aceasta pagina.",
+      "signIn": "Autentificare"
+    }
+  }
+}

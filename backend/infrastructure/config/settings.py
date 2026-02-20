@@ -32,11 +32,12 @@ class Settings(BaseSettings):
     # Redis (for background tasks and caching)
     redis_url: str = "redis://localhost:6379/0"
 
-    # Authentication
+    # Authentication / JWT
     secret_key: str = "change-me-in-production-use-secrets-gen"
-    algorithm: str = "HS256"
-    access_token_expire_minutes: int = 30
-    refresh_token_expire_days: int = 7
+    jwt_secret_key: str = "change-me-in-production-jwt-secret"
+    jwt_algorithm: str = "HS256"
+    jwt_access_token_expire_minutes: int = 30
+    jwt_refresh_token_expire_days: int = 7
 
     # CORS
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:8000"]
@@ -98,3 +99,7 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Get cached settings instance."""
     return Settings()
+
+
+# Global settings instance
+settings = get_settings()
