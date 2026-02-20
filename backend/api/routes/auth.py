@@ -14,6 +14,7 @@ from infrastructure.database.models.user import User, UserStatus
 from infrastructure.config.settings import settings
 from core.security.password import password_hasher
 from core.security.tokens import TokenService
+from adapters.email.resend_adapter import email_service
 from api.schemas.auth import (
     LoginRequest,
     RegisterRequest,
@@ -125,7 +126,18 @@ async def register(
     await db.commit()
     await db.refresh(user)
 
-    # TODO: Send verification email
+    # Send verification email
+    verification_token = token_service.create_email_verification_token(
+        user.id, user.email
+    )
+    user.email_verification_token = verification_token
+    await db.commit()
+
+    await email_service.send_verification_email(
+        to_email=user.email,
+        user_name=user.name,
+        verification_token=verification_token,
+    )
 
     return user
 
@@ -255,7 +267,12 @@ async def request_password_reset(
         user.password_reset_expires = datetime.now(timezone.utc)
         await db.commit()
 
-        # TODO: Send password reset email
+        # Send password reset email
+        await email_service.send_password_reset_email(
+            to_email=user.email,
+            user_name=user.name,
+            reset_token=reset_token,
+        )
 
     return {"message": "If the email exists, a password reset link has been sent"}
 
