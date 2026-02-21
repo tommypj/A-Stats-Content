@@ -5,6 +5,7 @@ echo "=== A-Stats Engine Starting ==="
 echo "Environment: ${ENVIRONMENT:-not set}"
 echo "Port: ${PORT:-8000}"
 echo "Database URL set: $(if [ -n "$DATABASE_URL" ]; then echo 'yes'; else echo 'NO - NOT SET'; fi)"
+echo "CORS_ORIGINS: ${CORS_ORIGINS:-not set}"
 
 echo "Running database migrations..."
 if alembic upgrade head; then
