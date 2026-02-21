@@ -17,6 +17,7 @@ import {
 import { api, GeneratedImage, Article } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { AIGenerationProgress } from "@/components/ui/ai-generation-progress";
 
 const IMAGE_STYLES = [
   { value: "photographic", label: "Photographic" },
@@ -304,23 +305,17 @@ function GenerateImageContent() {
             Preview
           </h3>
 
-          {!generatedImage ? (
+          {loading || generatedImage?.status === "generating" ? (
+            <AIGenerationProgress
+              type="image"
+              title={prompt.slice(0, 60)}
+              isGenerating={loading || generatedImage?.status === "generating"}
+            />
+          ) : !generatedImage ? (
             <div className="aspect-square bg-surface-secondary rounded-xl flex items-center justify-center">
               <div className="text-center text-text-muted">
                 <ImageIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
                 <p className="text-sm">Your generated image will appear here</p>
-              </div>
-            </div>
-          ) : generatedImage.status === "generating" ? (
-            <div className="aspect-square bg-surface-secondary rounded-xl flex items-center justify-center">
-              <div className="text-center">
-                <Loader2 className="h-12 w-12 mx-auto mb-3 text-primary-500 animate-spin" />
-                <p className="text-sm text-text-primary font-medium">
-                  Generating your image...
-                </p>
-                <p className="text-xs text-text-muted mt-1">
-                  This may take up to a minute
-                </p>
               </div>
             </div>
           ) : generatedImage.status === "failed" ? (

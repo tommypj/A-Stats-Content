@@ -91,6 +91,7 @@ const config: Config = {
         "fade-in": "fadeIn 0.3s ease-in-out",
         "slide-up": "slideUp 0.4s ease-out",
         "pulse-soft": "pulseSoft 2s ease-in-out infinite",
+        "writing": "writing 1.5s ease-in-out infinite",
       },
       keyframes: {
         fadeIn: {
@@ -104,6 +105,12 @@ const config: Config = {
         pulseSoft: {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.7" },
+        },
+        writing: {
+          "0%, 100%": { transform: "rotate(-5deg) translateY(0)" },
+          "25%": { transform: "rotate(0deg) translateY(-2px)" },
+          "50%": { transform: "rotate(5deg) translateY(0)" },
+          "75%": { transform: "rotate(0deg) translateY(2px)" },
         },
       },
     },
