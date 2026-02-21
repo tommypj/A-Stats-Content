@@ -24,6 +24,8 @@ async def lifespan(app: FastAPI):
     # Startup
     console.print(f"[bold green]Starting {settings.app_name} v{settings.app_version}[/bold green]")
     console.print(f"Environment: {settings.environment}")
+    console.print(f"CORS origins raw: {settings.cors_origins!r}")
+    console.print(f"CORS origins list: {settings.cors_origins_list!r}")
 
     if settings.is_development:
         console.print("[yellow]Development mode - initializing database...[/yellow]")
