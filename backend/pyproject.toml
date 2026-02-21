@@ -41,6 +41,7 @@ dependencies = [
     "python-docx>=1.1.0",
     "beautifulsoup4>=4.12.0",
     "lxml>=4.9.0",  # For BeautifulSoup HTML parsing
+    "markdown>=3.5.0",  # For article HTML conversion
 
     # External Services
     "stripe>=7.0.0",
