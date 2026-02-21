@@ -3,12 +3,15 @@ Anthropic Claude adapter for AI content generation.
 """
 
 import json
+import logging
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 
 import anthropic
 
 from infrastructure.config.settings import settings
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -47,7 +50,10 @@ class AnthropicContentService:
 
     def __init__(self):
         if settings.anthropic_api_key:
-            self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+            self._client = anthropic.AsyncAnthropic(
+                api_key=settings.anthropic_api_key,
+                timeout=120.0,
+            )
         else:
             self._client = None
         self._model = settings.anthropic_model
@@ -129,7 +135,7 @@ Respond in JSON format:
     "estimated_read_time": 7
 }}"""
 
-        message = self._client.messages.create(
+        message = await self._client.messages.create(
             model=self._model,
             max_tokens=self._max_tokens,
             system=self._get_system_prompt(),
@@ -227,7 +233,7 @@ Format your response as:
 ---
 META_DESCRIPTION: [Your meta description here]"""
 
-        message = self._client.messages.create(
+        message = await self._client.messages.create(
             model=self._model,
             max_tokens=8000,
             system=self._get_system_prompt(),
@@ -287,7 +293,7 @@ Original content:
 
 Provide the improved version in markdown format."""
 
-        message = self._client.messages.create(
+        message = await self._client.messages.create(
             model=self._model,
             max_tokens=8000,
             system=self._get_system_prompt(),
@@ -320,7 +326,7 @@ Requirements:
 
 Respond with ONLY the meta description, nothing else."""
 
-        message = self._client.messages.create(
+        message = await self._client.messages.create(
             model=self._model,
             max_tokens=200,
             messages=[{"role": "user", "content": prompt}],
@@ -415,7 +421,7 @@ Respond with ONLY the meta description, nothing else."""
             return "This is a mock response for development. Configure ANTHROPIC_API_KEY to use real AI."
 
         try:
-            message = self._client.messages.create(
+            message = await self._client.messages.create(
                 model=self._model,
                 max_tokens=max_tokens,
                 temperature=temperature,

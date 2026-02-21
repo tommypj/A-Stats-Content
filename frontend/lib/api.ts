@@ -10,8 +10,13 @@ export const apiClient: AxiosInstance = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 30000, // 30 seconds
+  timeout: 30000, // 30 seconds default
 });
+
+/**
+ * Extended timeout for AI generation requests (articles, outlines, images)
+ */
+const AI_TIMEOUT = 180000; // 3 minutes
 
 /**
  * Request interceptor for adding auth token
@@ -184,6 +189,7 @@ export const api = {
       apiRequest<Outline>({
         method: "POST",
         url: `/outlines/${id}/regenerate`,
+        timeout: AI_TIMEOUT,
       }),
   },
 
@@ -206,6 +212,7 @@ export const api = {
         method: "POST",
         url: "/articles/generate",
         data,
+        timeout: AI_TIMEOUT,
       }),
     update: (id: string, data: UpdateArticleInput) =>
       apiRequest<Article>({
@@ -223,6 +230,7 @@ export const api = {
         method: "POST",
         url: `/articles/${id}/improve`,
         data: { improvement_type },
+        timeout: AI_TIMEOUT,
       }),
     analyzeSeo: (id: string) =>
       apiRequest<Article>({
@@ -244,6 +252,7 @@ export const api = {
         method: "POST",
         url: "/images/generate",
         data,
+        timeout: AI_TIMEOUT,
       }),
     delete: (id: string) =>
       apiRequest<void>({
