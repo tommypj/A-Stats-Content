@@ -73,6 +73,7 @@ function NewArticleContent() {
     setError("");
 
     try {
+      // This returns immediately with status "generating"
       const article = await api.articles.generate({
         outline_id: outline.id,
         tone: tone || undefined,
@@ -83,11 +84,39 @@ function NewArticleContent() {
         custom_instructions: customInstructions || undefined,
       });
 
-      router.push(`/articles/${article.id}`);
+      // Poll until article generation completes
+      const maxAttempts = 120; // 120 * 3s = 6 minutes max
+      let attempts = 0;
+
+      const poll = setInterval(async () => {
+        try {
+          attempts++;
+          const updated = await api.articles.get(article.id);
+
+          if (updated.status === "completed" || updated.status === "published") {
+            clearInterval(poll);
+            router.push(`/articles/${updated.id}`);
+          } else if (updated.status === "failed") {
+            clearInterval(poll);
+            setError(
+              "Article generation failed. Please try again."
+            );
+            setGenerating(false);
+          } else if (attempts >= maxAttempts) {
+            clearInterval(poll);
+            setError("Generation is taking too long. Check your articles list for the result.");
+            setGenerating(false);
+          }
+        } catch (pollErr) {
+          console.error("Polling error:", pollErr);
+          clearInterval(poll);
+          setError("Lost connection while generating. Check your articles list.");
+          setGenerating(false);
+        }
+      }, 3000);
     } catch (err) {
-      setError("Failed to generate article. Please try again.");
+      setError("Failed to start article generation. Please try again.");
       console.error(err);
-    } finally {
       setGenerating(false);
     }
   }

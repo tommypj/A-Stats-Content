@@ -10,7 +10,7 @@ import markdown
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,7 +23,7 @@ from api.schemas.content import (
     ArticleImproveRequest,
 )
 from api.routes.auth import get_current_user
-from infrastructure.database.connection import get_db
+from infrastructure.database.connection import get_db, async_session_maker
 from infrastructure.database.models import Article, Outline, User, ContentStatus
 from adapters.ai.anthropic_adapter import content_ai_service
 from infrastructure.config.settings import settings
@@ -183,14 +183,104 @@ async def create_article(
     return article
 
 
+async def _generate_article_background(
+    article_id: str,
+    outline_title: str,
+    outline_keyword: str,
+    outline_sections: list,
+    outline_tone: str,
+    outline_target_audience: Optional[str],
+    writing_style: str,
+    voice: str,
+    list_usage: str,
+    custom_instructions: Optional[str],
+):
+    """Background task that generates article content and updates the DB."""
+    async with async_session_maker() as db:
+        try:
+            result = await db.execute(
+                select(Article).where(Article.id == article_id)
+            )
+            article = result.scalar_one_or_none()
+            if not article:
+                logger.error("Background generation: article %s not found", article_id)
+                return
+
+            generated = await content_ai_service.generate_article(
+                title=outline_title,
+                keyword=outline_keyword,
+                sections=outline_sections,
+                tone=outline_tone,
+                target_audience=outline_target_audience,
+                writing_style=writing_style,
+                voice=voice,
+                list_usage=list_usage,
+                custom_instructions=custom_instructions,
+            )
+
+            article.content = generated.content
+            article.content_html = markdown.markdown(generated.content)
+            article.meta_description = generated.meta_description
+            article.word_count = generated.word_count
+            article.read_time = calculate_read_time(generated.content)
+            article.ai_model = settings.anthropic_model
+            article.status = ContentStatus.COMPLETED.value
+
+            # Run SEO analysis
+            seo_result = analyze_seo(
+                generated.content,
+                outline_keyword,
+                outline_title,
+                generated.meta_description,
+            )
+            article.seo_score = seo_result["score"]
+            article.seo_analysis = seo_result
+
+            # Generate image prompt (with 30s timeout)
+            try:
+                image_prompt = await asyncio.wait_for(
+                    content_ai_service.generate_image_prompt(
+                        title=outline_title,
+                        content=generated.content,
+                        keyword=outline_keyword,
+                    ),
+                    timeout=30.0,
+                )
+                article.image_prompt = image_prompt
+            except (asyncio.TimeoutError, Exception) as img_err:
+                logger.warning(
+                    "Failed to generate image prompt for article %s: %s",
+                    article_id, img_err,
+                )
+
+            await db.commit()
+            logger.info("Article %s generated successfully", article_id)
+
+        except Exception as e:
+            logger.error("Background generation failed for article %s: %s", article_id, e)
+            try:
+                result = await db.execute(
+                    select(Article).where(Article.id == article_id)
+                )
+                article = result.scalar_one_or_none()
+                if article:
+                    article.status = ContentStatus.FAILED.value
+                    article.generation_error = str(e)
+                    await db.commit()
+            except Exception:
+                logger.error("Failed to mark article %s as failed", article_id, exc_info=True)
+
+
 @router.post("/generate", response_model=ArticleResponse, status_code=status.HTTP_201_CREATED)
 async def generate_article(
     request: ArticleGenerateRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Generate an article from an outline using AI.
+    Returns immediately with status 'generating'; the frontend polls for completion.
     """
     # Get the outline
     result = await db.execute(
@@ -233,62 +323,22 @@ async def generate_article(
 
     db.add(article)
     await db.commit()
-
-    # Generate article content
-    try:
-        generated = await content_ai_service.generate_article(
-            title=outline.title,
-            keyword=outline.keyword,
-            sections=outline.sections,
-            tone=request.tone or outline.tone,
-            target_audience=request.target_audience or outline.target_audience,
-            writing_style=request.writing_style or "balanced",
-            voice=request.voice or "second_person",
-            list_usage=request.list_usage or "balanced",
-            custom_instructions=request.custom_instructions,
-        )
-
-        article.content = generated.content
-        article.content_html = markdown.markdown(generated.content)
-        article.meta_description = generated.meta_description
-        article.word_count = generated.word_count
-        article.read_time = calculate_read_time(generated.content)
-        article.ai_model = settings.anthropic_model
-        article.status = ContentStatus.COMPLETED.value
-
-        # Run SEO analysis
-        seo_result = analyze_seo(
-            generated.content,
-            outline.keyword,
-            outline.title,
-            generated.meta_description,
-        )
-        article.seo_score = seo_result["score"]
-        article.seo_analysis = seo_result
-
-        # Generate image prompt (with 30s timeout so it doesn't block the response)
-        try:
-            image_prompt = await asyncio.wait_for(
-                content_ai_service.generate_image_prompt(
-                    title=outline.title,
-                    content=generated.content,
-                    keyword=outline.keyword,
-                ),
-                timeout=30.0,
-            )
-            article.image_prompt = image_prompt
-        except (asyncio.TimeoutError, Exception) as img_err:
-            logger.warning(
-                "Failed to generate image prompt for article %s: %s",
-                article.id, img_err,
-            )
-
-    except Exception as e:
-        article.status = ContentStatus.FAILED.value
-        article.generation_error = str(e)
-
-    await db.commit()
     await db.refresh(article)
+
+    # Kick off generation in the background and return immediately
+    background_tasks.add_task(
+        _generate_article_background,
+        article_id=article_id,
+        outline_title=outline.title,
+        outline_keyword=outline.keyword,
+        outline_sections=outline.sections,
+        outline_tone=request.tone or outline.tone,
+        outline_target_audience=request.target_audience or outline.target_audience,
+        writing_style=request.writing_style or "balanced",
+        voice=request.voice or "second_person",
+        list_usage=request.list_usage or "balanced",
+        custom_instructions=request.custom_instructions,
+    )
 
     return article
 
