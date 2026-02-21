@@ -13,12 +13,9 @@ export default createMiddleware({
 });
 
 export const config = {
-  // Match only internationalized pathnames
+  // Only match locale-aware routes (marketing & auth pages).
+  // Exclude dashboard app routes which don't use i18n.
   matcher: [
-    // Match all pathnames except for
-    // - API routes (/api/...)
-    // - Static files (/_next/static/..., /favicon.ico, etc.)
-    // - Files with extensions (.png, .jpg, etc.)
-    "/((?!api|_next|_vercel|.*\\..*).*)",
+    "/((?!api|_next|_vercel|.*\\..*|dashboard|outlines|articles|images|social|analytics|knowledge|teams|settings|help|admin).*)",
   ],
 };
