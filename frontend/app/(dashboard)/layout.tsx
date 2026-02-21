@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   FileText,
@@ -10,11 +10,11 @@ import {
   Image as ImageIcon,
   BarChart3,
   Settings,
-  HelpCircle,
   Menu,
   X,
   LogOut,
   ChevronDown,
+  ChevronUp,
   Share2,
   Calendar,
   History,
@@ -22,10 +22,14 @@ import {
   Users,
   BookOpen,
   Shield,
+  Globe,
+  Zap,
+  FileSearch,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { TeamProvider } from "@/contexts/TeamContext";
 import { TeamSwitcher } from "@/components/team/team-switcher";
+import { api, UserResponse } from "@/lib/api";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -48,16 +52,36 @@ const navigation = [
   { name: "Teams", href: "/teams", icon: Users },
 ];
 
-const secondaryNavigation = [
-  { name: "Settings", href: "/settings", icon: Settings },
-  { name: "Help & Support", href: "/help", icon: HelpCircle },
-];
-
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set(["Social"]));
+  const [user, setUser] = useState<UserResponse | null>(null);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const data = await api.auth.me();
+        setUser(data);
+      } catch {
+        // Not logged in
+      }
+    };
+    loadUser();
+  }, []);
+
+  const handleSignOut = () => {
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("refresh_token");
+    router.push("/login");
+  };
+
+  const isAdmin = user?.role === "admin" || user?.role === "super_admin";
+  const userInitials = user?.name
+    ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+    : "U";
 
   return (
     <div className="min-h-screen bg-surface-secondary">
@@ -188,42 +212,121 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                 </Link>
               );
             })}
-
-            <div className="pt-4 mt-4 border-t border-primary-800">
-              {secondaryNavigation.map((item) => {
-                const isActive = pathname === item.href;
-                return (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    className={clsx(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
-                      isActive
-                        ? "bg-primary-800 text-cream-50"
-                        : "text-cream-300 hover:bg-primary-900 hover:text-cream-100"
-                    )}
-                  >
-                    <item.icon className="h-5 w-5" />
-                    {item.name}
-                  </Link>
-                );
-              })}
-            </div>
           </nav>
 
-          {/* User section */}
-          <div className="p-4 border-t border-primary-800">
-            <div className="flex items-center gap-3 p-2 rounded-xl bg-primary-900">
-              <div className="h-9 w-9 rounded-full bg-primary-700 flex items-center justify-center">
-                <span className="text-sm font-medium text-cream-100">U</span>
+          {/* Expandable user submenu */}
+          <div className="border-t border-primary-800">
+            {userMenuOpen && (
+              <div className="px-3 py-3 space-y-3 bg-primary-900/50 animate-in">
+                {/* Connections */}
+                <div>
+                  <p className="px-3 text-[10px] font-semibold uppercase tracking-wider text-primary-400 mb-2">
+                    Connections
+                  </p>
+                  <div className="flex gap-2 px-3">
+                    <Link
+                      href="/analytics"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-800 border border-primary-700 text-xs font-medium text-cream-200 hover:bg-primary-700 transition-colors"
+                    >
+                      <Globe className="h-3.5 w-3.5 text-primary-400" />
+                      GSC
+                    </Link>
+                    <Link
+                      href="/settings"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-800 border border-primary-700 text-xs font-medium text-cream-200 hover:bg-primary-700 transition-colors"
+                    >
+                      <Globe className="h-3.5 w-3.5 text-primary-400" />
+                      WordPress
+                    </Link>
+                  </div>
+                </div>
+
+                {/* Credits */}
+                <Link
+                  href="/settings/billing"
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-cream-300 hover:bg-primary-800 hover:text-cream-100 transition-colors"
+                >
+                  <Zap className="h-4 w-4 text-amber-500" />
+                  <span>Credits</span>
+                  <span className="ml-auto text-sm font-medium text-amber-500">
+                    {user?.subscription_tier === "free" ? "Free" : "Pro"}
+                  </span>
+                </Link>
+
+                {/* Settings */}
+                <Link
+                  href="/settings"
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-cream-300 hover:bg-primary-800 hover:text-cream-100 transition-colors"
+                >
+                  <Settings className="h-4 w-4" />
+                  Settings
+                </Link>
+
+                {/* Admin section */}
+                {isAdmin && (
+                  <div>
+                    <p className="px-3 text-[10px] font-semibold uppercase tracking-wider text-amber-500 mb-2">
+                      Admin
+                    </p>
+                    <div className="space-y-0.5">
+                      <Link
+                        href="/admin"
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-cream-300 hover:bg-primary-800 hover:text-cream-100 transition-colors"
+                      >
+                        <LayoutDashboard className="h-4 w-4" />
+                        Dashboard
+                      </Link>
+                      <Link
+                        href="/admin/users"
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-cream-300 hover:bg-primary-800 hover:text-cream-100 transition-colors"
+                      >
+                        <Users className="h-4 w-4" />
+                        User Management
+                      </Link>
+                      <Link
+                        href="/admin/audit-logs"
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-cream-300 hover:bg-primary-800 hover:text-cream-100 transition-colors"
+                      >
+                        <FileSearch className="h-4 w-4" />
+                        System Logs
+                      </Link>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sign Out */}
+                <button
+                  onClick={handleSignOut}
+                  className="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-sm text-cream-300 hover:bg-primary-800 hover:text-cream-100 transition-colors"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign Out
+                </button>
               </div>
-              <div className="flex-1 min-w-0">
+            )}
+
+            {/* User card - always visible */}
+            <button
+              onClick={() => setUserMenuOpen(!userMenuOpen)}
+              className="w-full flex items-center gap-3 p-4 hover:bg-primary-900 transition-colors"
+            >
+              <div className="h-9 w-9 rounded-full bg-primary-700 flex items-center justify-center shrink-0">
+                <span className="text-sm font-medium text-cream-100">{userInitials}</span>
+              </div>
+              <div className="flex-1 min-w-0 text-left">
                 <p className="text-sm font-medium text-cream-100 truncate">
-                  User Name
+                  {user?.name || "Loading..."}
                 </p>
-                <p className="text-xs text-primary-400 truncate">Free Plan</p>
+                <p className="text-xs text-primary-400 truncate">
+                  {user?.email || ""}
+                </p>
               </div>
-            </div>
+              {userMenuOpen ? (
+                <ChevronDown className="h-4 w-4 text-primary-400 shrink-0" />
+              ) : (
+                <ChevronUp className="h-4 w-4 text-primary-400 shrink-0" />
+              )}
+            </button>
           </div>
         </div>
       </aside>
@@ -242,42 +345,16 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
             <div className="flex-1" />
 
-            {/* User menu */}
+            {/* Top-right user avatar (mobile/quick access) */}
             <div className="relative">
               <button
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                onClick={() => router.push("/settings")}
                 className="flex items-center gap-2 p-2 rounded-xl hover:bg-surface-secondary transition-colors"
               >
                 <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
-                  <span className="text-sm font-medium text-primary-700">U</span>
+                  <span className="text-sm font-medium text-primary-700">{userInitials}</span>
                 </div>
-                <ChevronDown className="h-4 w-4 text-text-muted" />
               </button>
-
-              {userMenuOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setUserMenuOpen(false)}
-                  />
-                  <div className="absolute right-0 mt-2 w-48 bg-surface rounded-xl border border-surface-tertiary shadow-soft-lg z-50">
-                    <div className="p-2">
-                      <Link
-                        href="/settings"
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
-                        onClick={() => setUserMenuOpen(false)}
-                      >
-                        <Settings className="h-4 w-4" />
-                        Settings
-                      </Link>
-                      <button className="flex w-full items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50">
-                        <LogOut className="h-4 w-4" />
-                        Sign Out
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
             </div>
           </div>
         </header>
