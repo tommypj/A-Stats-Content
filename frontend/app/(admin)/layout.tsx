@@ -144,7 +144,7 @@ export default function AdminLayout({
               // Item with submenu
               if ("submenu" in item) {
                 const isExpanded = expandedMenus.has(item.name);
-                const hasActiveChild = item.submenu.some((subItem) =>
+                const hasActiveChild = item.submenu?.some((subItem) =>
                   pathname === subItem.href || pathname.startsWith(subItem.href + "/")
                 );
 
@@ -178,7 +178,7 @@ export default function AdminLayout({
                     </button>
                     {isExpanded && (
                       <div className="mt-1 ml-3 pl-3 border-l-2 border-surface-tertiary space-y-1">
-                        {item.submenu.map((subItem) => {
+                        {item.submenu?.map((subItem) => {
                           const isActive = pathname === subItem.href || pathname.startsWith(subItem.href + "/");
                           return (
                             <Link
