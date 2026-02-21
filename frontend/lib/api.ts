@@ -963,6 +963,7 @@ export interface KeywordRanking {
   impressions: number;
   ctr: number;
   position: number;
+  position_change?: number;
   created_at: string;
 }
 
@@ -982,6 +983,7 @@ export interface PagePerformance {
   impressions: number;
   ctr: number;
   position: number;
+  position_change?: number;
   created_at: string;
 }
 

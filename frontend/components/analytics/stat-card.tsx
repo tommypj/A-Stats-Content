@@ -9,7 +9,7 @@ interface StatCardProps {
   value: string | number;
   change?: number;
   icon: LucideIcon;
-  trend?: "up" | "down" | "neutral";
+  trend?: "up" | "down" | "neutral" | "stable";
   isLoading?: boolean;
 }
 
