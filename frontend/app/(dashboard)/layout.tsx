@@ -21,6 +21,7 @@ import {
   Edit3,
   Users,
   BookOpen,
+  Shield,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { TeamProvider } from "@/contexts/TeamContext";
@@ -68,32 +69,40 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - Dark sage theme */}
       <aside
         className={clsx(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-surface-tertiary transform transition-transform duration-200 ease-in-out lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 w-64 bg-primary-950 transform transition-transform duration-200 ease-in-out lg:translate-x-0",
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
         <div className="flex h-full flex-col">
           {/* Logo */}
-          <div className="flex h-16 items-center justify-between px-4 border-b border-surface-tertiary">
+          <div className="flex h-16 items-center justify-between px-4 border-b border-primary-800">
             <Link href="/dashboard" className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary-400 to-primary-600" />
-              <span className="font-display text-lg font-semibold text-text-primary">
-                A-Stats
-              </span>
+              <div className="h-8 w-8 rounded-lg bg-primary-700 flex items-center justify-center">
+                <Sparkles className="h-4 w-4 text-cream-200" />
+              </div>
+              <div>
+                <span className="font-display text-lg font-semibold text-cream-100">
+                  A-Stats
+                </span>
+                <p className="text-xs text-primary-400">Relational SEO</p>
+              </div>
             </Link>
+            <div className="h-8 w-8 rounded-lg bg-amber-600/20 border border-amber-600/40 flex items-center justify-center">
+              <Shield className="h-4 w-4 text-amber-500" />
+            </div>
             <button
               onClick={() => setSidebarOpen(false)}
-              className="lg:hidden p-1 rounded-lg hover:bg-surface-secondary"
+              className="lg:hidden p-1 rounded-lg hover:bg-primary-800"
             >
-              <X className="h-5 w-5 text-text-secondary" />
+              <X className="h-5 w-5 text-cream-300" />
             </button>
           </div>
 
           {/* Team Switcher */}
-          <div className="px-3 py-4 border-b border-surface-tertiary">
+          <div className="px-3 py-4 border-b border-primary-800">
             <TeamSwitcher />
           </div>
 
@@ -122,8 +131,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                       className={clsx(
                         "flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
                         hasActiveChild
-                          ? "bg-primary-50 text-primary-600"
-                          : "text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
+                          ? "bg-primary-800 text-cream-50"
+                          : "text-cream-300 hover:bg-primary-900 hover:text-cream-100"
                       )}
                     >
                       <item.icon className="h-5 w-5" />
@@ -136,7 +145,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                       />
                     </button>
                     {isExpanded && (
-                      <div className="mt-1 ml-3 pl-3 border-l-2 border-surface-tertiary space-y-1">
+                      <div className="mt-1 ml-3 pl-3 border-l-2 border-primary-700 space-y-1">
                         {item.submenu?.map((subItem) => {
                           const isActive = pathname === subItem.href;
                           return (
@@ -146,8 +155,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                               className={clsx(
                                 "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                                 isActive
-                                  ? "bg-primary-50 text-primary-600"
-                                  : "text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
+                                  ? "bg-primary-800 text-cream-50"
+                                  : "text-cream-300 hover:bg-primary-900 hover:text-cream-100"
                               )}
                             >
                               <subItem.icon className="h-4 w-4" />
@@ -170,8 +179,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                   className={clsx(
                     "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-primary-50 text-primary-600"
-                      : "text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
+                      ? "bg-primary-800 text-cream-50"
+                      : "text-cream-300 hover:bg-primary-900 hover:text-cream-100"
                   )}
                 >
                   <item.icon className="h-5 w-5" />
@@ -180,7 +189,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
               );
             })}
 
-            <div className="pt-4 mt-4 border-t border-surface-tertiary">
+            <div className="pt-4 mt-4 border-t border-primary-800">
               {secondaryNavigation.map((item) => {
                 const isActive = pathname === item.href;
                 return (
@@ -190,8 +199,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                     className={clsx(
                       "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
                       isActive
-                        ? "bg-primary-50 text-primary-600"
-                        : "text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
+                        ? "bg-primary-800 text-cream-50"
+                        : "text-cream-300 hover:bg-primary-900 hover:text-cream-100"
                     )}
                   >
                     <item.icon className="h-5 w-5" />
@@ -203,16 +212,16 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           </nav>
 
           {/* User section */}
-          <div className="p-4 border-t border-surface-tertiary">
-            <div className="flex items-center gap-3 p-2 rounded-xl bg-surface-secondary">
-              <div className="h-9 w-9 rounded-full bg-healing-lavender flex items-center justify-center">
-                <span className="text-sm font-medium text-text-primary">U</span>
+          <div className="p-4 border-t border-primary-800">
+            <div className="flex items-center gap-3 p-2 rounded-xl bg-primary-900">
+              <div className="h-9 w-9 rounded-full bg-primary-700 flex items-center justify-center">
+                <span className="text-sm font-medium text-cream-100">U</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-text-primary truncate">
+                <p className="text-sm font-medium text-cream-100 truncate">
                   User Name
                 </p>
-                <p className="text-xs text-text-muted truncate">Free Plan</p>
+                <p className="text-xs text-primary-400 truncate">Free Plan</p>
               </div>
             </div>
           </div>
@@ -222,7 +231,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       {/* Main content */}
       <div className="lg:pl-64">
         {/* Top header */}
-        <header className="sticky top-0 z-30 h-16 bg-white/80 backdrop-blur-md border-b border-surface-tertiary">
+        <header className="sticky top-0 z-30 h-16 bg-surface/80 backdrop-blur-md border-b border-surface-tertiary">
           <div className="flex h-full items-center justify-between px-4 lg:px-8">
             <button
               onClick={() => setSidebarOpen(true)}
@@ -239,8 +248,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
                 className="flex items-center gap-2 p-2 rounded-xl hover:bg-surface-secondary transition-colors"
               >
-                <div className="h-8 w-8 rounded-full bg-healing-lavender flex items-center justify-center">
-                  <span className="text-sm font-medium text-text-primary">U</span>
+                <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
+                  <span className="text-sm font-medium text-primary-700">U</span>
                 </div>
                 <ChevronDown className="h-4 w-4 text-text-muted" />
               </button>
@@ -251,7 +260,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                     className="fixed inset-0 z-40"
                     onClick={() => setUserMenuOpen(false)}
                   />
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl border border-surface-tertiary shadow-lg z-50">
+                  <div className="absolute right-0 mt-2 w-48 bg-surface rounded-xl border border-surface-tertiary shadow-soft-lg z-50">
                     <div className="p-2">
                       <Link
                         href="/settings"

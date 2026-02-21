@@ -15,9 +15,9 @@ import {
   LogOut,
   ChevronDown,
   FileSearch,
-  Activity,
   FileCheck,
   Image as ImageIcon,
+  Sparkles,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { api } from "@/lib/api";
@@ -56,7 +56,6 @@ export default function AdminLayout({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is admin
     const checkAdminRole = async () => {
       try {
         const token = localStorage.getItem("auth_token");
@@ -65,7 +64,6 @@ export default function AdminLayout({
           return;
         }
 
-        // Check user role via API
         const user = await api.auth.me();
         if (user.role !== "admin" && user.role !== "super_admin") {
           router.push("/dashboard");
@@ -87,7 +85,7 @@ export default function AdminLayout({
     return (
       <div className="min-h-screen bg-surface-secondary flex items-center justify-center">
         <div className="text-center">
-          <div className="h-8 w-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto" />
+          <div className="h-8 w-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="mt-4 text-text-secondary">Loading admin panel...</p>
         </div>
       </div>
@@ -108,33 +106,35 @@ export default function AdminLayout({
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - Dark sage theme */}
       <aside
         className={clsx(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-surface-tertiary transform transition-transform duration-200 ease-in-out lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 w-64 bg-primary-950 transform transition-transform duration-200 ease-in-out lg:translate-x-0",
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
         <div className="flex h-full flex-col">
           {/* Logo */}
-          <div className="flex h-16 items-center justify-between px-4 border-b border-surface-tertiary">
+          <div className="flex h-16 items-center justify-between px-4 border-b border-primary-800">
             <Link href="/admin" className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-red-500 to-purple-600" />
+              <div className="h-8 w-8 rounded-lg bg-primary-700 flex items-center justify-center">
+                <Sparkles className="h-4 w-4 text-cream-200" />
+              </div>
               <div>
-                <span className="font-display text-lg font-semibold text-text-primary">
+                <span className="font-display text-lg font-semibold text-cream-100">
                   A-Stats
                 </span>
                 <div className="flex items-center gap-1">
-                  <Shield className="h-3 w-3 text-red-600" />
-                  <span className="text-xs font-medium text-red-600">Admin</span>
+                  <Shield className="h-3 w-3 text-amber-500" />
+                  <span className="text-xs font-medium text-amber-500">Admin</span>
                 </div>
               </div>
             </Link>
             <button
               onClick={() => setSidebarOpen(false)}
-              className="lg:hidden p-1 rounded-lg hover:bg-surface-secondary"
+              className="lg:hidden p-1 rounded-lg hover:bg-primary-800"
             >
-              <X className="h-5 w-5 text-text-secondary" />
+              <X className="h-5 w-5 text-cream-300" />
             </button>
           </div>
 
@@ -163,8 +163,8 @@ export default function AdminLayout({
                       className={clsx(
                         "flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
                         hasActiveChild
-                          ? "bg-purple-50 text-purple-600"
-                          : "text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
+                          ? "bg-primary-800 text-cream-50"
+                          : "text-cream-300 hover:bg-primary-900 hover:text-cream-100"
                       )}
                     >
                       <item.icon className="h-5 w-5" />
@@ -177,7 +177,7 @@ export default function AdminLayout({
                       />
                     </button>
                     {isExpanded && (
-                      <div className="mt-1 ml-3 pl-3 border-l-2 border-surface-tertiary space-y-1">
+                      <div className="mt-1 ml-3 pl-3 border-l-2 border-primary-700 space-y-1">
                         {item.submenu?.map((subItem) => {
                           const isActive = pathname === subItem.href || pathname.startsWith(subItem.href + "/");
                           return (
@@ -187,8 +187,8 @@ export default function AdminLayout({
                               className={clsx(
                                 "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                                 isActive
-                                  ? "bg-purple-50 text-purple-600"
-                                  : "text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
+                                  ? "bg-primary-800 text-cream-50"
+                                  : "text-cream-300 hover:bg-primary-900 hover:text-cream-100"
                               )}
                             >
                               <subItem.icon className="h-4 w-4" />
@@ -211,8 +211,8 @@ export default function AdminLayout({
                   className={clsx(
                     "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-purple-50 text-purple-600"
-                      : "text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
+                      ? "bg-primary-800 text-cream-50"
+                      : "text-cream-300 hover:bg-primary-900 hover:text-cream-100"
                   )}
                 >
                   <item.icon className="h-5 w-5" />
@@ -221,7 +221,7 @@ export default function AdminLayout({
               );
             })}
 
-            <div className="pt-4 mt-4 border-t border-surface-tertiary">
+            <div className="pt-4 mt-4 border-t border-primary-800">
               {secondaryNavigation.map((item) => {
                 const isActive = pathname === item.href;
                 return (
@@ -231,8 +231,8 @@ export default function AdminLayout({
                     className={clsx(
                       "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
                       isActive
-                        ? "bg-purple-50 text-purple-600"
-                        : "text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
+                        ? "bg-primary-800 text-cream-50"
+                        : "text-cream-300 hover:bg-primary-900 hover:text-cream-100"
                     )}
                   >
                     <item.icon className="h-5 w-5" />
@@ -244,23 +244,23 @@ export default function AdminLayout({
           </nav>
 
           {/* User section */}
-          <div className="p-4 border-t border-surface-tertiary">
+          <div className="p-4 border-t border-primary-800">
             <Link
               href="/dashboard"
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-cream-300 hover:bg-primary-900 hover:text-cream-100"
             >
               <LayoutDashboard className="h-4 w-4" />
               Back to Dashboard
             </Link>
-            <div className="mt-2 flex items-center gap-3 p-2 rounded-xl bg-surface-secondary">
-              <div className="h-9 w-9 rounded-full bg-red-100 flex items-center justify-center">
-                <Shield className="h-5 w-5 text-red-600" />
+            <div className="mt-2 flex items-center gap-3 p-2 rounded-xl bg-primary-900">
+              <div className="h-9 w-9 rounded-full bg-primary-700 flex items-center justify-center">
+                <Shield className="h-5 w-5 text-amber-500" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-text-primary truncate">
+                <p className="text-sm font-medium text-cream-100 truncate">
                   Admin User
                 </p>
-                <p className="text-xs text-text-muted truncate">Super Admin</p>
+                <p className="text-xs text-primary-400 truncate">Super Admin</p>
               </div>
             </div>
           </div>
@@ -270,7 +270,7 @@ export default function AdminLayout({
       {/* Main content */}
       <div className="lg:pl-64">
         {/* Top header */}
-        <header className="sticky top-0 z-30 h-16 bg-white/80 backdrop-blur-md border-b border-surface-tertiary">
+        <header className="sticky top-0 z-30 h-16 bg-surface/80 backdrop-blur-md border-b border-surface-tertiary">
           <div className="flex h-full items-center justify-between px-4 lg:px-8">
             <button
               onClick={() => setSidebarOpen(true)}
@@ -287,8 +287,8 @@ export default function AdminLayout({
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
                 className="flex items-center gap-2 p-2 rounded-xl hover:bg-surface-secondary transition-colors"
               >
-                <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
-                  <Shield className="h-4 w-4 text-red-600" />
+                <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
+                  <Shield className="h-4 w-4 text-primary-700" />
                 </div>
                 <ChevronDown className="h-4 w-4 text-text-muted" />
               </button>
@@ -299,7 +299,7 @@ export default function AdminLayout({
                     className="fixed inset-0 z-40"
                     onClick={() => setUserMenuOpen(false)}
                   />
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl border border-surface-tertiary shadow-lg z-50">
+                  <div className="absolute right-0 mt-2 w-48 bg-surface rounded-xl border border-surface-tertiary shadow-soft-lg z-50">
                     <div className="p-2">
                       <Link
                         href="/admin/settings"
