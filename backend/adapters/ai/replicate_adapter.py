@@ -109,29 +109,33 @@ class ReplicateImageService:
 
         This method is called in a thread pool by generate_image.
         """
-        # Ideogram V3 Turbo accepts aspect_ratio as a standard ratio string
-        # Map common dimensions to standard ratios
+        # Ideogram V3 Turbo on Replicate accepts aspect_ratio as "W:H" strings
+        # Valid values: "1:3","3:1","1:2","2:1","9:16","16:9","10:16","16:10","2:3","3:2","3:4","4:3","4:5","5:4","1:1"
         ratio = width / height
         if abs(ratio - 1.0) < 0.05:
-            aspect_ratio = "ASPECT_1_1"
+            aspect_ratio = "1:1"
         elif abs(ratio - (4/3)) < 0.05:
-            aspect_ratio = "ASPECT_4_3"
+            aspect_ratio = "4:3"
         elif abs(ratio - (3/4)) < 0.05:
-            aspect_ratio = "ASPECT_3_4"
+            aspect_ratio = "3:4"
         elif abs(ratio - (16/9)) < 0.05:
-            aspect_ratio = "ASPECT_16_9"
+            aspect_ratio = "16:9"
         elif abs(ratio - (9/16)) < 0.05:
-            aspect_ratio = "ASPECT_9_16"
+            aspect_ratio = "9:16"
         elif abs(ratio - (3/2)) < 0.05:
-            aspect_ratio = "ASPECT_3_2"
+            aspect_ratio = "3:2"
         elif abs(ratio - (2/3)) < 0.05:
-            aspect_ratio = "ASPECT_2_3"
+            aspect_ratio = "2:3"
+        elif abs(ratio - (4/5)) < 0.05:
+            aspect_ratio = "4:5"
+        elif abs(ratio - (5/4)) < 0.05:
+            aspect_ratio = "5:4"
         elif ratio > 1.5:
-            aspect_ratio = "ASPECT_16_9"
+            aspect_ratio = "16:9"
         elif ratio < 0.67:
-            aspect_ratio = "ASPECT_9_16"
+            aspect_ratio = "9:16"
         else:
-            aspect_ratio = "ASPECT_1_1"
+            aspect_ratio = "1:1"
 
         input_params = {
             "prompt": prompt,

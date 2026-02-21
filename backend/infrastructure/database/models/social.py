@@ -185,6 +185,14 @@ class ScheduledPost(Base, TimestampMixin):
         nullable=True,
     )
 
+    # Relationships
+    targets: Mapped[list["PostTarget"]] = relationship(
+        "PostTarget",
+        foreign_keys="PostTarget.scheduled_post_id",
+        lazy="noload",
+        cascade="all, delete-orphan",
+    )
+
     # Indexes
     __table_args__ = (
         Index("ix_scheduled_posts_user_status", "user_id", "status"),
