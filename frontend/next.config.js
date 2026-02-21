@@ -9,9 +9,19 @@ const nextConfig = {
 
   // Image optimization
   images: {
-    domains: [
-      "localhost",
-      "replicate.delivery", // For AI-generated images
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "replicate.delivery",
+      },
+      {
+        protocol: "https",
+        hostname: "*.replicate.delivery",
+      },
+      {
+        protocol: "http",
+        hostname: "localhost",
+      },
     ],
   },
 
