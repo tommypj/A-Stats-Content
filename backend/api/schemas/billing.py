@@ -57,13 +57,14 @@ class CheckoutRequest(BaseModel):
     plan: str = Field(..., description="Plan ID (starter, professional, enterprise)")
     billing_cycle: str = Field(..., description="Billing cycle (monthly, yearly)")
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "plan": "starter",
                 "billing_cycle": "monthly"
             }
         }
+    }
 
 
 class CheckoutResponse(BaseModel):

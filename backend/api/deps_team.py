@@ -500,6 +500,7 @@ async def require_team_admin(
     Raises:
         HTTPException: 403 if user is not admin/owner
     """
+    from infrastructure.database.models.team import TeamMemberRole
     member = await get_team_member(team_id, current_user.id, db)
 
     if member.role not in [TeamMemberRole.OWNER.value, TeamMemberRole.ADMIN.value]:
@@ -530,6 +531,7 @@ async def require_team_owner(
     Raises:
         HTTPException: 403 if user is not the owner
     """
+    from infrastructure.database.models.team import TeamMemberRole
     member = await get_team_member(team_id, current_user.id, db)
 
     if member.role != TeamMemberRole.OWNER.value:

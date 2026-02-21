@@ -78,7 +78,7 @@ class TeamResponse(BaseModel):
     name: str
     slug: str
     description: Optional[str] = None
-    logo_url: Optional[str] = None
+    avatar_url: Optional[str] = None
 
     # Billing
     subscription_tier: str
@@ -87,18 +87,16 @@ class TeamResponse(BaseModel):
     lemonsqueezy_subscription_id: Optional[str] = None
 
     # Usage tracking
-    articles_generated: int
-    outlines_generated: int
-    images_generated: int
+    articles_generated_this_month: int = 0
+    outlines_generated_this_month: int = 0
+    images_generated_this_month: int = 0
     usage_reset_date: Optional[datetime] = None
-
-    # Settings
-    settings: Optional[dict] = None
+    max_members: int = 5
 
     # Metadata
-    created_by_id: Optional[str] = None
+    owner_id: str
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
 
     # Member info (only when requested)
     member_count: Optional[int] = None
@@ -112,9 +110,9 @@ class TeamListResponse(BaseModel):
 
     teams: List[TeamResponse]
     total: int
-    page: int
-    page_size: int
-    total_pages: int
+    page: int = 1
+    page_size: int = 50
+    total_pages: int = 1
 
 
 # =============================================================================
@@ -306,9 +304,10 @@ class TeamSwitchResponse(BaseModel):
     """Response after switching teams."""
 
     current_team_id: str
-    team_name: str
-    team_slug: str
-    user_role: str
+    message: Optional[str] = None
+    team_name: Optional[str] = None
+    team_slug: Optional[str] = None
+    user_role: Optional[str] = None
 
 
 # Aliases for route compatibility
@@ -338,25 +337,32 @@ class TeamDetailResponse(BaseModel):
     slug: str
     avatar_url: Optional[str] = None
     description: Optional[str] = None
+    owner_id: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     subscription_tier: str = "free"
     subscription_status: str = "active"
+    subscription_expires: Optional[datetime] = None
     max_members: int = 5
     member_count: int = 0
-    user_role: str  # Current user's role
+    current_user_role: Optional[str] = None  # Current user's role
+    members: Optional[list] = None
 
 
 class TeamDeleteResponse(BaseModel):
     """Response after deleting a team."""
 
-    success: bool
+    success: bool = True
     message: str
+    team_id: Optional[str] = None
 
 
 class CurrentTeamResponse(BaseModel):
     """Response for current active team."""
 
+    team: Optional["TeamResponse"] = None
+    is_personal_workspace: bool = True
+    # Legacy flat fields (kept for backward compatibility)
     team_id: Optional[str] = None
     team_name: Optional[str] = None
     team_slug: Optional[str] = None

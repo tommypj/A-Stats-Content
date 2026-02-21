@@ -341,7 +341,7 @@ async def verify_account(
 # ============================================
 
 
-@router.post("/posts", response_model=ScheduledPostResponse)
+@router.post("/posts", response_model=ScheduledPostResponse, status_code=201)
 async def create_scheduled_post(
     request: CreatePostRequest,
     current_user: User = Depends(get_current_user),
@@ -363,6 +363,13 @@ async def create_scheduled_post(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="One or more social accounts not found or not owned by user",
+        )
+
+    # Validate scheduled_at is in the future
+    if request.scheduled_at and request.scheduled_at < datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Scheduled time must be in the future",
         )
 
     # Validate content length for each platform
@@ -876,6 +883,56 @@ async def get_calendar(
         start_date=start_date.isoformat(),
         end_date=end_date.isoformat(),
     )
+
+
+# ============================================
+# Stats Endpoint
+# ============================================
+
+
+@router.get("/stats")
+async def get_post_stats(
+    breakdown: Optional[str] = Query(None, description="Breakdown type: 'platform'"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get post statistics for the current user."""
+    # Count posts by status
+    result = await db.execute(
+        select(ScheduledPost.status, func.count(ScheduledPost.id).label("count"))
+        .where(ScheduledPost.user_id == current_user.id)
+        .group_by(ScheduledPost.status)
+    )
+    rows = result.all()
+
+    counts: dict = {}
+    total = 0
+    for row in rows:
+        counts[row.status] = row.count
+        total += row.count
+
+    stats: dict = {
+        "scheduled": counts.get(PostStatus.SCHEDULED.value, 0),
+        "pending": counts.get(PostStatus.SCHEDULED.value, 0),
+        "published": counts.get(PostStatus.PUBLISHED.value, 0),
+        "failed": counts.get(PostStatus.FAILED.value, 0),
+        "draft": counts.get(PostStatus.DRAFT.value, 0),
+        "total": total,
+    }
+
+    if breakdown == "platform":
+        # Count by platform via PostTarget -> SocialAccount join
+        platform_result = await db.execute(
+            select(SocialAccount.platform, func.count(PostTarget.id).label("count"))
+            .join(PostTarget, PostTarget.social_account_id == SocialAccount.id)
+            .join(ScheduledPost, ScheduledPost.id == PostTarget.scheduled_post_id)
+            .where(ScheduledPost.user_id == current_user.id)
+            .group_by(SocialAccount.platform)
+        )
+        platform_rows = platform_result.all()
+        stats["by_platform"] = {row.platform: row.count for row in platform_rows}
+
+    return stats
 
 
 # ============================================

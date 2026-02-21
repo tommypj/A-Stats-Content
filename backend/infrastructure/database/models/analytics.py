@@ -65,7 +65,7 @@ class GSCConnection(Base, TimestampMixin):
 
     # Connection metadata
     connected_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default="now()"
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
     )
     last_sync: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True

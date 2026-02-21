@@ -102,13 +102,13 @@ class Team(Base, TimestampMixin):
         "TeamMember",
         back_populates="team",
         cascade="all, delete-orphan",
-        lazy="selectinload",
+        lazy="selectin",
     )
     invitations = relationship(
         "TeamInvitation",
         back_populates="team",
         cascade="all, delete-orphan",
-        lazy="selectinload",
+        lazy="selectin",
     )
 
     # Indexes

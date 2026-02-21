@@ -175,7 +175,7 @@ class BulkDeleteRequest(BaseModel):
         description="Type of content to delete",
         pattern="^(article|outline|image|social_post)$",
     )
-    ids: List[str] = Field(..., min_items=1, description="List of content IDs to delete")
+    ids: List[str] = Field(..., min_length=1, description="List of content IDs to delete")
 
 
 class BulkDeleteResponse(BaseModel):

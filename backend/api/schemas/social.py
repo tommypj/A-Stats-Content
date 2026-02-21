@@ -79,9 +79,9 @@ class CreatePostRequest(BaseModel):
     """Request to create a scheduled post."""
 
     content: str = Field(..., min_length=1, max_length=10000)
-    account_ids: List[str] = Field(..., min_items=1, description="Target account IDs")
+    account_ids: List[str] = Field(..., min_length=1, description="Target account IDs")
     scheduled_at: Optional[datetime] = Field(None, description="When to publish (None = draft)")
-    media_urls: Optional[List[str]] = Field(None, max_items=10)
+    media_urls: Optional[List[str]] = Field(None, max_length=10)
     link_url: Optional[str] = Field(None, max_length=2048)
     article_id: Optional[str] = None
     team_id: Optional[str] = Field(None, description="Team ID for team content")
@@ -95,7 +95,7 @@ class UpdatePostRequest(BaseModel):
 
     content: Optional[str] = Field(None, min_length=1, max_length=10000)
     scheduled_at: Optional[datetime] = None
-    media_urls: Optional[List[str]] = Field(None, max_items=10)
+    media_urls: Optional[List[str]] = Field(None, max_length=10)
     link_url: Optional[str] = Field(None, max_length=2048)
     status: Optional[str] = None
 

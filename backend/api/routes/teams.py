@@ -109,7 +109,7 @@ async def create_team(
         name=data.name,
         slug=slug,
         description=data.description,
-        avatar_url=data.avatar_url,
+        avatar_url=getattr(data, 'logo_url', None),
         owner_id=current_user.id,
         subscription_tier="free",
         subscription_status="active",
@@ -357,8 +357,8 @@ async def update_team(
         team.name = data.name
     if data.description is not None:
         team.description = data.description
-    if data.avatar_url is not None:
-        team.avatar_url = data.avatar_url
+    if data.logo_url is not None:
+        team.avatar_url = data.logo_url
     if data.settings is not None:
         team.settings = data.settings
 

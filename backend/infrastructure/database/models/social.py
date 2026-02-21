@@ -245,6 +245,12 @@ class PostTarget(Base, TimestampMixin):
         DateTime(timezone=True), nullable=True
     )
 
+    # Relationships
+    social_account: Mapped["SocialAccount"] = relationship(
+        "SocialAccount",
+        lazy="noload",
+    )
+
     # Indexes
     __table_args__ = (
         Index("ix_post_targets_post", "scheduled_post_id", "social_account_id"),
