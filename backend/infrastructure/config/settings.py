@@ -55,23 +55,46 @@ class Settings(BaseSettings):
     resend_api_key: Optional[str] = None
     resend_from_email: str = "noreply@astats.app"
 
-    # Stripe (Payments)
-    stripe_secret_key: Optional[str] = None
-    stripe_publishable_key: Optional[str] = None
-    stripe_webhook_secret: Optional[str] = None
-    stripe_price_pro_monthly: Optional[str] = None
-    stripe_price_pro_yearly: Optional[str] = None
-    stripe_price_elite_monthly: Optional[str] = None
-    stripe_price_elite_yearly: Optional[str] = None
+    # LemonSqueezy (Payments)
+    lemonsqueezy_api_key: Optional[str] = None
+    lemonsqueezy_store_id: Optional[str] = None
+    lemonsqueezy_webhook_secret: Optional[str] = None
+    lemonsqueezy_variant_starter_monthly: Optional[str] = None
+    lemonsqueezy_variant_starter_yearly: Optional[str] = None
+    lemonsqueezy_variant_professional_monthly: Optional[str] = None
+    lemonsqueezy_variant_professional_yearly: Optional[str] = None
+    lemonsqueezy_variant_enterprise_monthly: Optional[str] = None
+    lemonsqueezy_variant_enterprise_yearly: Optional[str] = None
 
     # Google (OAuth & Search Console)
     google_client_id: Optional[str] = None
     google_client_secret: Optional[str] = None
     google_redirect_uri: str = "http://localhost:8000/api/v1/gsc/callback"
 
+    # Twitter/X OAuth 2.0
+    twitter_client_id: Optional[str] = None
+    twitter_client_secret: Optional[str] = None
+    twitter_redirect_uri: str = "http://localhost:8000/api/v1/social/twitter/callback"
+
+    # LinkedIn OAuth 2.0
+    linkedin_client_id: Optional[str] = None
+    linkedin_client_secret: Optional[str] = None
+    linkedin_redirect_uri: str = "http://localhost:8000/api/v1/social/linkedin/callback"
+
+    # Facebook/Instagram OAuth
+    facebook_app_id: Optional[str] = None
+    facebook_app_secret: Optional[str] = None
+    facebook_redirect_uri: str = "http://localhost:8000/api/v1/social/facebook/callback"
+
     # ChromaDB (Vector Store)
+    chroma_host: str = "localhost"
+    chroma_port: int = 8001
     chroma_persist_directory: str = "./data/chroma"
-    chroma_collection_name: str = "knowledge_vault"
+    chroma_collection_prefix: str = "knowledge_vault"
+
+    # Embeddings
+    embedding_model: str = "text-embedding-3-small"  # OpenAI model
+    openai_api_key: Optional[str] = None  # For embeddings
 
     # Storage
     storage_type: str = "local"  # local, s3
@@ -93,6 +116,18 @@ class Settings(BaseSettings):
     def is_development(self) -> bool:
         """Check if running in development."""
         return self.environment == "development"
+
+    def validate_production_secrets(self) -> None:
+        """Validate that production secrets are properly configured."""
+        if self.is_production:
+            if "change-me" in self.secret_key.lower():
+                raise ValueError("SECRET_KEY must be changed for production!")
+            if "change-me" in self.jwt_secret_key.lower():
+                raise ValueError("JWT_SECRET_KEY must be changed for production!")
+            if len(self.secret_key) < 32:
+                raise ValueError("SECRET_KEY must be at least 32 characters!")
+            if len(self.jwt_secret_key) < 32:
+                raise ValueError("JWT_SECRET_KEY must be at least 32 characters!")
 
 
 @lru_cache

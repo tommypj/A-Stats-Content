@@ -5,7 +5,7 @@ Authentication API routes.
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status, Header
+from fastapi import APIRouter, Depends, HTTPException, status, Header, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +15,7 @@ from infrastructure.config.settings import settings
 from core.security.password import password_hasher
 from core.security.tokens import TokenService
 from adapters.email.resend_adapter import email_service
+from api.middleware.rate_limit import limiter
 from api.schemas.auth import (
     LoginRequest,
     RegisterRequest,
@@ -96,15 +97,17 @@ async def get_current_active_user(
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("3/minute")
 async def register(
-    request: RegisterRequest,
+    request: Request,
+    register_data: RegisterRequest,
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """
     Register a new user account.
     """
     # Check if email already exists
-    result = await db.execute(select(User).where(User.email == request.email.lower()))
+    result = await db.execute(select(User).where(User.email == register_data.email.lower()))
     existing_user = result.scalar_one_or_none()
 
     if existing_user:
@@ -115,10 +118,10 @@ async def register(
 
     # Create new user
     user = User(
-        email=request.email.lower(),
-        name=request.name,
-        password_hash=password_hasher.hash(request.password),
-        language=request.language,
+        email=register_data.email.lower(),
+        name=register_data.name,
+        password_hash=password_hasher.hash(register_data.password),
+        language=register_data.language,
         status=UserStatus.PENDING.value,
     )
 
@@ -143,8 +146,10 @@ async def register(
 
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit("5/minute")
 async def login(
-    request: LoginRequest,
+    request: Request,
+    login_data: LoginRequest,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """
@@ -152,11 +157,11 @@ async def login(
     """
     # Find user by email
     result = await db.execute(
-        select(User).where(User.email == request.email.lower())
+        select(User).where(User.email == login_data.email.lower())
     )
     user = result.scalar_one_or_none()
 
-    if not user or not password_hasher.verify(request.password, user.password_hash):
+    if not user or not password_hasher.verify(login_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -246,8 +251,10 @@ async def get_me(
 
 
 @router.post("/password/reset-request", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit("3/hour")
 async def request_password_reset(
-    request: PasswordResetRequest,
+    request: Request,
+    reset_data: PasswordResetRequest,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """
@@ -255,7 +262,7 @@ async def request_password_reset(
     """
     # Find user by email
     result = await db.execute(
-        select(User).where(User.email == request.email.lower())
+        select(User).where(User.email == reset_data.email.lower())
     )
     user = result.scalar_one_or_none()
 
@@ -337,7 +344,9 @@ async def change_password(
 
 
 @router.post("/verify-email", status_code=status.HTTP_200_OK)
+@limiter.limit("5/hour")
 async def verify_email(
+    request: Request,
     token: str,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
@@ -381,7 +390,9 @@ async def verify_email(
 
 
 @router.post("/resend-verification", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit("5/hour")
 async def resend_verification(
+    request: Request,
     email: str,
     db: AsyncSession = Depends(get_db),
 ) -> dict:

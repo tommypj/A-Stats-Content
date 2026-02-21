@@ -118,6 +118,45 @@ class ResendEmailService:
             print(f"Failed to send welcome email: {e}")
             return False
 
+    async def send_team_invitation_email(
+        self,
+        to_email: str,
+        inviter_name: str,
+        team_name: str,
+        role: str,
+        invitation_url: str,
+    ) -> bool:
+        """
+        Send team invitation email.
+
+        Args:
+            to_email: Recipient email address
+            inviter_name: Name of the person who sent the invitation
+            team_name: Name of the team
+            role: Role the user will have in the team
+            invitation_url: URL to accept the invitation
+
+        Returns:
+            True if sent successfully, False otherwise
+        """
+        if not settings.resend_api_key:
+            print(f"[DEV] Team invitation email for {to_email}: {invitation_url}")
+            return True
+
+        try:
+            resend.Emails.send({
+                "from": self._from_email,
+                "to": to_email,
+                "subject": f"You've been invited to join {team_name} on A-Stats",
+                "html": self._get_team_invitation_email_html(
+                    inviter_name, team_name, role, invitation_url
+                ),
+            })
+            return True
+        except Exception as e:
+            print(f"Failed to send team invitation email: {e}")
+            return False
+
     def _get_verification_email_html(self, user_name: str, verification_url: str) -> str:
         """Generate verification email HTML."""
         return f"""
@@ -247,6 +286,71 @@ class ResendEmailService:
 
                 <p style="color: #8B8BA7; font-size: 12px; text-align: center;">
                     Need help? Reply to this email or visit our help center.
+                </p>
+            </div>
+        </body>
+        </html>
+        """
+
+    def _get_team_invitation_email_html(
+        self, inviter_name: str, team_name: str, role: str, invitation_url: str
+    ) -> str:
+        """Generate team invitation email HTML."""
+        # Format role nicely
+        role_display = role.title()
+
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #FFF8F0; padding: 40px 20px;">
+            <div style="max-width: 560px; margin: 0 auto; background: white; border-radius: 16px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                <div style="text-align: center; margin-bottom: 32px;">
+                    <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #ed8f73, #da7756); border-radius: 12px; margin: 0 auto;"></div>
+                    <h1 style="color: #1A1A2E; font-size: 24px; margin: 16px 0 0;">A-Stats Content</h1>
+                </div>
+
+                <h2 style="color: #1A1A2E; font-size: 20px; margin-bottom: 16px;">You've been invited to join a team!</h2>
+
+                <p style="color: #4A4A68; line-height: 1.6; margin-bottom: 24px;">
+                    {inviter_name} has invited you to join <strong>{team_name}</strong> on A-Stats Content.
+                </p>
+
+                <div style="background: #F8F9FA; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+                    <h3 style="color: #1A1A2E; font-size: 16px; margin: 0 0 16px;">Invitation Details:</h3>
+                    <ul style="color: #4A4A68; margin: 0; padding-left: 20px; line-height: 1.8;">
+                        <li><strong>Team:</strong> {team_name}</li>
+                        <li><strong>Your role:</strong> {role_display}</li>
+                        <li><strong>Invited by:</strong> {inviter_name}</li>
+                    </ul>
+                </div>
+
+                <div style="background: #FFF8F0; border-left: 4px solid #da7756; padding: 16px; margin-bottom: 24px;">
+                    <p style="color: #4A4A68; margin: 0; font-size: 14px; line-height: 1.6;">
+                        <strong>What is A-Stats?</strong><br>
+                        A-Stats Content is an AI-powered platform for creating SEO-optimized therapeutic content.
+                        Generate articles, outlines, and images with advanced AI tools.
+                    </p>
+                </div>
+
+                <div style="text-align: center; margin: 32px 0;">
+                    <a href="{invitation_url}" style="display: inline-block; background: #da7756; color: white; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 500;">
+                        Accept Invitation
+                    </a>
+                </div>
+
+                <p style="color: #8B8BA7; font-size: 14px; line-height: 1.6; text-align: center;">
+                    If you don't have an A-Stats account yet, you'll be prompted to create one.
+                </p>
+
+                <hr style="border: none; border-top: 1px solid #F1F3F5; margin: 32px 0;">
+
+                <p style="color: #8B8BA7; font-size: 12px; text-align: center;">
+                    This invitation will expire in 7 days.<br>
+                    If you didn't expect this invitation, you can safely ignore this email.
                 </p>
             </div>
         </body>

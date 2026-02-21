@@ -1,0 +1,224 @@
+"""
+Content API schemas for outlines, articles, and images.
+"""
+
+from datetime import datetime
+from typing import Optional, List, Dict, Any
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+# ============================================================================
+# Outline Schemas
+# ============================================================================
+
+
+class OutlineSectionSchema(BaseModel):
+    """Outline section structure."""
+
+    heading: str = Field(..., description="H2 heading for the section")
+    subheadings: List[str] = Field(default_factory=list, description="H3 subheadings")
+    notes: str = Field(default="", description="Content notes for this section")
+    word_count_target: int = Field(default=200, ge=50, le=2000)
+
+
+class OutlineCreateRequest(BaseModel):
+    """Request to create/generate an outline."""
+
+    keyword: str = Field(..., min_length=2, max_length=255)
+    target_audience: Optional[str] = Field(None, max_length=500)
+    tone: str = Field(default="professional", max_length=50)
+    word_count_target: int = Field(default=1500, ge=500, le=10000)
+    auto_generate: bool = Field(default=True, description="Auto-generate with AI")
+    team_id: Optional[str] = Field(None, description="Team ID for team content")
+
+
+class OutlineUpdateRequest(BaseModel):
+    """Request to update an outline."""
+
+    title: Optional[str] = Field(None, max_length=500)
+    keyword: Optional[str] = Field(None, min_length=2, max_length=255)
+    target_audience: Optional[str] = Field(None, max_length=500)
+    tone: Optional[str] = Field(None, max_length=50)
+    sections: Optional[List[OutlineSectionSchema]] = None
+    word_count_target: Optional[int] = Field(None, ge=500, le=10000)
+
+
+class OutlineResponse(BaseModel):
+    """Outline response."""
+
+    id: str
+    user_id: str
+    team_id: Optional[str] = None
+    title: str
+    keyword: str
+    target_audience: Optional[str]
+    tone: str
+    sections: Optional[List[Dict[str, Any]]]
+    status: str
+    word_count_target: int
+    estimated_read_time: Optional[int]
+    ai_model: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class OutlineListResponse(BaseModel):
+    """List of outlines response."""
+
+    items: List[OutlineResponse]
+    total: int
+    page: int
+    page_size: int
+    pages: int
+
+
+# ============================================================================
+# Article Schemas
+# ============================================================================
+
+
+class ArticleGenerateRequest(BaseModel):
+    """Request to generate an article from an outline."""
+
+    outline_id: str = Field(..., description="UUID of the outline to use")
+    tone: Optional[str] = Field(None, max_length=50)
+    target_audience: Optional[str] = Field(None, max_length=500)
+
+
+class ArticleCreateRequest(BaseModel):
+    """Request to create an article manually."""
+
+    title: str = Field(..., min_length=5, max_length=500)
+    keyword: str = Field(..., min_length=2, max_length=255)
+    content: Optional[str] = None
+    meta_description: Optional[str] = Field(None, max_length=320)
+    outline_id: Optional[str] = None
+    team_id: Optional[str] = Field(None, description="Team ID for team content")
+
+
+class ArticleUpdateRequest(BaseModel):
+    """Request to update an article."""
+
+    title: Optional[str] = Field(None, min_length=5, max_length=500)
+    keyword: Optional[str] = Field(None, min_length=2, max_length=255)
+    meta_description: Optional[str] = Field(None, max_length=320)
+    content: Optional[str] = None
+    status: Optional[str] = None
+
+
+class ArticleSEOAnalysis(BaseModel):
+    """SEO analysis result."""
+
+    keyword_density: float
+    title_has_keyword: bool
+    meta_description_length: int
+    headings_structure: str
+    internal_links: int
+    external_links: int
+    image_alt_texts: bool
+    readability_score: float
+    suggestions: List[str]
+
+
+class ArticleResponse(BaseModel):
+    """Article response."""
+
+    id: str
+    user_id: str
+    team_id: Optional[str] = None
+    outline_id: Optional[str]
+    title: str
+    slug: Optional[str]
+    keyword: str
+    meta_description: Optional[str]
+    content: Optional[str]
+    content_html: Optional[str]
+    status: str
+    word_count: int
+    read_time: Optional[int]
+    seo_score: Optional[float]
+    seo_analysis: Optional[Dict[str, Any]]
+    ai_model: Optional[str]
+    published_at: Optional[datetime]
+    published_url: Optional[str]
+    featured_image_id: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ArticleListResponse(BaseModel):
+    """List of articles response."""
+
+    items: List[ArticleResponse]
+    total: int
+    page: int
+    page_size: int
+    pages: int
+
+
+class ArticleImproveRequest(BaseModel):
+    """Request to improve article content."""
+
+    improvement_type: str = Field(
+        default="seo",
+        description="Type: seo, readability, engagement",
+    )
+
+
+# ============================================================================
+# Generated Image Schemas
+# ============================================================================
+
+
+class ImageGenerateRequest(BaseModel):
+    """Request to generate an image."""
+
+    prompt: str = Field(..., min_length=10, max_length=1000)
+    style: Optional[str] = Field(None, max_length=50)
+    article_id: Optional[str] = None
+    team_id: Optional[str] = Field(None, description="Team ID for team content")
+    width: int = Field(default=1024, ge=256, le=2048)
+    height: int = Field(default=1024, ge=256, le=2048)
+
+
+class ImageSetFeaturedRequest(BaseModel):
+    """Request to set an image as featured for an article."""
+
+    article_id: str = Field(..., description="ID of the article to set the featured image for")
+
+
+class ImageResponse(BaseModel):
+    """Generated image response."""
+
+    id: str
+    user_id: str
+    team_id: Optional[str] = None
+    article_id: Optional[str]
+    prompt: str
+    url: str
+    local_path: Optional[str]
+    alt_text: Optional[str]
+    style: Optional[str]
+    model: Optional[str]
+    width: Optional[int]
+    height: Optional[int]
+    status: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ImageListResponse(BaseModel):
+    """List of images response."""
+
+    items: List[ImageResponse]
+    total: int
+    page: int
+    page_size: int
+    pages: int

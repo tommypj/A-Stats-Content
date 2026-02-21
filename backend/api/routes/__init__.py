@@ -3,6 +3,20 @@ from fastapi import APIRouter
 
 from .health import router as health_router
 from .auth import router as auth_router
+from .outlines import router as outlines_router
+from .articles import router as articles_router
+from .images import router as images_router
+from .wordpress import router as wordpress_router
+from .analytics import router as analytics_router
+from .billing import router as billing_router
+from .team_billing import router as team_billing_router
+from .knowledge import router as knowledge_router
+from .social import router as social_router
+from .admin_analytics import router as admin_analytics_router
+from .admin_content import router as admin_content_router
+from .admin_users import router as admin_users_router
+from .team_invitations import router as team_invitations_router
+from .teams import router as teams_router
 
 # Create main API router
 api_router = APIRouter()
@@ -10,6 +24,20 @@ api_router = APIRouter()
 # Include route modules
 api_router.include_router(health_router, tags=["Health"])
 api_router.include_router(auth_router)
+api_router.include_router(outlines_router)
+api_router.include_router(articles_router)
+api_router.include_router(images_router)
+api_router.include_router(wordpress_router)
+api_router.include_router(analytics_router)
+api_router.include_router(billing_router)
+api_router.include_router(team_billing_router)
+api_router.include_router(knowledge_router)
+api_router.include_router(social_router)
+api_router.include_router(admin_analytics_router)
+api_router.include_router(admin_content_router)
+api_router.include_router(admin_users_router)
+api_router.include_router(team_invitations_router)
+api_router.include_router(teams_router)
 
 # Future routes will be added here:
 # api_router.include_router(content_router, prefix="/content", tags=["Content"])

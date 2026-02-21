@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Optional
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, Index, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text, JSON, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -98,13 +98,21 @@ class User(Base, TimestampMixin):
         default=SubscriptionTier.FREE.value,
         nullable=False,
     )
+    subscription_status: Mapped[str] = mapped_column(
+        String(50),
+        default="active",
+        nullable=False,
+    )  # active, cancelled, paused, past_due, expired
     subscription_expires: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    stripe_customer_id: Mapped[Optional[str]] = mapped_column(
+    lemonsqueezy_customer_id: Mapped[Optional[str]] = mapped_column(
         String(255), nullable=True, unique=True
     )
-    stripe_subscription_id: Mapped[Optional[str]] = mapped_column(
+    lemonsqueezy_subscription_id: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True
+    )
+    lemonsqueezy_variant_id: Mapped[Optional[str]] = mapped_column(
         String(255), nullable=True
     )
 
@@ -134,6 +142,33 @@ class User(Base, TimestampMixin):
     )
     login_count: Mapped[int] = mapped_column(default=0, nullable=False)
 
+    # WordPress integration
+    wordpress_credentials: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    """
+    Structure:
+    {
+        "site_url": "https://mysite.com",
+        "username": "admin",
+        "app_password_encrypted": "encrypted_password_here",
+        "connected_at": "2025-01-15T12:00:00Z",
+        "last_tested_at": "2025-01-15T12:00:00Z"
+    }
+    """
+
+    # Suspension fields
+    is_suspended: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    suspended_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    suspended_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Multi-tenancy - currently selected team
+    current_team_id: Mapped[Optional[str]] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("teams.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
     # Soft delete
     deleted_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -143,7 +178,9 @@ class User(Base, TimestampMixin):
     __table_args__ = (
         Index("ix_users_email_status", "email", "status"),
         Index("ix_users_subscription", "subscription_tier", "subscription_expires"),
-        Index("ix_users_stripe", "stripe_customer_id"),
+        Index("ix_users_lemonsqueezy", "lemonsqueezy_customer_id"),
+        Index("ix_users_role", "role"),
+        Index("ix_users_current_team", "current_team_id"),
     )
 
     def __repr__(self) -> str:

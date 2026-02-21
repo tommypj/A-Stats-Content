@@ -1,12 +1,18 @@
 """A-Stats Engine - Main FastAPI Application."""
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from rich.console import Console
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from infrastructure.config import get_settings
 from infrastructure.database import init_db, close_db
 from api.routes import api_router
+from api.middleware.rate_limit import limiter
+from services.social_scheduler import scheduler_service
+from services.post_queue import post_queue
 
 console = Console()
 settings = get_settings()
@@ -23,12 +29,34 @@ async def lifespan(app: FastAPI):
         console.print("[yellow]Development mode - initializing database...[/yellow]")
         await init_db()
 
+    # Initialize Redis post queue (optional)
+    console.print("[cyan]Connecting to Redis for post queue...[/cyan]")
+    await post_queue.connect()
+
+    # Start social media scheduler in background
+    console.print("[cyan]Starting social media scheduler...[/cyan]")
+    scheduler_task = asyncio.create_task(scheduler_service.start())
+
     console.print("[green]Application started successfully![/green]")
 
     yield
 
     # Shutdown
     console.print("[yellow]Shutting down...[/yellow]")
+
+    # Stop scheduler
+    console.print("[cyan]Stopping social media scheduler...[/cyan]")
+    await scheduler_service.stop()
+    scheduler_task.cancel()
+
+    try:
+        await scheduler_task
+    except asyncio.CancelledError:
+        pass
+
+    # Disconnect Redis
+    await post_queue.disconnect()
+
     await close_db()
     console.print("[red]Application stopped.[/red]")
 
@@ -42,6 +70,10 @@ app = FastAPI(
     redoc_url="/redoc" if settings.is_development else None,
     lifespan=lifespan,
 )
+
+# Rate limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS middleware
 app.add_middleware(
