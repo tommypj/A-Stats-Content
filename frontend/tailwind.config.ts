@@ -41,6 +41,12 @@ const config: Config = {
           secondary: "#4A4A68",
           muted: "#8B8BA7",
         },
+        // CSS variable-based colors (shadcn/ui)
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
