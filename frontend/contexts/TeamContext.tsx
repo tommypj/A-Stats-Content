@@ -16,9 +16,16 @@ export interface TeamContextType {
   createTeam: (data: TeamCreateRequest) => Promise<Team>;
 
   // Permission helpers
+  canCreate: boolean; // MEMBER+ in team, or personal workspace
   canEdit: boolean; // MEMBER+ in team, or personal workspace
   canManage: boolean; // ADMIN+ in team
   canBilling: boolean; // OWNER in team
+  isViewer: boolean; // VIEWER role in team
+
+  // Usage tracking
+  usage: { articles_used: number; outlines_used: number; images_used: number } | null;
+  limits: { articles_per_month: number; outlines_per_month: number; images_per_month: number } | null;
+  isAtLimit: (resource: "articles" | "outlines" | "images") => boolean;
 }
 
 const TeamContext = createContext<TeamContextType | undefined>(undefined);
@@ -35,8 +42,21 @@ export function TeamProvider({ children }: { children: ReactNode }) {
 
   // Permission helpers
   const canEdit = isPersonalWorkspace || ["owner", "admin", "member"].includes(currentTeam?.my_role || "");
+  const canCreate = canEdit;
   const canManage = !isPersonalWorkspace && ["owner", "admin"].includes(currentTeam?.my_role || "");
   const canBilling = !isPersonalWorkspace && currentTeam?.my_role === "owner";
+  const isViewer = !isPersonalWorkspace && currentTeam?.my_role === "viewer";
+
+  // Usage and limits stubs (populated when team billing is loaded)
+  const [usage, setUsage] = useState<{ articles_used: number; outlines_used: number; images_used: number } | null>(null);
+  const [limits, setLimits] = useState<{ articles_per_month: number; outlines_per_month: number; images_per_month: number } | null>(null);
+
+  const isAtLimit = useCallback((resource: "articles" | "outlines" | "images"): boolean => {
+    if (!usage || !limits) return false;
+    const usageMap = { articles: usage.articles_used, outlines: usage.outlines_used, images: usage.images_used };
+    const limitMap = { articles: limits.articles_per_month, outlines: limits.outlines_per_month, images: limits.images_per_month };
+    return usageMap[resource] >= limitMap[resource];
+  }, [usage, limits]);
 
   // Load teams and current team on mount
   const loadTeams = useCallback(async () => {
@@ -142,9 +162,14 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     switchTeam,
     refreshTeams,
     createTeam,
+    canCreate,
     canEdit,
     canManage,
     canBilling,
+    isViewer,
+    usage,
+    limits,
+    isAtLimit,
   };
 
   return <TeamContext.Provider value={value}>{children}</TeamContext.Provider>;

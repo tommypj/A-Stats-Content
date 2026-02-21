@@ -468,6 +468,11 @@ export const api = {
         method: "DELETE",
         url: `/social/accounts/${id}`,
       }),
+    verify: (accountId: string) =>
+      apiRequest<SocialAccount>({
+        method: "POST",
+        url: `/social/accounts/${accountId}/verify`,
+      }),
     analytics: (postId: string) =>
       apiRequest<SocialAnalytics>({
         url: `/social/posts/${postId}/analytics`,
@@ -621,6 +626,24 @@ export const api = {
       apiRequest<Team | null>({
         url: "/teams/current",
       }),
+    uploadLogo: (teamId: string, file: File) => {
+      const formData = new FormData();
+      formData.append("logo", file);
+      return apiClient.post<Team>(`/teams/${teamId}/logo`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      }).then(res => res.data);
+    },
+    transferOwnership: (teamId: string, newOwnerId: string) =>
+      apiRequest<void>({
+        method: "POST",
+        url: `/teams/${teamId}/transfer-ownership`,
+        data: { new_owner_id: newOwnerId },
+      }),
+    leave: (teamId: string) =>
+      apiRequest<void>({
+        method: "POST",
+        url: `/teams/${teamId}/leave`,
+      }),
 
     members: {
       list: (teamId: string) =>
@@ -666,6 +689,15 @@ export const api = {
         apiRequest<TeamInvitation>({
           method: "POST",
           url: `/teams/${teamId}/invitations/${invitationId}/resend`,
+        }),
+      getByToken: (token: string) =>
+        apiRequest<TeamInvitation>({
+          url: `/invitations/${token}`,
+        }),
+      accept: (token: string) =>
+        apiRequest<void>({
+          method: "POST",
+          url: `/invitations/${token}/accept`,
         }),
     },
 

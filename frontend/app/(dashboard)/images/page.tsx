@@ -42,7 +42,7 @@ export default function ImagesPage() {
   async function loadImages() {
     try {
       setLoading(true);
-      const response = await api.images.list({ limit: 50 });
+      const response = await api.images.list({ page_size: 50 });
       setImages(response.items);
     } catch (error) {
       console.error("Failed to load images:", error);

@@ -103,7 +103,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
               // Item with submenu
               if ("submenu" in item) {
                 const isExpanded = expandedMenus.has(item.name);
-                const hasActiveChild = item.submenu.some((subItem) =>
+                const hasActiveChild = item.submenu?.some((subItem) =>
                   pathname.startsWith(subItem.href)
                 );
 
@@ -137,7 +137,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                     </button>
                     {isExpanded && (
                       <div className="mt-1 ml-3 pl-3 border-l-2 border-surface-tertiary space-y-1">
-                        {item.submenu.map((subItem) => {
+                        {item.submenu?.map((subItem) => {
                           const isActive = pathname === subItem.href;
                           return (
                             <Link

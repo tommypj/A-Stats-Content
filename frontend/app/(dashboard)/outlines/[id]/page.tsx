@@ -107,7 +107,7 @@ export default function OutlineDetailPage() {
         word_count_target: 200,
       },
     ]);
-    setExpandedSections(new Set([...expandedSections, editedSections.length]));
+    setExpandedSections(new Set([...Array.from(expandedSections), editedSections.length]));
   }
 
   function removeSection(index: number) {

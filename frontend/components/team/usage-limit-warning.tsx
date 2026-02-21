@@ -118,7 +118,7 @@ export function UsageLimitWarning({
               >
                 <Button
                   size="sm"
-                  variant={isAtLimit ? "default" : "outline"}
+                  variant={isAtLimit ? "primary" : "outline"}
                   leftIcon={<TrendingUp className="h-4 w-4" />}
                 >
                   {isAtLimit ? "Upgrade Now" : "View Plans"}
@@ -222,7 +222,7 @@ export function UsageLimitBanner({
         >
           <Button
             size="sm"
-            variant={isAtLimit ? "default" : "outline"}
+            variant={isAtLimit ? "primary" : "outline"}
           >
             {isAtLimit ? "Upgrade Plan" : "View Plans"}
           </Button>

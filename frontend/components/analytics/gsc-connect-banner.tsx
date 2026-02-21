@@ -30,16 +30,16 @@ export function GscConnectBanner({ onConnect, isLoading = false }: GscConnectBan
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Connect Google Search Console
               </Button>
-              <Button variant="outline" asChild>
-                <a
-                  href="https://search.google.com/search-console"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
+              <a
+                href="https://search.google.com/search-console"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button variant="outline">
                   Learn More
                   <ExternalLink className="h-4 w-4 ml-2" />
-                </a>
-              </Button>
+                </Button>
+              </a>
             </div>
           </div>
         </div>
