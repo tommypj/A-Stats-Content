@@ -1,5 +1,6 @@
 export { Button, buttonVariants, type ButtonProps } from "./button";
 export { Input, type InputProps } from "./input";
+export { Textarea, type TextareaProps } from "./textarea";
 export {
   Card,
   CardHeader,
@@ -8,3 +9,7 @@ export {
   CardDescription,
   CardContent,
 } from "./card";
+export { Dialog } from "./dialog";
+export { Badge, type BadgeProps } from "./badge";
+export { Progress, type ProgressProps } from "./progress";
+export { Skeleton } from "./skeleton";

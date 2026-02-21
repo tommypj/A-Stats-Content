@@ -1,62 +1,102 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   FileText,
-  Sparkles,
-  Image as ImageIcon,
+  Users,
   BarChart3,
+  Shield,
   Settings,
-  HelpCircle,
   Menu,
   X,
   LogOut,
   ChevronDown,
-  Share2,
-  Calendar,
-  History,
-  Edit3,
-  Users,
-  BookOpen,
+  FileSearch,
+  Activity,
+  FileCheck,
+  Image as ImageIcon,
 } from "lucide-react";
 import { clsx } from "clsx";
-import { TeamProvider } from "@/contexts/TeamContext";
-import { TeamSwitcher } from "@/components/team/team-switcher";
+import { api } from "@/lib/api";
 
 const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Outlines", href: "/outlines", icon: FileText },
-  { name: "Articles", href: "/articles", icon: Sparkles },
-  { name: "Images", href: "/images", icon: ImageIcon },
+  { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
+  { name: "Users", href: "/admin/users", icon: Users },
   {
-    name: "Social",
-    icon: Share2,
+    name: "Content",
+    icon: FileText,
     submenu: [
-      { name: "Dashboard", href: "/social/dashboard", icon: LayoutDashboard },
-      { name: "Compose", href: "/social/compose", icon: Edit3 },
-      { name: "Calendar", href: "/social/calendar", icon: Calendar },
-      { name: "History", href: "/social/history", icon: History },
-      { name: "Accounts", href: "/social/accounts", icon: Users },
+      { name: "Articles", href: "/admin/content/articles", icon: FileText },
+      { name: "Outlines", href: "/admin/content/outlines", icon: FileCheck },
+      { name: "Images", href: "/admin/content/images", icon: ImageIcon },
     ],
   },
-  { name: "Analytics", href: "/analytics", icon: BarChart3 },
-  { name: "Knowledge", href: "/knowledge", icon: BookOpen },
-  { name: "Teams", href: "/teams", icon: Users },
+  { name: "Analytics", href: "/admin/analytics", icon: BarChart3 },
+  { name: "Audit Logs", href: "/admin/audit-logs", icon: FileSearch },
 ];
 
 const secondaryNavigation = [
-  { name: "Settings", href: "/settings", icon: Settings },
-  { name: "Help & Support", href: "/help", icon: HelpCircle },
+  { name: "Settings", href: "/admin/settings", icon: Settings },
 ];
 
-function DashboardContent({ children }: { children: React.ReactNode }) {
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set(["Social"]));
+  const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set(["Content"]));
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check if user is admin
+    const checkAdminRole = async () => {
+      try {
+        const token = localStorage.getItem("auth_token");
+        if (!token) {
+          router.push("/login");
+          return;
+        }
+
+        // Check user role via API
+        const user = await api.auth.me();
+        if (user.role !== "admin" && user.role !== "super_admin") {
+          router.push("/dashboard");
+          return;
+        }
+
+        setIsAdmin(true);
+        setLoading(false);
+      } catch (error) {
+        console.error("Failed to check admin role:", error);
+        router.push("/login");
+      }
+    };
+
+    checkAdminRole();
+  }, [router]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-surface-secondary flex items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="mt-4 text-text-secondary">Loading admin panel...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-surface-secondary">
@@ -78,11 +118,17 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         <div className="flex h-full flex-col">
           {/* Logo */}
           <div className="flex h-16 items-center justify-between px-4 border-b border-surface-tertiary">
-            <Link href="/dashboard" className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary-400 to-primary-600" />
-              <span className="font-display text-lg font-semibold text-text-primary">
-                A-Stats
-              </span>
+            <Link href="/admin" className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-red-500 to-purple-600" />
+              <div>
+                <span className="font-display text-lg font-semibold text-text-primary">
+                  A-Stats
+                </span>
+                <div className="flex items-center gap-1">
+                  <Shield className="h-3 w-3 text-red-600" />
+                  <span className="text-xs font-medium text-red-600">Admin</span>
+                </div>
+              </div>
             </Link>
             <button
               onClick={() => setSidebarOpen(false)}
@@ -92,11 +138,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             </button>
           </div>
 
-          {/* Team Switcher */}
-          <div className="px-3 py-4 border-b border-surface-tertiary">
-            <TeamSwitcher />
-          </div>
-
           {/* Navigation */}
           <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
             {navigation.map((item) => {
@@ -104,7 +145,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
               if ("submenu" in item) {
                 const isExpanded = expandedMenus.has(item.name);
                 const hasActiveChild = item.submenu.some((subItem) =>
-                  pathname.startsWith(subItem.href)
+                  pathname === subItem.href || pathname.startsWith(subItem.href + "/")
                 );
 
                 return (
@@ -122,7 +163,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                       className={clsx(
                         "flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
                         hasActiveChild
-                          ? "bg-primary-50 text-primary-600"
+                          ? "bg-purple-50 text-purple-600"
                           : "text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
                       )}
                     >
@@ -138,7 +179,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                     {isExpanded && (
                       <div className="mt-1 ml-3 pl-3 border-l-2 border-surface-tertiary space-y-1">
                         {item.submenu.map((subItem) => {
-                          const isActive = pathname === subItem.href;
+                          const isActive = pathname === subItem.href || pathname.startsWith(subItem.href + "/");
                           return (
                             <Link
                               key={subItem.name}
@@ -146,7 +187,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                               className={clsx(
                                 "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                                 isActive
-                                  ? "bg-primary-50 text-primary-600"
+                                  ? "bg-purple-50 text-purple-600"
                                   : "text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
                               )}
                             >
@@ -170,7 +211,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                   className={clsx(
                     "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-primary-50 text-primary-600"
+                      ? "bg-purple-50 text-purple-600"
                       : "text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
                   )}
                 >
@@ -190,7 +231,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                     className={clsx(
                       "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
                       isActive
-                        ? "bg-primary-50 text-primary-600"
+                        ? "bg-purple-50 text-purple-600"
                         : "text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
                     )}
                   >
@@ -204,15 +245,22 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
           {/* User section */}
           <div className="p-4 border-t border-surface-tertiary">
-            <div className="flex items-center gap-3 p-2 rounded-xl bg-surface-secondary">
-              <div className="h-9 w-9 rounded-full bg-healing-lavender flex items-center justify-center">
-                <span className="text-sm font-medium text-text-primary">U</span>
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              Back to Dashboard
+            </Link>
+            <div className="mt-2 flex items-center gap-3 p-2 rounded-xl bg-surface-secondary">
+              <div className="h-9 w-9 rounded-full bg-red-100 flex items-center justify-center">
+                <Shield className="h-5 w-5 text-red-600" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-text-primary truncate">
-                  User Name
+                  Admin User
                 </p>
-                <p className="text-xs text-text-muted truncate">Free Plan</p>
+                <p className="text-xs text-text-muted truncate">Super Admin</p>
               </div>
             </div>
           </div>
@@ -239,8 +287,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
                 className="flex items-center gap-2 p-2 rounded-xl hover:bg-surface-secondary transition-colors"
               >
-                <div className="h-8 w-8 rounded-full bg-healing-lavender flex items-center justify-center">
-                  <span className="text-sm font-medium text-text-primary">U</span>
+                <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
+                  <Shield className="h-4 w-4 text-red-600" />
                 </div>
                 <ChevronDown className="h-4 w-4 text-text-muted" />
               </button>
@@ -254,7 +302,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl border border-surface-tertiary shadow-lg z-50">
                     <div className="p-2">
                       <Link
-                        href="/settings"
+                        href="/admin/settings"
                         className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
                         onClick={() => setUserMenuOpen(false)}
                       >
@@ -277,17 +325,5 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         <main className="p-4 lg:p-8">{children}</main>
       </div>
     </div>
-  );
-}
-
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <TeamProvider>
-      <DashboardContent>{children}</DashboardContent>
-    </TeamProvider>
   );
 }
