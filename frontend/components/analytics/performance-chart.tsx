@@ -90,7 +90,7 @@ export function PerformanceChart({ data, isLoading = false }: PerformanceChartPr
             <Line
               type="monotone"
               dataKey="total_clicks"
-              stroke="#3b82f6"
+              stroke="#627862"
               strokeWidth={2}
               dot={false}
               name="Clicks"
@@ -98,7 +98,7 @@ export function PerformanceChart({ data, isLoading = false }: PerformanceChartPr
             <Line
               type="monotone"
               dataKey="total_impressions"
-              stroke="#8b5cf6"
+              stroke="#bc7a5c"
               strokeWidth={2}
               dot={false}
               name="Impressions"

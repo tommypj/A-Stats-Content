@@ -2,7 +2,7 @@
 
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
-const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
+const COLORS = ["#627862", "#a17d66", "#bc7a5c", "#ef4444"];
 
 interface SubscriptionChartProps {
   data: Array<{ tier: string; count: number }>;

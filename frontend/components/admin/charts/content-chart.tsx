@@ -34,9 +34,9 @@ export function ContentChart({ data }: ContentChartProps) {
             }}
           />
           <Legend />
-          <Bar dataKey="articles" fill="#3b82f6" name="Articles" />
-          <Bar dataKey="outlines" fill="#10b981" name="Outlines" />
-          <Bar dataKey="images" fill="#f59e0b" name="Images" />
+          <Bar dataKey="articles" fill="#627862" name="Articles" />
+          <Bar dataKey="outlines" fill="#a17d66" name="Outlines" />
+          <Bar dataKey="images" fill="#bc7a5c" name="Images" />
         </BarChart>
       </ResponsiveContainer>
     </div>

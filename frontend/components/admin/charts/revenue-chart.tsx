@@ -42,10 +42,10 @@ export function RevenueChart({ data }: RevenueChartProps) {
           <Line
             type="monotone"
             dataKey="revenue"
-            stroke="#10b981"
+            stroke="#627862"
             strokeWidth={2}
             name="Revenue"
-            dot={{ fill: "#10b981", r: 4 }}
+            dot={{ fill: "#627862", r: 4 }}
             activeDot={{ r: 6 }}
           />
         </LineChart>

@@ -37,10 +37,10 @@ export function UserGrowthChart({ data }: UserGrowthChartProps) {
           <Line
             type="monotone"
             dataKey="count"
-            stroke="#3b82f6"
+            stroke="#627862"
             strokeWidth={2}
             name="Users"
-            dot={{ fill: "#3b82f6", r: 4 }}
+            dot={{ fill: "#627862", r: 4 }}
             activeDot={{ r: 6 }}
           />
         </LineChart>

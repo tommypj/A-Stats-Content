@@ -29,9 +29,9 @@ import {
 
 const SUBSCRIPTION_COLORS = {
   free: "#94a3b8",
-  starter: "#3b82f6",
-  professional: "#8b5cf6",
-  enterprise: "#f59e0b",
+  starter: "#627862",
+  professional: "#a17d66",
+  enterprise: "#bc7a5c",
 };
 
 export default function AdminDashboardPage() {
@@ -178,9 +178,9 @@ export default function AdminDashboardPage() {
                   <Line
                     type="monotone"
                     dataKey="count"
-                    stroke="#8b5cf6"
+                    stroke="#627862"
                     strokeWidth={2}
-                    dot={{ fill: "#8b5cf6", r: 4 }}
+                    dot={{ fill: "#627862", r: 4 }}
                     activeDot={{ r: 6 }}
                   />
                 </LineChart>
