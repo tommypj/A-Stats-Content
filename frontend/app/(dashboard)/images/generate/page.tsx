@@ -14,7 +14,7 @@ import {
   ImageIcon,
   CheckCircle2,
 } from "lucide-react";
-import { api, GeneratedImage, Article } from "@/lib/api";
+import { api, getImageUrl, GeneratedImage, Article } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AIGenerationProgress } from "@/components/ui/ai-generation-progress";
@@ -141,7 +141,7 @@ function GenerateImageContent() {
     if (!generatedImage?.url) return;
 
     try {
-      await navigator.clipboard.writeText(generatedImage.url);
+      await navigator.clipboard.writeText(getImageUrl(generatedImage.url));
       setCopiedUrl(true);
       setTimeout(() => setCopiedUrl(false), 2000);
     } catch (error) {
@@ -153,7 +153,7 @@ function GenerateImageContent() {
     if (!generatedImage?.url) return;
 
     const link = document.createElement("a");
-    link.href = generatedImage.url;
+    link.href = getImageUrl(generatedImage.url);
     link.download = `image-${generatedImage.id}.png`;
     document.body.appendChild(link);
     link.click();
@@ -329,7 +329,7 @@ function GenerateImageContent() {
             <>
               <div className="relative aspect-square bg-surface-secondary rounded-xl overflow-hidden mb-4">
                 <Image
-                  src={generatedImage.url}
+                  src={getImageUrl(generatedImage.url)}
                   alt={generatedImage.alt_text || generatedImage.prompt}
                   fill
                   className="object-contain"
@@ -368,7 +368,7 @@ function GenerateImageContent() {
                   <div className="flex items-center gap-2">
                     <input
                       type="text"
-                      value={generatedImage.url}
+                      value={getImageUrl(generatedImage.url)}
                       readOnly
                       className="flex-1 px-3 py-2 text-xs rounded-lg border border-surface-tertiary bg-surface-secondary"
                     />

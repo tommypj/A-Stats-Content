@@ -1,8 +1,10 @@
 """A-Stats Engine - Main FastAPI Application."""
 import asyncio
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from rich.console import Console
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -85,6 +87,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve uploaded files (images, etc.)
+uploads_path = os.path.join(os.path.dirname(__file__), "data", "uploads")
+os.makedirs(uploads_path, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_path), name="uploads")
 
 # Include API routes
 app.include_router(api_router, prefix="/api/v1")

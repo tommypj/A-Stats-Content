@@ -17,7 +17,7 @@ import {
   ExternalLink,
   Sparkles,
 } from "lucide-react";
-import { api, GeneratedImage } from "@/lib/api";
+import { api, getImageUrl, GeneratedImage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { clsx } from "clsx";
@@ -141,7 +141,7 @@ export default function ImagesPage() {
                       className="w-full h-full group cursor-pointer"
                     >
                       <Image
-                        src={image.url}
+                        src={getImageUrl(image.url)}
                         alt={image.alt_text || image.prompt}
                         fill
                         className="object-cover group-hover:opacity-90 transition-opacity"
@@ -186,21 +186,21 @@ export default function ImagesPage() {
                           <div className="fixed inset-0 z-40" onClick={() => setActiveMenu(null)} />
                           <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg border border-surface-tertiary shadow-lg z-50">
                             <button
-                              onClick={() => handleCopyUrl(image.url, image.id)}
+                              onClick={() => handleCopyUrl(getImageUrl(image.url), image.id)}
                               className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-surface-secondary"
                             >
                               <Copy className="h-4 w-4" />
                               {copiedId === image.id ? "Copied!" : "Copy URL"}
                             </button>
                             <button
-                              onClick={() => handleDownload(image.url, image.id)}
+                              onClick={() => handleDownload(getImageUrl(image.url), image.id)}
                               className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-surface-secondary"
                             >
                               <Download className="h-4 w-4" />
                               Download
                             </button>
                             <a
-                              href={image.url}
+                              href={getImageUrl(image.url)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-surface-secondary"
@@ -276,7 +276,7 @@ export default function ImagesPage() {
             <div className="p-6">
               <div className="relative w-full" style={{ aspectRatio: `${selectedImage.width}/${selectedImage.height}` }}>
                 <Image
-                  src={selectedImage.url}
+                  src={getImageUrl(selectedImage.url)}
                   alt={selectedImage.alt_text || selectedImage.prompt}
                   fill
                   className="object-contain"
@@ -308,7 +308,7 @@ export default function ImagesPage() {
                 <div className="flex gap-3 pt-4">
                   <Button
                     variant="outline"
-                    onClick={() => handleCopyUrl(selectedImage.url, selectedImage.id)}
+                    onClick={() => handleCopyUrl(getImageUrl(selectedImage.url), selectedImage.id)}
                     className="flex-1"
                   >
                     <Copy className="h-4 w-4 mr-2" />
@@ -316,7 +316,7 @@ export default function ImagesPage() {
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => handleDownload(selectedImage.url, selectedImage.id)}
+                    onClick={() => handleDownload(getImageUrl(selectedImage.url), selectedImage.id)}
                     className="flex-1"
                   >
                     <Download className="h-4 w-4 mr-2" />

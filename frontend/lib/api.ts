@@ -14,6 +14,19 @@ export const apiClient: AxiosInstance = axios.create({
 });
 
 /**
+ * Construct full image URL from a relative or absolute path.
+ * Backend stores image URLs as relative paths like /uploads/images/...
+ */
+export function getImageUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  // Already a full URL
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  // Relative path — prepend API base URL
+  const base = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/api\/v1\/?$/, "");
+  return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
+/**
  * Extended timeout for AI generation requests (articles, outlines, images)
  */
 const AI_TIMEOUT = 180000; // 3 minutes

@@ -91,8 +91,10 @@ async def generate_image(
         alt_text = f"AI-generated image: {request.prompt[:100]}"
 
         # Update image record
-        image.url = generated.url
+        # Store relative backend serving URL instead of the external Replicate URL
+        # (which may expire). The frontend constructs the full URL using NEXT_PUBLIC_API_URL.
         image.local_path = local_path
+        image.url = f"/uploads/{local_path}"
         image.alt_text = alt_text
         image.model = generated.model if hasattr(generated, "model") else None
         image.status = "completed"
