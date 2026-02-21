@@ -54,6 +54,21 @@ class Settings(BaseSettings):
     # CORS
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:8000"]
 
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v):
+        """Parse CORS origins from env var string or list."""
+        import json
+        if isinstance(v, str):
+            v = v.strip()
+            if v.startswith("["):
+                try:
+                    return json.loads(v)
+                except json.JSONDecodeError:
+                    pass
+            return [origin.strip().strip("'\"") for origin in v.split(",") if origin.strip()]
+        return v
+
     # Anthropic (AI Content Generation)
     anthropic_api_key: Optional[str] = None
     anthropic_model: str = "claude-sonnet-4-20250514"
