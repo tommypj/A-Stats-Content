@@ -29,7 +29,7 @@ from infrastructure.config import get_settings
 # Initialize security services
 password_hasher = PasswordHasher()
 settings = get_settings()
-token_service = TokenService(secret_key=settings.secret_key)
+token_service = TokenService(secret_key=settings.jwt_secret_key)
 
 
 # Database URL for testing (in-memory SQLite)
@@ -84,10 +84,10 @@ async def test_user(db_session: AsyncSession) -> User:
     user = User(
         id=str(uuid4()),
         email="test@example.com",
-        hashed_password=password_hasher.hash("testpassword123"),
-        full_name="Test User",
-        is_active=True,
-        is_verified=True,
+        password_hash=password_hasher.hash("testpassword123"),
+        name="Test User",
+        status="active",
+        email_verified=True,
     )
     db_session.add(user)
     await db_session.commit()
@@ -112,6 +112,13 @@ async def async_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, 
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
+
+    # Reset rate limiter state between tests to prevent cross-test 429s
+    if hasattr(app.state, "limiter"):
+        try:
+            app.state.limiter.reset()
+        except Exception:
+            pass
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         yield client
@@ -390,16 +397,18 @@ async def test_source(db_session: AsyncSession, test_user: User):
 
     Used for testing source retrieval, updates, and deletion.
     """
-    from infrastructure.database.models.knowledge import KnowledgeSource, ProcessingStatus
+    from infrastructure.database.models.knowledge import KnowledgeSource, SourceStatus
 
     source = KnowledgeSource(
         id=str(uuid4()),
         user_id=test_user.id,
+        title="Test Document",
         filename="test_document.pdf",
-        file_path="uploads/test_document.pdf",
+        file_type="pdf",
         file_size=1024,
-        status=ProcessingStatus.PENDING,
-        chunks_count=0,
+        file_url="uploads/test_document.pdf",
+        status=SourceStatus.PENDING.value,
+        chunk_count=0,
     )
     db_session.add(source)
     await db_session.commit()
@@ -414,16 +423,18 @@ async def processed_source(db_session: AsyncSession, test_user: User):
 
     Used for testing query operations that require indexed content.
     """
-    from infrastructure.database.models.knowledge import KnowledgeSource, ProcessingStatus
+    from infrastructure.database.models.knowledge import KnowledgeSource, SourceStatus
 
     source = KnowledgeSource(
         id=str(uuid4()),
         user_id=test_user.id,
+        title="Therapy Guide",
         filename="therapy_guide.pdf",
-        file_path="uploads/therapy_guide.pdf",
+        file_type="pdf",
         file_size=5120,
-        status=ProcessingStatus.COMPLETED,
-        chunks_count=25,
+        file_url="uploads/therapy_guide.pdf",
+        status=SourceStatus.COMPLETED.value,
+        chunk_count=25,
     )
     db_session.add(source)
     await db_session.commit()
@@ -438,16 +449,18 @@ async def pending_source(db_session: AsyncSession, test_user: User):
 
     Used for testing processing status checks.
     """
-    from infrastructure.database.models.knowledge import KnowledgeSource, ProcessingStatus
+    from infrastructure.database.models.knowledge import KnowledgeSource, SourceStatus
 
     source = KnowledgeSource(
         id=str(uuid4()),
         user_id=test_user.id,
+        title="Processing Document",
         filename="processing.pdf",
-        file_path="uploads/processing.pdf",
+        file_type="pdf",
         file_size=2048,
-        status=ProcessingStatus.PENDING,
-        chunks_count=0,
+        file_url="uploads/processing.pdf",
+        status=SourceStatus.PENDING.value,
+        chunk_count=0,
     )
     db_session.add(source)
     await db_session.commit()
@@ -462,17 +475,19 @@ async def failed_source(db_session: AsyncSession, test_user: User):
 
     Used for testing error handling and status reporting.
     """
-    from infrastructure.database.models.knowledge import KnowledgeSource, ProcessingStatus
+    from infrastructure.database.models.knowledge import KnowledgeSource, SourceStatus
 
     source = KnowledgeSource(
         id=str(uuid4()),
         user_id=test_user.id,
+        title="Corrupted Document",
         filename="corrupted.pdf",
-        file_path="uploads/corrupted.pdf",
+        file_type="pdf",
         file_size=512,
-        status=ProcessingStatus.FAILED,
+        file_url="uploads/corrupted.pdf",
+        status=SourceStatus.FAILED.value,
         error_message="Failed to parse PDF: Invalid format",
-        chunks_count=0,
+        chunk_count=0,
     )
     db_session.add(source)
     await db_session.commit()
@@ -487,25 +502,29 @@ async def test_sources(db_session: AsyncSession, test_user: User):
 
     Used for testing pagination, filtering, and list operations.
     """
-    from infrastructure.database.models.knowledge import KnowledgeSource, ProcessingStatus
+    from infrastructure.database.models.knowledge import KnowledgeSource, SourceStatus
+
+    statuses = [
+        SourceStatus.COMPLETED,
+        SourceStatus.COMPLETED,
+        SourceStatus.PENDING,
+        SourceStatus.FAILED,
+        SourceStatus.COMPLETED,
+    ]
 
     sources = [
         KnowledgeSource(
             id=str(uuid4()),
             user_id=test_user.id,
+            title=f"Document {i}",
             filename=f"document_{i}.pdf",
-            file_path=f"uploads/document_{i}.pdf",
+            file_type="pdf",
             file_size=1024 * i,
-            status=status,
-            chunks_count=10 * i if status == ProcessingStatus.COMPLETED else 0,
+            file_url=f"uploads/document_{i}.pdf",
+            status=status.value,
+            chunk_count=10 * i if status == SourceStatus.COMPLETED else 0,
         )
-        for i, status in enumerate([
-            ProcessingStatus.COMPLETED,
-            ProcessingStatus.COMPLETED,
-            ProcessingStatus.PENDING,
-            ProcessingStatus.FAILED,
-            ProcessingStatus.COMPLETED,
-        ], start=1)
+        for i, status in enumerate(statuses, start=1)
     ]
 
     for source in sources:
@@ -526,23 +545,27 @@ async def processed_sources(db_session: AsyncSession, test_user: User):
 
     Used for testing multi-source queries and filtering.
     """
-    from infrastructure.database.models.knowledge import KnowledgeSource, ProcessingStatus
+    from infrastructure.database.models.knowledge import KnowledgeSource, SourceStatus
+
+    filenames = [
+        "cbt_techniques.pdf",
+        "mindfulness_guide.pdf",
+        "stress_management.pdf",
+    ]
 
     sources = [
         KnowledgeSource(
             id=str(uuid4()),
             user_id=test_user.id,
+            title=filename.replace("_", " ").replace(".pdf", "").title(),
             filename=filename,
-            file_path=f"uploads/{filename}",
+            file_type="pdf",
             file_size=2048,
-            status=ProcessingStatus.COMPLETED,
-            chunks_count=15,
+            file_url=f"uploads/{filename}",
+            status=SourceStatus.COMPLETED.value,
+            chunk_count=15,
         )
-        for filename in [
-            "cbt_techniques.pdf",
-            "mindfulness_guide.pdf",
-            "stress_management.pdf"
-        ]
+        for filename in filenames
     ]
 
     for source in sources:
@@ -629,10 +652,10 @@ async def other_user(db_session: AsyncSession) -> User:
     user = User(
         id=str(uuid4()),
         email="other@example.com",
-        hashed_password=password_hasher.hash("testpassword123"),
-        full_name="Other User",
-        is_active=True,
-        is_verified=True,
+        password_hash=password_hasher.hash("testpassword123"),
+        name="Other User",
+        status="active",
+        email_verified=True,
     )
     db_session.add(user)
     await db_session.commit()
@@ -775,7 +798,8 @@ async def team(db_session: AsyncSession, test_user: User) -> dict:
     """
     # Skip if Team model not implemented
     try:
-        from infrastructure.database.models import Team, TeamMember, TeamRole
+        from infrastructure.database.models import Team, TeamMember
+        from infrastructure.database.models.team import TeamMemberRole as TeamRole
     except ImportError:
         pytest.skip("Team models not yet implemented")
 
@@ -784,7 +808,7 @@ async def team(db_session: AsyncSession, test_user: User) -> dict:
         name="Test Team",
         description="Team for testing",
         slug="test-team",
-        created_by=test_user.id,
+        owner_id=test_user.id,
     )
     db_session.add(team)
 
@@ -817,7 +841,8 @@ async def team_admin(db_session: AsyncSession, team: dict) -> dict:
     Returns dict with user data.
     """
     try:
-        from infrastructure.database.models import TeamMember, TeamRole
+        from infrastructure.database.models import TeamMember
+        from infrastructure.database.models.team import TeamMemberRole as TeamRole
     except ImportError:
         pytest.skip("Team models not yet implemented")
 
@@ -825,10 +850,10 @@ async def team_admin(db_session: AsyncSession, team: dict) -> dict:
     admin_user = User(
         id=str(uuid4()),
         email="teamadmin@example.com",
-        hashed_password=password_hasher.hash("adminpass123"),
-        full_name="Team Admin",
-        is_active=True,
-        is_verified=True,
+        password_hash=password_hasher.hash("adminpass123"),
+        name="Team Admin",
+        status="active",
+        email_verified=True,
     )
     db_session.add(admin_user)
     await db_session.flush()
@@ -872,7 +897,8 @@ async def team_member(db_session: AsyncSession, team: dict) -> dict:
     Returns dict with user data.
     """
     try:
-        from infrastructure.database.models import TeamMember, TeamRole
+        from infrastructure.database.models import TeamMember
+        from infrastructure.database.models.team import TeamMemberRole as TeamRole
     except ImportError:
         pytest.skip("Team models not yet implemented")
 
@@ -880,10 +906,10 @@ async def team_member(db_session: AsyncSession, team: dict) -> dict:
     member_user = User(
         id=str(uuid4()),
         email="teammember@example.com",
-        hashed_password=password_hasher.hash("memberpass123"),
-        full_name="Team Member",
-        is_active=True,
-        is_verified=True,
+        password_hash=password_hasher.hash("memberpass123"),
+        name="Team Member",
+        status="active",
+        email_verified=True,
     )
     db_session.add(member_user)
     await db_session.flush()
@@ -893,7 +919,7 @@ async def team_member(db_session: AsyncSession, team: dict) -> dict:
         id=str(uuid4()),
         team_id=team["id"],
         user_id=member_user.id,
-        role=TeamRole.MEMBER.value,
+        role=TeamRole.EDITOR.value,
     )
     db_session.add(member)
     await db_session.commit()
@@ -927,7 +953,8 @@ async def team_viewer(db_session: AsyncSession, team: dict) -> dict:
     Returns dict with user data.
     """
     try:
-        from infrastructure.database.models import TeamMember, TeamRole
+        from infrastructure.database.models import TeamMember
+        from infrastructure.database.models.team import TeamMemberRole as TeamRole
     except ImportError:
         pytest.skip("Team models not yet implemented")
 
@@ -935,10 +962,10 @@ async def team_viewer(db_session: AsyncSession, team: dict) -> dict:
     viewer_user = User(
         id=str(uuid4()),
         email="teamviewer@example.com",
-        hashed_password=password_hasher.hash("viewerpass123"),
-        full_name="Team Viewer",
-        is_active=True,
-        is_verified=True,
+        password_hash=password_hasher.hash("viewerpass123"),
+        name="Team Viewer",
+        status="active",
+        email_verified=True,
     )
     db_session.add(viewer_user)
     await db_session.flush()
@@ -982,7 +1009,8 @@ async def team_invitation(db_session: AsyncSession, team: dict, test_user: User)
     Returns dict with invitation data including token.
     """
     try:
-        from infrastructure.database.models import TeamInvitation, TeamRole
+        from infrastructure.database.models import TeamInvitation
+        from infrastructure.database.models.team import TeamMemberRole as TeamRole
     except ImportError:
         pytest.skip("Team models not yet implemented")
 
@@ -992,7 +1020,7 @@ async def team_invitation(db_session: AsyncSession, team: dict, test_user: User)
         id=str(uuid4()),
         team_id=team["id"],
         email="invited@example.com",
-        role=TeamRole.MEMBER.value,
+        role=TeamRole.EDITOR.value,
         token=secrets.token_urlsafe(32),
         invited_by=test_user.id,
         expires_at=datetime.utcnow() + timedelta(days=7),
@@ -1010,3 +1038,281 @@ async def team_invitation(db_session: AsyncSession, team: dict, test_user: User)
         "token": invitation.token,
         "status": invitation.status,
     }
+
+
+# ============================================================================
+# Social Media Test Fixtures (Phase 8)
+# ============================================================================
+
+def _encrypt_token(value: str) -> str:
+    """Encrypt a token using the app settings secret key."""
+    from infrastructure.config import get_settings
+    from core.security.encryption import encrypt_credential
+    settings = get_settings()
+    return encrypt_credential(value, settings.secret_key)
+
+
+@pytest.fixture
+async def connected_twitter_account(db_session: AsyncSession, test_user: User):
+    """
+    Create a connected Twitter account for testing.
+
+    Used for testing post creation and publishing to Twitter.
+    """
+    from infrastructure.database.models.social import SocialAccount
+
+    account = SocialAccount(
+        id=str(uuid4()),
+        user_id=test_user.id,
+        platform="twitter",
+        platform_username="testuser",
+        platform_user_id="123456",
+        access_token_encrypted=_encrypt_token("test_twitter_token"),
+        refresh_token_encrypted=_encrypt_token("test_twitter_refresh"),
+        token_expires_at=datetime.utcnow() + timedelta(hours=2),
+        is_active=True,
+    )
+    db_session.add(account)
+    await db_session.commit()
+    await db_session.refresh(account)
+    return account
+
+
+@pytest.fixture
+async def connected_linkedin_account(db_session: AsyncSession, test_user: User):
+    """
+    Create a connected LinkedIn account for testing.
+
+    Used for testing post creation and publishing to LinkedIn.
+    """
+    from infrastructure.database.models.social import SocialAccount
+
+    account = SocialAccount(
+        id=str(uuid4()),
+        user_id=test_user.id,
+        platform="linkedin",
+        platform_username="Test User",
+        platform_user_id="urn:li:person:123456",
+        access_token_encrypted=_encrypt_token("test_linkedin_token"),
+        token_expires_at=datetime.utcnow() + timedelta(days=60),
+        is_active=True,
+    )
+    db_session.add(account)
+    await db_session.commit()
+    await db_session.refresh(account)
+    return account
+
+
+@pytest.fixture
+async def connected_facebook_account(db_session: AsyncSession, test_user: User):
+    """
+    Create a connected Facebook account for testing.
+
+    Used for testing post creation and publishing to Facebook.
+    """
+    from infrastructure.database.models.social import SocialAccount
+
+    account = SocialAccount(
+        id=str(uuid4()),
+        user_id=test_user.id,
+        platform="facebook",
+        platform_username="Test Page",
+        platform_user_id="123456789",
+        access_token_encrypted=_encrypt_token("test_facebook_token"),
+        token_expires_at=datetime.utcnow() + timedelta(days=60),
+        is_active=True,
+        account_metadata={"page_id": "123456789"},
+    )
+    db_session.add(account)
+    await db_session.commit()
+    await db_session.refresh(account)
+    return account
+
+
+@pytest.fixture
+async def connected_accounts(
+    db_session: AsyncSession,
+    test_user: User,
+    connected_twitter_account,
+    connected_linkedin_account,
+):
+    """
+    Create multiple connected accounts for testing.
+
+    Used for testing multi-platform posting and account management.
+    """
+    return [connected_twitter_account, connected_linkedin_account]
+
+
+@pytest.fixture
+async def pending_post(
+    db_session: AsyncSession,
+    test_user: User,
+    connected_twitter_account,
+):
+    """
+    Create a pending scheduled post for testing.
+
+    Used for testing post retrieval, updates, and publishing.
+    """
+    from infrastructure.database.models.social import ScheduledPost, PostTarget, PostStatus
+
+    post = ScheduledPost(
+        id=str(uuid4()),
+        user_id=test_user.id,
+        content="Test pending post",
+        scheduled_at=datetime.utcnow() + timedelta(hours=2),
+        status=PostStatus.SCHEDULED,
+    )
+    db_session.add(post)
+    await db_session.flush()
+
+    target = PostTarget(
+        id=str(uuid4()),
+        scheduled_post_id=post.id,
+        social_account_id=connected_twitter_account.id,
+        is_published=False,
+    )
+    db_session.add(target)
+
+    await db_session.commit()
+    await db_session.refresh(post)
+    return post
+
+
+@pytest.fixture
+async def posted_post(
+    db_session: AsyncSession,
+    test_user: User,
+    connected_twitter_account,
+):
+    """
+    Create a post that has already been published.
+
+    Used for testing operations that should fail on published posts.
+    """
+    from infrastructure.database.models.social import ScheduledPost, PostTarget, PostStatus
+
+    post = ScheduledPost(
+        id=str(uuid4()),
+        user_id=test_user.id,
+        content="Test published post",
+        scheduled_at=datetime.utcnow() - timedelta(hours=1),
+        status=PostStatus.PUBLISHED,
+        published_at=datetime.utcnow() - timedelta(hours=1),
+    )
+    db_session.add(post)
+    await db_session.flush()
+
+    target = PostTarget(
+        id=str(uuid4()),
+        scheduled_post_id=post.id,
+        social_account_id=connected_twitter_account.id,
+        is_published=True,
+        platform_post_id="1234567890",
+        published_at=datetime.utcnow() - timedelta(hours=1),
+    )
+    db_session.add(target)
+
+    await db_session.commit()
+    await db_session.refresh(post)
+    return post
+
+
+@pytest.fixture
+async def failed_post(
+    db_session: AsyncSession,
+    test_user: User,
+    connected_twitter_account,
+):
+    """
+    Create a post that failed to publish.
+
+    Used for testing retry operations and error handling.
+    """
+    from infrastructure.database.models.social import ScheduledPost, PostTarget, PostStatus
+
+    post = ScheduledPost(
+        id=str(uuid4()),
+        user_id=test_user.id,
+        content="Test failed post",
+        scheduled_at=datetime.utcnow() - timedelta(minutes=30),
+        status=PostStatus.FAILED,
+        publish_error="API Error: Rate limit exceeded",
+    )
+    db_session.add(post)
+    await db_session.flush()
+
+    target = PostTarget(
+        id=str(uuid4()),
+        scheduled_post_id=post.id,
+        social_account_id=connected_twitter_account.id,
+        is_published=False,
+        publish_error="API Error: Rate limit exceeded",
+    )
+    db_session.add(target)
+
+    await db_session.commit()
+    await db_session.refresh(post)
+    return post
+
+
+@pytest.fixture
+async def multiple_scheduled_posts(
+    db_session: AsyncSession,
+    test_user: User,
+    connected_accounts,
+):
+    """
+    Create multiple scheduled posts with various statuses.
+
+    Used for testing pagination, filtering, and calendar views.
+    """
+    from infrastructure.database.models.social import ScheduledPost, PostTarget, PostStatus
+
+    posts = []
+
+    statuses = [
+        PostStatus.SCHEDULED,
+        PostStatus.SCHEDULED,
+        PostStatus.PUBLISHED,
+        PostStatus.FAILED,
+        PostStatus.SCHEDULED,
+    ]
+
+    for i, post_status in enumerate(statuses):
+        scheduled_at = datetime.utcnow() + timedelta(hours=(i + 1))
+        if post_status == PostStatus.PUBLISHED:
+            scheduled_at = datetime.utcnow() - timedelta(hours=1)
+
+        post = ScheduledPost(
+            id=str(uuid4()),
+            user_id=test_user.id,
+            content=f"Test post {i + 1}",
+            scheduled_at=scheduled_at,
+            status=post_status,
+            published_at=datetime.utcnow() - timedelta(hours=1) if post_status == PostStatus.PUBLISHED else None,
+        )
+        db_session.add(post)
+        await db_session.flush()
+
+        for account in connected_accounts:
+            is_published = post_status == PostStatus.PUBLISHED
+            target = PostTarget(
+                id=str(uuid4()),
+                scheduled_post_id=post.id,
+                social_account_id=account.id,
+                is_published=is_published,
+                platform_post_id=f"post_{i}_{account.platform}" if is_published else None,
+                published_at=datetime.utcnow() - timedelta(hours=1) if is_published else None,
+            )
+            db_session.add(target)
+
+        posts.append(post)
+
+    await db_session.commit()
+
+    for post in posts:
+        await db_session.refresh(post)
+
+    return posts

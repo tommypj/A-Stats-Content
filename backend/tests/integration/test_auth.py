@@ -26,7 +26,7 @@ class TestRegistration:
         data = response.json()
         assert data["email"] == "newuser@example.com"
         assert data["name"] == "New User"
-        assert data["status"] == UserStatus.PENDING.value
+        assert data["email_verified"] is False
         assert "password" not in data
         assert "password_hash" not in data
 
@@ -200,7 +200,7 @@ class TestCurrentUser:
         assert response.status_code == 200
         data = response.json()
         assert data["email"] == test_user.email
-        assert data["name"] == test_user.full_name
+        assert data["name"] == test_user.name
         assert "password" not in data
         assert "password_hash" not in data
 

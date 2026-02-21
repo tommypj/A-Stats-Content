@@ -1,7 +1,7 @@
 # Social Media Test Fixtures - To be merged into conftest.py
 # This file contains all fixtures needed for Phase 8 Social Media Scheduling tests
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +11,14 @@ from infrastructure.database.models import User
 # Social Media Test Fixtures
 # ============================================================================
 
+def _encrypt_token(value: str) -> str:
+    """Encrypt a token using the app settings secret key."""
+    from infrastructure.config import get_settings
+    from core.security.encryption import encrypt_credential
+    settings = get_settings()
+    return encrypt_credential(value, settings.secret_key)
+
+
 @pytest.fixture
 async def connected_twitter_account(db_session: AsyncSession, test_user: User):
     """
@@ -19,17 +27,16 @@ async def connected_twitter_account(db_session: AsyncSession, test_user: User):
     Used for testing post creation and publishing to Twitter.
     """
     from infrastructure.database.models.social import SocialAccount
-    from core.security.encryption import encrypt_token
 
     account = SocialAccount(
         id=str(uuid4()),
         user_id=test_user.id,
         platform="twitter",
-        account_name="testuser",
-        account_id="123456",
-        encrypted_access_token=encrypt_token("test_twitter_token"),
-        encrypted_refresh_token=encrypt_token("test_twitter_refresh"),
-        token_expires_at=datetime.utcnow() + timedelta(hours=2),
+        platform_username="testuser",
+        platform_user_id="123456",
+        access_token_encrypted=_encrypt_token("test_twitter_token"),
+        refresh_token_encrypted=_encrypt_token("test_twitter_refresh"),
+        token_expires_at=datetime.now(timezone.utc) + timedelta(hours=2),
         is_active=True,
     )
     db_session.add(account)
@@ -46,16 +53,15 @@ async def connected_linkedin_account(db_session: AsyncSession, test_user: User):
     Used for testing post creation and publishing to LinkedIn.
     """
     from infrastructure.database.models.social import SocialAccount
-    from core.security.encryption import encrypt_token
 
     account = SocialAccount(
         id=str(uuid4()),
         user_id=test_user.id,
         platform="linkedin",
-        account_name="Test User",
-        account_id="urn:li:person:123456",
-        encrypted_access_token=encrypt_token("test_linkedin_token"),
-        token_expires_at=datetime.utcnow() + timedelta(days=60),
+        platform_username="Test User",
+        platform_user_id="urn:li:person:123456",
+        access_token_encrypted=_encrypt_token("test_linkedin_token"),
+        token_expires_at=datetime.now(timezone.utc) + timedelta(days=60),
         is_active=True,
     )
     db_session.add(account)
@@ -72,18 +78,17 @@ async def connected_facebook_account(db_session: AsyncSession, test_user: User):
     Used for testing post creation and publishing to Facebook.
     """
     from infrastructure.database.models.social import SocialAccount
-    from core.security.encryption import encrypt_token
 
     account = SocialAccount(
         id=str(uuid4()),
         user_id=test_user.id,
         platform="facebook",
-        account_name="Test Page",
-        account_id="123456789",
-        encrypted_access_token=encrypt_token("test_facebook_token"),
-        token_expires_at=datetime.utcnow() + timedelta(days=60),
+        platform_username="Test Page",
+        platform_user_id="123456789",
+        access_token_encrypted=_encrypt_token("test_facebook_token"),
+        token_expires_at=datetime.now(timezone.utc) + timedelta(days=60),
         is_active=True,
-        metadata={"page_id": "123456789"},
+        account_metadata={"page_id": "123456789"},
     )
     db_session.add(account)
     await db_session.commit()
@@ -123,9 +128,8 @@ async def pending_post(
         id=str(uuid4()),
         user_id=test_user.id,
         content="Test pending post",
-        scheduled_time=datetime.utcnow() + timedelta(hours=2),
-        timezone="UTC",
-        status=PostStatus.PENDING,
+        scheduled_at=datetime.now(timezone.utc) + timedelta(hours=2),
+        status=PostStatus.SCHEDULED,
     )
     db_session.add(post)
     await db_session.flush()
@@ -133,10 +137,9 @@ async def pending_post(
     # Add target
     target = PostTarget(
         id=str(uuid4()),
-        post_id=post.id,
-        account_id=connected_twitter_account.id,
-        platform="twitter",
-        status=PostStatus.PENDING,
+        scheduled_post_id=post.id,
+        social_account_id=connected_twitter_account.id,
+        is_published=False,
     )
     db_session.add(target)
 
@@ -162,9 +165,9 @@ async def posted_post(
         id=str(uuid4()),
         user_id=test_user.id,
         content="Test published post",
-        scheduled_time=datetime.utcnow() - timedelta(hours=1),
-        timezone="UTC",
+        scheduled_at=datetime.now(timezone.utc) - timedelta(hours=1),
         status=PostStatus.PUBLISHED,
+        published_at=datetime.now(timezone.utc) - timedelta(hours=1),
     )
     db_session.add(post)
     await db_session.flush()
@@ -172,12 +175,11 @@ async def posted_post(
     # Add published target
     target = PostTarget(
         id=str(uuid4()),
-        post_id=post.id,
-        account_id=connected_twitter_account.id,
-        platform="twitter",
-        status=PostStatus.PUBLISHED,
+        scheduled_post_id=post.id,
+        social_account_id=connected_twitter_account.id,
+        is_published=True,
         platform_post_id="1234567890",
-        published_at=datetime.utcnow() - timedelta(hours=1),
+        published_at=datetime.now(timezone.utc) - timedelta(hours=1),
     )
     db_session.add(target)
 
@@ -203,9 +205,9 @@ async def failed_post(
         id=str(uuid4()),
         user_id=test_user.id,
         content="Test failed post",
-        scheduled_time=datetime.utcnow() - timedelta(minutes=30),
-        timezone="UTC",
+        scheduled_at=datetime.now(timezone.utc) - timedelta(minutes=30),
         status=PostStatus.FAILED,
+        publish_error="API Error: Rate limit exceeded",
     )
     db_session.add(post)
     await db_session.flush()
@@ -213,12 +215,10 @@ async def failed_post(
     # Add failed target
     target = PostTarget(
         id=str(uuid4()),
-        post_id=post.id,
-        account_id=connected_twitter_account.id,
-        platform="twitter",
-        status=PostStatus.FAILED,
-        error_message="API Error: Rate limit exceeded",
-        retry_count=1,
+        scheduled_post_id=post.id,
+        social_account_id=connected_twitter_account.id,
+        is_published=False,
+        publish_error="API Error: Rate limit exceeded",
     )
     db_session.add(target)
 
@@ -243,39 +243,39 @@ async def multiple_scheduled_posts(
     posts = []
 
     statuses = [
-        PostStatus.PENDING,
-        PostStatus.PENDING,
+        PostStatus.SCHEDULED,
+        PostStatus.SCHEDULED,
         PostStatus.PUBLISHED,
         PostStatus.FAILED,
-        PostStatus.PENDING,
+        PostStatus.SCHEDULED,
     ]
 
-    for i, status in enumerate(statuses):
-        scheduled_time = datetime.utcnow() + timedelta(hours=(i + 1))
-        if status == PostStatus.PUBLISHED:
-            scheduled_time = datetime.utcnow() - timedelta(hours=1)
+    for i, post_status in enumerate(statuses):
+        scheduled_at = datetime.now(timezone.utc) + timedelta(hours=(i + 1))
+        if post_status == PostStatus.PUBLISHED:
+            scheduled_at = datetime.now(timezone.utc) - timedelta(hours=1)
 
         post = ScheduledPost(
             id=str(uuid4()),
             user_id=test_user.id,
             content=f"Test post {i + 1}",
-            scheduled_time=scheduled_time,
-            timezone="UTC",
-            status=status,
+            scheduled_at=scheduled_at,
+            status=post_status,
+            published_at=datetime.now(timezone.utc) - timedelta(hours=1) if post_status == PostStatus.PUBLISHED else None,
         )
         db_session.add(post)
         await db_session.flush()
 
         # Add target for each account
         for account in connected_accounts:
+            is_published = post_status == PostStatus.PUBLISHED
             target = PostTarget(
                 id=str(uuid4()),
-                post_id=post.id,
-                account_id=account.id,
-                platform=account.platform,
-                status=status,
-                platform_post_id=f"post_{i}_{account.platform}" if status == PostStatus.PUBLISHED else None,
-                published_at=datetime.utcnow() - timedelta(hours=1) if status == PostStatus.PUBLISHED else None,
+                scheduled_post_id=post.id,
+                social_account_id=account.id,
+                is_published=is_published,
+                platform_post_id=f"post_{i}_{account.platform}" if is_published else None,
+                published_at=datetime.now(timezone.utc) - timedelta(hours=1) if is_published else None,
             )
             db_session.add(target)
 

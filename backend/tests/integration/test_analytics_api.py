@@ -30,8 +30,11 @@ class TestGSCAuthUrlEndpoint:
         test_user: User,
         auth_headers: dict,
     ):
-        """Test successful retrieval of OAuth authorization URL."""
-        with patch("infrastructure.config.settings.settings") as mock_settings:
+        """Test successful retrieval of OAuth authorization URL.
+
+        The analytics route reads settings from 'api.routes.analytics.settings'.
+        """
+        with patch("api.routes.analytics.settings") as mock_settings:
             mock_settings.google_client_id = "test_client_id"
             mock_settings.google_client_secret = "test_secret"
             mock_settings.google_redirect_uri = "http://localhost:8000/callback"
@@ -61,8 +64,11 @@ class TestGSCAuthUrlEndpoint:
         async_client: AsyncClient,
         auth_headers: dict,
     ):
-        """Test OAuth URL when Google credentials not configured."""
-        with patch("infrastructure.config.settings.settings") as mock_settings:
+        """Test OAuth URL when Google credentials not configured.
+
+        The analytics route reads settings from 'api.routes.analytics.settings'.
+        """
+        with patch("api.routes.analytics.settings") as mock_settings:
             mock_settings.google_client_id = None
             mock_settings.google_client_secret = None
 
