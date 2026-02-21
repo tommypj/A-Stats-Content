@@ -78,7 +78,7 @@ class User(Base, TimestampMixin):
     # Email verification
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     email_verification_token: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True
+        Text, nullable=True
     )
     email_verification_expires: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -86,7 +86,7 @@ class User(Base, TimestampMixin):
 
     # Password reset
     password_reset_token: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True
+        Text, nullable=True
     )
     password_reset_expires: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
