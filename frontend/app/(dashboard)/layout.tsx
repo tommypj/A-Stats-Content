@@ -214,98 +214,114 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
-          {/* Expandable user submenu */}
-          <div className="border-t border-primary-800">
+          {/* User card + floating submenu */}
+          <div className="relative border-t border-primary-800">
+            {/* Floating popover - overlays sidebar content */}
             {userMenuOpen && (
-              <div className="px-3 py-3 space-y-3 bg-primary-900/50 animate-in">
-                {/* Connections */}
-                <div>
-                  <p className="px-3 text-[10px] font-semibold uppercase tracking-wider text-primary-400 mb-2">
-                    Connections
-                  </p>
-                  <div className="flex gap-2 px-3">
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setUserMenuOpen(false)}
+                />
+                <div className="absolute bottom-full left-0 right-0 z-50 mx-2 mb-1 rounded-xl bg-primary-900/95 backdrop-blur-md border border-primary-700 shadow-lg animate-in">
+                  <div className="px-3 py-3 space-y-3">
+                    {/* Connections */}
+                    <div>
+                      <p className="px-3 text-[10px] font-semibold uppercase tracking-wider text-primary-400 mb-2">
+                        Connections
+                      </p>
+                      <div className="flex gap-2 px-3">
+                        <Link
+                          href="/analytics"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-800 border border-primary-700 text-xs font-medium text-cream-200 hover:bg-primary-700 transition-colors"
+                        >
+                          <Globe className="h-3.5 w-3.5 text-primary-400" />
+                          GSC
+                        </Link>
+                        <Link
+                          href="/settings"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-800 border border-primary-700 text-xs font-medium text-cream-200 hover:bg-primary-700 transition-colors"
+                        >
+                          <Globe className="h-3.5 w-3.5 text-primary-400" />
+                          WordPress
+                        </Link>
+                      </div>
+                    </div>
+
+                    {/* Credits */}
                     <Link
-                      href="/analytics"
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-800 border border-primary-700 text-xs font-medium text-cream-200 hover:bg-primary-700 transition-colors"
+                      href="/settings/billing"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-cream-300 hover:bg-primary-800 hover:text-cream-100 transition-colors"
                     >
-                      <Globe className="h-3.5 w-3.5 text-primary-400" />
-                      GSC
+                      <Zap className="h-4 w-4 text-amber-500" />
+                      <span>Credits</span>
+                      <span className="ml-auto text-sm font-medium text-amber-500">
+                        {user?.subscription_tier === "free" ? "Free" : "Pro"}
+                      </span>
                     </Link>
+
+                    {/* Settings */}
                     <Link
                       href="/settings"
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-800 border border-primary-700 text-xs font-medium text-cream-200 hover:bg-primary-700 transition-colors"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-cream-300 hover:bg-primary-800 hover:text-cream-100 transition-colors"
                     >
-                      <Globe className="h-3.5 w-3.5 text-primary-400" />
-                      WordPress
+                      <Settings className="h-4 w-4" />
+                      Settings
                     </Link>
+
+                    {/* Admin section */}
+                    {isAdmin && (
+                      <div>
+                        <p className="px-3 text-[10px] font-semibold uppercase tracking-wider text-amber-500 mb-2">
+                          Admin
+                        </p>
+                        <div className="space-y-0.5">
+                          <Link
+                            href="/admin"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-cream-300 hover:bg-primary-800 hover:text-cream-100 transition-colors"
+                          >
+                            <LayoutDashboard className="h-4 w-4" />
+                            Dashboard
+                          </Link>
+                          <Link
+                            href="/admin/users"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-cream-300 hover:bg-primary-800 hover:text-cream-100 transition-colors"
+                          >
+                            <Users className="h-4 w-4" />
+                            User Management
+                          </Link>
+                          <Link
+                            href="/admin/audit-logs"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-cream-300 hover:bg-primary-800 hover:text-cream-100 transition-colors"
+                          >
+                            <FileSearch className="h-4 w-4" />
+                            System Logs
+                          </Link>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Sign Out */}
+                    <button
+                      onClick={handleSignOut}
+                      className="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-sm text-cream-300 hover:bg-primary-800 hover:text-cream-100 transition-colors"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Sign Out
+                    </button>
                   </div>
                 </div>
-
-                {/* Credits */}
-                <Link
-                  href="/settings/billing"
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-cream-300 hover:bg-primary-800 hover:text-cream-100 transition-colors"
-                >
-                  <Zap className="h-4 w-4 text-amber-500" />
-                  <span>Credits</span>
-                  <span className="ml-auto text-sm font-medium text-amber-500">
-                    {user?.subscription_tier === "free" ? "Free" : "Pro"}
-                  </span>
-                </Link>
-
-                {/* Settings */}
-                <Link
-                  href="/settings"
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-cream-300 hover:bg-primary-800 hover:text-cream-100 transition-colors"
-                >
-                  <Settings className="h-4 w-4" />
-                  Settings
-                </Link>
-
-                {/* Admin section */}
-                {isAdmin && (
-                  <div>
-                    <p className="px-3 text-[10px] font-semibold uppercase tracking-wider text-amber-500 mb-2">
-                      Admin
-                    </p>
-                    <div className="space-y-0.5">
-                      <Link
-                        href="/admin"
-                        className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-cream-300 hover:bg-primary-800 hover:text-cream-100 transition-colors"
-                      >
-                        <LayoutDashboard className="h-4 w-4" />
-                        Dashboard
-                      </Link>
-                      <Link
-                        href="/admin/users"
-                        className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-cream-300 hover:bg-primary-800 hover:text-cream-100 transition-colors"
-                      >
-                        <Users className="h-4 w-4" />
-                        User Management
-                      </Link>
-                      <Link
-                        href="/admin/audit-logs"
-                        className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-cream-300 hover:bg-primary-800 hover:text-cream-100 transition-colors"
-                      >
-                        <FileSearch className="h-4 w-4" />
-                        System Logs
-                      </Link>
-                    </div>
-                  </div>
-                )}
-
-                {/* Sign Out */}
-                <button
-                  onClick={handleSignOut}
-                  className="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-sm text-cream-300 hover:bg-primary-800 hover:text-cream-100 transition-colors"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Sign Out
-                </button>
-              </div>
+              </>
             )}
 
-            {/* User card - always visible */}
+            {/* User card - always visible at bottom */}
             <button
               onClick={() => setUserMenuOpen(!userMenuOpen)}
               className="w-full flex items-center gap-3 p-4 hover:bg-primary-900 transition-colors"
