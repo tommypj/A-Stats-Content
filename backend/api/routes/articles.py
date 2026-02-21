@@ -2,6 +2,8 @@
 Article API routes.
 """
 
+import asyncio
+import logging
 import math
 import re
 import markdown
@@ -25,6 +27,8 @@ from infrastructure.database.connection import get_db
 from infrastructure.database.models import Article, Outline, User, ContentStatus
 from adapters.ai.anthropic_adapter import content_ai_service
 from infrastructure.config.settings import settings
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/articles", tags=["articles"])
 
@@ -262,18 +266,21 @@ async def generate_article(
         article.seo_score = seo_result["score"]
         article.seo_analysis = seo_result
 
-        # Generate image prompt from the article content
+        # Generate image prompt (with 30s timeout so it doesn't block the response)
         try:
-            image_prompt = await content_ai_service.generate_image_prompt(
-                title=outline.title,
-                content=generated.content,
-                keyword=outline.keyword,
+            image_prompt = await asyncio.wait_for(
+                content_ai_service.generate_image_prompt(
+                    title=outline.title,
+                    content=generated.content,
+                    keyword=outline.keyword,
+                ),
+                timeout=30.0,
             )
             article.image_prompt = image_prompt
-        except Exception as img_err:
-            import logging
-            logging.getLogger(__name__).warning(
-                f"Failed to generate image prompt for article {article.id}: {img_err}"
+        except (asyncio.TimeoutError, Exception) as img_err:
+            logger.warning(
+                "Failed to generate image prompt for article %s: %s",
+                article.id, img_err,
             )
 
     except Exception as e:

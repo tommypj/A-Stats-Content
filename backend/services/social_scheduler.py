@@ -75,7 +75,7 @@ class SocialSchedulerService:
                 stmt = (
                     select(ScheduledPost)
                     .options(
-                        selectinload(ScheduledPost.targets).selectinload(PostTarget.account)
+                        selectinload(ScheduledPost.targets).selectinload(PostTarget.social_account)
                     )
                     .where(
                         and_(
@@ -131,7 +131,7 @@ class SocialSchedulerService:
                     continue  # Skip already processed targets
 
                 try:
-                    result = await self.publish_to_platform(post, target, target.account, db)
+                    result = await self.publish_to_platform(post, target, target.social_account, db)
 
                     if result.success:
                         success_count += 1
@@ -140,8 +140,8 @@ class SocialSchedulerService:
 
                 except Exception as e:
                     logger.error(
-                        f"Failed to publish to {target.account.platform} "
-                        f"({target.account.account_name}): {e}",
+                        f"Failed to publish to {target.social_account.platform} "
+                        f"({target.social_account.platform_username}): {e}",
                         exc_info=True,
                     )
                     target.status = PostTargetStatus.FAILED.value
@@ -188,7 +188,7 @@ class SocialSchedulerService:
         try:
             logger.info(
                 f"Publishing post {post.id} to {account.platform} "
-                f"({account.account_name})"
+                f"({account.platform_username})"
             )
 
             # Decrypt credentials
@@ -204,7 +204,7 @@ class SocialSchedulerService:
                 ),
                 token_expiry=account.token_expiry,
                 account_id=account.account_id,
-                account_name=account.account_name,
+                platform_username=account.platform_username,
                 account_username=account.account_username,
                 profile_image_url=account.profile_image_url,
             )
@@ -280,7 +280,7 @@ class SocialSchedulerService:
             stmt = (
                 select(ScheduledPost)
                 .options(
-                    selectinload(ScheduledPost.targets).selectinload(PostTarget.account)
+                    selectinload(ScheduledPost.targets).selectinload(PostTarget.social_account)
                 )
                 .where(ScheduledPost.id == post_id)
             )
@@ -318,8 +318,8 @@ class SocialSchedulerService:
                 "failed_count": failed_count,
                 "targets": [
                     {
-                        "account": t.account.account_name,
-                        "platform": t.account.platform,
+                        "account": t.social_account.platform_username,
+                        "platform": t.social_account.platform,
                         "status": t.status,
                         "post_url": t.platform_post_url,
                         "error": t.error_message,
@@ -350,7 +350,7 @@ class SocialSchedulerService:
                 select(PostTarget)
                 .options(
                     selectinload(PostTarget.post),
-                    selectinload(PostTarget.account),
+                    selectinload(PostTarget.social_account),
                 )
                 .where(PostTarget.id == target_id)
             )
@@ -370,7 +370,7 @@ class SocialSchedulerService:
 
             # Attempt to publish
             result = await self.publish_to_platform(
-                target.post, target, target.account, db
+                target.post, target, target.social_account, db
             )
 
             await db.commit()
