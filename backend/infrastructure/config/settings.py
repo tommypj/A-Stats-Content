@@ -57,14 +57,15 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins_list(self) -> list[str]:
-        """Parse CORS origins into a list."""
+        """Parse CORS origins into a list, stripping trailing slashes."""
         v = self.cors_origins.strip()
         if v.startswith("["):
             try:
-                return json.loads(v)
+                origins = json.loads(v)
+                return [o.rstrip("/") for o in origins]
             except json.JSONDecodeError:
                 pass
-        return [origin.strip().strip("'\"") for origin in v.split(",") if origin.strip()]
+        return [origin.strip().strip("'\"").rstrip("/") for origin in v.split(",") if origin.strip()]
 
     # Anthropic (AI Content Generation)
     anthropic_api_key: Optional[str] = None
