@@ -1,6 +1,7 @@
 """Application settings and configuration."""
+import json
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, Union
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -51,14 +52,15 @@ class Settings(BaseSettings):
     jwt_access_token_expire_minutes: int = 30
     jwt_refresh_token_expire_days: int = 7
 
-    # CORS
-    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:8000"]
+    # CORS - Use Union so pydantic-settings doesn't auto-JSON-parse
+    cors_origins: Union[str, list[str]] = '["http://localhost:3000", "http://localhost:8000"]'
 
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, v):
         """Parse CORS origins from env var string or list."""
-        import json
+        if isinstance(v, list):
+            return v
         if isinstance(v, str):
             v = v.strip()
             if v.startswith("["):
