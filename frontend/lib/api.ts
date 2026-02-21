@@ -1262,6 +1262,7 @@ export interface AdminUserDetail {
   total_outlines: number;
   total_images: number;
   storage_used_mb: number;
+  lemonsqueezy_customer_id?: string;
 }
 
 export interface AdminUserListResponse {
