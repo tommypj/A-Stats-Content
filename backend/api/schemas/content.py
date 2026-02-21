@@ -163,6 +163,7 @@ class ArticleResponse(BaseModel):
     seo_score: Optional[float]
     seo_analysis: Optional[Dict[str, Any]]
     ai_model: Optional[str]
+    image_prompt: Optional[str] = None
     published_at: Optional[datetime]
     published_url: Optional[str]
     featured_image_id: Optional[str]

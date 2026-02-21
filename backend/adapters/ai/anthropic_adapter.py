@@ -426,6 +426,49 @@ Respond with ONLY the meta description, nothing else."""
             word_count=len(content.split()),
         )
 
+    async def generate_image_prompt(
+        self,
+        title: str,
+        content: str,
+        keyword: str,
+    ) -> str:
+        """
+        Generate a concise image prompt optimized for AI image generation,
+        based on the article's title, content, and keyword.
+
+        Returns:
+            A 1-3 sentence visual image prompt.
+        """
+        if not self._client:
+            return f"A visually striking image representing {keyword}, related to {title}"
+
+        # Use only the first ~1500 chars of content to keep cost low
+        content_excerpt = content[:1500]
+
+        prompt = f"""Based on this article, write a concise image generation prompt (1-3 sentences) that an AI image model like Ideogram or DALL-E could use to create a compelling featured image.
+
+Title: {title}
+Keyword: {keyword}
+Content excerpt:
+{content_excerpt}
+
+Requirements:
+- Describe a specific visual scene, not abstract concepts
+- Include details about composition, lighting, colors, and mood
+- Do NOT include any text or words in the image description
+- Keep it under 200 words
+- Optimize for photographic or editorial style
+
+Respond with ONLY the image prompt, nothing else."""
+
+        message = await self._client.messages.create(
+            model=self._model,
+            max_tokens=200,
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        return message.content[0].text.strip()
+
     async def generate_text(
         self,
         prompt: str,

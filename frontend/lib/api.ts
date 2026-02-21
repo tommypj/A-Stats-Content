@@ -250,6 +250,12 @@ export const api = {
         method: "POST",
         url: `/articles/${id}/analyze-seo`,
       }),
+    generateImagePrompt: (id: string) =>
+      apiRequest<Article>({
+        method: "POST",
+        url: `/articles/${id}/generate-image-prompt`,
+        timeout: AI_TIMEOUT,
+      }),
   },
 
   // Images
@@ -863,6 +869,7 @@ export interface Article {
   published_at?: string;
   published_url?: string;
   featured_image_id?: string;
+  image_prompt?: string;
   wordpress_post_id?: number;
   wordpress_post_url?: string;
   created_at: string;

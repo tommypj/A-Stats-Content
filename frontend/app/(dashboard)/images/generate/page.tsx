@@ -61,10 +61,27 @@ function GenerateImageContent() {
   const [generatedImage, setGeneratedImage] = useState<GeneratedImage | null>(null);
   const [error, setError] = useState("");
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [promptSource, setPromptSource] = useState<"manual" | "article">("manual");
 
   useEffect(() => {
     loadArticles();
   }, []);
+
+  // Auto-fill prompt when article selection changes
+  useEffect(() => {
+    if (!articleId) {
+      if (promptSource === "article") {
+        setPrompt("");
+        setPromptSource("manual");
+      }
+      return;
+    }
+    const selected = articles.find((a) => a.id === articleId);
+    if (selected?.image_prompt) {
+      setPrompt(selected.image_prompt);
+      setPromptSource("article");
+    }
+  }, [articleId, articles]);
 
   async function loadArticles() {
     try {
@@ -193,14 +210,23 @@ function GenerateImageContent() {
               </label>
               <textarea
                 value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
+                onChange={(e) => {
+                  setPrompt(e.target.value);
+                  setPromptSource("manual");
+                }}
                 placeholder="Describe the image you want to generate... (e.g., A serene meditation space with soft lighting and plants)"
                 rows={4}
                 className="w-full px-4 py-3 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all resize-none"
               />
-              <p className="text-xs text-text-muted mt-1.5">
-                Be specific and descriptive for best results
-              </p>
+              {promptSource === "article" ? (
+                <p className="text-xs text-primary-600 mt-1.5">
+                  Auto-generated from article — feel free to edit
+                </p>
+              ) : (
+                <p className="text-xs text-text-muted mt-1.5">
+                  Be specific and descriptive for best results
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">

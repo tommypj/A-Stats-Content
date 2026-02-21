@@ -262,6 +262,20 @@ async def generate_article(
         article.seo_score = seo_result["score"]
         article.seo_analysis = seo_result
 
+        # Generate image prompt from the article content
+        try:
+            image_prompt = await content_ai_service.generate_image_prompt(
+                title=outline.title,
+                content=generated.content,
+                keyword=outline.keyword,
+            )
+            article.image_prompt = image_prompt
+        except Exception as img_err:
+            import logging
+            logging.getLogger(__name__).warning(
+                f"Failed to generate image prompt for article {article.id}: {img_err}"
+            )
+
     except Exception as e:
         article.status = ContentStatus.FAILED.value
         article.generation_error = str(e)
@@ -526,6 +540,54 @@ async def analyze_article_seo(
     )
     article.seo_score = seo_result["score"]
     article.seo_analysis = seo_result
+
+    await db.commit()
+    await db.refresh(article)
+
+    return article
+
+
+@router.post("/{article_id}/generate-image-prompt", response_model=ArticleResponse)
+async def generate_article_image_prompt(
+    article_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Generate an image prompt for an existing article that doesn't have one yet.
+    """
+    result = await db.execute(
+        select(Article).where(
+            Article.id == article_id,
+            Article.user_id == current_user.id,
+        )
+    )
+    article = result.scalar_one_or_none()
+
+    if not article:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Article not found",
+        )
+
+    if not article.content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Article has no content to generate an image prompt from",
+        )
+
+    try:
+        image_prompt = await content_ai_service.generate_image_prompt(
+            title=article.title,
+            content=article.content,
+            keyword=article.keyword,
+        )
+        article.image_prompt = image_prompt
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate image prompt: {str(e)}",
+        )
 
     await db.commit()
     await db.refresh(article)

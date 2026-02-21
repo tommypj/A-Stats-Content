@@ -197,6 +197,7 @@ class Article(Base, TimestampMixin):
     ai_model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     generation_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     generation_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    image_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Publishing
     published_at: Mapped[Optional[datetime]] = mapped_column(
