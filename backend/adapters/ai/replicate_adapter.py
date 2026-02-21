@@ -3,6 +3,7 @@ Replicate adapter for AI image generation using Flux models.
 """
 
 import asyncio
+import logging
 from typing import Optional
 from dataclasses import dataclass
 
@@ -12,6 +13,8 @@ except ImportError:
     replicate = None
 
 from infrastructure.config.settings import settings
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -30,11 +33,16 @@ class ReplicateImageService:
     """AI image generation service using Replicate Flux models."""
 
     def __init__(self):
-        if settings.replicate_api_token and replicate:
-            self._client = replicate.Client(api_token=settings.replicate_api_token)
-        else:
-            self._client = None
         self._model = settings.replicate_model
+        if not replicate:
+            logger.warning("replicate package not installed — image generation will use mock mode")
+            self._client = None
+        elif not settings.replicate_api_token:
+            logger.warning("REPLICATE_API_TOKEN not set — image generation will use mock mode")
+            self._client = None
+        else:
+            self._client = replicate.Client(api_token=settings.replicate_api_token)
+            logger.info(f"Replicate client initialized with model: {self._model}")
 
     async def generate_image(
         self,
@@ -88,9 +96,8 @@ class ReplicateImageService:
             )
 
         except Exception as e:
-            # Graceful error handling - return mock data on error
-            print(f"Error generating image with Replicate: {e}")
-            return self._mock_image(prompt, width, height, style)
+            logger.error(f"Replicate image generation failed: {e}", exc_info=True)
+            raise
 
     def _run_model(self, prompt: str, width: int, height: int):
         """
@@ -98,20 +105,38 @@ class ReplicateImageService:
 
         This method is called in a thread pool by generate_image.
         """
+        # Flux 1.1 Pro uses aspect_ratio as a standard ratio string
+        from math import gcd
+        divisor = gcd(width, height)
+        aspect_w, aspect_h = width // divisor, height // divisor
+        # Map to closest standard ratio Flux accepts
+        ratio_map = {
+            (1, 1): "1:1",
+            (4, 3): "4:3",
+            (3, 4): "3:4",
+            (16, 9): "16:9",
+            (9, 16): "9:16",
+            (3, 2): "3:2",
+            (2, 3): "2:3",
+        }
+        aspect_ratio = ratio_map.get((aspect_w, aspect_h), "1:1")
+
         input_params = {
             "prompt": prompt,
-            "width": width,
-            "height": height,
-            "num_outputs": 1,
-            "aspect_ratio": f"{width}:{height}",
+            "aspect_ratio": aspect_ratio,
             "output_format": "jpg",
             "output_quality": 90,
         }
 
-        return self._client.run(
+        logger.info(f"Calling Replicate model {self._model} with aspect_ratio={aspect_ratio}")
+
+        output = self._client.run(
             self._model,
             input=input_params,
         )
+
+        logger.info(f"Replicate output type: {type(output)}, value: {output}")
+        return output
 
     def _enhance_prompt(self, prompt: str, style: Optional[str] = None) -> str:
         """

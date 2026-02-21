@@ -58,3 +58,34 @@ async def readiness_check(db: AsyncSession = Depends(get_db)):
 async def liveness_check():
     """Kubernetes-style liveness probe."""
     return {"alive": True}
+
+
+@router.get("/health/services")
+async def services_check():
+    """Check status of external service connections."""
+    from adapters.ai.replicate_adapter import image_ai_service
+    from adapters.ai.anthropic_adapter import content_ai_service
+
+    services = {}
+
+    # Replicate
+    services["replicate"] = {
+        "configured": image_ai_service._client is not None,
+        "api_token_set": bool(settings.replicate_api_token),
+        "model": settings.replicate_model,
+    }
+
+    # Anthropic
+    services["anthropic"] = {
+        "configured": content_ai_service._client is not None,
+        "api_key_set": bool(settings.anthropic_api_key),
+        "model": settings.anthropic_model,
+    }
+
+    all_configured = all(s["configured"] for s in services.values())
+
+    return {
+        "status": "healthy" if all_configured else "degraded",
+        "services": services,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
