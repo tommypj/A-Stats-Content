@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { Sparkles, Clock, FileText, History } from "lucide-react";
+import { Sparkles, Clock, FileText, History, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 
@@ -19,6 +19,14 @@ interface QueryHistoryItem {
 }
 
 export default function QueryPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-primary-500" /></div>}>
+      <QueryPageContent />
+    </Suspense>
+  );
+}
+
+function QueryPageContent() {
   const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
   const [response, setResponse] = useState<QueryResponse | null>(null);

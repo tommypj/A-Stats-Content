@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -13,6 +13,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
 export default function NewArticlePage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-primary-500" /></div>}>
+      <NewArticleContent />
+    </Suspense>
+  );
+}
+
+function NewArticleContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const outlineId = searchParams.get("outline");

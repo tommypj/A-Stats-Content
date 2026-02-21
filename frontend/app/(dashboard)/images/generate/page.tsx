@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -38,6 +38,14 @@ const IMAGE_SIZES = [
 ];
 
 export default function GenerateImagePage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-primary-500" /></div>}>
+      <GenerateImageContent />
+    </Suspense>
+  );
+}
+
+function GenerateImageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const articleIdParam = searchParams.get("article");
