@@ -238,7 +238,7 @@ export default function ArticlesPage() {
             const status = statusConfig[article.status];
             const StatusIcon = status.icon;
             const isTeamContent = !!article.team_id;
-            const canModify = canEdit || article.user_id === "current_user_id"; // TODO: Get actual current user ID
+            const canModify = canEdit;
 
             return (
               <Card key={article.id} className="p-4 hover:shadow-md transition-shadow">
@@ -297,7 +297,17 @@ export default function ArticlesPage() {
                   </div>
 
                   {/* Actions */}
-                  <div className="relative">
+                  <div className="relative flex items-center gap-1">
+                    {/* Show delete button directly for failed/stuck articles */}
+                    {canModify && (article.status === "failed" || article.status === "generating") && (
+                      <button
+                        onClick={() => handleDelete(article.id)}
+                        className="p-1.5 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors"
+                        title="Delete article"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                     <button
                       onClick={() => setActiveMenu(activeMenu === article.id ? null : article.id)}
                       className="p-1.5 rounded-lg hover:bg-surface-secondary"
