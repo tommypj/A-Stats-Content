@@ -35,7 +35,7 @@ const navigation = [
     name: "Social",
     icon: Share2,
     submenu: [
-      { name: "Dashboard", href: "/social/dashboard", icon: LayoutDashboard },
+      { name: "Dashboard", href: "/social", icon: LayoutDashboard },
       { name: "Compose", href: "/social/compose", icon: Edit3 },
       { name: "Calendar", href: "/social/calendar", icon: Calendar },
       { name: "History", href: "/social/history", icon: History },

@@ -64,10 +64,14 @@ class UserResponse(BaseModel):
     role: str
     email_verified: bool
     subscription_tier: str
+    subscription_status: str = "active"
     language: str
     timezone: str
     created_at: datetime
     last_login: Optional[datetime] = None
+    articles_generated_this_month: int = 0
+    outlines_generated_this_month: int = 0
+    images_generated_this_month: int = 0
 
     model_config = ConfigDict(from_attributes=True)
 

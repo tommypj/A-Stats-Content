@@ -21,6 +21,7 @@ from api.schemas.auth import (
     RegisterRequest,
     TokenResponse,
     UserResponse,
+    UserUpdateRequest,
     RefreshTokenRequest,
     PasswordResetRequest,
     PasswordResetConfirm,
@@ -247,6 +248,26 @@ async def get_me(
     """
     Get current authenticated user profile.
     """
+    return current_user
+
+
+@router.put("/me", response_model=UserResponse)
+async def update_me(
+    update_data: UserUpdateRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """
+    Update current authenticated user profile.
+    """
+    if update_data.name is not None:
+        current_user.name = update_data.name
+    if update_data.language is not None:
+        current_user.language = update_data.language
+    if update_data.timezone is not None:
+        current_user.timezone = update_data.timezone
+    await db.commit()
+    await db.refresh(current_user)
     return current_user
 
 

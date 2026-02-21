@@ -141,6 +141,12 @@ export const api = {
         url: "/auth/verify-email",
         data: { token },
       }),
+    updateProfile: (data: { name?: string; language?: string; timezone?: string }) =>
+      apiRequest<UserResponse>({
+        method: "PUT",
+        url: "/auth/me",
+        data,
+      }),
     changePassword: (currentPassword: string, newPassword: string) =>
       apiRequest<{ message: string }>({
         method: "POST",
@@ -740,10 +746,14 @@ export interface UserResponse {
   role: string;
   email_verified: boolean;
   subscription_tier: string;
+  subscription_status: string;
   language: string;
   timezone: string;
   created_at: string;
   last_login?: string;
+  articles_generated_this_month: number;
+  outlines_generated_this_month: number;
+  images_generated_this_month: number;
 }
 
 export interface Outline {
