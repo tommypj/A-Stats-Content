@@ -22,7 +22,7 @@ dependencies = [
     "alembic>=1.13.1",
 
     # Validation & Settings
-    "pydantic>=2.5.0",
+    "pydantic[email]>=2.5.0",
     "pydantic-settings>=2.1.0",
 
     # Authentication
