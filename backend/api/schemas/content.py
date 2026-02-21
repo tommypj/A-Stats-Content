@@ -87,6 +87,26 @@ class ArticleGenerateRequest(BaseModel):
     outline_id: str = Field(..., description="UUID of the outline to use")
     tone: Optional[str] = Field(None, max_length=50)
     target_audience: Optional[str] = Field(None, max_length=500)
+    writing_style: Optional[str] = Field(
+        None,
+        max_length=50,
+        description="Writing style: editorial, narrative, listicle, or balanced",
+    )
+    voice: Optional[str] = Field(
+        None,
+        max_length=50,
+        description="Voice: first_person, second_person, third_person",
+    )
+    list_usage: Optional[str] = Field(
+        None,
+        max_length=50,
+        description="List usage preference: minimal, balanced, heavy",
+    )
+    custom_instructions: Optional[str] = Field(
+        None,
+        max_length=1000,
+        description="Custom instructions for the AI writer",
+    )
 
 
 class ArticleCreateRequest(BaseModel):

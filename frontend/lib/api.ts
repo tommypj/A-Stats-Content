@@ -869,6 +869,10 @@ export interface GenerateArticleInput {
   outline_id: string;
   tone?: string;
   target_audience?: string;
+  writing_style?: string;
+  voice?: string;
+  list_usage?: string;
+  custom_instructions?: string;
 }
 
 export interface UpdateArticleInput {

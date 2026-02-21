@@ -40,6 +40,10 @@ function NewArticleContent() {
   // Generation options
   const [tone, setTone] = useState("");
   const [targetAudience, setTargetAudience] = useState("");
+  const [writingStyle, setWritingStyle] = useState("balanced");
+  const [voice, setVoice] = useState("second_person");
+  const [listUsage, setListUsage] = useState("balanced");
+  const [customInstructions, setCustomInstructions] = useState("");
 
   useEffect(() => {
     if (outlineId) {
@@ -73,6 +77,10 @@ function NewArticleContent() {
         outline_id: outline.id,
         tone: tone || undefined,
         target_audience: targetAudience || undefined,
+        writing_style: writingStyle,
+        voice: voice,
+        list_usage: listUsage,
+        custom_instructions: customInstructions || undefined,
       });
 
       router.push(`/articles/${article.id}`);
@@ -161,36 +169,107 @@ function NewArticleContent() {
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
+              {/* Writing Style Controls */}
+              <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                    Tone (optional override)
-                  </label>
-                  <select
-                    value={tone}
-                    onChange={(e) => setTone(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all"
-                  >
-                    <option value="">Use outline tone ({outline.tone})</option>
-                    <option value="professional">Professional</option>
-                    <option value="friendly">Friendly</option>
-                    <option value="empathetic">Empathetic</option>
-                    <option value="informative">Informative</option>
-                    <option value="conversational">Conversational</option>
-                  </select>
+                  <h4 className="text-sm font-medium text-text-primary mb-3">Writing Style</h4>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div>
+                      <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                        Style
+                      </label>
+                      <select
+                        value={writingStyle}
+                        onChange={(e) => setWritingStyle(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all text-sm"
+                      >
+                        <option value="balanced">Balanced (Recommended)</option>
+                        <option value="editorial">Editorial</option>
+                        <option value="narrative">Narrative / Storytelling</option>
+                        <option value="listicle">Listicle</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                        Voice
+                      </label>
+                      <select
+                        value={voice}
+                        onChange={(e) => setVoice(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all text-sm"
+                      >
+                        <option value="second_person">You / Your (direct)</option>
+                        <option value="first_person">I / We (personal)</option>
+                        <option value="third_person">They / One (formal)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                        List Usage
+                      </label>
+                      <select
+                        value={listUsage}
+                        onChange={(e) => setListUsage(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all text-sm"
+                      >
+                        <option value="balanced">Balanced</option>
+                        <option value="minimal">Minimal (mostly prose)</option>
+                        <option value="heavy">Heavy (scannable)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                      Tone (optional override)
+                    </label>
+                    <select
+                      value={tone}
+                      onChange={(e) => setTone(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all text-sm"
+                    >
+                      <option value="">Use outline tone ({outline.tone})</option>
+                      <option value="professional">Professional</option>
+                      <option value="friendly">Friendly</option>
+                      <option value="empathetic">Empathetic</option>
+                      <option value="informative">Informative</option>
+                      <option value="conversational">Conversational</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                      Target Audience (optional override)
+                    </label>
+                    <input
+                      type="text"
+                      value={targetAudience}
+                      onChange={(e) => setTargetAudience(e.target.value)}
+                      placeholder={outline.target_audience || "e.g., health-conscious adults"}
+                      className="w-full px-3 py-2 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all text-sm"
+                    />
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                    Target Audience (optional override)
+                  <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                    Custom Instructions (optional)
                   </label>
-                  <input
-                    type="text"
-                    value={targetAudience}
-                    onChange={(e) => setTargetAudience(e.target.value)}
-                    placeholder={outline.target_audience || "e.g., health-conscious adults"}
-                    className="w-full px-4 py-2.5 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all"
+                  <textarea
+                    value={customInstructions}
+                    onChange={(e) => setCustomInstructions(e.target.value)}
+                    placeholder="e.g., Include a personal anecdote in the introduction. Reference recent 2025 studies. Avoid medical disclaimers."
+                    rows={2}
+                    maxLength={1000}
+                    className="w-full px-3 py-2.5 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all resize-none text-sm"
                   />
+                  <p className="text-xs text-text-muted mt-1">
+                    {customInstructions.length}/1000 characters
+                  </p>
                 </div>
               </div>
 

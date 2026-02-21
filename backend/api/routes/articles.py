@@ -238,6 +238,10 @@ async def generate_article(
             sections=outline.sections,
             tone=request.tone or outline.tone,
             target_audience=request.target_audience or outline.target_audience,
+            writing_style=request.writing_style or "balanced",
+            voice=request.voice or "second_person",
+            list_usage=request.list_usage or "balanced",
+            custom_instructions=request.custom_instructions,
         )
 
         article.content = generated.content

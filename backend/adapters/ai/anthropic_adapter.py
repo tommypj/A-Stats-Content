@@ -59,25 +59,48 @@ class AnthropicContentService:
         self._model = settings.anthropic_model
         self._max_tokens = settings.anthropic_max_tokens
 
-    def _get_system_prompt(self) -> str:
+    def _get_system_prompt(self, writing_style: str = "balanced", voice: str = "second_person", list_usage: str = "balanced") -> str:
         """Get the system prompt for content generation."""
-        return """You are an expert SEO content writer specializing in therapeutic and wellness content.
-Your writing style is:
-- Empathetic and understanding
-- Clear and accessible
-- Evidence-based when appropriate
-- Engaging and actionable
-- Optimized for search engines while remaining natural
 
-You understand therapeutic language, healing modalities, and how to communicate with audiences seeking wellness information.
-Always maintain a professional yet warm tone that builds trust with readers.
+        style_instructions = {
+            "editorial": "Write in an editorial, opinion-driven style. Take clear positions, use rhetorical questions, and build persuasive arguments. Each section should read like a magazine feature — compelling, authoritative, and narrative-driven.",
+            "narrative": "Write in a storytelling, narrative style. Use anecdotes, scenarios, and vivid descriptions. Guide the reader through a journey rather than presenting information in a structured list format. Paint pictures with words.",
+            "listicle": "Write in a structured listicle style. Use numbered items or bullet points as the primary format. Each point should have a bold heading followed by a brief explanation. Keep it scannable and punchy.",
+            "balanced": "Write in a balanced editorial style that combines flowing prose paragraphs with occasional lists. The majority of content should be written as engaging paragraphs. Use bullet points or numbered lists sparingly — only when presenting 4+ parallel items that genuinely benefit from list format (like ingredients, steps in a process, or tool recommendations). Never use a list when a well-written paragraph would be more engaging.",
+        }
 
-When generating content:
-1. Use the target keyword naturally throughout the content
-2. Include relevant subheadings (H2, H3) for better structure
-3. Write in a way that's easy to read (short paragraphs, bullet points where appropriate)
-4. Include a compelling introduction and conclusion
-5. Provide actionable insights and practical advice"""
+        voice_instructions = {
+            "first_person": "Write in first person (I/we). Share personal insights and experiences as if you are an expert sharing your own journey and knowledge.",
+            "second_person": "Write in second person (you/your). Address the reader directly, making the content feel personal and actionable.",
+            "third_person": "Write in third person (one/they/people). Maintain an objective, authoritative distance suitable for academic or professional contexts.",
+        }
+
+        list_instructions = {
+            "minimal": "Avoid bullet points and numbered lists almost entirely. Express all information through well-crafted prose paragraphs. If you must use a list, limit it to one per 500 words maximum.",
+            "balanced": "Use lists sparingly and strategically. For every list you include, ensure there are at least 3-4 substantial prose paragraphs surrounding it. Lists should be the exception, not the rule.",
+            "heavy": "Feel free to use bullet points and numbered lists frequently to make content highly scannable. But still include introductory and transitional paragraphs between lists.",
+        }
+
+        return f"""You are an expert SEO content writer who produces high-quality, human-sounding articles.
+
+WRITING APPROACH:
+{style_instructions.get(writing_style, style_instructions['balanced'])}
+
+VOICE:
+{voice_instructions.get(voice, voice_instructions['second_person'])}
+
+LIST USAGE:
+{list_instructions.get(list_usage, list_instructions['balanced'])}
+
+CRITICAL RULES:
+1. Write like a skilled human journalist, not an AI. Vary sentence length. Use transitional phrases between ideas.
+2. Each paragraph should be 3-5 sentences that develop a single idea with depth.
+3. Use the target keyword naturally — never bold it repeatedly or force it into every section.
+4. Subheadings (H2, H3) should be followed by at least 2-3 prose paragraphs before any list appears.
+5. Include specific examples, analogies, and scenarios rather than generic advice.
+6. Do NOT start multiple consecutive paragraphs with the same word or structure.
+7. Avoid filler phrases like "In conclusion", "It's important to note that", "As mentioned above".
+8. When citing research or studies, be specific — name the institution, year, or researcher when possible. Do not say "studies show" without attribution."""
 
     async def generate_outline(
         self,
@@ -138,7 +161,7 @@ Respond in JSON format:
         message = await self._client.messages.create(
             model=self._model,
             max_tokens=self._max_tokens,
-            system=self._get_system_prompt(),
+            system=self._get_system_prompt(writing_style="balanced", voice="second_person", list_usage="balanced"),
             messages=[{"role": "user", "content": prompt}],
         )
 
@@ -178,6 +201,10 @@ Respond in JSON format:
         sections: List[Dict[str, Any]],
         tone: str = "professional",
         target_audience: Optional[str] = None,
+        writing_style: str = "balanced",
+        voice: str = "second_person",
+        list_usage: str = "balanced",
+        custom_instructions: Optional[str] = None,
     ) -> GeneratedArticle:
         """
         Generate a full article based on an outline.
@@ -197,6 +224,7 @@ Respond in JSON format:
             return self._mock_article(title, keyword, sections)
 
         audience_context = f"Target audience: {target_audience}" if target_audience else ""
+        custom_context = f"\nAdditional instructions from the user:\n{custom_instructions}" if custom_instructions else ""
 
         # Format sections for the prompt
         sections_text = "\n".join([
@@ -216,27 +244,28 @@ Tone: {tone}
 Outline:
 {sections_text}
 
-Requirements:
-1. Write naturally flowing content that incorporates the keyword organically
-2. Use the provided headings and subheadings exactly as specified
-3. Include an engaging introduction that hooks the reader
-4. Provide practical, actionable advice in each section
-5. End with a compelling conclusion with a call-to-action
-6. Use bullet points and numbered lists where appropriate
-7. Write in markdown format
+IMPORTANT WRITING GUIDELINES:
+1. Follow the outline structure exactly — use the provided H2 and H3 headings
+2. Write rich, flowing paragraphs as the PRIMARY content format
+3. Open with a compelling introduction (2-3 paragraphs) that hooks the reader without using lists
+4. Under each heading, write at least 2-3 substantive paragraphs BEFORE considering any list
+5. When you do use a list, introduce it with a paragraph and follow it with analysis or a connecting paragraph
+6. End with a conclusion that synthesizes key insights and includes a call-to-action
+7. Vary your paragraph openings — do not start consecutive paragraphs the same way
+8. Include specific examples, case studies, or scenarios to illustrate points
+9. Use transitional phrases to connect sections naturally
+{custom_context}
 
-Also provide a meta description (150-160 characters) at the end.
+Write the article in markdown format.
 
-Format your response as:
-[Article content in markdown]
-
+At the very end, after the article, add:
 ---
-META_DESCRIPTION: [Your meta description here]"""
+META_DESCRIPTION: [A compelling 150-160 character meta description]"""
 
         message = await self._client.messages.create(
             model=self._model,
             max_tokens=8000,
-            system=self._get_system_prompt(),
+            system=self._get_system_prompt(writing_style=writing_style, voice=voice, list_usage=list_usage),
             messages=[{"role": "user", "content": prompt}],
         )
 
@@ -296,7 +325,7 @@ Provide the improved version in markdown format."""
         message = await self._client.messages.create(
             model=self._model,
             max_tokens=8000,
-            system=self._get_system_prompt(),
+            system=self._get_system_prompt(writing_style="balanced", voice="second_person", list_usage="balanced"),
             messages=[{"role": "user", "content": prompt}],
         )
 
