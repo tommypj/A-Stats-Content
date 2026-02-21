@@ -80,11 +80,15 @@ class ReplicateImageService:
                 height,
             )
 
-            # Replicate returns either a URL string or a list with one URL
+            # Replicate models return various types: URL string, list of URLs, or FileOutput
             if isinstance(output, list) and len(output) > 0:
-                image_url = output[0]
+                image_url = str(output[0])
+            elif hasattr(output, 'url'):
+                image_url = output.url
             else:
                 image_url = str(output)
+
+            logger.info(f"Generated image URL: {image_url}")
 
             return GeneratedImage(
                 url=image_url,
@@ -105,27 +109,33 @@ class ReplicateImageService:
 
         This method is called in a thread pool by generate_image.
         """
-        # Flux 1.1 Pro uses aspect_ratio as a standard ratio string
-        from math import gcd
-        divisor = gcd(width, height)
-        aspect_w, aspect_h = width // divisor, height // divisor
-        # Map to closest standard ratio Flux accepts
-        ratio_map = {
-            (1, 1): "1:1",
-            (4, 3): "4:3",
-            (3, 4): "3:4",
-            (16, 9): "16:9",
-            (9, 16): "9:16",
-            (3, 2): "3:2",
-            (2, 3): "2:3",
-        }
-        aspect_ratio = ratio_map.get((aspect_w, aspect_h), "1:1")
+        # Ideogram V3 Turbo accepts aspect_ratio as a standard ratio string
+        # Map common dimensions to standard ratios
+        ratio = width / height
+        if abs(ratio - 1.0) < 0.05:
+            aspect_ratio = "ASPECT_1_1"
+        elif abs(ratio - (4/3)) < 0.05:
+            aspect_ratio = "ASPECT_4_3"
+        elif abs(ratio - (3/4)) < 0.05:
+            aspect_ratio = "ASPECT_3_4"
+        elif abs(ratio - (16/9)) < 0.05:
+            aspect_ratio = "ASPECT_16_9"
+        elif abs(ratio - (9/16)) < 0.05:
+            aspect_ratio = "ASPECT_9_16"
+        elif abs(ratio - (3/2)) < 0.05:
+            aspect_ratio = "ASPECT_3_2"
+        elif abs(ratio - (2/3)) < 0.05:
+            aspect_ratio = "ASPECT_2_3"
+        elif ratio > 1.5:
+            aspect_ratio = "ASPECT_16_9"
+        elif ratio < 0.67:
+            aspect_ratio = "ASPECT_9_16"
+        else:
+            aspect_ratio = "ASPECT_1_1"
 
         input_params = {
             "prompt": prompt,
             "aspect_ratio": aspect_ratio,
-            "output_format": "jpg",
-            "output_quality": 90,
         }
 
         logger.info(f"Calling Replicate model {self._model} with aspect_ratio={aspect_ratio}")
@@ -153,14 +163,14 @@ class ReplicateImageService:
             return prompt
 
         style_modifiers = {
-            "photographic": "professional photograph, high detail, sharp focus, realistic lighting",
-            "artistic": "artistic illustration, creative, expressive, vibrant colors",
-            "minimalist": "minimalist design, clean lines, simple composition, elegant",
-            "dramatic": "dramatic lighting, high contrast, cinematic, moody atmosphere",
-            "vintage": "vintage style, retro aesthetic, film grain, nostalgic",
-            "modern": "modern design, sleek, contemporary, polished",
-            "abstract": "abstract art, geometric shapes, conceptual, creative interpretation",
-            "watercolor": "watercolor painting style, soft edges, flowing colors, artistic",
+            "photographic": "professional photography, realistic, sharp focus",
+            "artistic": "artistic illustration, creative, vibrant colors",
+            "minimalist": "minimalist design, clean lines, simple composition",
+            "dramatic": "dramatic lighting, high contrast, cinematic",
+            "vintage": "vintage aesthetic, retro, film grain",
+            "modern": "modern design, sleek, contemporary",
+            "abstract": "abstract art, geometric, conceptual",
+            "watercolor": "watercolor painting, soft edges, flowing colors",
         }
 
         modifier = style_modifiers.get(style.lower(), style)

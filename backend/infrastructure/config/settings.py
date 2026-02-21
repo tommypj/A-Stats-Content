@@ -74,7 +74,7 @@ class Settings(BaseSettings):
 
     # Replicate (Image Generation)
     replicate_api_token: Optional[str] = None
-    replicate_model: str = "black-forest-labs/flux-1.1-pro"
+    replicate_model: str = "ideogram-ai/ideogram-v3-turbo"
 
     # Resend (Email)
     resend_api_key: Optional[str] = None
