@@ -64,15 +64,20 @@ async def create_audit_log(
     """
     Create an audit log entry for admin actions.
     """
+    # Combine description, metadata, and user_agent into the details JSON field
+    details = metadata.copy() if metadata else {}
+    if description:
+        details["description"] = description
+    if user_agent:
+        details["user_agent"] = user_agent
+
     audit_log = AdminAuditLog(
         admin_user_id=admin_user.id,
         action=action.value,
         target_type=target_type.value,
         target_id=target_id,
-        description=description,
-        metadata=metadata,
+        details=details if details else None,
         ip_address=ip_address,
-        user_agent=user_agent,
     )
     db.add(audit_log)
     await db.commit()
