@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { api, parseApiError, AnalyticsSummary, DailyAnalyticsData } from "@/lib/api";
+import { api, parseApiError, AnalyticsSummary, DailyAnalyticsData, GSCSite } from "@/lib/api";
 import { StatCard } from "@/components/analytics/stat-card";
 import { PerformanceChart } from "@/components/analytics/performance-chart";
 import { DateRangePicker } from "@/components/analytics/date-range-picker";
@@ -22,6 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function AnalyticsPage() {
   const [isConnected, setIsConnected] = useState(false);
+  const [siteUrl, setSiteUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -30,26 +31,67 @@ export default function AnalyticsPage() {
   const [dailyData, setDailyData] = useState<DailyAnalyticsData[]>([]);
   const [lastSync, setLastSync] = useState<string | null>(null);
 
+  // Site selection state
+  const [sites, setSites] = useState<GSCSite[]>([]);
+  const [isLoadingSites, setIsLoadingSites] = useState(false);
+  const [isSelectingSite, setIsSelectingSite] = useState(false);
+
   useEffect(() => {
     checkStatus();
   }, []);
 
   useEffect(() => {
-    if (isConnected) {
+    if (isConnected && siteUrl) {
       loadAnalytics();
     }
-  }, [isConnected, dateRange]);
+  }, [isConnected, siteUrl, dateRange]);
+
+  useEffect(() => {
+    if (isConnected && !siteUrl) {
+      loadSites();
+    }
+  }, [isConnected, siteUrl]);
 
   async function checkStatus() {
     try {
       setIsLoading(true);
       const status = await api.analytics.status();
       setIsConnected(status.connected);
+      setSiteUrl(status.site_url || null);
       setLastSync(status.last_sync || null);
     } catch (error) {
       console.error("Failed to check analytics status:", error);
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function loadSites() {
+    try {
+      setIsLoadingSites(true);
+      const response = await api.analytics.sites();
+      setSites(response.sites);
+    } catch (error) {
+      const apiError = parseApiError(error);
+      toast.error(apiError.message || "Failed to load GSC sites");
+    } finally {
+      setIsLoadingSites(false);
+    }
+  }
+
+  async function handleSelectSite(selectedSiteUrl: string) {
+    try {
+      setIsSelectingSite(true);
+      await api.analytics.selectSite(selectedSiteUrl);
+      setSiteUrl(selectedSiteUrl);
+      toast.success("Site selected! Syncing data...");
+      // Auto-sync after selecting site
+      handleSync();
+    } catch (error) {
+      const apiError = parseApiError(error);
+      toast.error(apiError.message || "Failed to select site");
+    } finally {
+      setIsSelectingSite(false);
     }
   }
 
@@ -129,6 +171,67 @@ export default function AnalyticsPage() {
           </p>
         </div>
         <GscConnectBanner onConnect={handleConnect} isLoading={isConnecting} />
+      </div>
+    );
+  }
+
+  // Connected but no site selected — show site picker
+  if (!siteUrl) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="font-display text-3xl font-bold text-text-primary">Analytics</h1>
+          <p className="mt-2 text-text-secondary">
+            Select a website from your Google Search Console to start tracking
+          </p>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Select a Website</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoadingSites ? (
+              <div className="flex items-center justify-center py-12">
+                <RefreshCw className="h-6 w-6 animate-spin text-primary-500" />
+                <span className="ml-3 text-text-secondary">Loading your sites...</span>
+              </div>
+            ) : sites.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-text-secondary">
+                  No verified sites found in your Google Search Console account.
+                </p>
+                <p className="text-sm text-text-muted mt-2">
+                  Make sure you have at least one verified property in GSC.
+                </p>
+                <Button
+                  variant="outline"
+                  className="mt-4"
+                  onClick={loadSites}
+                >
+                  Retry
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {sites.map((site) => (
+                  <button
+                    key={site.site_url}
+                    onClick={() => handleSelectSite(site.site_url)}
+                    disabled={isSelectingSite}
+                    className="w-full flex items-center justify-between p-4 rounded-xl border border-surface-tertiary hover:border-primary-500 hover:bg-primary-50 transition-colors text-left disabled:opacity-50"
+                  >
+                    <div>
+                      <p className="font-medium text-text-primary">{site.site_url}</p>
+                      <p className="text-sm text-text-muted capitalize">{site.permission_level}</p>
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-text-muted" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     );
   }
