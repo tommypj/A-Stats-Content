@@ -285,9 +285,15 @@ Respond in JSON format:
         ])
 
         # Calculate max_tokens based on word count target
-        # ~1.4 tokens per word on average, plus buffer for meta description
-        estimated_tokens = int(word_count_target * 1.5) + 200
-        max_tokens = min(max(estimated_tokens, 1500), 8000)
+        # Non-English languages (Romanian, German, etc.) use ~2.5-3.0 tokens per word
+        # English averages ~1.4 tokens per word
+        # Add buffer for markdown headings, formatting, and meta description
+        if language != "en":
+            tokens_per_word = 3.0
+        else:
+            tokens_per_word = 1.8
+        estimated_tokens = int(word_count_target * tokens_per_word) + 500
+        max_tokens = min(max(estimated_tokens, 2000), 16000)
 
         # Define word count tolerance range
         word_min = int(word_count_target * 0.85)
