@@ -10,7 +10,7 @@ import markdown
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -206,16 +206,19 @@ async def _generate_article_background(
                 logger.error("Background generation: article %s not found", article_id)
                 return
 
-            generated = await content_ai_service.generate_article(
-                title=outline_title,
-                keyword=outline_keyword,
-                sections=outline_sections,
-                tone=outline_tone,
-                target_audience=outline_target_audience,
-                writing_style=writing_style,
-                voice=voice,
-                list_usage=list_usage,
-                custom_instructions=custom_instructions,
+            generated = await asyncio.wait_for(
+                content_ai_service.generate_article(
+                    title=outline_title,
+                    keyword=outline_keyword,
+                    sections=outline_sections,
+                    tone=outline_tone,
+                    target_audience=outline_target_audience,
+                    writing_style=writing_style,
+                    voice=voice,
+                    list_usage=list_usage,
+                    custom_instructions=custom_instructions,
+                ),
+                timeout=270.0,  # 4.5 min hard limit
             )
 
             article.content = generated.content
@@ -257,16 +260,19 @@ async def _generate_article_background(
             logger.info("Article %s generated successfully", article_id)
 
         except Exception as e:
-            logger.error("Background generation failed for article %s: %s", article_id, e)
+            logger.error("Background generation failed for article %s: %s", article_id, e, exc_info=True)
+            # Use a fresh session to mark as failed (original session may be broken)
             try:
-                result = await db.execute(
-                    select(Article).where(Article.id == article_id)
-                )
-                article = result.scalar_one_or_none()
-                if article:
-                    article.status = ContentStatus.FAILED.value
-                    article.generation_error = str(e)
-                    await db.commit()
+                async with async_session_maker() as err_db:
+                    result = await err_db.execute(
+                        select(Article).where(Article.id == article_id)
+                    )
+                    article = result.scalar_one_or_none()
+                    if article:
+                        article.status = ContentStatus.FAILED.value
+                        article.generation_error = str(e)[:500]
+                        await err_db.commit()
+                        logger.info("Marked article %s as failed", article_id)
             except Exception:
                 logger.error("Failed to mark article %s as failed", article_id, exc_info=True)
 
@@ -274,7 +280,6 @@ async def _generate_article_background(
 @router.post("/generate", response_model=ArticleResponse, status_code=status.HTTP_201_CREATED)
 async def generate_article(
     request: ArticleGenerateRequest,
-    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -325,19 +330,21 @@ async def generate_article(
     await db.commit()
     await db.refresh(article)
 
-    # Kick off generation in the background and return immediately
-    background_tasks.add_task(
-        _generate_article_background,
-        article_id=article_id,
-        outline_title=outline.title,
-        outline_keyword=outline.keyword,
-        outline_sections=outline.sections,
-        outline_tone=request.tone or outline.tone,
-        outline_target_audience=request.target_audience or outline.target_audience,
-        writing_style=request.writing_style or "balanced",
-        voice=request.voice or "second_person",
-        list_usage=request.list_usage or "balanced",
-        custom_instructions=request.custom_instructions,
+    # Kick off generation as an asyncio task on the event loop
+    # (more reliable than BackgroundTasks for long-running async work)
+    asyncio.create_task(
+        _generate_article_background(
+            article_id=article_id,
+            outline_title=outline.title,
+            outline_keyword=outline.keyword,
+            outline_sections=outline.sections,
+            outline_tone=request.tone or outline.tone,
+            outline_target_audience=request.target_audience or outline.target_audience,
+            writing_style=request.writing_style or "balanced",
+            voice=request.voice or "second_person",
+            list_usage=request.list_usage or "balanced",
+            custom_instructions=request.custom_instructions,
+        )
     )
 
     return article

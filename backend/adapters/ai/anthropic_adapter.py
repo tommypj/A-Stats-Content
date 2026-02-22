@@ -52,7 +52,7 @@ class AnthropicContentService:
         if settings.anthropic_api_key:
             self._client = anthropic.AsyncAnthropic(
                 api_key=settings.anthropic_api_key,
-                timeout=120.0,
+                timeout=300.0,
             )
         else:
             self._client = None
