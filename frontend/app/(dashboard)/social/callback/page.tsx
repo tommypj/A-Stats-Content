@@ -19,8 +19,7 @@ function CallbackContent() {
 
   const handleCallback = async () => {
     try {
-      const code = searchParams.get("code");
-      const state = searchParams.get("state");
+      const success = searchParams.get("success");
       const errorParam = searchParams.get("error");
       const platformParam = searchParams.get("platform");
 
@@ -29,37 +28,30 @@ function CallbackContent() {
       }
 
       if (errorParam) {
-        setError(
-          errorParam === "access_denied"
-            ? "You denied access to your account"
-            : `Authorization error: ${errorParam}`
-        );
+        const errorMessages: Record<string, string> = {
+          access_denied: "You denied access to your account",
+          missing_params: "Missing authorization parameters from the provider",
+          invalid_state: "Session expired. Please try connecting again.",
+          token_exchange_failed: "Failed to verify your account with the provider. Please try again.",
+          unsupported_platform: "This platform is not yet supported.",
+          user_not_found: "User session not found. Please log in and try again.",
+          invalid_platform: "Invalid platform specified.",
+        };
+        setError(errorMessages[errorParam] || `Authorization error: ${errorParam}`);
         setStatus("error");
         return;
       }
 
-      if (!code || !state) {
-        setError("Missing authorization parameters");
-        setStatus("error");
+      if (success === "true") {
+        setStatus("success");
+        setTimeout(() => {
+          router.push("/social/accounts");
+        }, 2000);
         return;
       }
 
-      // In a real implementation, you would:
-      // 1. Send code + state to your backend
-      // 2. Backend exchanges code for access token
-      // 3. Backend stores tokens securely
-      // 4. Backend creates SocialAccount record
-
-      // Simulating API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      // For now, just show success
-      setStatus("success");
-
-      // Redirect after 2 seconds
-      setTimeout(() => {
-        router.push("/social/accounts");
-      }, 2000);
+      setError("Unexpected callback state. Please try connecting again.");
+      setStatus("error");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to connect account");
       setStatus("error");

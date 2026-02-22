@@ -3,11 +3,15 @@ Social media scheduling API routes.
 """
 
 import secrets
+import time
 from datetime import datetime, timezone, date
 from typing import Optional, List
+from urllib.parse import urlencode
 import math
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -48,6 +52,31 @@ from infrastructure.config.settings import settings
 from core.security.encryption import encrypt_credential, decrypt_credential
 
 router = APIRouter(prefix="/social", tags=["Social Media"])
+
+# In-memory OAuth state store (state -> {user_id, created_at})
+# For production with multiple instances, use Redis instead.
+_oauth_states: dict[str, dict] = {}
+_OAUTH_STATE_TTL = 600  # 10 minutes
+
+
+def _store_oauth_state(state: str, user_id: str) -> None:
+    """Store OAuth state with TTL. Also cleans up expired entries."""
+    now = time.time()
+    # Clean expired
+    expired = [k for k, v in _oauth_states.items() if now - v["created_at"] > _OAUTH_STATE_TTL]
+    for k in expired:
+        _oauth_states.pop(k, None)
+    _oauth_states[state] = {"user_id": str(user_id), "created_at": now}
+
+
+def _verify_oauth_state(state: str) -> Optional[str]:
+    """Verify and consume an OAuth state. Returns user_id or None."""
+    entry = _oauth_states.pop(state, None)
+    if not entry:
+        return None
+    if time.time() - entry["created_at"] > _OAUTH_STATE_TTL:
+        return None
+    return entry["user_id"]
 
 
 # ============================================
@@ -116,13 +145,7 @@ async def initiate_connection(
 ):
     """
     Get OAuth authorization URL for connecting a social account.
-
-    NOTE: This is a placeholder implementation.
-    In production, implement actual OAuth flows for each platform:
-    - Twitter: Use Twitter API v2 OAuth 2.0
-    - LinkedIn: Use LinkedIn OAuth 2.0
-    - Facebook: Use Facebook Graph API OAuth
-    - Instagram: Use Instagram Basic Display API or Graph API
+    Currently supports Facebook (which also covers Instagram Business accounts).
     """
     # Validate platform
     try:
@@ -135,13 +158,28 @@ async def initiate_connection(
 
     # Generate CSRF state token
     state = secrets.token_urlsafe(32)
+    _store_oauth_state(state, str(current_user.id))
 
-    # TODO: Store state in Redis/session for verification
-    # await redis.setex(f"oauth_state:{state}", 600, current_user.id)
+    if platform == "facebook":
+        if not settings.facebook_app_id or not settings.facebook_app_secret:
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail="Facebook integration is not configured. Please set FACEBOOK_APP_ID and FACEBOOK_APP_SECRET.",
+            )
 
-    # TODO: Get actual OAuth URLs from platform adapters
-    # For now, return placeholder
-    authorization_url = f"https://oauth.{platform}.com/authorize?client_id=XXX&state={state}"
+        params = urlencode({
+            "client_id": settings.facebook_app_id,
+            "redirect_uri": settings.facebook_redirect_uri,
+            "state": state,
+            "scope": "pages_show_list,pages_read_engagement,pages_manage_posts,pages_read_user_content",
+            "response_type": "code",
+        })
+        authorization_url = f"https://www.facebook.com/v21.0/dialog/oauth?{params}"
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=f"OAuth for {platform} is not yet implemented. Currently supported: facebook.",
+        )
 
     return ConnectAccountResponse(
         authorization_url=authorization_url,
@@ -152,96 +190,99 @@ async def initiate_connection(
 @router.get("/{platform}/callback")
 async def oauth_callback(
     platform: str,
-    code: str = Query(...),
-    state: str = Query(...),
-    current_user: User = Depends(get_current_user),
+    code: Optional[str] = Query(None),
+    state: Optional[str] = Query(None),
+    error: Optional[str] = Query(None),
+    error_description: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     """
     OAuth callback handler for social account connection.
-
-    NOTE: This is a placeholder implementation.
-    In production:
-    1. Verify state token against Redis/session
-    2. Exchange code for access/refresh tokens
-    3. Fetch user profile from platform
-    4. Encrypt tokens and store in database
+    This is hit by the browser redirect from the OAuth provider (no auth header).
+    The user is identified from the stored OAuth state token.
     """
+    frontend_callback = f"{settings.frontend_url}/social/callback"
+
+    # Handle OAuth error from provider
+    if error:
+        return RedirectResponse(
+            url=f"{frontend_callback}?error={error}&platform={platform}"
+        )
+
+    if not code or not state:
+        return RedirectResponse(
+            url=f"{frontend_callback}?error=missing_params&platform={platform}"
+        )
+
     # Validate platform
     try:
         Platform(platform)
     except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported platform: {platform}",
+        return RedirectResponse(
+            url=f"{frontend_callback}?error=invalid_platform&platform={platform}"
         )
 
-    # TODO: Verify state token
-    # stored_user_id = await redis.get(f"oauth_state:{state}")
-    # if not stored_user_id or stored_user_id != current_user.id:
-    #     raise HTTPException(status_code=400, detail="Invalid state token")
+    # Verify state and get user_id
+    user_id = _verify_oauth_state(state)
+    if not user_id:
+        return RedirectResponse(
+            url=f"{frontend_callback}?error=invalid_state&platform={platform}"
+        )
 
-    # TODO: Exchange code for tokens using platform adapter
-    # tokens = await platform_adapter.exchange_code(code)
-    # profile = await platform_adapter.get_profile(tokens.access_token)
+    # Look up the user
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        return RedirectResponse(
+            url=f"{frontend_callback}?error=user_not_found&platform={platform}"
+        )
 
-    # Placeholder: Mock token exchange
-    mock_tokens = {
-        "access_token": f"mock_access_token_{code}",
-        "refresh_token": f"mock_refresh_token_{code}",
-        "expires_in": 3600,
-    }
-    mock_profile = {
-        "id": f"platform_user_{platform}",
-        "username": f"user_{platform}",
-        "display_name": "Mock User",
-        "profile_image": None,
-    }
+    if platform == "facebook":
+        try:
+            tokens, profile = await _facebook_exchange_and_profile(code)
+        except Exception as e:
+            return RedirectResponse(
+                url=f"{frontend_callback}?error=token_exchange_failed&platform={platform}"
+            )
+    else:
+        return RedirectResponse(
+            url=f"{frontend_callback}?error=unsupported_platform&platform={platform}"
+        )
 
     # Encrypt tokens
-    access_token_encrypted = encrypt_credential(
-        mock_tokens["access_token"], settings.secret_key
-    )
-    refresh_token_encrypted = (
-        encrypt_credential(mock_tokens["refresh_token"], settings.secret_key)
-        if mock_tokens.get("refresh_token")
-        else None
-    )
+    access_token_encrypted = encrypt_credential(tokens["access_token"], settings.secret_key)
 
-    # Check if account already exists
+    # Check if account already exists for this user + platform + platform_user_id
     result = await db.execute(
         select(SocialAccount).where(
             and_(
+                SocialAccount.user_id == user.id,
                 SocialAccount.platform == platform,
-                SocialAccount.platform_user_id == mock_profile["id"],
+                SocialAccount.platform_user_id == profile["id"],
             )
         )
     )
     existing_account = result.scalar_one_or_none()
 
     if existing_account:
-        # Update existing account
         existing_account.access_token_encrypted = access_token_encrypted
-        existing_account.refresh_token_encrypted = refresh_token_encrypted
-        existing_account.token_expires_at = datetime.now(timezone.utc)
-        existing_account.platform_username = mock_profile.get("username")
-        existing_account.platform_display_name = mock_profile.get("display_name")
-        existing_account.profile_image_url = mock_profile.get("profile_image")
+        existing_account.token_expires_at = tokens.get("expires_at")
+        existing_account.platform_username = profile.get("username")
+        existing_account.platform_display_name = profile.get("display_name")
+        existing_account.profile_image_url = profile.get("profile_image")
         existing_account.is_active = True
         existing_account.last_verified_at = datetime.now(timezone.utc)
         existing_account.verification_error = None
     else:
-        # Create new account
         new_account = SocialAccount(
-            user_id=current_user.id,
+            user_id=user.id,
             platform=platform,
-            platform_user_id=mock_profile["id"],
-            platform_username=mock_profile.get("username"),
-            platform_display_name=mock_profile.get("display_name"),
-            profile_image_url=mock_profile.get("profile_image"),
+            platform_user_id=profile["id"],
+            platform_username=profile.get("username"),
+            platform_display_name=profile.get("display_name"),
+            profile_image_url=profile.get("profile_image"),
             access_token_encrypted=access_token_encrypted,
-            refresh_token_encrypted=refresh_token_encrypted,
-            token_expires_at=datetime.now(timezone.utc),
+            token_expires_at=tokens.get("expires_at"),
             is_active=True,
             last_verified_at=datetime.now(timezone.utc),
         )
@@ -250,12 +291,105 @@ async def oauth_callback(
     await db.commit()
 
     # Redirect to frontend success page
-    # In production, use proper redirect
-    return {
-        "message": "Account connected successfully",
-        "platform": platform,
-        "redirect_url": f"{settings.frontend_url}/settings/social?connected={platform}",
-    }
+    return RedirectResponse(
+        url=f"{frontend_callback}?success=true&platform={platform}"
+    )
+
+
+async def _facebook_exchange_and_profile(code: str) -> tuple[dict, dict]:
+    """
+    Exchange Facebook OAuth code for a long-lived page access token
+    and fetch the user's Facebook Page profile.
+    """
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        # Step 1: Exchange code for short-lived user access token
+        token_resp = await client.get(
+            "https://graph.facebook.com/v21.0/oauth/access_token",
+            params={
+                "client_id": settings.facebook_app_id,
+                "client_secret": settings.facebook_app_secret,
+                "redirect_uri": settings.facebook_redirect_uri,
+                "code": code,
+            },
+        )
+        if token_resp.status_code != 200:
+            raise Exception(f"Token exchange failed: {token_resp.text}")
+
+        token_data = token_resp.json()
+        short_token = token_data["access_token"]
+
+        # Step 2: Exchange for long-lived token (60 days)
+        long_token_resp = await client.get(
+            "https://graph.facebook.com/v21.0/oauth/access_token",
+            params={
+                "grant_type": "fb_exchange_token",
+                "client_id": settings.facebook_app_id,
+                "client_secret": settings.facebook_app_secret,
+                "fb_exchange_token": short_token,
+            },
+        )
+        if long_token_resp.status_code == 200:
+            long_data = long_token_resp.json()
+            access_token = long_data["access_token"]
+            expires_in = long_data.get("expires_in", 5184000)  # Default 60 days
+        else:
+            # Fall back to short-lived token
+            access_token = short_token
+            expires_in = token_data.get("expires_in", 3600)
+
+        # Step 3: Get user's Pages (we store Page access tokens for posting)
+        pages_resp = await client.get(
+            "https://graph.facebook.com/v21.0/me/accounts",
+            params={"access_token": access_token},
+        )
+
+        if pages_resp.status_code == 200:
+            pages_data = pages_resp.json()
+            pages = pages_data.get("data", [])
+
+            if pages:
+                # Use the first page — its token never expires as long as
+                # the user remains an admin and the app has permissions
+                page = pages[0]
+                page_token = page["access_token"]
+                profile = {
+                    "id": page["id"],
+                    "username": page.get("name", ""),
+                    "display_name": page.get("name", ""),
+                    "profile_image": f"https://graph.facebook.com/v21.0/{page['id']}/picture?type=small",
+                }
+                tokens = {
+                    "access_token": page_token,
+                    "expires_at": None,  # Page tokens don't expire
+                }
+                return tokens, profile
+
+        # Fallback: Use user profile if no pages
+        me_resp = await client.get(
+            "https://graph.facebook.com/v21.0/me",
+            params={
+                "fields": "id,name,picture.type(small)",
+                "access_token": access_token,
+            },
+        )
+        if me_resp.status_code != 200:
+            raise Exception(f"Profile fetch failed: {me_resp.text}")
+
+        me_data = me_resp.json()
+        picture_url = me_data.get("picture", {}).get("data", {}).get("url")
+
+        expires_at = datetime.now(timezone.utc).timestamp() + expires_in
+        tokens = {
+            "access_token": access_token,
+            "expires_at": datetime.fromtimestamp(expires_at, tz=timezone.utc),
+        }
+        profile = {
+            "id": me_data["id"],
+            "username": me_data.get("name", ""),
+            "display_name": me_data.get("name", ""),
+            "profile_image": picture_url,
+        }
+        return tokens, profile
 
 
 @router.delete("/accounts/{account_id}", response_model=DisconnectAccountResponse)

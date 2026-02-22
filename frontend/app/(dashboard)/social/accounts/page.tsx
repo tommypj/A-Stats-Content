@@ -45,18 +45,10 @@ export default function AccountsPage() {
       setConnectingPlatform(platform);
       setError(null);
 
-      // This would normally redirect to OAuth flow
-      // For now, we'll just show a message
-      alert(
-        `OAuth connection for ${platform} will redirect to the platform's authorization page. After authorization, you'll be redirected back to complete the connection.`
-      );
-
-      // In real implementation:
-      // const res = await api.social.connectAccount({ platform, ... });
-      // window.location.href = res.auth_url;
+      const res = await api.social.getConnectUrl(platform);
+      window.location.href = res.authorization_url;
     } catch (err) {
       setError(parseApiError(err).message);
-    } finally {
       setConnectingPlatform(null);
     }
   };

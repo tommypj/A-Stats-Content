@@ -498,11 +498,9 @@ export const api = {
       apiRequest<SocialAccountListResponse>({
         url: "/social/accounts",
       }),
-    connectAccount: (data: ConnectSocialAccountInput) =>
-      apiRequest<SocialAccount>({
-        method: "POST",
-        url: "/social/accounts/connect",
-        data,
+    getConnectUrl: (platform: SocialPlatform) =>
+      apiRequest<{ authorization_url: string; state: string }>({
+        url: `/social/${platform}/connect`,
       }),
     disconnectAccount: (id: string) =>
       apiRequest<void>({
