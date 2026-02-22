@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, parseApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -16,6 +16,9 @@ import {
   Loader2,
   CheckCircle,
   AlertCircle,
+  ExternalLink,
+  Search,
+  Unplug,
 } from "lucide-react";
 
 interface UserProfile {
@@ -51,8 +54,33 @@ export default function SettingsPage() {
   const [passwordError, setPasswordError] = useState("");
   const [passwordSaved, setPasswordSaved] = useState(false);
 
+  // WordPress integration
+  const [wpConnected, setWpConnected] = useState(false);
+  const [wpSiteUrl, setWpSiteUrl] = useState("");
+  const [wpUsername, setWpUsername] = useState("");
+  const [wpSiteName, setWpSiteName] = useState("");
+  const [wpLoadingStatus, setWpLoadingStatus] = useState(true);
+  const [showWpForm, setShowWpForm] = useState(false);
+  const [wpFormSiteUrl, setWpFormSiteUrl] = useState("");
+  const [wpFormUsername, setWpFormUsername] = useState("");
+  const [wpFormAppPassword, setWpFormAppPassword] = useState("");
+  const [wpConnecting, setWpConnecting] = useState(false);
+  const [wpDisconnecting, setWpDisconnecting] = useState(false);
+  const [wpError, setWpError] = useState("");
+
+  // GSC integration
+  const [gscConnected, setGscConnected] = useState(false);
+  const [gscSiteUrl, setGscSiteUrl] = useState("");
+  const [gscLastSync, setGscLastSync] = useState("");
+  const [gscLoadingStatus, setGscLoadingStatus] = useState(true);
+  const [gscConnecting, setGscConnecting] = useState(false);
+  const [gscDisconnecting, setGscDisconnecting] = useState(false);
+  const [gscError, setGscError] = useState("");
+
   useEffect(() => {
     loadProfile();
+    loadWordPressStatus();
+    loadGscStatus();
   }, []);
 
   const loadProfile = async () => {
@@ -108,6 +136,112 @@ export default function SettingsPage() {
       setPasswordError("Current password is incorrect");
     }
   };
+
+  const loadWordPressStatus = async () => {
+    try {
+      const status = await api.wordpress.status();
+      setWpConnected(status.is_connected);
+      setWpSiteUrl(status.site_url || "");
+      setWpUsername(status.username || "");
+      setWpSiteName(status.site_name || "");
+    } catch {
+      // 404 means not connected
+      setWpConnected(false);
+    } finally {
+      setWpLoadingStatus(false);
+    }
+  };
+
+  const handleWpConnect = async () => {
+    setWpError("");
+    if (!wpFormSiteUrl || !wpFormUsername || !wpFormAppPassword) {
+      setWpError("All fields are required");
+      return;
+    }
+    setWpConnecting(true);
+    try {
+      await api.wordpress.connect({
+        site_url: wpFormSiteUrl,
+        username: wpFormUsername,
+        app_password: wpFormAppPassword,
+      });
+      setShowWpForm(false);
+      setWpFormSiteUrl("");
+      setWpFormUsername("");
+      setWpFormAppPassword("");
+      await loadWordPressStatus();
+    } catch (err) {
+      setWpError(parseApiError(err).message);
+    } finally {
+      setWpConnecting(false);
+    }
+  };
+
+  const handleWpDisconnect = async () => {
+    setWpDisconnecting(true);
+    try {
+      await api.wordpress.disconnect();
+      setWpConnected(false);
+      setWpSiteUrl("");
+      setWpUsername("");
+      setWpSiteName("");
+    } catch (err) {
+      setWpError(parseApiError(err).message);
+    } finally {
+      setWpDisconnecting(false);
+    }
+  };
+
+  const loadGscStatus = async () => {
+    try {
+      const status = await api.analytics.status();
+      setGscConnected(status.connected);
+      setGscSiteUrl(status.site_url || "");
+      setGscLastSync(status.last_sync || "");
+    } catch {
+      setGscConnected(false);
+    } finally {
+      setGscLoadingStatus(false);
+    }
+  };
+
+  const handleGscConnect = async () => {
+    setGscError("");
+    setGscConnecting(true);
+    try {
+      const { auth_url } = await api.analytics.getAuthUrl();
+      window.open(auth_url, "_blank");
+    } catch (err) {
+      setGscError(parseApiError(err).message);
+    } finally {
+      setGscConnecting(false);
+    }
+  };
+
+  const handleGscDisconnect = async () => {
+    setGscDisconnecting(true);
+    try {
+      await api.analytics.disconnect();
+      setGscConnected(false);
+      setGscSiteUrl("");
+      setGscLastSync("");
+    } catch (err) {
+      setGscError(parseApiError(err).message);
+    } finally {
+      setGscDisconnecting(false);
+    }
+  };
+
+  // Re-check GSC status when window regains focus (after OAuth redirect)
+  useEffect(() => {
+    const onFocus = () => {
+      if (!gscConnected) {
+        loadGscStatus();
+      }
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [gscConnected]);
 
   if (loading) {
     return (
@@ -307,6 +441,176 @@ export default function SettingsPage() {
             <p className="text-xs text-text-muted">Images This Month</p>
           </div>
         </div>
+      </Card>
+
+      {/* WordPress Integration */}
+      <Card className="p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <Globe className="h-5 w-5 text-primary-500" />
+          <h2 className="text-lg font-display font-semibold text-text-primary">WordPress</h2>
+        </div>
+
+        {wpLoadingStatus ? (
+          <div className="flex items-center gap-2 text-text-secondary">
+            <Loader2 className="h-4 w-4 animate-spin" /> Checking connection...
+          </div>
+        ) : wpConnected ? (
+          <div className="space-y-4">
+            <div className="p-4 bg-green-50 border border-green-200 rounded-xl space-y-1">
+              <p className="flex items-center gap-2 text-sm font-medium text-green-800">
+                <CheckCircle className="h-4 w-4" /> Connected
+              </p>
+              {wpSiteName && (
+                <p className="text-sm text-green-700">Site: {wpSiteName}</p>
+              )}
+              <p className="text-sm text-green-700">URL: {wpSiteUrl}</p>
+              <p className="text-sm text-green-700">Username: {wpUsername}</p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={handleWpDisconnect}
+              disabled={wpDisconnecting}
+              className="text-red-600 border-red-200 hover:bg-red-50"
+            >
+              {wpDisconnecting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Unplug className="h-4 w-4 mr-2" />
+              )}
+              Disconnect
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm text-text-secondary">
+              Connect your WordPress site to publish articles directly from the dashboard.
+            </p>
+
+            {!showWpForm ? (
+              <Button onClick={() => setShowWpForm(true)}>
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Connect WordPress
+              </Button>
+            ) : (
+              <div className="space-y-3 p-4 bg-surface-secondary rounded-xl">
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-1">
+                    Site URL
+                  </label>
+                  <Input
+                    value={wpFormSiteUrl}
+                    onChange={(e) => setWpFormSiteUrl(e.target.value)}
+                    placeholder="https://yoursite.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-1">
+                    Username
+                  </label>
+                  <Input
+                    value={wpFormUsername}
+                    onChange={(e) => setWpFormUsername(e.target.value)}
+                    placeholder="WordPress username"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-1">
+                    Application Password
+                  </label>
+                  <Input
+                    type="password"
+                    value={wpFormAppPassword}
+                    onChange={(e) => setWpFormAppPassword(e.target.value)}
+                    placeholder="xxxx xxxx xxxx xxxx xxxx xxxx"
+                  />
+                  <p className="mt-1 text-xs text-text-muted">
+                    Generate one in WordPress &rarr; Users &rarr; Profile &rarr; Application Passwords
+                  </p>
+                </div>
+
+                {wpError && <p className="text-sm text-red-600">{wpError}</p>}
+
+                <div className="flex gap-2 pt-1">
+                  <Button onClick={handleWpConnect} disabled={wpConnecting}>
+                    {wpConnecting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                    Connect
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowWpForm(false);
+                      setWpError("");
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </Card>
+
+      {/* Google Search Console Integration */}
+      <Card className="p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <Search className="h-5 w-5 text-primary-500" />
+          <h2 className="text-lg font-display font-semibold text-text-primary">
+            Google Search Console
+          </h2>
+        </div>
+
+        {gscLoadingStatus ? (
+          <div className="flex items-center gap-2 text-text-secondary">
+            <Loader2 className="h-4 w-4 animate-spin" /> Checking connection...
+          </div>
+        ) : gscConnected ? (
+          <div className="space-y-4">
+            <div className="p-4 bg-green-50 border border-green-200 rounded-xl space-y-1">
+              <p className="flex items-center gap-2 text-sm font-medium text-green-800">
+                <CheckCircle className="h-4 w-4" /> Connected
+              </p>
+              {gscSiteUrl && (
+                <p className="text-sm text-green-700">Site: {gscSiteUrl}</p>
+              )}
+              {gscLastSync && (
+                <p className="text-sm text-green-700">
+                  Last sync: {new Date(gscLastSync).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+            <Button
+              variant="outline"
+              onClick={handleGscDisconnect}
+              disabled={gscDisconnecting}
+              className="text-red-600 border-red-200 hover:bg-red-50"
+            >
+              {gscDisconnecting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Unplug className="h-4 w-4 mr-2" />
+              )}
+              Disconnect
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm text-text-secondary">
+              Connect Google Search Console to track your search performance and get keyword insights.
+            </p>
+
+            {gscError && <p className="text-sm text-red-600">{gscError}</p>}
+
+            <Button onClick={handleGscConnect} disabled={gscConnecting}>
+              {gscConnecting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <ExternalLink className="h-4 w-4 mr-2" />
+              )}
+              Connect Google Search Console
+            </Button>
+          </div>
+        )}
       </Card>
     </div>
   );

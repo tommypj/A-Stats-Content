@@ -954,10 +954,14 @@ export interface WordPressConnection {
 }
 
 export interface WordPressConnectionStatus {
-  connected: boolean;
+  is_connected: boolean;
   site_url?: string;
   username?: string;
   site_name?: string;
+  connected_at?: string;
+  last_tested_at?: string;
+  connection_valid?: boolean;
+  error_message?: string;
 }
 
 export interface WordPressCategory {
