@@ -1,5 +1,5 @@
 """
-Replicate adapter for AI image generation using Flux models.
+Replicate adapter for AI image generation using Ideogram V3 Turbo.
 """
 
 import asyncio
@@ -29,8 +29,54 @@ class GeneratedImage:
     style: Optional[str] = None
 
 
+# Map our frontend styles to Ideogram V3 native parameters.
+# style_type: "None", "Auto", "General", "Realistic", "Design"
+# style_preset: 60+ presets like "Oil Painting", "Watercolor", "Pop Art", etc.
+STYLE_CONFIG = {
+    "realistic": {
+        "style_type": "Realistic",
+        "prompt_suffix": "ultra realistic, photorealistic, natural skin textures, natural lighting, lifelike details",
+    },
+    "photographic": {
+        "style_type": "Realistic",
+        "style_preset": "Photography",
+        "prompt_suffix": "professional DSLR photography, sharp focus, natural depth of field",
+    },
+    "artistic": {
+        "style_type": "General",
+        "prompt_suffix": "artistic illustration, creative, vibrant colors",
+    },
+    "minimalist": {
+        "style_type": "Design",
+        "prompt_suffix": "minimalist design, clean lines, simple composition",
+    },
+    "dramatic": {
+        "style_type": "Realistic",
+        "prompt_suffix": "dramatic lighting, high contrast, cinematic mood",
+    },
+    "vintage": {
+        "style_type": "General",
+        "style_preset": "Vintage",
+        "prompt_suffix": "vintage aesthetic, retro color grading, film grain",
+    },
+    "modern": {
+        "style_type": "Design",
+        "prompt_suffix": "modern design, sleek, contemporary aesthetic",
+    },
+    "abstract": {
+        "style_type": "General",
+        "prompt_suffix": "abstract art, geometric forms, conceptual",
+    },
+    "watercolor": {
+        "style_type": "General",
+        "style_preset": "Watercolor",
+        "prompt_suffix": "watercolor painting, soft edges, flowing colors",
+    },
+}
+
+
 class ReplicateImageService:
-    """AI image generation service using Replicate Flux models."""
+    """AI image generation service using Replicate Ideogram V3 Turbo."""
 
     def __init__(self):
         self._model = settings.replicate_model
@@ -52,32 +98,36 @@ class ReplicateImageService:
         style: Optional[str] = None,
     ) -> GeneratedImage:
         """
-        Generate an image using Replicate Flux model.
+        Generate an image using Ideogram V3 Turbo via Replicate.
 
         Args:
             prompt: Text description of the image to generate
             width: Image width in pixels (default: 1024)
             height: Image height in pixels (default: 1024)
-            style: Optional style modifier (e.g., "photographic", "artistic", "minimalist")
+            style: Style key (e.g., "realistic", "photographic", "artistic")
 
         Returns:
             GeneratedImage with URL and metadata
         """
         if not self._client:
-            # Return mock data for development when no API key is configured
             return self._mock_image(prompt, width, height, style)
 
         try:
-            # Enhance prompt with style if provided
-            enhanced_prompt = self._enhance_prompt(prompt, style)
+            # Get style configuration
+            style_cfg = STYLE_CONFIG.get(style.lower() if style else "", {})
 
-            # Run Replicate model in a thread pool to avoid blocking
-            # Replicate's run() is synchronous, so we use asyncio.to_thread
+            # Enhance prompt with style suffix
+            enhanced_prompt = prompt
+            if style_cfg.get("prompt_suffix"):
+                enhanced_prompt = f"{prompt}, {style_cfg['prompt_suffix']}"
+
+            # Run Replicate model in a thread pool (synchronous client)
             output = await asyncio.to_thread(
                 self._run_model,
                 enhanced_prompt,
                 width,
                 height,
+                style_cfg,
             )
 
             # Replicate models return various types: URL string, list of URLs, or FileOutput
@@ -103,14 +153,13 @@ class ReplicateImageService:
             logger.error(f"Replicate image generation failed: {e}", exc_info=True)
             raise
 
-    def _run_model(self, prompt: str, width: int, height: int):
+    def _run_model(self, prompt: str, width: int, height: int, style_cfg: dict):
         """
         Run the Replicate model synchronously.
 
         This method is called in a thread pool by generate_image.
         """
-        # Ideogram V3 Turbo on Replicate accepts aspect_ratio as "W:H" strings
-        # Valid values: "1:3","3:1","1:2","2:1","9:16","16:9","10:16","16:10","2:3","3:2","3:4","4:3","4:5","5:4","1:1"
+        # Calculate aspect ratio from dimensions
         ratio = width / height
         if abs(ratio - 1.0) < 0.05:
             aspect_ratio = "1:1"
@@ -142,7 +191,19 @@ class ReplicateImageService:
             "aspect_ratio": aspect_ratio,
         }
 
-        logger.info(f"Calling Replicate model {self._model} with aspect_ratio={aspect_ratio}")
+        # Apply Ideogram native style_type parameter (Realistic, General, Design)
+        if style_cfg.get("style_type"):
+            input_params["style_type"] = style_cfg["style_type"]
+
+        # Apply Ideogram native style_preset (Watercolor, Photography, Vintage, etc.)
+        if style_cfg.get("style_preset"):
+            input_params["style_preset"] = style_cfg["style_preset"]
+
+        logger.info(
+            f"Calling Replicate model {self._model} with "
+            f"aspect_ratio={aspect_ratio}, style_type={style_cfg.get('style_type')}, "
+            f"style_preset={style_cfg.get('style_preset')}"
+        )
 
         output = self._client.run(
             self._model,
@@ -151,35 +212,6 @@ class ReplicateImageService:
 
         logger.info(f"Replicate output type: {type(output)}, value: {output}")
         return output
-
-    def _enhance_prompt(self, prompt: str, style: Optional[str] = None) -> str:
-        """
-        Enhance the prompt with style modifiers.
-
-        Args:
-            prompt: Original prompt
-            style: Style modifier to apply
-
-        Returns:
-            Enhanced prompt with style guidance
-        """
-        if not style:
-            return prompt
-
-        style_modifiers = {
-            "realistic": "ultra realistic, photorealistic, natural lighting, real-world textures, no AI artifacts, lifelike details",
-            "photographic": "professional photography, realistic, sharp focus",
-            "artistic": "artistic illustration, creative, vibrant colors",
-            "minimalist": "minimalist design, clean lines, simple composition",
-            "dramatic": "dramatic lighting, high contrast, cinematic",
-            "vintage": "vintage aesthetic, retro, film grain",
-            "modern": "modern design, sleek, contemporary",
-            "abstract": "abstract art, geometric, conceptual",
-            "watercolor": "watercolor painting, soft edges, flowing colors",
-        }
-
-        modifier = style_modifiers.get(style.lower(), style)
-        return f"{prompt}, {modifier}"
 
     def _mock_image(
         self,
@@ -193,7 +225,6 @@ class ReplicateImageService:
 
         Returns a placeholder image URL from picsum.photos.
         """
-        # Use picsum.photos for placeholder images with the specified dimensions
         placeholder_url = f"https://picsum.photos/{width}/{height}"
 
         return GeneratedImage(
