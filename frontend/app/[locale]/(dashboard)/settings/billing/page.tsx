@@ -256,7 +256,7 @@ export default function BillingSettingsPage() {
       </div>
 
       {/* Usage Section */}
-      {subscription?.usage && currentPlan && (
+      {subscription && currentPlan && (
         <div className="card">
           <div className="p-6 border-b border-surface-tertiary">
             <div className="flex items-center justify-between">
@@ -276,18 +276,18 @@ export default function BillingSettingsPage() {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-text-primary">Articles</span>
                 <span className="text-sm text-text-secondary">
-                  {subscription.usage.articles_used} /{" "}
+                  {subscription.articles_generated_this_month} /{" "}
                   {currentPlan.limits.articles_per_month === -1
                     ? "Unlimited"
                     : currentPlan.limits.articles_per_month}
                 </span>
               </div>
               <Progress
-                value={subscription.usage.articles_used}
+                value={subscription.articles_generated_this_month}
                 max={currentPlan.limits.articles_per_month === -1 ? 100 : currentPlan.limits.articles_per_month}
               />
               {calculateUsagePercentage(
-                subscription.usage.articles_used,
+                subscription.articles_generated_this_month,
                 currentPlan.limits.articles_per_month
               ) >= 80 && currentPlan.limits.articles_per_month !== -1 && (
                 <p className="text-xs text-yellow-600 mt-1">
@@ -301,14 +301,14 @@ export default function BillingSettingsPage() {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-text-primary">Outlines</span>
                 <span className="text-sm text-text-secondary">
-                  {subscription.usage.outlines_used} /{" "}
+                  {subscription.outlines_generated_this_month} /{" "}
                   {currentPlan.limits.outlines_per_month === -1
                     ? "Unlimited"
                     : currentPlan.limits.outlines_per_month}
                 </span>
               </div>
               <Progress
-                value={subscription.usage.outlines_used}
+                value={subscription.outlines_generated_this_month}
                 max={currentPlan.limits.outlines_per_month === -1 ? 100 : currentPlan.limits.outlines_per_month}
               />
             </div>
@@ -318,14 +318,14 @@ export default function BillingSettingsPage() {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-text-primary">Images</span>
                 <span className="text-sm text-text-secondary">
-                  {subscription.usage.images_used} /{" "}
+                  {subscription.images_generated_this_month} /{" "}
                   {currentPlan.limits.images_per_month === -1
                     ? "Unlimited"
                     : currentPlan.limits.images_per_month}
                 </span>
               </div>
               <Progress
-                value={subscription.usage.images_used}
+                value={subscription.images_generated_this_month}
                 max={currentPlan.limits.images_per_month === -1 ? 100 : currentPlan.limits.images_per_month}
               />
             </div>
