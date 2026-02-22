@@ -156,8 +156,11 @@ async def gsc_oauth_callback(
             credentials.refresh_token, settings.secret_key
         )
 
-        # Check if connection already exists
-        existing_connection = await get_gsc_connection(current_user.id, db)
+        # Check if connection already exists (including inactive ones)
+        result = await db.execute(
+            select(GSCConnection).where(GSCConnection.user_id == current_user.id)
+        )
+        existing_connection = result.scalar_one_or_none()
 
         if existing_connection:
             # Update existing connection
