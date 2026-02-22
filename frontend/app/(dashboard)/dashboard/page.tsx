@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   FileText,
@@ -10,14 +11,11 @@ import {
   Plus,
   Clock,
   CheckCircle2,
+  Loader2,
+  BarChart2,
+  XCircle,
 } from "lucide-react";
-
-const stats = [
-  { name: "Total Articles", value: "0", icon: FileText, change: "+0%" },
-  { name: "Outlines Created", value: "0", icon: Sparkles, change: "+0%" },
-  { name: "Images Generated", value: "0", icon: ImageIcon, change: "+0%" },
-  { name: "SEO Score Avg", value: "N/A", icon: TrendingUp, change: "0%" },
-];
+import { api, Article, Outline, PlanInfo, UserResponse } from "@/lib/api";
 
 const quickActions = [
   {
@@ -38,18 +36,140 @@ const quickActions = [
     name: "Generate Image",
     description: "Create custom AI images",
     icon: ImageIcon,
-    href: "/images/new",
+    href: "/images/generate",
     color: "bg-healing-sky",
   },
 ];
 
+const statusIcons: Record<string, typeof CheckCircle2> = {
+  completed: CheckCircle2,
+  published: CheckCircle2,
+  draft: FileText,
+  generating: Loader2,
+  failed: XCircle,
+};
+
+const statusColors: Record<string, string> = {
+  completed: "text-green-600",
+  published: "text-blue-600",
+  draft: "text-text-muted",
+  generating: "text-yellow-600",
+  failed: "text-red-600",
+};
+
 export default function DashboardPage() {
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<UserResponse | null>(null);
+  const [recentArticles, setRecentArticles] = useState<Article[]>([]);
+  const [recentOutlines, setRecentOutlines] = useState<Outline[]>([]);
+  const [totalArticles, setTotalArticles] = useState(0);
+  const [totalOutlines, setTotalOutlines] = useState(0);
+  const [totalImages, setTotalImages] = useState(0);
+  const [avgSeoScore, setAvgSeoScore] = useState<number | null>(null);
+  const [planLimits, setPlanLimits] = useState<PlanInfo | null>(null);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  async function loadDashboardData() {
+    try {
+      setLoading(true);
+
+      const [userRes, articlesRes, outlinesRes, imagesRes, pricingRes] =
+        await Promise.all([
+          api.auth.me(),
+          api.articles.list({ page: 1, page_size: 5 }),
+          api.outlines.list({ page: 1, page_size: 5 }),
+          api.images.list({ page: 1, page_size: 1 }),
+          api.billing.pricing().catch(() => null),
+        ]);
+
+      setUser(userRes);
+      setRecentArticles(articlesRes.items);
+      setTotalArticles(articlesRes.total);
+      setRecentOutlines(outlinesRes.items);
+      setTotalOutlines(outlinesRes.total);
+      setTotalImages(imagesRes.total);
+
+      // Calculate average SEO score from articles that have one
+      const articlesWithSeo = articlesRes.items.filter(
+        (a) => a.seo_score !== undefined && a.seo_score !== null
+      );
+      if (articlesWithSeo.length > 0) {
+        const avg =
+          articlesWithSeo.reduce((sum, a) => sum + (a.seo_score || 0), 0) /
+          articlesWithSeo.length;
+        setAvgSeoScore(Math.round(avg));
+      }
+
+      // Find the user's current plan limits
+      if (pricingRes) {
+        const currentPlan = pricingRes.plans.find(
+          (p) => p.id === userRes.subscription_tier
+        );
+        if (currentPlan) {
+          setPlanLimits(currentPlan);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const articlesUsed = user?.articles_generated_this_month ?? 0;
+  const outlinesUsed = user?.outlines_generated_this_month ?? 0;
+  const imagesUsed = user?.images_generated_this_month ?? 0;
+
+  const articlesLimit = planLimits?.limits.articles_per_month ?? 5;
+  const outlinesLimit = planLimits?.limits.outlines_per_month ?? 10;
+  const imagesLimit = planLimits?.limits.images_per_month ?? 2;
+
+  function formatLimit(used: number, limit: number) {
+    return `${used} / ${limit === -1 ? "∞" : limit}`;
+  }
+
+  function usagePercent(used: number, limit: number) {
+    if (limit === -1) return Math.min(used * 5, 100); // show some progress for unlimited
+    return Math.min((used / limit) * 100, 100);
+  }
+
+  function getSeoScoreColor(score: number | null) {
+    if (score === null) return "text-text-muted";
+    if (score >= 80) return "text-green-600";
+    if (score >= 60) return "text-yellow-600";
+    return "text-red-600";
+  }
+
+  const stats = [
+    { name: "Total Articles", value: totalArticles.toString(), icon: FileText, change: `${articlesUsed} this month` },
+    { name: "Outlines Created", value: totalOutlines.toString(), icon: Sparkles, change: `${outlinesUsed} this month` },
+    { name: "Images Generated", value: totalImages.toString(), icon: ImageIcon, change: `${imagesUsed} this month` },
+    {
+      name: "SEO Score Avg",
+      value: avgSeoScore !== null ? avgSeoScore.toString() : "N/A",
+      icon: TrendingUp,
+      change: avgSeoScore !== null && avgSeoScore >= 80 ? "Good" : avgSeoScore !== null && avgSeoScore >= 60 ? "Fair" : avgSeoScore !== null ? "Needs work" : "",
+      changeColor: getSeoScoreColor(avgSeoScore),
+    },
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 animate-in">
       {/* Page header */}
       <div>
         <h1 className="text-2xl font-display font-bold text-text-primary">
-          Welcome back!
+          Welcome back{user?.name ? `, ${user.name.split(" ")[0]}` : ""}!
         </h1>
         <p className="mt-1 text-text-secondary">
           Here's an overview of your content creation activity.
@@ -64,7 +184,7 @@ export default function DashboardPage() {
               <div className="h-10 w-10 rounded-xl bg-primary-50 flex items-center justify-center">
                 <stat.icon className="h-5 w-5 text-primary-500" />
               </div>
-              <span className="text-xs font-medium text-healing-sage">
+              <span className={`text-xs font-medium ${"changeColor" in stat ? stat.changeColor : "text-text-muted"}`}>
                 {stat.change}
               </span>
             </div>
@@ -126,19 +246,46 @@ export default function DashboardPage() {
             </Link>
           </div>
           <div className="p-5">
-            <div className="text-center py-8">
-              <div className="h-12 w-12 rounded-xl bg-surface-secondary flex items-center justify-center mx-auto mb-3">
-                <FileText className="h-6 w-6 text-text-muted" />
+            {recentOutlines.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="h-12 w-12 rounded-xl bg-surface-secondary flex items-center justify-center mx-auto mb-3">
+                  <FileText className="h-6 w-6 text-text-muted" />
+                </div>
+                <p className="text-text-secondary text-sm">No outlines yet</p>
+                <Link
+                  href="/outlines/new"
+                  className="inline-flex items-center gap-1 mt-3 text-sm text-primary-500 hover:text-primary-600 font-medium"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create your first outline
+                </Link>
               </div>
-              <p className="text-text-secondary text-sm">No outlines yet</p>
-              <Link
-                href="/outlines/new"
-                className="inline-flex items-center gap-1 mt-3 text-sm text-primary-500 hover:text-primary-600 font-medium"
-              >
-                <Plus className="h-4 w-4" />
-                Create your first outline
-              </Link>
-            </div>
+            ) : (
+              <div className="space-y-3">
+                {recentOutlines.map((outline) => {
+                  const StatusIcon = statusIcons[outline.status] || FileText;
+                  return (
+                    <Link
+                      key={outline.id}
+                      href={`/outlines/${outline.id}`}
+                      className="flex items-center gap-3 p-2 -mx-2 rounded-lg hover:bg-surface-secondary transition-colors"
+                    >
+                      <StatusIcon
+                        className={`h-4 w-4 flex-shrink-0 ${statusColors[outline.status] || "text-text-muted"} ${outline.status === "generating" ? "animate-spin" : ""}`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-text-primary truncate">
+                          {outline.title}
+                        </p>
+                        <p className="text-xs text-text-muted">
+                          {outline.keyword} · {new Date(outline.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
@@ -156,19 +303,61 @@ export default function DashboardPage() {
             </Link>
           </div>
           <div className="p-5">
-            <div className="text-center py-8">
-              <div className="h-12 w-12 rounded-xl bg-surface-secondary flex items-center justify-center mx-auto mb-3">
-                <Sparkles className="h-6 w-6 text-text-muted" />
+            {recentArticles.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="h-12 w-12 rounded-xl bg-surface-secondary flex items-center justify-center mx-auto mb-3">
+                  <Sparkles className="h-6 w-6 text-text-muted" />
+                </div>
+                <p className="text-text-secondary text-sm">No articles yet</p>
+                <Link
+                  href="/articles/new"
+                  className="inline-flex items-center gap-1 mt-3 text-sm text-primary-500 hover:text-primary-600 font-medium"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create your first article
+                </Link>
               </div>
-              <p className="text-text-secondary text-sm">No articles yet</p>
-              <Link
-                href="/articles/new"
-                className="inline-flex items-center gap-1 mt-3 text-sm text-primary-500 hover:text-primary-600 font-medium"
-              >
-                <Plus className="h-4 w-4" />
-                Create your first article
-              </Link>
-            </div>
+            ) : (
+              <div className="space-y-3">
+                {recentArticles.map((article) => {
+                  const StatusIcon = statusIcons[article.status] || FileText;
+                  return (
+                    <Link
+                      key={article.id}
+                      href={`/articles/${article.id}`}
+                      className="flex items-center gap-3 p-2 -mx-2 rounded-lg hover:bg-surface-secondary transition-colors"
+                    >
+                      <StatusIcon
+                        className={`h-4 w-4 flex-shrink-0 ${statusColors[article.status] || "text-text-muted"} ${article.status === "generating" ? "animate-spin" : ""}`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-text-primary truncate">
+                          {article.title}
+                        </p>
+                        <div className="flex items-center gap-2 text-xs text-text-muted">
+                          <span>{article.keyword}</span>
+                          {article.seo_score !== undefined && (
+                            <>
+                              <span>·</span>
+                              <span className={getSeoScoreColor(article.seo_score)}>
+                                SEO {Math.round(article.seo_score)}
+                              </span>
+                            </>
+                          )}
+                          <span>·</span>
+                          <span>{new Date(article.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                      {article.word_count > 0 && (
+                        <span className="text-xs text-text-muted flex-shrink-0">
+                          {article.word_count.toLocaleString()} words
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -190,28 +379,43 @@ export default function DashboardPage() {
           <div>
             <div className="flex items-center justify-between text-sm mb-2">
               <span className="text-text-secondary">Articles</span>
-              <span className="text-text-primary font-medium">0 / 10</span>
+              <span className="text-text-primary font-medium">
+                {formatLimit(articlesUsed, articlesLimit)}
+              </span>
             </div>
             <div className="h-2 bg-surface-tertiary rounded-full overflow-hidden">
-              <div className="h-full w-0 bg-primary-500 rounded-full" />
+              <div
+                className="h-full bg-primary-500 rounded-full transition-all duration-500"
+                style={{ width: `${usagePercent(articlesUsed, articlesLimit)}%` }}
+              />
             </div>
           </div>
           <div>
             <div className="flex items-center justify-between text-sm mb-2">
               <span className="text-text-secondary">Outlines</span>
-              <span className="text-text-primary font-medium">0 / 20</span>
+              <span className="text-text-primary font-medium">
+                {formatLimit(outlinesUsed, outlinesLimit)}
+              </span>
             </div>
             <div className="h-2 bg-surface-tertiary rounded-full overflow-hidden">
-              <div className="h-full w-0 bg-healing-sage rounded-full" />
+              <div
+                className="h-full bg-healing-sage rounded-full transition-all duration-500"
+                style={{ width: `${usagePercent(outlinesUsed, outlinesLimit)}%` }}
+              />
             </div>
           </div>
           <div>
             <div className="flex items-center justify-between text-sm mb-2">
               <span className="text-text-secondary">Images</span>
-              <span className="text-text-primary font-medium">0 / 5</span>
+              <span className="text-text-primary font-medium">
+                {formatLimit(imagesUsed, imagesLimit)}
+              </span>
             </div>
             <div className="h-2 bg-surface-tertiary rounded-full overflow-hidden">
-              <div className="h-full w-0 bg-healing-lavender rounded-full" />
+              <div
+                className="h-full bg-healing-lavender rounded-full transition-all duration-500"
+                style={{ width: `${usagePercent(imagesUsed, imagesLimit)}%` }}
+              />
             </div>
           </div>
         </div>

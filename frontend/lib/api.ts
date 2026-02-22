@@ -1137,11 +1137,10 @@ export interface SubscriptionStatus {
   subscription_expires: string | null;
   customer_id: string | null;
   can_manage: boolean;
-  usage?: {
-    articles_used: number;
-    outlines_used: number;
-    images_used: number;
-  };
+  articles_generated_this_month: number;
+  outlines_generated_this_month: number;
+  images_generated_this_month: number;
+  usage_reset_date: string | null;
 }
 
 export interface CheckoutResponse {
