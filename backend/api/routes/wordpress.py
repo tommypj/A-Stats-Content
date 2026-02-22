@@ -20,10 +20,12 @@ from api.schemas.wordpress import (
     WordPressCategoryResponse,
     WordPressTagResponse,
     WordPressDisconnectResponse,
+    WordPressMediaUploadRequest,
+    WordPressMediaUploadResponse,
 )
 from api.routes.auth import get_current_user
 from infrastructure.database.connection import get_db
-from infrastructure.database.models import User, Article
+from infrastructure.database.models import User, Article, GeneratedImage
 from infrastructure.config.settings import settings
 from core.security.encryption import encrypt_credential, decrypt_credential
 
@@ -461,4 +463,122 @@ async def publish_to_wordpress(
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Failed to publish to WordPress: {str(e)}",
+        )
+
+
+@router.post("/upload-media", response_model=WordPressMediaUploadResponse)
+async def upload_media_to_wordpress(
+    request: WordPressMediaUploadRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Upload a generated image to the WordPress media library.
+    Downloads the image from its URL and uploads it to WordPress.
+    """
+    # Get WordPress credentials
+    wp_creds = get_wp_credentials(current_user)
+    if not wp_creds:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No WordPress connection configured",
+        )
+
+    # Get the image
+    result = await db.execute(
+        select(GeneratedImage).where(
+            GeneratedImage.id == request.image_id,
+            GeneratedImage.user_id == current_user.id,
+        )
+    )
+    image = result.scalar_one_or_none()
+
+    if not image:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found",
+        )
+
+    if not image.url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Image has no URL",
+        )
+
+    auth_header = create_wp_auth_header(wp_creds["username"], wp_creds["app_password"])
+
+    try:
+        async with _wp_client(timeout=60.0) as client:
+            # Download the image from its source URL
+            img_response = await client.get(image.url)
+            if img_response.status_code != 200:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Failed to download image from source: {img_response.status_code}",
+                )
+
+            image_data = img_response.content
+            content_type = img_response.headers.get("content-type", "image/png")
+
+            # Determine file extension from content type
+            ext_map = {
+                "image/png": ".png",
+                "image/jpeg": ".jpg",
+                "image/jpg": ".jpg",
+                "image/webp": ".webp",
+                "image/gif": ".gif",
+            }
+            ext = ext_map.get(content_type, ".png")
+            filename = f"ai-image-{image.id[:8]}{ext}"
+
+            # Determine title and alt text
+            title = request.title or image.alt_text or image.prompt[:100]
+            alt_text = request.alt_text or image.alt_text or f"AI-generated image: {image.prompt[:100]}"
+
+            # Upload to WordPress media library
+            upload_url = f"{wp_creds['site_url']}/wp-json/wp/v2/media"
+            response = await client.post(
+                upload_url,
+                headers={
+                    "Authorization": auth_header,
+                    "Content-Disposition": f'attachment; filename="{filename}"',
+                    "Content-Type": content_type,
+                },
+                content=image_data,
+            )
+
+            if response.status_code not in (200, 201):
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"WordPress media upload failed: {response.status_code} - {response.text}",
+                )
+
+            wp_media = response.json()
+
+            # Set title and alt text on the uploaded media
+            media_id = wp_media["id"]
+            update_url = f"{wp_creds['site_url']}/wp-json/wp/v2/media/{media_id}"
+            await client.post(
+                update_url,
+                headers={
+                    "Authorization": auth_header,
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "title": title,
+                    "alt_text": alt_text,
+                },
+            )
+
+            return WordPressMediaUploadResponse(
+                wordpress_media_id=media_id,
+                wordpress_url=wp_media.get("link", ""),
+                source_url=wp_media.get("source_url", wp_media.get("guid", {}).get("rendered", "")),
+                message="Image uploaded successfully to WordPress media library",
+            )
+
+    except httpx.RequestError as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to upload media to WordPress: {str(e)}",
         )

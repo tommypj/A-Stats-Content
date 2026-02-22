@@ -311,6 +311,13 @@ export const api = {
         url: "/wordpress/publish",
         data,
       }),
+    uploadMedia: (data: WordPressMediaUploadInput) =>
+      apiRequest<WordPressMediaUploadResponse>({
+        method: "POST",
+        url: "/wordpress/upload-media",
+        data,
+        timeout: 60000,
+      }),
   },
 
   // Analytics / Google Search Console
@@ -990,6 +997,19 @@ export interface WordPressPublishResponse {
   post_id: number;
   post_url: string;
   message?: string;
+}
+
+export interface WordPressMediaUploadInput {
+  image_id: string;
+  title?: string;
+  alt_text?: string;
+}
+
+export interface WordPressMediaUploadResponse {
+  wordpress_media_id: number;
+  wordpress_url: string;
+  source_url: string;
+  message: string;
 }
 
 // Analytics / GSC types

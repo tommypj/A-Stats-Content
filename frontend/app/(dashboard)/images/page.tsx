@@ -16,8 +16,9 @@ import {
   Copy,
   ExternalLink,
   Sparkles,
+  Globe,
 } from "lucide-react";
-import { api, getImageUrl, GeneratedImage } from "@/lib/api";
+import { api, getImageUrl, parseApiError, GeneratedImage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { clsx } from "clsx";
@@ -34,9 +35,14 @@ export default function ImagesPage() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<GeneratedImage | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [wpConnected, setWpConnected] = useState(false);
+  const [wpUploading, setWpUploading] = useState<string | null>(null);
+  const [wpUploaded, setWpUploaded] = useState<Set<string>>(new Set());
+  const [wpError, setWpError] = useState("");
 
   useEffect(() => {
     loadImages();
+    checkWpConnection();
   }, []);
 
   async function loadImages() {
@@ -82,6 +88,33 @@ export default function ImagesPage() {
     link.click();
     document.body.removeChild(link);
     setActiveMenu(null);
+  }
+
+  async function checkWpConnection() {
+    try {
+      const status = await api.wordpress.status();
+      setWpConnected(status.is_connected);
+    } catch {
+      setWpConnected(false);
+    }
+  }
+
+  async function handleSendToWordPress(image: GeneratedImage) {
+    setWpError("");
+    setWpUploading(image.id);
+    setActiveMenu(null);
+    try {
+      await api.wordpress.uploadMedia({
+        image_id: image.id,
+        alt_text: image.alt_text || undefined,
+      });
+      setWpUploaded((prev) => new Set(prev).add(image.id));
+    } catch (err) {
+      setWpError(parseApiError(err).message);
+      setTimeout(() => setWpError(""), 5000);
+    } finally {
+      setWpUploading(null);
+    }
   }
 
   return (
@@ -208,6 +241,22 @@ export default function ImagesPage() {
                               <ExternalLink className="h-4 w-4" />
                               Open in New Tab
                             </a>
+                            {wpConnected && (
+                              <button
+                                onClick={() => handleSendToWordPress(image)}
+                                disabled={wpUploading === image.id || wpUploaded.has(image.id)}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-surface-secondary disabled:opacity-50"
+                              >
+                                {wpUploading === image.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : wpUploaded.has(image.id) ? (
+                                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                ) : (
+                                  <Globe className="h-4 w-4" />
+                                )}
+                                {wpUploaded.has(image.id) ? "Sent to WordPress" : "Send to WordPress"}
+                              </button>
+                            )}
                             <button
                               onClick={() => handleDelete(image.id)}
                               className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 border-t border-surface-tertiary"
@@ -322,7 +371,27 @@ export default function ImagesPage() {
                     <Download className="h-4 w-4 mr-2" />
                     Download
                   </Button>
+                  {wpConnected && (
+                    <Button
+                      variant="outline"
+                      onClick={() => handleSendToWordPress(selectedImage)}
+                      disabled={wpUploading === selectedImage.id || wpUploaded.has(selectedImage.id)}
+                      className="flex-1"
+                    >
+                      {wpUploading === selectedImage.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : wpUploaded.has(selectedImage.id) ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-600 mr-2" />
+                      ) : (
+                        <Globe className="h-4 w-4 mr-2" />
+                      )}
+                      {wpUploaded.has(selectedImage.id) ? "Sent!" : "Send to WordPress"}
+                    </Button>
+                  )}
                 </div>
+                {wpError && (
+                  <p className="text-sm text-red-600 mt-2">{wpError}</p>
+                )}
               </div>
             </div>
           </div>

@@ -101,6 +101,23 @@ class WordPressTagResponse(BaseModel):
     count: Optional[int] = Field(None, description="Number of posts with this tag")
 
 
+class WordPressMediaUploadRequest(BaseModel):
+    """Request to upload an image to WordPress media library."""
+
+    image_id: str = Field(..., description="UUID of the generated image to upload")
+    title: Optional[str] = Field(None, description="Media title (defaults to prompt)")
+    alt_text: Optional[str] = Field(None, description="Alt text for the image")
+
+
+class WordPressMediaUploadResponse(BaseModel):
+    """Response after uploading media to WordPress."""
+
+    wordpress_media_id: int
+    wordpress_url: str
+    source_url: str
+    message: str = Field(default="Image uploaded successfully to WordPress")
+
+
 class WordPressDisconnectResponse(BaseModel):
     """Response after disconnecting WordPress."""
 
