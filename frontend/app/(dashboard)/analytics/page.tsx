@@ -35,6 +35,7 @@ export default function AnalyticsPage() {
   const [sites, setSites] = useState<GSCSite[]>([]);
   const [isLoadingSites, setIsLoadingSites] = useState(false);
   const [isSelectingSite, setIsSelectingSite] = useState(false);
+  const [sitesLoadError, setSitesLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     checkStatus();
@@ -69,11 +70,14 @@ export default function AnalyticsPage() {
   async function loadSites() {
     try {
       setIsLoadingSites(true);
+      setSitesLoadError(null);
       const response = await api.analytics.sites();
       setSites(response.sites);
     } catch (error) {
       const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to load GSC sites");
+      const message = apiError.message || "Failed to load GSC sites";
+      setSitesLoadError(message);
+      toast.error(message);
     } finally {
       setIsLoadingSites(false);
     }
@@ -195,6 +199,22 @@ export default function AnalyticsPage() {
               <div className="flex items-center justify-center py-12">
                 <RefreshCw className="h-6 w-6 animate-spin text-primary-500" />
                 <span className="ml-3 text-text-secondary">Loading your sites...</span>
+              </div>
+            ) : sitesLoadError ? (
+              <div className="text-center py-12">
+                <p className="text-red-500 font-medium">
+                  Failed to load sites from Google Search Console
+                </p>
+                <p className="text-sm text-text-muted mt-2">
+                  {sitesLoadError}
+                </p>
+                <Button
+                  variant="outline"
+                  className="mt-4"
+                  onClick={loadSites}
+                >
+                  Retry
+                </Button>
               </div>
             ) : sites.length === 0 ? (
               <div className="text-center py-12">

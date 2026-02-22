@@ -2,7 +2,7 @@
 Analytics database models for Google Search Console integration.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
@@ -65,7 +65,7 @@ class GSCConnection(Base, TimestampMixin):
 
     # Connection metadata
     connected_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
     )
     last_sync: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -80,7 +80,7 @@ class GSCConnection(Base, TimestampMixin):
     @property
     def is_token_expired(self) -> bool:
         """Check if access token is expired."""
-        return datetime.utcnow() >= self.token_expiry
+        return datetime.now(timezone.utc) >= self.token_expiry
 
 
 class KeywordRanking(Base, TimestampMixin):

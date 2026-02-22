@@ -7,7 +7,7 @@ search performance data, keyword rankings, and page-level analytics.
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from typing import List, Dict, Any, Optional
 from urllib.parse import urlencode
 
@@ -179,7 +179,7 @@ class GSCAdapter:
 
             # Calculate token expiry
             expires_in = tokens.get("expires_in", 3600)
-            token_expiry = datetime.utcnow() + timedelta(seconds=expires_in)
+            token_expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
             logger.info("Successfully exchanged code for tokens")
 
@@ -237,7 +237,7 @@ class GSCAdapter:
 
             # Calculate new token expiry
             expires_in = tokens.get("expires_in", 3600)
-            token_expiry = datetime.utcnow() + timedelta(seconds=expires_in)
+            token_expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
             logger.info("Successfully refreshed tokens")
 
@@ -271,7 +271,11 @@ class GSCAdapter:
         """
         try:
             # Check if token is expired and refresh if needed
-            if datetime.utcnow() >= credentials.token_expiry:
+            # Ensure token_expiry is timezone-aware for comparison
+            token_expiry = credentials.token_expiry
+            if token_expiry.tzinfo is None:
+                token_expiry = token_expiry.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) >= token_expiry:
                 logger.info("Access token expired, refreshing...")
                 credentials = self.refresh_tokens(credentials)
 
@@ -298,7 +302,7 @@ class GSCAdapter:
             logger.error(f"Failed to create API service: {e}")
             raise GSCAuthError(f"Failed to authenticate with Google API: {e}")
 
-    def list_sites(self, credentials: GSCCredentials) -> List[Dict[str, Any]]:
+    def list_sites(self, credentials: GSCCredentials) -> tuple[List[Dict[str, Any]], "GSCCredentials"]:
         """
         List all verified sites/properties for the authenticated user.
 
@@ -306,7 +310,7 @@ class GSCAdapter:
             credentials: OAuth credentials
 
         Returns:
-            List of site objects with siteUrl and permissionLevel
+            Tuple of (list of site objects, potentially updated credentials)
 
         Raises:
             GSCAPIError: If API request fails
@@ -317,10 +321,13 @@ class GSCAdapter:
             logger.info("Fetching verified sites from Google Search Console")
             response = service.sites().list().execute()
 
+            logger.info(f"GSC sites API raw response keys: {list(response.keys()) if response else 'None'}")
+            logger.info(f"GSC sites API raw response: {response}")
+
             sites = response.get("siteEntry", [])
             logger.info(f"Retrieved {len(sites)} verified sites")
 
-            return sites
+            return sites, updated_creds
 
         except HttpError as e:
             if e.resp.status == 403:

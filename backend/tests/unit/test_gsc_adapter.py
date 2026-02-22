@@ -308,7 +308,7 @@ class TestGSCAdapter:
         mock_service.sites.return_value.list.return_value = mock_sites_list
         mock_build.return_value = mock_service
 
-        sites = adapter.list_sites(mock_credentials)
+        sites, updated_creds = adapter.list_sites(mock_credentials)
 
         assert len(sites) == 2
         assert sites[0]["siteUrl"] == "https://example.com"

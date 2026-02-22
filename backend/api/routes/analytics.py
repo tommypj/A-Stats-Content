@@ -3,7 +3,7 @@ Analytics API routes for Google Search Console integration.
 """
 
 import math
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import urlencode
 from uuid import uuid4
@@ -168,7 +168,7 @@ async def gsc_oauth_callback(
             existing_connection.refresh_token = encrypted_refresh_token
             existing_connection.token_expiry = credentials.token_expiry
             existing_connection.is_active = True
-            existing_connection.connected_at = datetime.utcnow()
+            existing_connection.connected_at = datetime.now(timezone.utc)
             connection = existing_connection
         else:
             # Create new connection
@@ -178,7 +178,7 @@ async def gsc_oauth_callback(
                 access_token=encrypted_access_token,
                 refresh_token=encrypted_refresh_token,
                 token_expiry=credentials.token_expiry,
-                connected_at=datetime.utcnow(),
+                connected_at=datetime.now(timezone.utc),
                 is_active=True,
             )
             db.add(connection)
@@ -217,7 +217,7 @@ async def disconnect_gsc(
     connection.is_active = False
     await db.commit()
 
-    return GSCDisconnectResponse(disconnected_at=datetime.utcnow())
+    return GSCDisconnectResponse(disconnected_at=datetime.now(timezone.utc))
 
 
 @router.get("/gsc/status", response_model=GSCConnectionStatus)
@@ -249,6 +249,9 @@ async def get_gsc_sites(
     """
     List verified sites from Google Search Console.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
     connection = await get_gsc_connection(current_user.id, db)
 
     if not connection:
@@ -260,7 +263,7 @@ async def get_gsc_sites(
     try:
         # Import required modules
         from adapters.search.gsc_adapter import GSCAdapter, GSCCredentials
-        from core.security.encryption import decrypt_credential
+        from core.security.encryption import decrypt_credential, encrypt_credential
 
         # Decrypt the stored tokens
         decrypted_access_token = decrypt_credential(
@@ -268,6 +271,12 @@ async def get_gsc_sites(
         )
         decrypted_refresh_token = decrypt_credential(
             connection.refresh_token, settings.secret_key
+        )
+
+        logger.info(
+            f"GSC list_sites: token starts with '{decrypted_access_token[:10]}...', "
+            f"refresh starts with '{decrypted_refresh_token[:10]}...', "
+            f"token_expiry={connection.token_expiry}"
         )
 
         # Create credentials object
@@ -280,7 +289,18 @@ async def get_gsc_sites(
 
         # Initialize GSC adapter and fetch sites
         gsc_adapter = GSCAdapter()
-        sites_data = gsc_adapter.list_sites(credentials)
+        sites_data, updated_creds = gsc_adapter.list_sites(credentials)
+
+        # If tokens were refreshed, save them back to the database
+        if updated_creds.access_token != decrypted_access_token:
+            logger.info("GSC tokens were refreshed, saving back to database")
+            connection.access_token = encrypt_credential(
+                updated_creds.access_token, settings.secret_key
+            )
+            connection.token_expiry = updated_creds.token_expiry
+            await db.commit()
+
+        logger.info(f"GSC list_sites: returning {len(sites_data)} sites")
 
         # Transform to response format
         sites = [
@@ -294,6 +314,7 @@ async def get_gsc_sites(
         return GSCSiteListResponse(sites=sites)
 
     except Exception as e:
+        logger.error(f"GSC list_sites failed: {type(e).__name__}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch GSC sites: {str(e)}",
@@ -421,7 +442,7 @@ async def sync_gsc_data(
                     "impressions": stmt.excluded.impressions,
                     "ctr": stmt.excluded.ctr,
                     "position": stmt.excluded.position,
-                    "updated_at": datetime.utcnow(),
+                    "updated_at": datetime.now(timezone.utc),
                 },
             )
             await db.execute(stmt)
@@ -447,7 +468,7 @@ async def sync_gsc_data(
                     "impressions": stmt.excluded.impressions,
                     "ctr": stmt.excluded.ctr,
                     "position": stmt.excluded.position,
-                    "updated_at": datetime.utcnow(),
+                    "updated_at": datetime.now(timezone.utc),
                 },
             )
             await db.execute(stmt)
@@ -473,13 +494,13 @@ async def sync_gsc_data(
                     "total_impressions": stmt.excluded.total_impressions,
                     "avg_ctr": stmt.excluded.avg_ctr,
                     "avg_position": stmt.excluded.avg_position,
-                    "updated_at": datetime.utcnow(),
+                    "updated_at": datetime.now(timezone.utc),
                 },
             )
             await db.execute(stmt)
 
         # Update last_sync timestamp
-        sync_completed_at = datetime.utcnow()
+        sync_completed_at = datetime.now(timezone.utc)
         connection.last_sync = sync_completed_at
         await db.commit()
 
