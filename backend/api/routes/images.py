@@ -75,29 +75,27 @@ async def generate_image(
             style=request.style,
         )
 
-        # Download the generated image
-        image_data = await download_image(generated.url)
-
-        # Determine filename from image_id
-        filename = f"image_{image_id}.jpg"
-
-        # Save image to storage (local or S3 based on settings)
-        local_path = await storage_adapter.save_image(
-            image_data=image_data,
-            filename=filename,
-        )
-
-        # Generate alt text (basic implementation for now)
-        alt_text = f"AI-generated image: {request.prompt[:100]}"
-
-        # Update image record
-        # Store relative backend serving URL instead of the external Replicate URL
-        # (which may expire). The frontend constructs the full URL using NEXT_PUBLIC_API_URL.
-        image.local_path = local_path
-        image.url = f"/uploads/{local_path}"
-        image.alt_text = alt_text
+        # Store the external URL immediately (always accessible, even if local save fails)
+        image.url = generated.url
+        image.alt_text = f"AI-generated image: {request.prompt[:100]}"
         image.model = generated.model if hasattr(generated, "model") else None
         image.status = "completed"
+
+        # Try to download and cache locally (non-critical — external URL is the fallback)
+        try:
+            image_data = await download_image(generated.url)
+            filename = f"image_{image_id}.jpg"
+            local_path = await storage_adapter.save_image(
+                image_data=image_data,
+                filename=filename,
+            )
+            image.local_path = local_path
+        except Exception as dl_err:
+            # Local caching failed — image is still accessible via external URL
+            import logging
+            logging.getLogger(__name__).warning(
+                "Failed to cache image locally for %s: %s", image_id, dl_err
+            )
 
     except Exception as e:
         image.status = "failed"
