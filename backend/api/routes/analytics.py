@@ -828,8 +828,8 @@ async def get_article_performance(
     page_size: int = Query(20, ge=1, le=100),
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
-    sort_by: str = Query("total_clicks", regex="^(total_clicks|total_impressions|avg_position|avg_ctr|published_at)$"),
-    sort_order: str = Query("desc", regex="^(asc|desc)$"),
+    sort_by: str = Query("total_clicks", pattern="^(total_clicks|total_impressions|avg_position|avg_ctr|published_at)$"),
+    sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
