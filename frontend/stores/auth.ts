@@ -12,13 +12,15 @@ export interface User {
 interface AuthState {
   user: User | null;
   token: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
 
   // Actions
   setUser: (user: User | null) => void;
   setToken: (token: string | null) => void;
-  login: (user: User, token: string) => void;
+  setRefreshToken: (refreshToken: string | null) => void;
+  login: (user: User, token: string, refreshToken?: string) => void;
   logout: () => void;
   setLoading: (loading: boolean) => void;
 }
@@ -28,6 +30,7 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       token: null,
+      refreshToken: null,
       isAuthenticated: false,
       isLoading: true,
 
@@ -46,11 +49,24 @@ export const useAuthStore = create<AuthState>()(
         set({ token });
       },
 
-      login: (user, token) => {
+      setRefreshToken: (refreshToken) => {
+        if (refreshToken) {
+          localStorage.setItem("refresh_token", refreshToken);
+        } else {
+          localStorage.removeItem("refresh_token");
+        }
+        set({ refreshToken });
+      },
+
+      login: (user, token, refreshToken) => {
         localStorage.setItem("auth_token", token);
+        if (refreshToken) {
+          localStorage.setItem("refresh_token", refreshToken);
+        }
         set({
           user,
           token,
+          refreshToken: refreshToken || null,
           isAuthenticated: true,
           isLoading: false,
         });
@@ -58,9 +74,11 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         localStorage.removeItem("auth_token");
+        localStorage.removeItem("refresh_token");
         set({
           user: null,
           token: null,
+          refreshToken: null,
           isAuthenticated: false,
         });
       },
@@ -72,6 +90,7 @@ export const useAuthStore = create<AuthState>()(
       partialize: (state) => ({
         user: state.user,
         token: state.token,
+        refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
       }),
     }

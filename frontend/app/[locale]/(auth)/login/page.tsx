@@ -51,6 +51,9 @@ export default function LoginPage() {
 
       // Get user info
       localStorage.setItem("auth_token", response.access_token);
+      if (response.refresh_token) {
+        localStorage.setItem("refresh_token", response.refresh_token);
+      }
       const user = await api.auth.me();
 
       login(
@@ -61,7 +64,8 @@ export default function LoginPage() {
           role: user.role as "user" | "admin",
           subscription_tier: "free",
         },
-        response.access_token
+        response.access_token,
+        response.refresh_token
       );
 
       toast.success("Welcome back!");

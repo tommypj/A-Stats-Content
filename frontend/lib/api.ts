@@ -50,16 +50,99 @@ apiClient.interceptors.request.use(
 );
 
 /**
- * Response interceptor for handling errors
+ * Silent token refresh logic.
+ * When a 401 is received, attempts to refresh the access token using
+ * the stored refresh token before redirecting to login.
+ * Queues concurrent requests so only one refresh call is made at a time.
  */
+let isRefreshing = false;
+let failedQueue: Array<{
+  resolve: (token: string) => void;
+  reject: (error: unknown) => void;
+}> = [];
+
+function processQueue(error: unknown, token: string | null) {
+  failedQueue.forEach((promise) => {
+    if (token) {
+      promise.resolve(token);
+    } else {
+      promise.reject(error);
+    }
+  });
+  failedQueue = [];
+}
+
+function forceLogout() {
+  localStorage.removeItem("auth_token");
+  localStorage.removeItem("refresh_token");
+  window.location.href = "/login";
+}
+
 apiClient.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => {
-    if (error.response?.status === 401) {
-      // Clear token and redirect to login
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("auth_token");
-        window.location.href = "/login";
+  async (error: AxiosError) => {
+    const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
+
+    // Only attempt refresh on 401 errors, not on auth endpoints themselves
+    if (
+      error.response?.status === 401 &&
+      originalRequest &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes("/auth/login") &&
+      !originalRequest.url?.includes("/auth/refresh") &&
+      typeof window !== "undefined"
+    ) {
+      const refreshToken = localStorage.getItem("refresh_token");
+
+      if (!refreshToken) {
+        forceLogout();
+        return Promise.reject(error);
+      }
+
+      if (isRefreshing) {
+        // Another refresh is in progress — queue this request
+        return new Promise((resolve, reject) => {
+          failedQueue.push({
+            resolve: (token: string) => {
+              if (originalRequest.headers) {
+                originalRequest.headers.Authorization = `Bearer ${token}`;
+              }
+              resolve(apiClient(originalRequest));
+            },
+            reject,
+          });
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const { data } = await axios.post(`${API_URL}/api/v1/auth/refresh`, {
+          refresh_token: refreshToken,
+        });
+
+        const newAccessToken = data.access_token;
+        const newRefreshToken = data.refresh_token;
+
+        localStorage.setItem("auth_token", newAccessToken);
+        if (newRefreshToken) {
+          localStorage.setItem("refresh_token", newRefreshToken);
+        }
+
+        processQueue(null, newAccessToken);
+
+        // Retry the original request with new token
+        if (originalRequest.headers) {
+          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        }
+        return apiClient(originalRequest);
+      } catch (refreshError) {
+        processQueue(refreshError, null);
+        forceLogout();
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
       }
     }
 
@@ -116,7 +199,7 @@ export const api = {
   // Auth
   auth: {
     login: (email: string, password: string) =>
-      apiRequest<{ access_token: string; token_type: string }>({
+      apiRequest<{ access_token: string; refresh_token: string; token_type: string; expires_in: number }>({
         method: "POST",
         url: "/auth/login",
         data: { email, password },
@@ -132,7 +215,7 @@ export const api = {
         url: "/auth/me",
       }),
     refresh: (refreshToken: string) =>
-      apiRequest<{ access_token: string; token_type: string }>({
+      apiRequest<{ access_token: string; refresh_token: string; token_type: string; expires_in: number }>({
         method: "POST",
         url: "/auth/refresh",
         data: { refresh_token: refreshToken },
