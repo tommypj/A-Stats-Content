@@ -1393,11 +1393,11 @@ export interface AdminUserDetail {
 }
 
 export interface AdminUserListResponse {
-  items: AdminUserDetail[];
+  users: AdminUserDetail[];
   total: number;
   page: number;
   page_size: number;
-  pages: number;
+  total_pages: number;
 }
 
 export interface AdminUpdateUserInput {
@@ -1464,7 +1464,7 @@ export interface AdminArticleListResponse {
   total: number;
   page: number;
   page_size: number;
-  pages: number;
+  total_pages: number;
 }
 
 export interface AdminOutlineListResponse {
@@ -1472,7 +1472,7 @@ export interface AdminOutlineListResponse {
   total: number;
   page: number;
   page_size: number;
-  pages: number;
+  total_pages: number;
 }
 
 export interface AdminImageListResponse {
@@ -1480,7 +1480,7 @@ export interface AdminImageListResponse {
   total: number;
   page: number;
   page_size: number;
-  pages: number;
+  total_pages: number;
 }
 
 export interface AdminAuditQueryParams {
@@ -1507,11 +1507,11 @@ export interface AdminAuditLog {
 }
 
 export interface AdminAuditLogListResponse {
-  items: AdminAuditLog[];
+  logs: AdminAuditLog[];
   total: number;
   page: number;
   page_size: number;
-  pages: number;
+  total_pages: number;
 }
 
 // Teams (Multi-tenancy) types

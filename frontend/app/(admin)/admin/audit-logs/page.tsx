@@ -33,7 +33,7 @@ export default function AdminAuditLogsPage() {
         resource_type: resourceFilter === "all" ? undefined : resourceFilter,
       };
       const response = await api.admin.auditLogs(params);
-      setLogs(response.items);
+      setLogs(response.logs);
       setTotal(response.total);
     } catch (err) {
       setError(parseApiError(err).message);

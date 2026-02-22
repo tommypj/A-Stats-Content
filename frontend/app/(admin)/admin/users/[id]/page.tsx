@@ -60,7 +60,7 @@ export default function AdminUserDetailPage() {
         user_id: userId,
         page_size: 10,
       });
-      setAuditLogs(response.items);
+      setAuditLogs(response.logs);
     } catch (err) {
       console.error("Failed to fetch audit logs:", err);
     }

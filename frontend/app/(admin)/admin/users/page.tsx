@@ -54,9 +54,9 @@ export default function AdminUsersPage() {
       if (statusFilter === "active") params.status = "active";
 
       const response = await api.admin.users.list(params);
-      setUsers(response.items);
+      setUsers(response.users);
       setTotal(response.total);
-      setPages(response.pages);
+      setPages(response.total_pages);
     } catch (err) {
       const apiError = parseApiError(err);
       setError(apiError.message);
