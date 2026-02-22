@@ -59,6 +59,7 @@ async def create_outline(
                 target_audience=request.target_audience,
                 tone=request.tone,
                 word_count_target=request.word_count_target,
+                language=request.language or current_user.language or "en",
             )
 
             # Update outline with generated content
@@ -250,6 +251,7 @@ async def regenerate_outline(
             target_audience=outline.target_audience,
             tone=outline.tone,
             word_count_target=outline.word_count_target,
+            language=current_user.language or "en",
         )
 
         outline.title = generated.title

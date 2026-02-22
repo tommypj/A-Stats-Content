@@ -198,6 +198,7 @@ async def _generate_article_background(
     list_usage: str,
     custom_instructions: Optional[str],
     word_count_target: int = 1500,
+    language: str = "en",
 ):
     """Background task that generates article content and updates the DB."""
     async with async_session_maker() as db:
@@ -222,6 +223,7 @@ async def _generate_article_background(
                     list_usage=list_usage,
                     custom_instructions=custom_instructions,
                     word_count_target=word_count_target,
+                    language=language,
                 ),
                 timeout=270.0,  # 4.5 min hard limit
             )
@@ -350,6 +352,7 @@ async def generate_article(
             list_usage=request.list_usage or "balanced",
             custom_instructions=request.custom_instructions,
             word_count_target=outline.word_count_target or 1500,
+            language=request.language or current_user.language or "en",
         )
     )
 

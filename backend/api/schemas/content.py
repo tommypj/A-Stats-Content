@@ -30,6 +30,7 @@ class OutlineCreateRequest(BaseModel):
     target_audience: Optional[str] = Field(None, max_length=500)
     tone: str = Field(default="professional", max_length=50)
     word_count_target: int = Field(default=1500, ge=500, le=10000)
+    language: Optional[str] = Field(None, max_length=10, description="Content language code (e.g., 'en', 'ro')")
     auto_generate: bool = Field(default=True, description="Auto-generate with AI")
     team_id: Optional[str] = Field(None, description="Team ID for team content")
 
@@ -107,6 +108,7 @@ class ArticleGenerateRequest(BaseModel):
         max_length=1000,
         description="Custom instructions for the AI writer",
     )
+    language: Optional[str] = Field(None, max_length=10, description="Content language code (e.g., 'en', 'ro')")
 
 
 class ArticleCreateRequest(BaseModel):

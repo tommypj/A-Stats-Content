@@ -917,6 +917,7 @@ export interface CreateOutlineInput {
   target_audience?: string;
   tone?: string;
   word_count_target?: number;
+  language?: string;
   auto_generate?: boolean;
   team_id?: string;
 }
@@ -1010,6 +1011,7 @@ export interface GenerateArticleInput {
   voice?: string;
   list_usage?: string;
   custom_instructions?: string;
+  language?: string;
 }
 
 export interface UpdateArticleInput {

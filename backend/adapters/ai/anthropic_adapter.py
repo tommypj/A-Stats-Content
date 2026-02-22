@@ -59,7 +59,37 @@ class AnthropicContentService:
         self._model = settings.anthropic_model
         self._max_tokens = settings.anthropic_max_tokens
 
-    def _get_system_prompt(self, writing_style: str = "balanced", voice: str = "second_person", list_usage: str = "balanced") -> str:
+    # Language name mapping for clear AI instructions
+    LANGUAGE_NAMES = {
+        "en": "English",
+        "ro": "Romanian (limba română)",
+        "es": "Spanish (español)",
+        "de": "German (Deutsch)",
+        "fr": "French (français)",
+        "it": "Italian (italiano)",
+        "pt": "Portuguese (português)",
+        "nl": "Dutch (Nederlands)",
+        "pl": "Polish (polski)",
+        "ru": "Russian (русский)",
+        "ja": "Japanese (日本語)",
+        "ko": "Korean (한국어)",
+        "zh": "Chinese (中文)",
+        "ar": "Arabic (العربية)",
+        "tr": "Turkish (Türkçe)",
+        "sv": "Swedish (svenska)",
+        "da": "Danish (dansk)",
+        "no": "Norwegian (norsk)",
+        "fi": "Finnish (suomi)",
+        "hu": "Hungarian (magyar)",
+        "cs": "Czech (čeština)",
+        "bg": "Bulgarian (български)",
+    }
+
+    def _get_language_name(self, language_code: str) -> str:
+        """Get the full language name from a language code."""
+        return self.LANGUAGE_NAMES.get(language_code, language_code)
+
+    def _get_system_prompt(self, writing_style: str = "balanced", voice: str = "second_person", list_usage: str = "balanced", language: str = "en") -> str:
         """Get the system prompt for content generation."""
 
         style_instructions = {
@@ -81,8 +111,21 @@ class AnthropicContentService:
             "heavy": "Feel free to use bullet points and numbered lists frequently to make content highly scannable. But still include introductory and transitional paragraphs between lists.",
         }
 
-        return f"""You are an expert SEO content writer who produces high-quality, human-sounding articles.
+        language_name = self._get_language_name(language)
+        language_instruction = ""
+        if language != "en":
+            language_instruction = f"""
+LANGUAGE — THIS IS CRITICAL:
+You MUST write the ENTIRE article in {language_name}. Every word, heading, subheading, paragraph, and meta description must be in {language_name}.
+Use native-level grammar, correct gender agreements, proper declensions, and natural idiomatic expressions.
+Do NOT mix languages. Do NOT use English words unless they are commonly used loanwords in {language_name}.
+Write as a native {language_name} speaker would — with correct syntax, word order, and cultural context.
+"""
+        else:
+            language_instruction = "\nLANGUAGE: Write in English.\n"
 
+        return f"""You are an expert SEO content writer who produces high-quality, human-sounding articles.
+{language_instruction}
 WRITING APPROACH:
 {style_instructions.get(writing_style, style_instructions['balanced'])}
 
@@ -108,6 +151,7 @@ CRITICAL RULES:
         target_audience: Optional[str] = None,
         tone: str = "professional",
         word_count_target: int = 1500,
+        language: str = "en",
     ) -> GeneratedOutline:
         """
         Generate an article outline based on keyword and parameters.
@@ -126,21 +170,23 @@ CRITICAL RULES:
             return self._mock_outline(keyword, word_count_target)
 
         audience_context = f"Target audience: {target_audience}" if target_audience else ""
+        language_name = self._get_language_name(language)
+        language_context = f"\nLanguage: Write ALL content (title, headings, notes, meta description) in {language_name}." if language != "en" else ""
 
         prompt = f"""Create a comprehensive article outline for the following:
 
 Keyword: {keyword}
 {audience_context}
 Tone: {tone}
-Target word count: {word_count_target} words
+Target word count: {word_count_target} words{language_context}
 
 Generate a detailed outline with:
-1. A compelling, SEO-optimized title
-2. 5-7 main sections with H2 headings
+1. A compelling, SEO-optimized title{f' (in {language_name})' if language != 'en' else ''}
+2. 5-7 main sections with H2 headings{f' (in {language_name})' if language != 'en' else ''}
 3. 2-4 subheadings (H3) per section
 4. Brief notes for each section describing the content
 5. Estimated word count per section
-6. A meta description (150-160 characters)
+6. A meta description (150-160 characters){f' (in {language_name})' if language != 'en' else ''}
 
 Respond in JSON format:
 {{
@@ -161,7 +207,7 @@ Respond in JSON format:
         message = await self._client.messages.create(
             model=self._model,
             max_tokens=self._max_tokens,
-            system=self._get_system_prompt(writing_style="balanced", voice="second_person", list_usage="balanced"),
+            system=self._get_system_prompt(writing_style="balanced", voice="second_person", list_usage="balanced", language=language),
             messages=[{"role": "user", "content": prompt}],
         )
 
@@ -206,6 +252,7 @@ Respond in JSON format:
         list_usage: str = "balanced",
         custom_instructions: Optional[str] = None,
         word_count_target: int = 1500,
+        language: str = "en",
     ) -> GeneratedArticle:
         """
         Generate a full article based on an outline.
@@ -226,6 +273,8 @@ Respond in JSON format:
 
         audience_context = f"Target audience: {target_audience}" if target_audience else ""
         custom_context = f"\nAdditional instructions from the user:\n{custom_instructions}" if custom_instructions else ""
+        language_name = self._get_language_name(language)
+        language_context = f"\n**LANGUAGE: Write the ENTIRE article in {language_name}. All headings, paragraphs, and meta description must be in {language_name} with correct grammar, gender agreements, and natural phrasing.**" if language != "en" else ""
 
         # Format sections for the prompt
         sections_text = "\n".join([
@@ -249,7 +298,7 @@ Respond in JSON format:
 Title: {title}
 Keyword: {keyword}
 {audience_context}
-Tone: {tone}
+Tone: {tone}{language_context}
 
 **TARGET WORD COUNT: approximately {word_count_target} words (between {word_min} and {word_max} words). This is a strict requirement — do NOT exceed {word_max} words.**
 
@@ -278,7 +327,7 @@ META_DESCRIPTION: [A compelling 150-160 character meta description]"""
         message = await self._client.messages.create(
             model=self._model,
             max_tokens=max_tokens,
-            system=self._get_system_prompt(writing_style=writing_style, voice=voice, list_usage=list_usage),
+            system=self._get_system_prompt(writing_style=writing_style, voice=voice, list_usage=list_usage, language=language),
             messages=[{"role": "user", "content": prompt}],
         )
 
