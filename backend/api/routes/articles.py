@@ -7,6 +7,7 @@ import logging
 import math
 import re
 import markdown
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
@@ -21,6 +22,8 @@ from api.schemas.content import (
     ArticleResponse,
     ArticleListResponse,
     ArticleImproveRequest,
+    SocialPostsResponse,
+    SocialPostUpdateRequest,
 )
 from api.routes.auth import get_current_user
 from infrastructure.database.connection import get_db, async_session_maker
@@ -657,3 +660,139 @@ async def generate_article_image_prompt(
     await db.refresh(article)
 
     return article
+
+
+@router.get("/{article_id}/social-posts", response_model=SocialPostsResponse)
+async def get_social_posts(
+    article_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get social media posts for an article."""
+    result = await db.execute(
+        select(Article).where(
+            Article.id == article_id,
+            Article.user_id == current_user.id,
+        )
+    )
+    article = result.scalar_one_or_none()
+
+    if not article:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Article not found",
+        )
+
+    social = article.social_posts or {}
+    return SocialPostsResponse(
+        twitter=social.get("twitter"),
+        linkedin=social.get("linkedin"),
+        facebook=social.get("facebook"),
+        instagram=social.get("instagram"),
+    )
+
+
+@router.post("/{article_id}/generate-social-posts", response_model=SocialPostsResponse)
+async def generate_social_posts(
+    article_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate AI social media posts for an article."""
+    result = await db.execute(
+        select(Article).where(
+            Article.id == article_id,
+            Article.user_id == current_user.id,
+        )
+    )
+    article = result.scalar_one_or_none()
+
+    if not article:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Article not found",
+        )
+
+    article_url = article.published_url or (
+        f"https://wordpress.example.com/?p={article.wordpress_post_id}"
+        if article.wordpress_post_id
+        else None
+    )
+
+    if not article_url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Article must be published to WordPress first to generate social posts",
+        )
+
+    summary = article.meta_description or (article.content[:300] if article.content else article.title)
+
+    try:
+        posts = await content_ai_service.generate_social_posts(
+            article_title=article.title,
+            article_summary=summary,
+            article_url=article_url,
+            keywords=[article.keyword],
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate social posts: {str(e)}",
+        )
+
+    now = datetime.now(timezone.utc).isoformat()
+    social_posts = {
+        platform: {"text": text, "generated_at": now}
+        for platform, text in posts.items()
+    }
+
+    article.social_posts = social_posts
+    await db.commit()
+    await db.refresh(article)
+
+    return SocialPostsResponse(
+        twitter=social_posts.get("twitter"),
+        linkedin=social_posts.get("linkedin"),
+        facebook=social_posts.get("facebook"),
+        instagram=social_posts.get("instagram"),
+    )
+
+
+@router.put("/{article_id}/social-posts", response_model=SocialPostsResponse)
+async def update_social_post(
+    article_id: str,
+    request: SocialPostUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update a single platform's social post text."""
+    result = await db.execute(
+        select(Article).where(
+            Article.id == article_id,
+            Article.user_id == current_user.id,
+        )
+    )
+    article = result.scalar_one_or_none()
+
+    if not article:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Article not found",
+        )
+
+    social_posts = dict(article.social_posts or {})
+    social_posts[request.platform] = {
+        "text": request.text,
+        "generated_at": (social_posts.get(request.platform, {}) or {}).get("generated_at"),
+    }
+
+    article.social_posts = social_posts
+    await db.commit()
+    await db.refresh(article)
+
+    return SocialPostsResponse(
+        twitter=social_posts.get("twitter"),
+        linkedin=social_posts.get("linkedin"),
+        facebook=social_posts.get("facebook"),
+        instagram=social_posts.get("instagram"),
+    )

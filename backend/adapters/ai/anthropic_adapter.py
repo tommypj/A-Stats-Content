@@ -426,6 +426,77 @@ Respond with ONLY the meta description, nothing else."""
             word_count=len(content.split()),
         )
 
+    async def generate_social_posts(
+        self,
+        article_title: str,
+        article_summary: str,
+        article_url: str,
+        keywords: Optional[List[str]] = None,
+    ) -> Dict[str, str]:
+        """
+        Generate platform-specific social media posts for an article.
+
+        Returns:
+            Dict with keys: twitter, linkedin, facebook, instagram
+        """
+        if not self._client:
+            return {
+                "twitter": f"Check out our latest article: {article_title} {article_url} #content #seo",
+                "linkedin": f"I just published a new article: {article_title}\n\nKey takeaways from this piece:\n\nRead more: {article_url}\n\n#ContentMarketing #SEO",
+                "facebook": f"Have you ever wondered about {article_title.lower()}? We just published a deep dive into this topic. Check it out!\n\n{article_url}",
+                "instagram": f"{article_title}\n\nWe break down everything you need to know in our latest article. Link in bio!\n\n#content #seo #digitalmarketing #blogging #contentcreation",
+            }
+
+        keywords_text = ", ".join(keywords) if keywords else "content marketing"
+
+        prompt = f"""Generate social media posts for the following article. Each post should promote the article and include the URL.
+
+Article Title: {article_title}
+Article Summary: {article_summary}
+Article URL: {article_url}
+Keywords: {keywords_text}
+
+Generate a post for each platform with these constraints:
+
+1. **Twitter/X** (max 280 characters total including URL): Concise hook, include the URL, add 2-3 relevant hashtags. Must be punchy and engaging.
+
+2. **LinkedIn** (max 3000 characters): Professional tone, include 2-3 key takeaways as bullet points, include the URL, add 3-5 professional hashtags. Start with a compelling hook.
+
+3. **Facebook** (max 500 characters): Conversational tone, start with an engaging question or hook, include the URL, add 2-3 hashtags. Encourage engagement.
+
+4. **Instagram** (caption style): Write an engaging caption with emojis, include 5-10 relevant hashtags at the end, mention "link in bio" instead of the URL. Make it visually descriptive.
+
+Respond in JSON format:
+{{
+    "twitter": "tweet text here",
+    "linkedin": "linkedin post here",
+    "facebook": "facebook post here",
+    "instagram": "instagram caption here"
+}}"""
+
+        message = await self._client.messages.create(
+            model=self._model,
+            max_tokens=2000,
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        response_text = message.content[0].text
+
+        # Extract JSON from response
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0]
+        elif "```" in response_text:
+            response_text = response_text.split("```")[1].split("```")[0]
+
+        data = json.loads(response_text.strip())
+
+        return {
+            "twitter": data.get("twitter", ""),
+            "linkedin": data.get("linkedin", ""),
+            "facebook": data.get("facebook", ""),
+            "instagram": data.get("instagram", ""),
+        }
+
     async def generate_image_prompt(
         self,
         title: str,

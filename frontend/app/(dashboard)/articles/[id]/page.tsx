@@ -18,11 +18,13 @@ import {
   Upload,
   ExternalLink,
   Trash2,
+  Share2,
 } from "lucide-react";
 import { api, Article } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import PublishToWordPressModal from "@/components/publish-to-wordpress-modal";
+import SocialPostsModal from "@/components/social-posts-modal";
 import { clsx } from "clsx";
 import { toast } from "sonner";
 
@@ -42,6 +44,9 @@ export default function ArticleEditorPage() {
   const [saving, setSaving] = useState(false);
   const [improving, setImproving] = useState(false);
   const [viewMode, setViewMode] = useState<"edit" | "preview">("edit");
+
+  // Social posts modal state
+  const [showSocialModal, setShowSocialModal] = useState(false);
 
   // WordPress modal state
   const [showWpModal, setShowWpModal] = useState(false);
@@ -237,6 +242,17 @@ export default function ArticleEditorPage() {
               Publish to WordPress
             </Button>
           )}
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowSocialModal(true)}
+            disabled={!article.published_url && !article.wordpress_post_url}
+            title={!article.published_url && !article.wordpress_post_url ? "Publish to WordPress first" : "Share on social media"}
+            leftIcon={<Share2 className="h-4 w-4" />}
+          >
+            Share
+          </Button>
 
           <div className="flex rounded-lg border border-surface-tertiary overflow-hidden">
             <button
@@ -520,6 +536,15 @@ export default function ArticleEditorPage() {
           onSuccess={handleWordPressPublishSuccess}
         />
       )}
+
+      {/* Social Posts Modal */}
+      <SocialPostsModal
+        articleId={articleId}
+        articleTitle={article.title}
+        articleUrl={article.published_url || article.wordpress_post_url}
+        isOpen={showSocialModal}
+        onClose={() => setShowSocialModal(false)}
+      />
     </div>
   );
 }

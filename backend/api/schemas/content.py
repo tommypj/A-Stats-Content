@@ -167,6 +167,7 @@ class ArticleResponse(BaseModel):
     published_at: Optional[datetime]
     published_url: Optional[str]
     featured_image_id: Optional[str]
+    social_posts: Optional[Dict[str, Any]] = None
     created_at: datetime
     updated_at: datetime
 
@@ -181,6 +182,29 @@ class ArticleListResponse(BaseModel):
     page: int
     page_size: int
     pages: int
+
+
+class SocialPostContent(BaseModel):
+    """Social post content for a single platform."""
+
+    text: str
+    generated_at: Optional[datetime] = None
+
+
+class SocialPostsResponse(BaseModel):
+    """Social posts for all platforms."""
+
+    twitter: Optional[SocialPostContent] = None
+    linkedin: Optional[SocialPostContent] = None
+    facebook: Optional[SocialPostContent] = None
+    instagram: Optional[SocialPostContent] = None
+
+
+class SocialPostUpdateRequest(BaseModel):
+    """Request to update a single platform's social post text."""
+
+    platform: str = Field(..., pattern="^(twitter|linkedin|facebook|instagram)$")
+    text: str = Field(..., min_length=1, max_length=5000)
 
 
 class ArticleImproveRequest(BaseModel):

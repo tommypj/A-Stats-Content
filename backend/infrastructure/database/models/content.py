@@ -206,6 +206,9 @@ class Article(Base, TimestampMixin):
     published_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     wordpress_post_id: Mapped[Optional[int]] = mapped_column(nullable=True)
 
+    # Social media posts (AI-generated content for sharing)
+    social_posts: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
     # Featured image
     featured_image_id: Mapped[Optional[str]] = mapped_column(
         UUID(as_uuid=False),

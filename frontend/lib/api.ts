@@ -256,6 +256,22 @@ export const api = {
         url: `/articles/${id}/generate-image-prompt`,
         timeout: AI_TIMEOUT,
       }),
+    getSocialPosts: (id: string) =>
+      apiRequest<SocialPostsData>({
+        url: `/articles/${id}/social-posts`,
+      }),
+    generateSocialPosts: (id: string) =>
+      apiRequest<SocialPostsData>({
+        method: "POST",
+        url: `/articles/${id}/generate-social-posts`,
+        timeout: AI_TIMEOUT,
+      }),
+    updateSocialPost: (id: string, platform: string, text: string) =>
+      apiRequest<SocialPostsData>({
+        method: "PUT",
+        url: `/articles/${id}/social-posts`,
+        data: { platform, text },
+      }),
   },
 
   // Images
@@ -877,8 +893,21 @@ export interface Article {
   image_prompt?: string;
   wordpress_post_id?: number;
   wordpress_post_url?: string;
+  social_posts?: SocialPostsData;
   created_at: string;
   updated_at: string;
+}
+
+export interface SocialPostContent {
+  text: string;
+  generated_at?: string;
+}
+
+export interface SocialPostsData {
+  twitter?: SocialPostContent;
+  linkedin?: SocialPostContent;
+  facebook?: SocialPostContent;
+  instagram?: SocialPostContent;
 }
 
 export interface CreateArticleInput {
