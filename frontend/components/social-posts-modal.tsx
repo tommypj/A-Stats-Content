@@ -9,11 +9,12 @@ import {
   Share2,
   Check,
   RefreshCw,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { api, parseApiError, SocialPostsData } from "@/lib/api";
+import { api, parseApiError, SocialPostsData, getImageUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 type Platform = "twitter" | "linkedin" | "facebook" | "instagram";
@@ -29,6 +30,7 @@ interface SocialPostsModalProps {
   articleId: string;
   articleTitle: string;
   articleUrl?: string;
+  imageUrl?: string;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -37,6 +39,7 @@ export default function SocialPostsModal({
   articleId,
   articleTitle,
   articleUrl,
+  imageUrl,
   isOpen,
   onClose,
 }: SocialPostsModalProps) {
@@ -133,6 +136,28 @@ export default function SocialPostsModal({
     if (!text) return;
 
     if (navigator.share) {
+      // Try sharing with image file if available
+      if (imageUrl) {
+        const fullUrl = getImageUrl(imageUrl);
+        try {
+          const response = await fetch(fullUrl);
+          const blob = await response.blob();
+          const fileName = fullUrl.split("/").pop() || "featured-image.jpg";
+          const imageFile = new File([blob], fileName, { type: blob.type || "image/jpeg" });
+
+          if (navigator.canShare && navigator.canShare({ files: [imageFile] })) {
+            await navigator.share({
+              files: [imageFile],
+              title: articleTitle,
+              text,
+            });
+            return;
+          }
+        } catch {
+          // File fetch or share failed — fall through to text share
+        }
+      }
+
       try {
         await navigator.share({
           title: articleTitle,
@@ -147,6 +172,25 @@ export default function SocialPostsModal({
       }
     } else {
       handleCopy(platform);
+    }
+  }
+
+  async function handleDownloadImage() {
+    if (!imageUrl) return;
+    const fullUrl = getImageUrl(imageUrl);
+    try {
+      const response = await fetch(fullUrl);
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = fullUrl.split("/").pop() || "featured-image.jpg";
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      toast.error("Failed to download image");
     }
   }
 
@@ -210,6 +254,28 @@ export default function SocialPostsModal({
             </div>
           ) : hasPosts ? (
             <>
+              {/* Featured Image Preview */}
+              {imageUrl && (
+                <div className="border border-surface-tertiary rounded-xl overflow-hidden">
+                  <img
+                    src={getImageUrl(imageUrl)}
+                    alt="Featured image"
+                    className="w-full object-cover rounded-t-xl"
+                    style={{ maxHeight: "200px" }}
+                  />
+                  <div className="px-3 py-2 flex justify-end bg-surface-secondary">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDownloadImage}
+                      leftIcon={<Download className="h-4 w-4" />}
+                    >
+                      Download Image
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {/* Platform Tabs */}
               <div className="flex gap-1 bg-surface-secondary p-1 rounded-xl">
                 {PLATFORMS.map((platform) => {

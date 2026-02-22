@@ -47,6 +47,7 @@ export default function ArticleEditorPage() {
 
   // Social posts modal state
   const [showSocialModal, setShowSocialModal] = useState(false);
+  const [featuredImageUrl, setFeaturedImageUrl] = useState<string | undefined>(undefined);
 
   // WordPress modal state
   const [showWpModal, setShowWpModal] = useState(false);
@@ -73,6 +74,16 @@ export default function ArticleEditorPage() {
       setContent(data.content || "");
       setMetaDescription(data.meta_description || "");
       setKeyword(data.keyword);
+
+      // Fetch featured image URL if article has one
+      if (data.featured_image_id) {
+        try {
+          const image = await api.images.get(data.featured_image_id);
+          setFeaturedImageUrl(image.url);
+        } catch {
+          // Non-critical — featured image preview is optional
+        }
+      }
     } catch (error) {
       console.error("Failed to load article:", error);
     } finally {
@@ -542,6 +553,7 @@ export default function ArticleEditorPage() {
         articleId={articleId}
         articleTitle={article.title}
         articleUrl={article.published_url || article.wordpress_post_url}
+        imageUrl={featuredImageUrl}
         isOpen={showSocialModal}
         onClose={() => setShowSocialModal(false)}
       />
