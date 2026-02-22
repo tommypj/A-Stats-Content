@@ -285,15 +285,14 @@ Respond in JSON format:
         ])
 
         # Calculate max_tokens based on word count target
-        # Non-English languages (Romanian, German, etc.) use ~2.5-3.0 tokens per word
-        # English averages ~1.4 tokens per word
-        # Add buffer for markdown headings, formatting, and meta description
+        # Non-English languages (Romanian, German, etc.) use significantly more tokens
+        # per word due to tokenization. Be generous — you only pay for tokens generated.
         if language != "en":
-            tokens_per_word = 3.0
+            tokens_per_word = 4.0
         else:
-            tokens_per_word = 1.8
-        estimated_tokens = int(word_count_target * tokens_per_word) + 500
-        max_tokens = min(max(estimated_tokens, 2000), 16000)
+            tokens_per_word = 2.5
+        estimated_tokens = int(word_count_target * tokens_per_word) + 1000
+        max_tokens = min(max(estimated_tokens, 4000), 16000)
 
         # Define word count tolerance range
         word_min = int(word_count_target * 0.85)
@@ -313,15 +312,16 @@ Outline:
 
 IMPORTANT WRITING GUIDELINES:
 1. **WORD COUNT IS CRITICAL**: The article MUST be approximately {word_count_target} words. Distribute the word budget across sections proportionally to the per-section targets shown above. Do NOT write more than {word_max} words total.
-2. Follow the outline structure exactly — use the provided H2 and H3 headings
-3. Write rich, flowing paragraphs as the PRIMARY content format
-4. Open with a compelling introduction (2-3 paragraphs) that hooks the reader without using lists
-5. Under each heading, write at least 2-3 substantive paragraphs BEFORE considering any list
-6. When you do use a list, introduce it with a paragraph and follow it with analysis or a connecting paragraph
-7. End with a conclusion that synthesizes key insights and includes a call-to-action
-8. Vary your paragraph openings — do not start consecutive paragraphs the same way
-9. Include specific examples, case studies, or scenarios to illustrate points
-10. Use transitional phrases to connect sections naturally
+2. **COMPLETE ALL SECTIONS**: You MUST write content for EVERY section in the outline. Do not stop early. All {len(sections)} sections must be covered.
+3. Follow the outline structure exactly — use the provided H2 and H3 headings
+4. Write rich, flowing paragraphs as the PRIMARY content format
+5. Open with a compelling introduction (2-3 paragraphs) that hooks the reader without using lists
+6. Under each heading, write at least 2-3 substantive paragraphs BEFORE considering any list
+7. When you do use a list, introduce it with a paragraph and follow it with analysis or a connecting paragraph
+8. End with a conclusion that synthesizes key insights and includes a call-to-action
+9. Vary your paragraph openings — do not start consecutive paragraphs the same way
+10. Include specific examples, case studies, or scenarios to illustrate points
+11. Use transitional phrases to connect sections naturally
 {custom_context}
 
 Write the article in markdown format.
@@ -330,12 +330,33 @@ At the very end, after the article, add:
 ---
 META_DESCRIPTION: [A compelling 150-160 character meta description]"""
 
-        message = await self._client.messages.create(
-            model=self._model,
-            max_tokens=max_tokens,
-            system=self._get_system_prompt(writing_style=writing_style, voice=voice, list_usage=list_usage, language=language),
-            messages=[{"role": "user", "content": prompt}],
-        )
+        # Generate with retry on truncation
+        max_attempts = 2
+        for attempt in range(max_attempts):
+            message = await self._client.messages.create(
+                model=self._model,
+                max_tokens=max_tokens,
+                system=self._get_system_prompt(writing_style=writing_style, voice=voice, list_usage=list_usage, language=language),
+                messages=[{"role": "user", "content": prompt}],
+            )
+
+            if message.stop_reason == "max_tokens" and attempt < max_attempts - 1:
+                # Response was truncated — retry with 50% more tokens
+                logger.warning(
+                    "Article generation truncated (stop_reason=max_tokens, "
+                    "max_tokens=%d, word_target=%d, language=%s). Retrying with more tokens.",
+                    max_tokens, word_count_target, language,
+                )
+                max_tokens = min(int(max_tokens * 1.5), 16000)
+                continue
+
+            if message.stop_reason == "max_tokens":
+                logger.error(
+                    "Article generation still truncated after retry "
+                    "(max_tokens=%d, word_target=%d, language=%s)",
+                    max_tokens, word_count_target, language,
+                )
+            break
 
         response_text = message.content[0].text
 
