@@ -79,7 +79,7 @@ export default function ArticleEditorPage() {
     try {
       setCheckingWpConnection(true);
       const status = await api.wordpress.status();
-      setWpConnected(status.connected);
+      setWpConnected(status.is_connected);
     } catch (error) {
       console.error("Failed to check WordPress connection:", error);
       setWpConnected(false);

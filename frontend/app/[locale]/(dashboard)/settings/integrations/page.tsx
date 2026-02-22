@@ -56,8 +56,8 @@ export default function IntegrationsSettingsPage() {
     try {
       setLoadingStatus(true);
       const status = await api.wordpress.status();
-      setWpConnected(status.connected);
-      if (status.connected) {
+      setWpConnected(status.is_connected);
+      if (status.is_connected) {
         setWpSiteUrl(status.site_url || "");
         setWpUsername(status.username || "");
         setWpSiteName(status.site_name || "");
