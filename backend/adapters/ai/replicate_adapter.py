@@ -167,6 +167,7 @@ class ReplicateImageService:
             return prompt
 
         style_modifiers = {
+            "realistic": "ultra realistic, photorealistic, natural lighting, real-world textures, no AI artifacts, lifelike details",
             "photographic": "professional photography, realistic, sharp focus",
             "artistic": "artistic illustration, creative, vibrant colors",
             "minimalist": "minimalist design, clean lines, simple composition",

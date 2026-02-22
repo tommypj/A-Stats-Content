@@ -20,6 +20,7 @@ import { Card } from "@/components/ui/card";
 import { AIGenerationProgress } from "@/components/ui/ai-generation-progress";
 
 const IMAGE_STYLES = [
+  { value: "realistic", label: "Realistic" },
   { value: "photographic", label: "Photographic" },
   { value: "artistic", label: "Artistic" },
   { value: "minimalist", label: "Minimalist" },
@@ -52,7 +53,7 @@ function GenerateImageContent() {
   const articleIdParam = searchParams.get("article");
 
   const [prompt, setPrompt] = useState("");
-  const [style, setStyle] = useState("photographic");
+  const [style, setStyle] = useState("realistic");
   const [size, setSize] = useState("1024x1024");
   const [articleId, setArticleId] = useState<string>(articleIdParam || "");
   const [articles, setArticles] = useState<Article[]>([]);
