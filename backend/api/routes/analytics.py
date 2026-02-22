@@ -5,6 +5,7 @@ Analytics API routes for Google Search Console integration.
 import math
 from datetime import date, datetime, timedelta
 from typing import Optional
+from urllib.parse import urlencode
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -104,17 +105,17 @@ async def get_gsc_auth_url(
     # Generate state for CSRF protection
     state = str(uuid4())
 
-    # Build OAuth URL
-    auth_url = (
-        "https://accounts.google.com/o/oauth2/v2/auth?"
-        f"client_id={settings.google_client_id}&"
-        f"redirect_uri={settings.google_redirect_uri}&"
-        "response_type=code&"
-        "scope=https://www.googleapis.com/auth/webmasters.readonly&"
-        "access_type=offline&"
-        "prompt=consent&"
-        f"state={state}"
-    )
+    # Build OAuth URL with proper URL encoding
+    params = {
+        "client_id": settings.google_client_id,
+        "redirect_uri": settings.google_redirect_uri,
+        "response_type": "code",
+        "scope": "https://www.googleapis.com/auth/webmasters.readonly",
+        "access_type": "offline",
+        "prompt": "consent",
+        "state": state,
+    }
+    auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
 
     return GSCConnectResponse(auth_url=auth_url, state=state)
 

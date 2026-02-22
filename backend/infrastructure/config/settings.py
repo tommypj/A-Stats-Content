@@ -94,7 +94,7 @@ class Settings(BaseSettings):
     # Google (OAuth & Search Console)
     google_client_id: Optional[str] = None
     google_client_secret: Optional[str] = None
-    google_redirect_uri: str = "http://localhost:8000/api/v1/gsc/callback"
+    google_redirect_uri: str = "http://localhost:3000/analytics/callback"
 
     # Twitter/X OAuth 2.0
     twitter_client_id: Optional[str] = None
