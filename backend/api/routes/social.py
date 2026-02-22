@@ -171,7 +171,7 @@ async def initiate_connection(
             "client_id": settings.facebook_app_id,
             "redirect_uri": settings.facebook_redirect_uri,
             "state": state,
-            "scope": "pages_show_list,pages_read_engagement,pages_manage_posts,pages_read_user_content",
+            "scope": "public_profile,pages_show_list,pages_manage_posts",
             "response_type": "code",
         })
         authorization_url = f"https://www.facebook.com/v21.0/dialog/oauth?{params}"
