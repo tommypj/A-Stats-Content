@@ -205,6 +205,7 @@ Respond in JSON format:
         voice: str = "second_person",
         list_usage: str = "balanced",
         custom_instructions: Optional[str] = None,
+        word_count_target: int = 1500,
     ) -> GeneratedArticle:
         """
         Generate a full article based on an outline.
@@ -234,6 +235,15 @@ Respond in JSON format:
             for s in sections
         ])
 
+        # Calculate max_tokens based on word count target
+        # ~1.4 tokens per word on average, plus buffer for meta description
+        estimated_tokens = int(word_count_target * 1.5) + 200
+        max_tokens = min(max(estimated_tokens, 1500), 8000)
+
+        # Define word count tolerance range
+        word_min = int(word_count_target * 0.85)
+        word_max = int(word_count_target * 1.15)
+
         prompt = f"""Write a complete, SEO-optimized article based on this outline:
 
 Title: {title}
@@ -241,19 +251,22 @@ Keyword: {keyword}
 {audience_context}
 Tone: {tone}
 
+**TARGET WORD COUNT: approximately {word_count_target} words (between {word_min} and {word_max} words). This is a strict requirement — do NOT exceed {word_max} words.**
+
 Outline:
 {sections_text}
 
 IMPORTANT WRITING GUIDELINES:
-1. Follow the outline structure exactly — use the provided H2 and H3 headings
-2. Write rich, flowing paragraphs as the PRIMARY content format
-3. Open with a compelling introduction (2-3 paragraphs) that hooks the reader without using lists
-4. Under each heading, write at least 2-3 substantive paragraphs BEFORE considering any list
-5. When you do use a list, introduce it with a paragraph and follow it with analysis or a connecting paragraph
-6. End with a conclusion that synthesizes key insights and includes a call-to-action
-7. Vary your paragraph openings — do not start consecutive paragraphs the same way
-8. Include specific examples, case studies, or scenarios to illustrate points
-9. Use transitional phrases to connect sections naturally
+1. **WORD COUNT IS CRITICAL**: The article MUST be approximately {word_count_target} words. Distribute the word budget across sections proportionally to the per-section targets shown above. Do NOT write more than {word_max} words total.
+2. Follow the outline structure exactly — use the provided H2 and H3 headings
+3. Write rich, flowing paragraphs as the PRIMARY content format
+4. Open with a compelling introduction (2-3 paragraphs) that hooks the reader without using lists
+5. Under each heading, write at least 2-3 substantive paragraphs BEFORE considering any list
+6. When you do use a list, introduce it with a paragraph and follow it with analysis or a connecting paragraph
+7. End with a conclusion that synthesizes key insights and includes a call-to-action
+8. Vary your paragraph openings — do not start consecutive paragraphs the same way
+9. Include specific examples, case studies, or scenarios to illustrate points
+10. Use transitional phrases to connect sections naturally
 {custom_context}
 
 Write the article in markdown format.
@@ -264,7 +277,7 @@ META_DESCRIPTION: [A compelling 150-160 character meta description]"""
 
         message = await self._client.messages.create(
             model=self._model,
-            max_tokens=8000,
+            max_tokens=max_tokens,
             system=self._get_system_prompt(writing_style=writing_style, voice=voice, list_usage=list_usage),
             messages=[{"role": "user", "content": prompt}],
         )
