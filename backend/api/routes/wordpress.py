@@ -29,6 +29,17 @@ from core.security.encryption import encrypt_credential, decrypt_credential
 
 router = APIRouter(prefix="/wordpress", tags=["WordPress"])
 
+WP_USER_AGENT = "A-Stats-Content/1.0 (WordPress Integration)"
+
+
+def _wp_client(timeout: float = 15.0) -> httpx.AsyncClient:
+    """Create an httpx client configured for WordPress API calls."""
+    return httpx.AsyncClient(
+        timeout=timeout,
+        follow_redirects=True,
+        headers={"User-Agent": WP_USER_AGENT},
+    )
+
 
 def get_wp_credentials(user: User) -> Optional[dict]:
     """
@@ -94,7 +105,7 @@ async def test_wp_connection(site_url: str, username: str, app_password: str) ->
     auth_header = create_wp_auth_header(username, app_password)
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with _wp_client() as client:
             response = await client.get(
                 test_url,
                 headers={"Authorization": auth_header},
@@ -263,7 +274,7 @@ async def get_wordpress_categories(
     auth_header = create_wp_auth_header(wp_creds["username"], wp_creds["app_password"])
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with _wp_client() as client:
             response = await client.get(
                 categories_url,
                 headers={"Authorization": auth_header},
@@ -312,7 +323,7 @@ async def get_wordpress_tags(
     auth_header = create_wp_auth_header(wp_creds["username"], wp_creds["app_password"])
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with _wp_client() as client:
             response = await client.get(
                 tags_url,
                 headers={"Authorization": auth_header},
@@ -399,7 +410,7 @@ async def publish_to_wordpress(
     auth_header = create_wp_auth_header(wp_creds["username"], wp_creds["app_password"])
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with _wp_client(timeout=30.0) as client:
             # If article was already published and update_existing is True, update it
             if article.wordpress_post_id and request.update_existing:
                 # Update existing post
