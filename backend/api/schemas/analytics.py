@@ -209,3 +209,132 @@ class DateRangeParams(BaseModel):
     end_date: Optional[date_type] = Field(None, description="End date (YYYY-MM-DD)")
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ============================================================================
+# Article Performance Schemas
+# ============================================================================
+
+
+class ArticlePerformanceItem(BaseModel):
+    """Article with cross-referenced GSC performance data."""
+
+    article_id: str
+    title: str
+    keyword: str
+    published_url: str
+    published_at: Optional[datetime] = None
+    seo_score: Optional[float] = None
+    total_clicks: int = 0
+    total_impressions: int = 0
+    avg_ctr: float = 0.0
+    avg_position: float = 0.0
+    clicks_trend: Optional[TrendData] = None
+    position_trend: Optional[TrendData] = None
+    performance_status: str = Field(
+        default="new",
+        description="improving, declining, neutral, or new",
+    )
+
+
+class ArticlePerformanceListResponse(BaseModel):
+    """Paginated list of articles with GSC performance data."""
+
+    items: List[ArticlePerformanceItem]
+    total: int
+    page: int
+    page_size: int
+    pages: int
+    total_published_articles: int = 0
+    articles_with_data: int = 0
+
+
+class ArticleDailyPerformance(BaseModel):
+    """Single day of performance data for an article."""
+
+    date: date_type
+    clicks: int = 0
+    impressions: int = 0
+    ctr: float = 0.0
+    position: float = 0.0
+
+
+class ArticlePerformanceDetailResponse(BaseModel):
+    """Detailed performance data for a single article."""
+
+    article_id: str
+    title: str
+    keyword: str
+    published_url: str
+    published_at: Optional[datetime] = None
+    seo_score: Optional[float] = None
+    total_clicks: int = 0
+    total_impressions: int = 0
+    avg_ctr: float = 0.0
+    avg_position: float = 0.0
+    clicks_trend: Optional[TrendData] = None
+    impressions_trend: Optional[TrendData] = None
+    ctr_trend: Optional[TrendData] = None
+    position_trend: Optional[TrendData] = None
+    daily_data: List[ArticleDailyPerformance] = Field(default_factory=list)
+    start_date: date_type
+    end_date: date_type
+
+
+# ============================================================================
+# Content Opportunities Schemas
+# ============================================================================
+
+
+class KeywordOpportunity(BaseModel):
+    """A keyword opportunity identified from GSC data."""
+
+    keyword: str
+    clicks: int = 0
+    impressions: int = 0
+    ctr: float = 0.0
+    position: float = 0.0
+    opportunity_type: str = Field(
+        ..., description="quick_win, content_gap, or rising"
+    )
+    position_change: float = 0.0
+    has_existing_article: bool = False
+    existing_article_id: Optional[str] = None
+
+
+class ContentOpportunitiesResponse(BaseModel):
+    """Categorized content opportunities from keyword data."""
+
+    quick_wins: List[KeywordOpportunity] = Field(default_factory=list)
+    content_gaps: List[KeywordOpportunity] = Field(default_factory=list)
+    rising_keywords: List[KeywordOpportunity] = Field(default_factory=list)
+    total_opportunities: int = 0
+    start_date: date_type
+    end_date: date_type
+
+
+class ContentSuggestionRequest(BaseModel):
+    """Request for AI-generated content suggestions."""
+
+    keywords: List[str] = Field(..., min_length=1, max_length=20)
+    max_suggestions: int = Field(default=5, ge=1, le=10)
+
+
+class ContentSuggestion(BaseModel):
+    """AI-generated content suggestion based on keyword data."""
+
+    suggested_title: str
+    target_keyword: str
+    content_angle: str
+    rationale: str
+    estimated_difficulty: str = Field(
+        ..., description="easy, medium, or hard"
+    )
+    estimated_word_count: int = 1500
+
+
+class ContentSuggestionsResponse(BaseModel):
+    """Response containing AI-generated content suggestions."""
+
+    suggestions: List[ContentSuggestion] = Field(default_factory=list)
+    based_on_keywords: List[str] = Field(default_factory=list)

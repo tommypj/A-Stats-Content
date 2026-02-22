@@ -474,6 +474,28 @@ export const api = {
         url: "/analytics/summary",
         params,
       }),
+    articlePerformance: (params?: ArticlePerformanceParams) =>
+      apiRequest<ArticlePerformanceListResponse>({
+        url: "/analytics/article-performance",
+        params,
+      }),
+    articlePerformanceDetail: (articleId: string, params?: { start_date?: string; end_date?: string }) =>
+      apiRequest<ArticlePerformanceDetailResponse>({
+        url: `/analytics/article-performance/${articleId}`,
+        params,
+      }),
+    opportunities: (params?: { start_date?: string; end_date?: string }) =>
+      apiRequest<ContentOpportunitiesResponse>({
+        url: "/analytics/opportunities",
+        params,
+      }),
+    suggestContent: (keywords: string[], maxSuggestions: number = 5) =>
+      apiRequest<ContentSuggestionsResponse>({
+        method: "POST",
+        url: "/analytics/opportunities/suggest",
+        data: { keywords, max_suggestions: maxSuggestions },
+        timeout: 60000,
+      }),
   },
 
   // Billing / LemonSqueezy
@@ -1245,6 +1267,106 @@ export interface AnalyticsSummary {
   start_date: string;
   end_date: string;
   site_url: string;
+}
+
+// Article Performance types
+export interface ArticlePerformanceParams {
+  page?: number;
+  page_size?: number;
+  start_date?: string;
+  end_date?: string;
+  sort_by?: "total_clicks" | "total_impressions" | "avg_position" | "avg_ctr" | "published_at";
+  sort_order?: "asc" | "desc";
+}
+
+export interface ArticlePerformanceItem {
+  article_id: string;
+  title: string;
+  keyword: string;
+  published_url: string;
+  published_at?: string;
+  seo_score?: number;
+  total_clicks: number;
+  total_impressions: number;
+  avg_ctr: number;
+  avg_position: number;
+  clicks_trend?: TrendData;
+  position_trend?: TrendData;
+  performance_status: "improving" | "declining" | "neutral" | "new";
+}
+
+export interface ArticlePerformanceListResponse {
+  items: ArticlePerformanceItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+  total_published_articles: number;
+  articles_with_data: number;
+}
+
+export interface ArticleDailyPerformance {
+  date: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+}
+
+export interface ArticlePerformanceDetailResponse {
+  article_id: string;
+  title: string;
+  keyword: string;
+  published_url: string;
+  published_at?: string;
+  seo_score?: number;
+  total_clicks: number;
+  total_impressions: number;
+  avg_ctr: number;
+  avg_position: number;
+  clicks_trend?: TrendData;
+  impressions_trend?: TrendData;
+  ctr_trend?: TrendData;
+  position_trend?: TrendData;
+  daily_data: ArticleDailyPerformance[];
+  start_date: string;
+  end_date: string;
+}
+
+// Content Opportunities types
+export interface KeywordOpportunity {
+  keyword: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+  opportunity_type: "quick_win" | "content_gap" | "rising";
+  position_change: number;
+  has_existing_article: boolean;
+  existing_article_id?: string;
+}
+
+export interface ContentOpportunitiesResponse {
+  quick_wins: KeywordOpportunity[];
+  content_gaps: KeywordOpportunity[];
+  rising_keywords: KeywordOpportunity[];
+  total_opportunities: number;
+  start_date: string;
+  end_date: string;
+}
+
+export interface ContentSuggestion {
+  suggested_title: string;
+  target_keyword: string;
+  content_angle: string;
+  rationale: string;
+  estimated_difficulty: "easy" | "medium" | "hard";
+  estimated_word_count: number;
+}
+
+export interface ContentSuggestionsResponse {
+  suggestions: ContentSuggestion[];
+  based_on_keywords: string[];
 }
 
 // Billing / LemonSqueezy types

@@ -29,6 +29,15 @@ from api.schemas.analytics import (
     DailyAnalyticsListResponse,
     AnalyticsSummaryResponse,
     TrendData,
+    ArticlePerformanceItem,
+    ArticlePerformanceListResponse,
+    ArticleDailyPerformance,
+    ArticlePerformanceDetailResponse,
+    KeywordOpportunity,
+    ContentOpportunitiesResponse,
+    ContentSuggestionRequest,
+    ContentSuggestion,
+    ContentSuggestionsResponse,
 )
 from api.routes.auth import get_current_user
 from infrastructure.database.connection import get_db
@@ -39,6 +48,7 @@ from infrastructure.database.models.analytics import (
     PagePerformance,
     DailyAnalytics,
 )
+from infrastructure.database.models.content import Article
 from infrastructure.config.settings import settings
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
@@ -792,4 +802,566 @@ async def get_analytics_summary(
         start_date=start_date,
         end_date=end_date,
         site_url=connection.site_url,
+    )
+
+
+# ============================================================================
+# Article Performance Endpoints
+# ============================================================================
+
+
+def normalize_url(url: str) -> str:
+    """Normalize a URL for comparison by stripping protocol, www, and trailing slash."""
+    url = url.lower().strip().rstrip("/")
+    for prefix in ("https://", "http://"):
+        if url.startswith(prefix):
+            url = url[len(prefix):]
+            break
+    if url.startswith("www."):
+        url = url[4:]
+    return url
+
+
+@router.get("/article-performance", response_model=ArticlePerformanceListResponse)
+async def get_article_performance(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    sort_by: str = Query("total_clicks", regex="^(total_clicks|total_impressions|avg_position|avg_ctr|published_at)$"),
+    sort_order: str = Query("desc", regex="^(asc|desc)$"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    List published articles cross-referenced with GSC page performance data.
+    """
+    connection = await get_gsc_connection(current_user.id, db)
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="GSC not connected",
+        )
+
+    # Default date range: last 30 days
+    if not end_date:
+        end_date = date.today()
+    if not start_date:
+        start_date = end_date - timedelta(days=30)
+
+    # Previous period for trend calculation
+    period_length = (end_date - start_date).days
+    previous_start = start_date - timedelta(days=period_length)
+    previous_end = start_date - timedelta(days=1)
+
+    # Fetch all published articles for this user
+    articles_query = select(Article).where(
+        and_(
+            Article.user_id == current_user.id,
+            Article.published_url.isnot(None),
+            Article.published_url != "",
+        )
+    )
+    articles_result = await db.execute(articles_query)
+    articles = articles_result.scalars().all()
+
+    total_published = len(articles)
+
+    # Fetch all page performance rows in the current period
+    current_perf_query = select(PagePerformance).where(
+        and_(
+            PagePerformance.user_id == current_user.id,
+            PagePerformance.date >= start_date,
+            PagePerformance.date <= end_date,
+        )
+    )
+    current_perf_result = await db.execute(current_perf_query)
+    current_perf_rows = current_perf_result.scalars().all()
+
+    # Fetch previous period performance
+    previous_perf_query = select(PagePerformance).where(
+        and_(
+            PagePerformance.user_id == current_user.id,
+            PagePerformance.date >= previous_start,
+            PagePerformance.date <= previous_end,
+        )
+    )
+    previous_perf_result = await db.execute(previous_perf_query)
+    previous_perf_rows = previous_perf_result.scalars().all()
+
+    # Build lookup maps by normalized URL
+    current_by_url: dict[str, list] = {}
+    for row in current_perf_rows:
+        key = normalize_url(row.page_url)
+        current_by_url.setdefault(key, []).append(row)
+
+    previous_by_url: dict[str, list] = {}
+    for row in previous_perf_rows:
+        key = normalize_url(row.page_url)
+        previous_by_url.setdefault(key, []).append(row)
+
+    # Cross-reference articles with performance data
+    items: list[ArticlePerformanceItem] = []
+    articles_with_data = 0
+
+    for article in articles:
+        norm_url = normalize_url(article.published_url)
+        current_rows = current_by_url.get(norm_url, [])
+        previous_rows = previous_by_url.get(norm_url, [])
+
+        total_clicks = sum(r.clicks for r in current_rows)
+        total_impressions = sum(r.impressions for r in current_rows)
+        avg_ctr = (
+            sum(r.ctr for r in current_rows) / len(current_rows)
+            if current_rows
+            else 0.0
+        )
+        avg_position = (
+            sum(r.position for r in current_rows) / len(current_rows)
+            if current_rows
+            else 0.0
+        )
+
+        prev_clicks = sum(r.clicks for r in previous_rows)
+        prev_position = (
+            sum(r.position for r in previous_rows) / len(previous_rows)
+            if previous_rows
+            else 0.0
+        )
+
+        clicks_trend = calculate_trend(total_clicks, prev_clicks) if current_rows or previous_rows else None
+        position_trend = calculate_trend(avg_position, prev_position) if current_rows or previous_rows else None
+
+        # Determine performance status
+        if not current_rows and not previous_rows:
+            perf_status = "new"
+        elif clicks_trend and clicks_trend.change_percent > 5:
+            perf_status = "improving"
+        elif clicks_trend and clicks_trend.change_percent < -5:
+            perf_status = "declining"
+        else:
+            perf_status = "neutral"
+
+        if current_rows:
+            articles_with_data += 1
+
+        items.append(
+            ArticlePerformanceItem(
+                article_id=article.id,
+                title=article.title,
+                keyword=article.keyword,
+                published_url=article.published_url,
+                published_at=article.published_at,
+                seo_score=article.seo_score,
+                total_clicks=total_clicks,
+                total_impressions=total_impressions,
+                avg_ctr=round(avg_ctr, 4),
+                avg_position=round(avg_position, 2),
+                clicks_trend=clicks_trend,
+                position_trend=position_trend,
+                performance_status=perf_status,
+            )
+        )
+
+    # Sort
+    reverse = sort_order == "desc"
+    sort_key_map = {
+        "total_clicks": lambda x: x.total_clicks,
+        "total_impressions": lambda x: x.total_impressions,
+        "avg_position": lambda x: x.avg_position,
+        "avg_ctr": lambda x: x.avg_ctr,
+        "published_at": lambda x: x.published_at or datetime.min.replace(tzinfo=timezone.utc),
+    }
+    items.sort(key=sort_key_map.get(sort_by, sort_key_map["total_clicks"]), reverse=reverse)
+
+    total = len(items)
+    pages_count = math.ceil(total / page_size) if total > 0 else 0
+    paginated = items[(page - 1) * page_size : page * page_size]
+
+    return ArticlePerformanceListResponse(
+        items=paginated,
+        total=total,
+        page=page,
+        page_size=page_size,
+        pages=pages_count,
+        total_published_articles=total_published,
+        articles_with_data=articles_with_data,
+    )
+
+
+@router.get("/article-performance/{article_id}", response_model=ArticlePerformanceDetailResponse)
+async def get_article_performance_detail(
+    article_id: str,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get detailed performance data for a single article.
+    """
+    connection = await get_gsc_connection(current_user.id, db)
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="GSC not connected",
+        )
+
+    # Fetch the article
+    article_result = await db.execute(
+        select(Article).where(
+            and_(
+                Article.id == article_id,
+                Article.user_id == current_user.id,
+            )
+        )
+    )
+    article = article_result.scalar_one_or_none()
+
+    if not article:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
+
+    if not article.published_url:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Article has no published URL")
+
+    # Default date range
+    if not end_date:
+        end_date = date.today()
+    if not start_date:
+        start_date = end_date - timedelta(days=30)
+
+    period_length = (end_date - start_date).days
+    previous_start = start_date - timedelta(days=period_length)
+    previous_end = start_date - timedelta(days=1)
+
+    norm_url = normalize_url(article.published_url)
+
+    # Fetch all page performance for this URL in date range
+    all_perf_query = select(PagePerformance).where(
+        and_(
+            PagePerformance.user_id == current_user.id,
+            PagePerformance.date >= start_date,
+            PagePerformance.date <= end_date,
+        )
+    ).order_by(PagePerformance.date)
+    all_perf_result = await db.execute(all_perf_query)
+    all_rows = all_perf_result.scalars().all()
+
+    # Filter by normalized URL
+    current_rows = [r for r in all_rows if normalize_url(r.page_url) == norm_url]
+
+    # Previous period
+    prev_perf_query = select(PagePerformance).where(
+        and_(
+            PagePerformance.user_id == current_user.id,
+            PagePerformance.date >= previous_start,
+            PagePerformance.date <= previous_end,
+        )
+    )
+    prev_perf_result = await db.execute(prev_perf_query)
+    prev_rows = [r for r in prev_perf_result.scalars().all() if normalize_url(r.page_url) == norm_url]
+
+    # Build daily data
+    daily_data = [
+        ArticleDailyPerformance(
+            date=r.date,
+            clicks=r.clicks,
+            impressions=r.impressions,
+            ctr=round(r.ctr, 4),
+            position=round(r.position, 2),
+        )
+        for r in current_rows
+    ]
+
+    # Aggregates
+    total_clicks = sum(r.clicks for r in current_rows)
+    total_impressions = sum(r.impressions for r in current_rows)
+    avg_ctr = sum(r.ctr for r in current_rows) / len(current_rows) if current_rows else 0.0
+    avg_position = sum(r.position for r in current_rows) / len(current_rows) if current_rows else 0.0
+
+    prev_clicks = sum(r.clicks for r in prev_rows)
+    prev_impressions = sum(r.impressions for r in prev_rows)
+    prev_ctr = sum(r.ctr for r in prev_rows) / len(prev_rows) if prev_rows else 0.0
+    prev_position = sum(r.position for r in prev_rows) / len(prev_rows) if prev_rows else 0.0
+
+    return ArticlePerformanceDetailResponse(
+        article_id=article.id,
+        title=article.title,
+        keyword=article.keyword,
+        published_url=article.published_url,
+        published_at=article.published_at,
+        seo_score=article.seo_score,
+        total_clicks=total_clicks,
+        total_impressions=total_impressions,
+        avg_ctr=round(avg_ctr, 4),
+        avg_position=round(avg_position, 2),
+        clicks_trend=calculate_trend(total_clicks, prev_clicks),
+        impressions_trend=calculate_trend(total_impressions, prev_impressions),
+        ctr_trend=calculate_trend(avg_ctr, prev_ctr),
+        position_trend=calculate_trend(avg_position, prev_position),
+        daily_data=daily_data,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+
+# ============================================================================
+# Content Opportunities Endpoints
+# ============================================================================
+
+
+@router.get("/opportunities", response_model=ContentOpportunitiesResponse)
+async def get_content_opportunities(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Analyze keyword data to surface content opportunities.
+    Categories: quick wins (positions 5-20), content gaps (high impressions, low CTR),
+    rising keywords (improved position).
+    """
+    connection = await get_gsc_connection(current_user.id, db)
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="GSC not connected",
+        )
+
+    if not end_date:
+        end_date = date.today()
+    if not start_date:
+        start_date = end_date - timedelta(days=30)
+
+    period_length = (end_date - start_date).days
+    previous_start = start_date - timedelta(days=period_length)
+    previous_end = start_date - timedelta(days=1)
+
+    # Fetch current period keywords aggregated
+    current_kw_query = (
+        select(
+            KeywordRanking.keyword,
+            func.sum(KeywordRanking.clicks).label("clicks"),
+            func.sum(KeywordRanking.impressions).label("impressions"),
+            func.avg(KeywordRanking.ctr).label("ctr"),
+            func.avg(KeywordRanking.position).label("position"),
+        )
+        .where(
+            and_(
+                KeywordRanking.user_id == current_user.id,
+                KeywordRanking.date >= start_date,
+                KeywordRanking.date <= end_date,
+            )
+        )
+        .group_by(KeywordRanking.keyword)
+    )
+    current_result = await db.execute(current_kw_query)
+    current_keywords = {row.keyword: row for row in current_result.all()}
+
+    # Fetch previous period for comparison
+    prev_kw_query = (
+        select(
+            KeywordRanking.keyword,
+            func.avg(KeywordRanking.position).label("position"),
+        )
+        .where(
+            and_(
+                KeywordRanking.user_id == current_user.id,
+                KeywordRanking.date >= previous_start,
+                KeywordRanking.date <= previous_end,
+            )
+        )
+        .group_by(KeywordRanking.keyword)
+    )
+    prev_result = await db.execute(prev_kw_query)
+    prev_positions = {row.keyword: row.position for row in prev_result.all()}
+
+    # Fetch existing articles to cross-reference
+    articles_query = select(Article.id, Article.keyword).where(
+        Article.user_id == current_user.id
+    )
+    articles_result = await db.execute(articles_query)
+    article_keywords = {row.keyword.lower(): row.id for row in articles_result.all()}
+
+    quick_wins = []
+    content_gaps = []
+    rising_keywords = []
+
+    for keyword, data in current_keywords.items():
+        clicks = data.clicks or 0
+        impressions = data.impressions or 0
+        ctr = data.ctr or 0.0
+        position = data.position or 0.0
+        prev_pos = prev_positions.get(keyword, position)
+        position_change = prev_pos - position  # positive = improved (lower position number)
+
+        has_article = keyword.lower() in article_keywords
+        article_id = article_keywords.get(keyword.lower())
+
+        # Quick Wins: positions 5-20 with decent impressions
+        if 5 <= position <= 20 and impressions >= 50:
+            quick_wins.append(
+                KeywordOpportunity(
+                    keyword=keyword,
+                    clicks=clicks,
+                    impressions=impressions,
+                    ctr=round(ctr, 4),
+                    position=round(position, 2),
+                    opportunity_type="quick_win",
+                    position_change=round(position_change, 2),
+                    has_existing_article=has_article,
+                    existing_article_id=article_id,
+                )
+            )
+
+        # Content Gaps: high impressions but very low CTR
+        if impressions >= 100 and ctr < 0.02:
+            content_gaps.append(
+                KeywordOpportunity(
+                    keyword=keyword,
+                    clicks=clicks,
+                    impressions=impressions,
+                    ctr=round(ctr, 4),
+                    position=round(position, 2),
+                    opportunity_type="content_gap",
+                    position_change=round(position_change, 2),
+                    has_existing_article=has_article,
+                    existing_article_id=article_id,
+                )
+            )
+
+        # Rising Keywords: position improved by > 3
+        if position_change > 3:
+            rising_keywords.append(
+                KeywordOpportunity(
+                    keyword=keyword,
+                    clicks=clicks,
+                    impressions=impressions,
+                    ctr=round(ctr, 4),
+                    position=round(position, 2),
+                    opportunity_type="rising",
+                    position_change=round(position_change, 2),
+                    has_existing_article=has_article,
+                    existing_article_id=article_id,
+                )
+            )
+
+    # Sort each category
+    quick_wins.sort(key=lambda x: x.impressions, reverse=True)
+    content_gaps.sort(key=lambda x: x.impressions, reverse=True)
+    rising_keywords.sort(key=lambda x: x.position_change, reverse=True)
+
+    total = len(quick_wins) + len(content_gaps) + len(rising_keywords)
+
+    return ContentOpportunitiesResponse(
+        quick_wins=quick_wins[:50],
+        content_gaps=content_gaps[:50],
+        rising_keywords=rising_keywords[:50],
+        total_opportunities=total,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+
+@router.post("/opportunities/suggest", response_model=ContentSuggestionsResponse)
+async def suggest_content(
+    request: ContentSuggestionRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Generate AI-powered content suggestions based on selected keywords.
+    """
+    connection = await get_gsc_connection(current_user.id, db)
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="GSC not connected",
+        )
+
+    # Fetch keyword data for the requested keywords
+    kw_query = (
+        select(
+            KeywordRanking.keyword,
+            func.sum(KeywordRanking.clicks).label("clicks"),
+            func.sum(KeywordRanking.impressions).label("impressions"),
+            func.avg(KeywordRanking.ctr).label("ctr"),
+            func.avg(KeywordRanking.position).label("position"),
+        )
+        .where(
+            and_(
+                KeywordRanking.user_id == current_user.id,
+                KeywordRanking.keyword.in_(request.keywords),
+            )
+        )
+        .group_by(KeywordRanking.keyword)
+    )
+    kw_result = await db.execute(kw_query)
+    keyword_data = [
+        {
+            "keyword": row.keyword,
+            "clicks": row.clicks or 0,
+            "impressions": row.impressions or 0,
+            "ctr": row.ctr or 0.0,
+            "position": row.position or 0.0,
+        }
+        for row in kw_result.all()
+    ]
+
+    # Include any keywords that weren't found in the DB with default values
+    found_kws = {kd["keyword"] for kd in keyword_data}
+    for kw in request.keywords:
+        if kw not in found_kws:
+            keyword_data.append({
+                "keyword": kw,
+                "clicks": 0,
+                "impressions": 0,
+                "ctr": 0.0,
+                "position": 0.0,
+            })
+
+    # Fetch existing article titles
+    articles_query = select(Article.title).where(
+        Article.user_id == current_user.id
+    )
+    articles_result = await db.execute(articles_query)
+    existing_titles = [row[0] for row in articles_result.all()]
+
+    # Get user language preference
+    user_result = await db.execute(
+        select(User.language).where(User.id == current_user.id)
+    )
+    user_lang = user_result.scalar() or "en"
+
+    # Call AI adapter
+    from adapters.ai.anthropic_adapter import content_ai_service
+
+    try:
+        suggestions_data = await content_ai_service.generate_content_suggestions(
+            keywords=keyword_data,
+            existing_articles=existing_titles,
+            language=user_lang,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate suggestions: {str(e)}",
+        )
+
+    suggestions = [
+        ContentSuggestion(
+            suggested_title=s.get("suggested_title", ""),
+            target_keyword=s.get("target_keyword", ""),
+            content_angle=s.get("content_angle", ""),
+            rationale=s.get("rationale", ""),
+            estimated_difficulty=s.get("estimated_difficulty", "medium"),
+            estimated_word_count=s.get("estimated_word_count", 1500),
+        )
+        for s in suggestions_data[:request.max_suggestions]
+    ]
+
+    return ContentSuggestionsResponse(
+        suggestions=suggestions,
+        based_on_keywords=request.keywords,
     )

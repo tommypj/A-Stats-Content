@@ -602,6 +602,103 @@ Respond with ONLY the image prompt, nothing else."""
 
         return message.content[0].text.strip()
 
+    async def generate_content_suggestions(
+        self,
+        keywords: List[Dict[str, Any]],
+        existing_articles: List[str],
+        language: str = "en",
+    ) -> List[Dict[str, Any]]:
+        """
+        Generate content suggestions based on keyword opportunity data.
+
+        Args:
+            keywords: List of dicts with keyword, impressions, clicks, ctr, position
+            existing_articles: List of existing article titles to avoid duplication
+            language: Target language code
+
+        Returns:
+            List of suggestion dicts with title, keyword, angle, rationale, difficulty, word_count
+        """
+        if not self._client:
+            return [
+                {
+                    "suggested_title": f"Complete Guide to {kw['keyword'].title()}",
+                    "target_keyword": kw["keyword"],
+                    "content_angle": "Comprehensive guide covering all aspects",
+                    "rationale": f"Keyword has {kw.get('impressions', 0)} impressions with room for improvement",
+                    "estimated_difficulty": "medium",
+                    "estimated_word_count": 1500,
+                }
+                for kw in keywords[:5]
+            ]
+
+        language_name = self._get_language_name(language)
+        language_instruction = f"\nGenerate all titles and content angles in {language_name}." if language != "en" else ""
+
+        keywords_text = "\n".join([
+            f"- \"{kw['keyword']}\" — {kw.get('impressions', 0)} impressions, "
+            f"{kw.get('clicks', 0)} clicks, CTR: {kw.get('ctr', 0):.2%}, "
+            f"Avg Position: {kw.get('position', 0):.1f}"
+            for kw in keywords
+        ])
+
+        existing_text = "\n".join([f"- {title}" for title in existing_articles]) if existing_articles else "None"
+
+        prompt = f"""Analyze these keyword opportunities from Google Search Console and suggest article topics.
+
+KEYWORD DATA:
+{keywords_text}
+
+EXISTING ARTICLES (avoid duplicating these):
+{existing_text}
+{language_instruction}
+
+For each suggestion provide:
+1. A compelling, SEO-optimized article title
+2. The primary target keyword
+3. A content angle (1-2 sentences describing the unique approach)
+4. Rationale for why this content would perform well (based on the data)
+5. Estimated difficulty (easy/medium/hard based on keyword competition implied by position)
+6. Recommended word count (1000-3000)
+
+Group related keywords into single article suggestions where appropriate.
+Suggest 5-{min(len(keywords), 10)} articles.
+
+Respond in JSON format:
+{{
+    "suggestions": [
+        {{
+            "suggested_title": "Article Title",
+            "target_keyword": "primary keyword",
+            "content_angle": "Unique approach description",
+            "rationale": "Why this will perform well",
+            "estimated_difficulty": "easy|medium|hard",
+            "estimated_word_count": 1500
+        }}
+    ]
+}}"""
+
+        try:
+            message = await self._client.messages.create(
+                model=self._model,
+                max_tokens=2000,
+                messages=[{"role": "user", "content": prompt}],
+            )
+
+            response_text = message.content[0].text
+
+            if "```json" in response_text:
+                response_text = response_text.split("```json")[1].split("```")[0]
+            elif "```" in response_text:
+                response_text = response_text.split("```")[1].split("```")[0]
+
+            data = json.loads(response_text.strip())
+            return data.get("suggestions", [])
+
+        except Exception as e:
+            logger.error(f"Failed to generate content suggestions: {e}")
+            raise
+
     async def generate_text(
         self,
         prompt: str,

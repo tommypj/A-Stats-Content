@@ -25,6 +25,9 @@ import {
   Globe,
   Zap,
   FileSearch,
+  Search,
+  TrendingUp,
+  Lightbulb,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { TeamProvider } from "@/contexts/TeamContext";
@@ -47,7 +50,17 @@ const navigation = [
       { name: "Accounts", href: "/social/accounts", icon: Users },
     ],
   },
-  { name: "Analytics", href: "/analytics", icon: BarChart3 },
+  {
+    name: "Analytics",
+    icon: BarChart3,
+    submenu: [
+      { name: "Overview", href: "/analytics", icon: LayoutDashboard },
+      { name: "Keywords", href: "/analytics/keywords", icon: Search },
+      { name: "Pages", href: "/analytics/pages", icon: FileText },
+      { name: "Article Performance", href: "/analytics/articles", icon: TrendingUp },
+      { name: "Content Opportunities", href: "/analytics/opportunities", icon: Lightbulb },
+    ],
+  },
   { name: "Knowledge", href: "/knowledge", icon: BookOpen },
   { name: "Teams", href: "/teams", icon: Users },
 ];
@@ -57,7 +70,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set(["Social"]));
+  const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set(["Social", "Analytics"]));
   const [user, setUser] = useState<UserResponse | null>(null);
 
   useEffect(() => {
