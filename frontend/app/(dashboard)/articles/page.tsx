@@ -299,7 +299,7 @@ export default function ArticlesPage() {
                   {/* Actions */}
                   <div className="relative flex items-center gap-1">
                     {/* Show delete button directly for failed/stuck articles */}
-                    {canModify && (article.status === "failed" || article.status === "generating") && (
+                    {(article.status === "failed" || article.status === "generating") && (
                       <button
                         onClick={() => handleDelete(article.id)}
                         className="p-1.5 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors"
@@ -339,15 +339,13 @@ export default function ArticlesPage() {
                               View Live
                             </a>
                           )}
-                          {canModify && (
-                            <button
-                              onClick={() => handleDelete(article.id)}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              Delete
-                            </button>
-                          )}
+                          <button
+                            onClick={() => handleDelete(article.id)}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Delete
+                          </button>
                         </div>
                       </>
                     )}

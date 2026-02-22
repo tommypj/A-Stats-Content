@@ -17,6 +17,7 @@ import {
   Code,
   Upload,
   ExternalLink,
+  Trash2,
 } from "lucide-react";
 import { api, Article } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -129,6 +130,19 @@ export default function ArticleEditorPage() {
       setArticle(updated);
     } catch (error) {
       console.error("Failed to analyze SEO:", error);
+    }
+  }
+
+  async function handleDelete() {
+    if (!article) return;
+    if (!confirm("Are you sure you want to delete this article? This cannot be undone.")) return;
+
+    try {
+      await api.articles.delete(article.id);
+      router.push("/articles");
+    } catch (error) {
+      console.error("Failed to delete article:", error);
+      toast.error("Failed to delete article");
     }
   }
 
@@ -484,6 +498,13 @@ export default function ArticleEditorPage() {
               >
                 <Code className="h-4 w-4" />
                 Copy HTML
+              </button>
+              <button
+                onClick={handleDelete}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition-colors"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete Article
               </button>
             </div>
           </Card>
