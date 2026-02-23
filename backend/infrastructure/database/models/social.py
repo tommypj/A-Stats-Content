@@ -77,10 +77,10 @@ class SocialAccount(Base, TimestampMixin):
         index=True,
     )
 
-    # Team ownership (optional - for multi-tenancy)
-    team_id: Mapped[Optional[str]] = mapped_column(
+    # Project ownership (optional - for multi-tenancy)
+    project_id: Mapped[Optional[str]] = mapped_column(
         UUID(as_uuid=False),
-        ForeignKey("teams.id", ondelete="CASCADE"),
+        ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
@@ -148,10 +148,10 @@ class ScheduledPost(Base, TimestampMixin):
         index=True,
     )
 
-    # Team ownership (optional - for multi-tenancy)
-    team_id: Mapped[Optional[str]] = mapped_column(
+    # Project ownership (optional - for multi-tenancy)
+    project_id: Mapped[Optional[str]] = mapped_column(
         UUID(as_uuid=False),
-        ForeignKey("teams.id", ondelete="CASCADE"),
+        ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )

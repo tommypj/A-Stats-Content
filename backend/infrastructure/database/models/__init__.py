@@ -15,7 +15,7 @@ from .social import (
     PostStatus,
 )
 from .admin import AdminAuditLog, AuditAction, AuditTargetType
-from .team import Team, TeamMember, TeamInvitation, TeamMemberRole, InvitationStatus
+from .project import Project, ProjectMember, ProjectInvitation, ProjectMemberRole, InvitationStatus
 
 __all__ = [
     "Base",
@@ -44,9 +44,9 @@ __all__ = [
     "AdminAuditLog",
     "AuditAction",
     "AuditTargetType",
-    "Team",
-    "TeamMember",
-    "TeamInvitation",
-    "TeamMemberRole",
+    "Project",
+    "ProjectMember",
+    "ProjectInvitation",
+    "ProjectMemberRole",
     "InvitationStatus",
 ]

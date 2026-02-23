@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Optional
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text, JSON, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -142,19 +142,6 @@ class User(Base, TimestampMixin):
     )
     login_count: Mapped[int] = mapped_column(default=0, nullable=False)
 
-    # WordPress integration
-    wordpress_credentials: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    """
-    Structure:
-    {
-        "site_url": "https://mysite.com",
-        "username": "admin",
-        "app_password_encrypted": "encrypted_password_here",
-        "connected_at": "2025-01-15T12:00:00Z",
-        "last_tested_at": "2025-01-15T12:00:00Z"
-    }
-    """
-
     # Suspension fields
     is_suspended: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     suspended_at: Mapped[Optional[datetime]] = mapped_column(
@@ -162,10 +149,10 @@ class User(Base, TimestampMixin):
     )
     suspended_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    # Multi-tenancy - currently selected team
-    current_team_id: Mapped[Optional[str]] = mapped_column(
+    # Multi-tenancy - currently selected project
+    current_project_id: Mapped[Optional[str]] = mapped_column(
         UUID(as_uuid=False),
-        ForeignKey("teams.id", ondelete="SET NULL"),
+        ForeignKey("projects.id", ondelete="SET NULL"),
         nullable=True,
     )
 
@@ -180,7 +167,7 @@ class User(Base, TimestampMixin):
         Index("ix_users_subscription", "subscription_tier", "subscription_expires"),
         Index("ix_users_lemonsqueezy", "lemonsqueezy_customer_id"),
         Index("ix_users_role", "role"),
-        Index("ix_users_current_team", "current_team_id"),
+        Index("ix_users_current_project", "current_project_id"),
     )
 
     def __repr__(self) -> str:

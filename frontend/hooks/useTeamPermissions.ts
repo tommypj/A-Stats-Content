@@ -1,7 +1,7 @@
-import { useTeam } from "@/contexts/TeamContext";
-import type { TeamRole } from "@/lib/api";
+import { useProject } from "@/contexts/ProjectContext";
+import type { ProjectRole } from "@/lib/api";
 
-export interface TeamPermissions {
+export interface ProjectPermissions {
   // Role checks
   isOwner: boolean;
   isAdmin: boolean;
@@ -12,26 +12,26 @@ export interface TeamPermissions {
   canCreateContent: boolean; // MEMBER+ or personal workspace
   canEditContent: boolean; // MEMBER+ or personal workspace
   canDeleteContent: boolean; // ADMIN+ or personal workspace
-  canManageMembers: boolean; // ADMIN+ in team
-  canManageBilling: boolean; // OWNER in team
-  canManageSettings: boolean; // ADMIN+ in team
-  canInviteMembers: boolean; // ADMIN+ in team
+  canManageMembers: boolean; // ADMIN+ in project
+  canManageBilling: boolean; // OWNER in project
+  canManageSettings: boolean; // ADMIN+ in project
+  canInviteMembers: boolean; // ADMIN+ in project
 
   // Helpers
-  hasRole: (role: TeamRole) => boolean;
-  hasMinRole: (minRole: TeamRole) => boolean;
+  hasRole: (role: ProjectRole) => boolean;
+  hasMinRole: (minRole: ProjectRole) => boolean;
 }
 
-const roleHierarchy: TeamRole[] = ["viewer", "member", "admin", "owner"];
+const roleHierarchy: ProjectRole[] = ["viewer", "member", "admin", "owner"];
 
-function getRoleLevel(role: TeamRole): number {
+function getRoleLevel(role: ProjectRole): number {
   return roleHierarchy.indexOf(role);
 }
 
-export function useTeamPermissions(): TeamPermissions {
-  const { currentTeam, isPersonalWorkspace } = useTeam();
+export function useProjectPermissions(): ProjectPermissions {
+  const { currentProject, isPersonalWorkspace } = useProject();
 
-  const currentRole = currentTeam?.my_role;
+  const currentRole = currentProject?.my_role;
 
   // Role checks
   const isOwner = currentRole === "owner";
@@ -49,12 +49,12 @@ export function useTeamPermissions(): TeamPermissions {
   const canInviteMembers = !isPersonalWorkspace && isAdmin;
 
   // Helper functions
-  const hasRole = (role: TeamRole): boolean => {
+  const hasRole = (role: ProjectRole): boolean => {
     if (isPersonalWorkspace) return false;
     return currentRole === role;
   };
 
-  const hasMinRole = (minRole: TeamRole): boolean => {
+  const hasMinRole = (minRole: ProjectRole): boolean => {
     if (isPersonalWorkspace) {
       // In personal workspace, consider user as having all permissions
       return true;
@@ -79,3 +79,7 @@ export function useTeamPermissions(): TeamPermissions {
     hasMinRole,
   };
 }
+
+// Backward-compatible alias
+export const useTeamPermissions = useProjectPermissions;
+export type TeamPermissions = ProjectPermissions;

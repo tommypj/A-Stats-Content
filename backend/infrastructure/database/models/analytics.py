@@ -41,14 +41,13 @@ class GSCConnection(Base, TimestampMixin):
         UUID(as_uuid=False),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
-        unique=True,  # One GSC connection per user
         index=True,
     )
 
-    # Team ownership (optional - for multi-tenancy)
-    team_id: Mapped[Optional[str]] = mapped_column(
+    # Project ownership (optional - for multi-tenancy)
+    project_id: Mapped[Optional[str]] = mapped_column(
         UUID(as_uuid=False),
-        ForeignKey("teams.id", ondelete="CASCADE"),
+        ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )

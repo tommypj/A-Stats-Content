@@ -22,9 +22,9 @@ import { api, Article } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { clsx } from "clsx";
-import { useTeam } from "@/contexts/TeamContext";
-import { ContentOwnershipBadge } from "@/components/team/content-ownership-badge";
-import { UsageLimitBanner } from "@/components/team/usage-limit-warning";
+import { useProject } from "@/contexts/ProjectContext";
+import { ContentOwnershipBadge } from "@/components/project/content-ownership-badge";
+import { UsageLimitBanner } from "@/components/project/usage-limit-warning";
 
 const statusConfig = {
   draft: { label: "Draft", color: "bg-gray-100 text-gray-700", icon: FileText },
@@ -34,7 +34,7 @@ const statusConfig = {
   failed: { label: "Failed", color: "bg-red-100 text-red-700", icon: XCircle },
 };
 
-type ContentFilter = "all" | "personal" | "team";
+type ContentFilter = "all" | "personal" | "project";
 
 function getSeoScoreColor(score: number | undefined) {
   if (!score) return "text-text-muted";
@@ -50,7 +50,7 @@ export default function ArticlesPage() {
   const [contentFilter, setContentFilter] = useState<ContentFilter>("all");
 
   const {
-    currentTeam,
+    currentProject,
     isPersonalWorkspace,
     canCreate,
     canEdit,
@@ -58,27 +58,27 @@ export default function ArticlesPage() {
     usage,
     limits,
     isAtLimit,
-  } = useTeam();
+  } = useProject();
 
   useEffect(() => {
     loadArticles();
-  }, [currentTeam, contentFilter]);
+  }, [currentProject, contentFilter]);
 
   async function loadArticles() {
     try {
       setLoading(true);
       const params: any = { page_size: 50 };
 
-      // Apply team context
-      if (!isPersonalWorkspace && currentTeam) {
-        params.team_id = currentTeam.id;
+      // Apply project context
+      if (!isPersonalWorkspace && currentProject) {
+        params.project_id = currentProject.id;
       }
 
       // Apply content filter
       if (contentFilter === "personal") {
-        delete params.team_id;
-      } else if (contentFilter === "team" && currentTeam) {
-        params.team_id = currentTeam.id;
+        delete params.project_id;
+      } else if (contentFilter === "project" && currentProject) {
+        params.project_id = currentProject.id;
       }
 
       const response = await api.articles.list(params);
@@ -109,13 +109,13 @@ export default function ArticlesPage() {
   return (
     <div className="space-y-6">
       {/* Usage Limit Warning */}
-      {!isPersonalWorkspace && currentTeam && usage && limits && (
+      {!isPersonalWorkspace && currentProject && usage && limits && (
         <UsageLimitBanner
           resource="articles"
           used={articlesUsed}
           limit={articlesLimit}
-          isTeam={true}
-          teamName={currentTeam.name}
+          isProject={true}
+          projectName={currentProject.name}
         />
       )}
 
@@ -128,12 +128,12 @@ export default function ArticlesPage() {
           <p className="text-text-secondary mt-1">
             {isPersonalWorkspace
               ? "Manage and edit your generated articles"
-              : `Managing articles for ${currentTeam?.name}`}
+              : `Managing articles for ${currentProject?.name}`}
           </p>
         </div>
         <div className="flex gap-2">
-          {/* Content Filter (only show in team context) */}
-          {!isPersonalWorkspace && currentTeam && (
+          {/* Content Filter (only show in project context) */}
+          {!isPersonalWorkspace && currentProject && (
             <div className="flex items-center gap-1 bg-surface-secondary rounded-lg p-1">
               <button
                 onClick={() => setContentFilter("all")}
@@ -164,17 +164,17 @@ export default function ArticlesPage() {
                 </span>
               </button>
               <button
-                onClick={() => setContentFilter("team")}
+                onClick={() => setContentFilter("project")}
                 className={clsx(
                   "px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
-                  contentFilter === "team"
+                  contentFilter === "project"
                     ? "bg-white text-text-primary shadow-sm"
                     : "text-text-secondary hover:text-text-primary"
                 )}
               >
                 <span className="flex items-center gap-1.5">
                   <Users className="h-4 w-4" />
-                  Team
+                  Project
                 </span>
               </button>
             </div>
@@ -220,7 +220,7 @@ export default function ArticlesPage() {
           </h3>
           <p className="text-text-secondary mb-6">
             {isViewer
-              ? "Your team has not created any articles yet"
+              ? "Your project has not created any articles yet"
               : "Create an outline first, then generate an article from it"}
           </p>
           {!isViewer && (
@@ -237,7 +237,7 @@ export default function ArticlesPage() {
           {articles.map((article) => {
             const status = statusConfig[article.status];
             const StatusIcon = status.icon;
-            const isTeamContent = !!article.team_id;
+            const isProjectContent = !!article.project_id;
             const canModify = canEdit;
 
             return (
@@ -265,9 +265,9 @@ export default function ArticlesPage() {
                         </h3>
                       </Link>
                       <ContentOwnershipBadge
-                        teamId={article.team_id}
-                        teamName={currentTeam?.name}
-                        isPersonal={!isTeamContent}
+                        projectId={article.project_id}
+                        projectName={currentProject?.name}
+                        isPersonal={!isProjectContent}
                         variant="compact"
                       />
                     </div>
@@ -356,7 +356,7 @@ export default function ArticlesPage() {
                 {isViewer && (
                   <div className="mt-3 pt-3 border-t border-surface-tertiary">
                     <p className="text-xs text-text-muted italic">
-                      View-only mode: You cannot edit team content
+                      View-only mode: You cannot edit project content
                     </p>
                   </div>
                 )}
