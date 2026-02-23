@@ -144,7 +144,7 @@ class Settings(BaseSettings):
 
     def validate_production_secrets(self) -> None:
         """Validate that production secrets are properly configured."""
-        if self.is_production:
+        if self.environment in ("production", "staging"):
             if "change-me" in self.secret_key.lower():
                 raise ValueError("SECRET_KEY must be changed for production!")
             if "change-me" in self.jwt_secret_key.lower():

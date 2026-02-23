@@ -4,7 +4,7 @@ Knowledge Vault API routes for document upload and RAG queries.
 
 import math
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import uuid4
 
@@ -18,7 +18,7 @@ from fastapi import (
     Form,
     File,
 )
-from sqlalchemy import select, func, and_, desc
+from sqlalchemy import select, func, and_, desc, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.schemas.knowledge import (
@@ -49,6 +49,10 @@ ALLOWED_FILE_TYPES = {
     "text/html": "html",
 }
 ALLOWED_EXTENSIONS = {"pdf", "txt", "md", "docx", "html"}
+
+
+def _escape_like(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def get_file_extension(filename: str) -> str:
@@ -112,6 +116,7 @@ async def upload_document(
     source = KnowledgeSource(
         id=source_id,
         user_id=current_user.id,
+        project_id=current_user.current_project_id if current_user.current_project_id else None,
         title=title,
         filename=file.filename,
         file_type=file_ext,
@@ -167,7 +172,15 @@ async def list_sources(
     - search: search in title, filename, description
     - file_type: pdf, txt, md, docx, html
     """
-    query = select(KnowledgeSource).where(KnowledgeSource.user_id == current_user.id)
+    if current_user.current_project_id:
+        query = select(KnowledgeSource).where(
+            KnowledgeSource.project_id == current_user.current_project_id
+        )
+    else:
+        query = select(KnowledgeSource).where(
+            KnowledgeSource.user_id == current_user.id,
+            KnowledgeSource.project_id.is_(None),
+        )
 
     # Apply filters
     if status:
@@ -177,7 +190,7 @@ async def list_sources(
         query = query.where(KnowledgeSource.file_type == file_type)
 
     if search:
-        search_pattern = f"%{search}%"
+        search_pattern = f"%{_escape_like(search)}%"
         query = query.where(
             (KnowledgeSource.title.ilike(search_pattern))
             | (KnowledgeSource.filename.ilike(search_pattern))
@@ -236,10 +249,17 @@ async def get_source(
     """
     Get details of a specific knowledge source.
     """
+    if current_user.current_project_id:
+        ownership_filter = KnowledgeSource.project_id == current_user.current_project_id
+    else:
+        ownership_filter = and_(
+            KnowledgeSource.user_id == current_user.id,
+            KnowledgeSource.project_id.is_(None),
+        )
     result = await db.execute(
         select(KnowledgeSource).where(
             KnowledgeSource.id == source_id,
-            KnowledgeSource.user_id == current_user.id,
+            ownership_filter,
         )
     )
     source = result.scalar_one_or_none()
@@ -281,10 +301,17 @@ async def update_source(
     """
     Update knowledge source metadata (title, description, tags).
     """
+    if current_user.current_project_id:
+        ownership_filter = KnowledgeSource.project_id == current_user.current_project_id
+    else:
+        ownership_filter = and_(
+            KnowledgeSource.user_id == current_user.id,
+            KnowledgeSource.project_id.is_(None),
+        )
     result = await db.execute(
         select(KnowledgeSource).where(
             KnowledgeSource.id == source_id,
-            KnowledgeSource.user_id == current_user.id,
+            ownership_filter,
         )
     )
     source = result.scalar_one_or_none()
@@ -337,10 +364,17 @@ async def delete_source(
     2. Delete associated chunks from ChromaDB (TODO)
     3. Delete the file from storage (TODO)
     """
+    if current_user.current_project_id:
+        ownership_filter = KnowledgeSource.project_id == current_user.current_project_id
+    else:
+        ownership_filter = and_(
+            KnowledgeSource.user_id == current_user.id,
+            KnowledgeSource.project_id.is_(None),
+        )
     result = await db.execute(
         select(KnowledgeSource).where(
             KnowledgeSource.id == source_id,
-            KnowledgeSource.user_id == current_user.id,
+            ownership_filter,
         )
     )
     source = result.scalar_one_or_none()
@@ -384,13 +418,22 @@ async def query_knowledge(
     # TODO: Implement RAG query flow
     # For now, return a placeholder response
 
+    # Build ownership filter based on project context
+    if current_user.current_project_id:
+        base_ownership_filter = KnowledgeSource.project_id == current_user.current_project_id
+    else:
+        base_ownership_filter = and_(
+            KnowledgeSource.user_id == current_user.id,
+            KnowledgeSource.project_id.is_(None),
+        )
+
     # Validate that user has completed sources
     if request.source_ids:
         # Check that specified sources exist and are completed
         result = await db.execute(
             select(KnowledgeSource).where(
                 KnowledgeSource.id.in_(request.source_ids),
-                KnowledgeSource.user_id == current_user.id,
+                base_ownership_filter,
             )
         )
         sources = result.scalars().all()
@@ -412,7 +455,7 @@ async def query_knowledge(
         # Query all completed sources
         result = await db.execute(
             select(KnowledgeSource).where(
-                KnowledgeSource.user_id == current_user.id,
+                base_ownership_filter,
                 KnowledgeSource.status == SourceStatus.COMPLETED.value,
             )
         )
@@ -501,6 +544,15 @@ async def get_knowledge_stats(
     - Query statistics
     - Breakdown by file type
     """
+    # Build ownership filter based on project context
+    if current_user.current_project_id:
+        stats_ownership_filter = KnowledgeSource.project_id == current_user.current_project_id
+    else:
+        stats_ownership_filter = and_(
+            KnowledgeSource.user_id == current_user.id,
+            KnowledgeSource.project_id.is_(None),
+        )
+
     # Get source statistics
     source_stats = await db.execute(
         select(
@@ -508,7 +560,7 @@ async def get_knowledge_stats(
             func.sum(KnowledgeSource.chunk_count).label("total_chunks"),
             func.sum(KnowledgeSource.char_count).label("total_characters"),
             func.sum(KnowledgeSource.file_size).label("total_bytes"),
-        ).where(KnowledgeSource.user_id == current_user.id)
+        ).where(stats_ownership_filter)
     )
     stats = source_stats.first()
 
@@ -524,7 +576,7 @@ async def get_knowledge_stats(
             KnowledgeSource.file_type,
             func.count(KnowledgeSource.id).label("count"),
         )
-        .where(KnowledgeSource.user_id == current_user.id)
+        .where(stats_ownership_filter)
         .group_by(KnowledgeSource.file_type)
     )
     sources_by_type = {row.file_type: row.count for row in type_stats}
@@ -538,7 +590,7 @@ async def get_knowledge_stats(
     total_queries = total_queries_result.scalar() or 0
 
     # Get recent queries (last 30 days)
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     recent_queries_result = await db.execute(
         select(func.count(KnowledgeQuery.id)).where(
             and_(
@@ -583,10 +635,17 @@ async def reprocess_source(
     - Retrying failed processing
     - Forcing reprocessing with updated algorithms
     """
+    if current_user.current_project_id:
+        reprocess_ownership_filter = KnowledgeSource.project_id == current_user.current_project_id
+    else:
+        reprocess_ownership_filter = and_(
+            KnowledgeSource.user_id == current_user.id,
+            KnowledgeSource.project_id.is_(None),
+        )
     result = await db.execute(
         select(KnowledgeSource).where(
             KnowledgeSource.id == source_id,
-            KnowledgeSource.user_id == current_user.id,
+            reprocess_ownership_filter,
         )
     )
     source = result.scalar_one_or_none()

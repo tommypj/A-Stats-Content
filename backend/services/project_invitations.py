@@ -2,7 +2,7 @@
 Project invitation background service.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 
 from sqlalchemy import select
@@ -30,7 +30,7 @@ async def expire_old_invitations(db: AsyncSession) -> int:
     result = await db.execute(
         select(ProjectInvitation).where(
             ProjectInvitation.status == InvitationStatus.PENDING.value,
-            ProjectInvitation.expires_at < datetime.utcnow(),
+            ProjectInvitation.expires_at < datetime.now(timezone.utc),
         )
     )
     expired_invitations = result.scalars().all()
@@ -64,7 +64,7 @@ async def cleanup_old_invitations(db: AsyncSession, days_old: int = 30) -> int:
     """
     from datetime import timedelta
 
-    cutoff_date = datetime.utcnow() - timedelta(days=days_old)
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_old)
 
     # Find old non-pending invitations
     result = await db.execute(

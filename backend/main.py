@@ -1,13 +1,18 @@
 """A-Stats Engine - Main FastAPI Application."""
 import asyncio
+import logging
 import os
+import uuid
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from rich.console import Console
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+
+logger = logging.getLogger(__name__)
 
 from infrastructure.config import get_settings
 from infrastructure.database import init_db, close_db
@@ -30,6 +35,38 @@ async def lifespan(app: FastAPI):
     console.print(f"CORS origins list: {settings.cors_origins_list!r}")
 
     settings.validate_production_secrets()
+
+    # Recover articles and outlines stuck in "generating" status from previous shutdown
+    from infrastructure.database.connection import async_session_maker
+    from infrastructure.database.models.content import Article, Outline, ContentStatus
+    from sqlalchemy import update
+
+    async with async_session_maker() as recovery_db:
+        stale_articles = await recovery_db.execute(
+            update(Article)
+            .where(Article.status == ContentStatus.GENERATING.value)
+            .values(
+                status=ContentStatus.FAILED.value,
+                generation_error="Server restarted during generation",
+            )
+        )
+        stale_outlines = await recovery_db.execute(
+            update(Outline)
+            .where(Outline.status == ContentStatus.GENERATING.value)
+            .values(
+                status=ContentStatus.FAILED.value,
+                generation_error="Server restarted during generation",
+            )
+        )
+        await recovery_db.commit()
+        if stale_articles.rowcount > 0:
+            logger.warning(
+                "Recovered %d articles stuck in generating status", stale_articles.rowcount
+            )
+        if stale_outlines.rowcount > 0:
+            logger.warning(
+                "Recovered %d outlines stuck in generating status", stale_outlines.rowcount
+            )
 
     if settings.is_development:
         console.print("[yellow]Development mode - initializing database...[/yellow]")
@@ -80,6 +117,24 @@ app = FastAPI(
 # Rate limiting
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error("Unhandled exception: %s", str(exc), exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
+
+
+@app.middleware("http")
+async def add_request_id(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    return response
+
 
 # CORS middleware
 app.add_middleware(

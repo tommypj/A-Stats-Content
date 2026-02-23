@@ -1,4 +1,5 @@
 """Health check endpoints."""
+import logging
 from datetime import datetime
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
@@ -8,6 +9,8 @@ from infrastructure.database import get_db
 from infrastructure.config import get_settings
 from api.deps_admin import get_current_admin_user
 from infrastructure.database.models.user import User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 settings = get_settings()
@@ -34,7 +37,8 @@ async def health_check_db(db: AsyncSession = Depends(get_db)):
         result.scalar()
         db_status = "connected"
     except Exception as e:
-        db_status = f"error: {str(e)}"
+        logger.error("Health check DB error: %s", str(e))
+        db_status = "error: database check failed"
 
     return {
         "status": "healthy" if db_status == "connected" else "degraded",

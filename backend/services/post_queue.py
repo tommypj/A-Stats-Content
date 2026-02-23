@@ -7,7 +7,7 @@ Falls back to database polling if Redis is unavailable.
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 
 try:
@@ -122,7 +122,7 @@ class PostQueueManager:
             return []
 
         try:
-            now = datetime.utcnow().timestamp()
+            now = datetime.now(timezone.utc).timestamp()
 
             # Get posts with score <= now (sorted by timestamp)
             posts = await self.redis.zrangebyscore(
@@ -317,7 +317,7 @@ class PostQueueManager:
                 # Simple recovery: move back to scheduled with current time
                 # A more sophisticated approach would check actual processing time
                 await self.redis.srem(self.PROCESSING_SET, post_id)
-                await self.schedule_post(post_id, datetime.utcnow())
+                await self.schedule_post(post_id, datetime.now(timezone.utc))
                 recovered += 1
 
             if recovered > 0:

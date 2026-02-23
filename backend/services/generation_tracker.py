@@ -6,12 +6,14 @@ and increments project usage counters only on success.
 
 import logging
 import time
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from infrastructure.config.settings import settings
 from infrastructure.database.models.generation import GenerationLog, AdminAlert
 from infrastructure.database.models.project import Project
 from services.project_usage import ProjectUsageService
@@ -128,6 +130,42 @@ class GenerationTracker:
     ) -> bool:
         """Check if the project (or user) can generate more of this resource type.
         Returns True if allowed. False if limit reached."""
+        entity_id = project_id or user_id
+
+        # Redis-based atomic counter check to prevent race conditions.
+        # If Redis is configured, use an atomic increment to verify the quota
+        # before falling through to the slower DB-based check.
+        if settings.redis_url and entity_id:
+            try:
+                import redis.asyncio as aioredis
+                r = aioredis.from_url(settings.redis_url)
+                key = (
+                    f"gen_limit:{entity_id}:{resource_type}:"
+                    f"{datetime.now(timezone.utc).strftime('%Y-%m')}"
+                )
+                current = await r.incr(key)
+                if current == 1:
+                    await r.expire(key, 86400 * 35)  # expire after 35 days
+                await r.aclose()
+
+                # We need the plan limit to compare against.
+                # Derive it from the project or user record.
+                limit = await self._get_limit(project_id, user_id, resource_type)
+                if limit is not None:
+                    if limit == -1:
+                        return True  # unlimited
+                    if current > limit:
+                        return False
+                    return True
+                # If we couldn't determine the limit, fall through to DB check.
+            except Exception as e:
+                logger.warning(
+                    "Redis quota check failed for %s, falling back to DB: %s",
+                    entity_id,
+                    e,
+                )
+                # Fall through to DB-based check below.
+
         if not project_id:
             # Check user-level limits for personal workspace
             if not user_id:
@@ -160,7 +198,7 @@ class GenerationTracker:
 
                 return current_usage < limit
             except Exception as e:
-                logger.warning("Failed to check user-level limit for user %s: %s", user_id, e)
+                logger.error("Failed to check user-level limit for user %s: %s", user_id, e)
                 return True  # Fail open — don't block generation if limit check fails
 
         try:
@@ -170,5 +208,46 @@ class GenerationTracker:
             # Check limit — resource_type should be plural: 'articles', 'outlines', 'images'
             return await usage_service.check_project_limit(project_id, resource_type + "s")
         except Exception as e:
-            logger.warning("Failed to check limit for project %s: %s", project_id, e)
-            return True  # Fail open — don't block generation if limit check fails
+            logger.error("Failed to check project usage limit: %s", str(e))
+            return False  # fail closed — deny generation when limits can't be verified
+
+    async def _get_limit(
+        self,
+        project_id: Optional[str],
+        user_id: Optional[str],
+        resource_type: str,
+    ) -> Optional[int]:
+        """Return the numeric generation limit for the given context, or None if unknown.
+
+        Returns -1 for unlimited, a non-negative int for a fixed cap, or None if the
+        limit cannot be determined (caller should fall back to DB-based check).
+        """
+        try:
+            if project_id:
+                from services.project_usage import ProjectUsageService, PROJECT_TIER_LIMITS
+                result = await self.db.execute(
+                    select(Project).where(Project.id == project_id)
+                )
+                project = result.scalar_one_or_none()
+                if not project:
+                    return None
+                tier = project.subscription_tier or "free"
+                tier_limits = PROJECT_TIER_LIMITS.get(tier, PROJECT_TIER_LIMITS["free"])
+                resource_key = resource_type + "s_per_month"
+                return tier_limits.get(resource_key)
+            elif user_id:
+                from infrastructure.database.models.user import User
+                from api.routes.billing import PLANS
+                user_result = await self.db.execute(
+                    select(User).where(User.id == user_id)
+                )
+                user = user_result.scalar_one_or_none()
+                if not user:
+                    return None
+                plan = PLANS.get(user.subscription_tier or "free", PLANS["free"])
+                limits = plan.get("limits", {})
+                limit_key = f"{resource_type}s_per_month"
+                return limits.get(limit_key)
+        except Exception as e:
+            logger.warning("Failed to determine limit for Redis check: %s", e)
+        return None

@@ -59,6 +59,10 @@ router = APIRouter(prefix="/analytics", tags=["analytics"])
 # ============================================================================
 
 
+def _escape_like(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def calculate_trend(current: float, previous: float) -> TrendData:
     """Calculate trend data between current and previous values."""
     if previous == 0:
@@ -287,11 +291,7 @@ async def get_gsc_sites(
             connection.refresh_token, settings.secret_key
         )
 
-        logger.info(
-            f"GSC list_sites: token starts with '{decrypted_access_token[:10]}...', "
-            f"refresh starts with '{decrypted_refresh_token[:10]}...', "
-            f"token_expiry={connection.token_expiry}"
-        )
+        logger.info("GSC list_sites: tokens decrypted successfully")
 
         # Create credentials object
         credentials = GSCCredentials(
@@ -565,7 +565,7 @@ async def get_keyword_rankings(
     if end_date:
         query = query.where(KeywordRanking.date <= end_date)
     if keyword:
-        query = query.where(KeywordRanking.keyword.ilike(f"%{keyword}%"))
+        query = query.where(KeywordRanking.keyword.ilike(f"%{_escape_like(keyword)}%"))
 
     # Get total count
     count_query = select(func.count()).select_from(query.subquery())
@@ -615,7 +615,7 @@ async def get_page_performances(
     if end_date:
         query = query.where(PagePerformance.date <= end_date)
     if page_url:
-        query = query.where(PagePerformance.page_url.ilike(f"%{page_url}%"))
+        query = query.where(PagePerformance.page_url.ilike(f"%{_escape_like(page_url)}%"))
 
     # Get total count
     count_query = select(func.count()).select_from(query.subquery())

@@ -44,6 +44,10 @@ router = APIRouter(prefix="/admin/content", tags=["Admin - Content"])
 # --- Helper Functions ---
 
 
+def _escape_like(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def create_author_info(user: User) -> AdminArticleAuthorInfo:
     """Create author info from user model."""
     return AdminArticleAuthorInfo(
@@ -105,7 +109,7 @@ async def list_all_articles(
     if status:
         query = query.where(Article.status == status)
     if search:
-        search_pattern = f"%{search}%"
+        search_pattern = f"%{_escape_like(search)}%"
         query = query.where(
             or_(
                 Article.title.ilike(search_pattern),
@@ -127,7 +131,7 @@ async def list_all_articles(
     if status:
         count_query = count_query.where(Article.status == status)
     if search:
-        search_pattern = f"%{search}%"
+        search_pattern = f"%{_escape_like(search)}%"
         count_query = count_query.where(
             or_(
                 Article.title.ilike(search_pattern),
@@ -309,7 +313,7 @@ async def list_all_outlines(
     if status:
         query = query.where(Outline.status == status)
     if search:
-        search_pattern = f"%{search}%"
+        search_pattern = f"%{_escape_like(search)}%"
         query = query.where(Outline.title.ilike(search_pattern))
 
     # Order by created_at desc
@@ -322,7 +326,7 @@ async def list_all_outlines(
     if status:
         count_query = count_query.where(Outline.status == status)
     if search:
-        search_pattern = f"%{search}%"
+        search_pattern = f"%{_escape_like(search)}%"
         count_query = count_query.where(Outline.title.ilike(search_pattern))
 
     result = await db.execute(count_query)

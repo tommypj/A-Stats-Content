@@ -21,7 +21,6 @@ def get_knowledge_service() -> KnowledgeService:
     """
     # Initialize ChromaDB adapter
     chroma = ChromaAdapter(
-        persist_directory=settings.chroma_persist_directory,
         collection_prefix=settings.chroma_collection_prefix,
     )
 

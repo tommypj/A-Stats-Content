@@ -3,7 +3,7 @@ Content API schemas for outlines, articles, and images.
 """
 
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Literal, Optional, List, Dict, Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -129,7 +129,7 @@ class ArticleUpdateRequest(BaseModel):
     keyword: Optional[str] = Field(None, min_length=2, max_length=255)
     meta_description: Optional[str] = Field(None, max_length=320)
     content: Optional[str] = None
-    status: Optional[str] = None
+    status: Optional[Literal["draft", "completed", "published"]] = None
 
 
 class ArticleSEOAnalysis(BaseModel):

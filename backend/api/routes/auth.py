@@ -2,10 +2,11 @@
 Authentication API routes.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header, Request
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,6 +38,18 @@ token_service = TokenService(
     access_token_expire_minutes=settings.jwt_access_token_expire_minutes,
     refresh_token_expire_days=settings.jwt_refresh_token_expire_days,
 )
+
+
+class VerifyEmailRequest(BaseModel):
+    """Request body for email verification."""
+
+    token: str
+
+
+class ResendVerificationRequest(BaseModel):
+    """Request body for resending email verification."""
+
+    email: str
 
 
 async def get_current_user(
@@ -308,7 +321,7 @@ async def request_password_reset(
         # Create reset token
         reset_token = token_service.create_password_reset_token(user.id)
         user.password_reset_token = reset_token
-        user.password_reset_expires = datetime.now(timezone.utc)
+        user.password_reset_expires = datetime.now(timezone.utc) + timedelta(hours=1)
         await db.commit()
 
         # Send password reset email
@@ -354,6 +367,12 @@ async def reset_password(
             detail="Invalid or already used reset token",
         )
 
+    if user.password_reset_expires and user.password_reset_expires < datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password reset token has expired",
+        )
+
     # Update password and bump updated_at so existing tokens are invalidated
     user.password_hash = password_hasher.hash(request.new_password)
     user.password_reset_token = None
@@ -392,14 +411,14 @@ async def change_password(
 @limiter.limit("5/hour")
 async def verify_email(
     request: Request,
-    token: str,
+    body: VerifyEmailRequest,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """
     Verify email address using verification token.
     """
     # Verify token
-    result = token_service.verify_email_verification_token(token)
+    result = token_service.verify_email_verification_token(body.token)
 
     if not result:
         raise HTTPException(
@@ -438,7 +457,7 @@ async def verify_email(
 @limiter.limit("5/hour")
 async def resend_verification(
     request: Request,
-    email: str,
+    body: ResendVerificationRequest,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """
@@ -446,7 +465,7 @@ async def resend_verification(
     """
     # Find user by email
     result = await db.execute(
-        select(User).where(User.email == email.lower())
+        select(User).where(User.email == body.email.lower())
     )
     user = result.scalar_one_or_none()
 
