@@ -234,8 +234,7 @@ class ProjectUsageService:
                 next_month = now.replace(month=now.month + 1, day=1)
             project.usage_reset_date = next_month
 
-        await self.db.commit()
-        await self.db.refresh(project)
+        await self.db.flush()
 
         logger.info(
             f"Incremented {resource} usage for project {project_id}: "
@@ -277,8 +276,7 @@ class ProjectUsageService:
             next_month = now.replace(month=now.month + 1, day=1)
         project.usage_reset_date = next_month
 
-        await self.db.commit()
-        await self.db.refresh(project)
+        await self.db.flush()
 
         logger.info(f"Reset usage counters for project {project_id}")
         return True

@@ -775,7 +775,7 @@ export const api = {
           data,
         }),
       markAllRead: () =>
-        apiRequest<{ updated: number }>({
+        apiRequest<{ message: string }>({
           method: "POST",
           url: "/admin/alerts/mark-all-read",
           data: {},

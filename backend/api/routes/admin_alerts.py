@@ -145,6 +145,18 @@ async def update_alert(
     await db.commit()
     await db.refresh(alert)
 
+    # Look up user info if available
+    user_email = None
+    user_name = None
+    if alert.user_id:
+        user_result = await db.execute(
+            select(User).where(User.id == alert.user_id)
+        )
+        user = user_result.scalar_one_or_none()
+        if user:
+            user_email = user.email
+            user_name = user.name
+
     return AdminAlertResponse(
         id=alert.id,
         alert_type=alert.alert_type,
@@ -158,6 +170,8 @@ async def update_alert(
         is_read=alert.is_read,
         is_resolved=alert.is_resolved,
         created_at=alert.created_at,
+        user_email=user_email,
+        user_name=user_name,
     )
 
 

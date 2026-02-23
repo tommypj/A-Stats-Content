@@ -257,10 +257,10 @@ async def create_project_invitation(
 
     # Send invitation email
     invitation_url = f"{settings.frontend_url}/invitations/{token}"
-    await email_service.send_team_invitation_email(
+    await email_service.send_project_invitation_email(
         to_email=invitation.email,
         inviter_name=current_user.name,
-        team_name=project.name,
+        project_name=project.name,
         role=invitation.role,
         invitation_url=invitation_url,
     )
@@ -375,10 +375,10 @@ async def resend_project_invitation(
 
     # Resend invitation email
     invitation_url = f"{settings.frontend_url}/invitations/{invitation.token}"
-    await email_service.send_team_invitation_email(
+    await email_service.send_project_invitation_email(
         to_email=invitation.email,
         inviter_name=current_user.name,
-        team_name=project.name,
+        project_name=project.name,
         role=invitation.role,
         invitation_url=invitation_url,
     )
