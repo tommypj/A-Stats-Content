@@ -8,7 +8,8 @@ import time
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
+from api.middleware.rate_limit import limiter
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,9 +31,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/outlines", tags=["outlines"])
 
 
+def _escape_like(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 @router.post("", response_model=OutlineResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
 async def create_outline(
-    request: OutlineCreateRequest,
+    request: Request,
+    body: OutlineCreateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -43,9 +50,9 @@ async def create_outline(
     project_id = getattr(current_user, 'current_project_id', None)
 
     # Check usage limit before creating any records
-    if request.auto_generate:
+    if body.auto_generate:
         tracker = GenerationTracker(db)
-        if not await tracker.check_limit(project_id, "outline"):
+        if not await tracker.check_limit(project_id, "outline", user_id=current_user.id):
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Monthly outline generation limit reached. Please upgrade your plan.",
@@ -55,19 +62,19 @@ async def create_outline(
     outline = Outline(
         id=outline_id,
         user_id=current_user.id,
-        title=f"Article about {request.keyword}",
-        keyword=request.keyword,
-        target_audience=request.target_audience,
-        tone=request.tone,
-        word_count_target=request.word_count_target,
-        status=ContentStatus.GENERATING.value if request.auto_generate else ContentStatus.DRAFT.value,
+        title=f"Article about {body.keyword}",
+        keyword=body.keyword,
+        target_audience=body.target_audience,
+        tone=body.tone,
+        word_count_target=body.word_count_target,
+        status=ContentStatus.GENERATING.value if body.auto_generate else ContentStatus.DRAFT.value,
     )
 
     db.add(outline)
     await db.commit()
 
     # Auto-generate with AI if requested
-    if request.auto_generate:
+    if body.auto_generate:
         tracker = GenerationTracker(db)
 
         start_time = time.time()
@@ -76,17 +83,17 @@ async def create_outline(
             project_id=project_id,
             resource_type="outline",
             resource_id=outline_id,
-            input_metadata={"keyword": request.keyword, "tone": request.tone},
+            input_metadata={"keyword": body.keyword, "tone": body.tone},
         )
         await db.commit()
 
         try:
             generated = await content_ai_service.generate_outline(
-                keyword=request.keyword,
-                target_audience=request.target_audience,
-                tone=request.tone,
-                word_count_target=request.word_count_target,
-                language=request.language or current_user.language or "en",
+                keyword=body.keyword,
+                target_audience=body.target_audience,
+                tone=body.tone,
+                word_count_target=body.word_count_target,
+                language=body.language or current_user.language or "en",
             )
 
             # Update outline with generated content
@@ -149,13 +156,19 @@ async def list_outlines(
     List user's outlines with pagination and filtering.
     """
     # Base query
-    query = select(Outline).where(Outline.user_id == current_user.id)
+    if current_user.current_project_id:
+        query = select(Outline).where(Outline.project_id == current_user.current_project_id)
+    else:
+        query = select(Outline).where(
+            Outline.user_id == current_user.id,
+            Outline.project_id.is_(None),
+        )
 
     # Apply filters
     if status:
         query = query.where(Outline.status == status)
     if keyword:
-        query = query.where(Outline.keyword.ilike(f"%{keyword}%"))
+        query = query.where(Outline.keyword.ilike(f"%{_escape_like(keyword)}%"))
 
     # Count total
     count_query = select(func.count()).select_from(query.subquery())
@@ -186,12 +199,17 @@ async def get_outline(
     """
     Get a specific outline by ID.
     """
-    result = await db.execute(
-        select(Outline).where(
+    if current_user.current_project_id:
+        query = select(Outline).where(
+            Outline.id == outline_id,
+            Outline.project_id == current_user.current_project_id,
+        )
+    else:
+        query = select(Outline).where(
             Outline.id == outline_id,
             Outline.user_id == current_user.id,
         )
-    )
+    result = await db.execute(query)
     outline = result.scalar_one_or_none()
 
     if not outline:
@@ -213,12 +231,17 @@ async def update_outline(
     """
     Update an outline.
     """
-    result = await db.execute(
-        select(Outline).where(
+    if current_user.current_project_id:
+        query = select(Outline).where(
+            Outline.id == outline_id,
+            Outline.project_id == current_user.current_project_id,
+        )
+    else:
+        query = select(Outline).where(
             Outline.id == outline_id,
             Outline.user_id == current_user.id,
         )
-    )
+    result = await db.execute(query)
     outline = result.scalar_one_or_none()
 
     if not outline:
@@ -250,12 +273,17 @@ async def delete_outline(
     """
     Delete an outline.
     """
-    result = await db.execute(
-        select(Outline).where(
+    if current_user.current_project_id:
+        query = select(Outline).where(
+            Outline.id == outline_id,
+            Outline.project_id == current_user.current_project_id,
+        )
+    else:
+        query = select(Outline).where(
             Outline.id == outline_id,
             Outline.user_id == current_user.id,
         )
-    )
+    result = await db.execute(query)
     outline = result.scalar_one_or_none()
 
     if not outline:
@@ -269,7 +297,9 @@ async def delete_outline(
 
 
 @router.post("/{outline_id}/regenerate", response_model=OutlineResponse)
+@limiter.limit("10/minute")
 async def regenerate_outline(
+    request: Request,
     outline_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -277,12 +307,17 @@ async def regenerate_outline(
     """
     Regenerate an outline using AI.
     """
-    result = await db.execute(
-        select(Outline).where(
+    if current_user.current_project_id:
+        query = select(Outline).where(
+            Outline.id == outline_id,
+            Outline.project_id == current_user.current_project_id,
+        )
+    else:
+        query = select(Outline).where(
             Outline.id == outline_id,
             Outline.user_id == current_user.id,
         )
-    )
+    result = await db.execute(query)
     outline = result.scalar_one_or_none()
 
     if not outline:
@@ -294,7 +329,7 @@ async def regenerate_outline(
     # Check usage limit before changing status
     project_id = getattr(current_user, 'current_project_id', None)
     tracker = GenerationTracker(db)
-    if not await tracker.check_limit(project_id, "outline"):
+    if not await tracker.check_limit(project_id, "outline", user_id=current_user.id):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Monthly outline generation limit reached. Please upgrade your plan.",

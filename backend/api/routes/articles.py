@@ -12,7 +12,8 @@ from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
+from api.middleware.rate_limit import limiter
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,6 +37,16 @@ from services.generation_tracker import GenerationTracker
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/articles", tags=["articles"])
+
+# Limit concurrent AI generation tasks to prevent resource exhaustion
+_generation_semaphore = asyncio.Semaphore(5)
+
+# Track active generation tasks so they are not garbage-collected mid-flight
+_active_generation_tasks: dict[str, asyncio.Task] = {}
+
+
+def _escape_like(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def slugify(text: str) -> str:
@@ -205,6 +216,42 @@ async def _generate_article_background(
     language: str = "en",
 ):
     """Background task that generates article content and updates the DB."""
+    async with _generation_semaphore:
+        await _run_article_generation(
+            article_id=article_id,
+            user_id=user_id,
+            project_id=project_id,
+            outline_title=outline_title,
+            outline_keyword=outline_keyword,
+            outline_sections=outline_sections,
+            outline_tone=outline_tone,
+            outline_target_audience=outline_target_audience,
+            writing_style=writing_style,
+            voice=voice,
+            list_usage=list_usage,
+            custom_instructions=custom_instructions,
+            word_count_target=word_count_target,
+            language=language,
+        )
+
+
+async def _run_article_generation(
+    article_id: str,
+    user_id: str,
+    project_id: Optional[str],
+    outline_title: str,
+    outline_keyword: str,
+    outline_sections: list,
+    outline_tone: str,
+    outline_target_audience: Optional[str],
+    writing_style: str,
+    voice: str,
+    list_usage: str,
+    custom_instructions: Optional[str],
+    word_count_target: int = 1500,
+    language: str = "en",
+):
+    """Inner implementation of background article generation (called under semaphore)."""
     start_time = time.time()
     gen_log = None
     tracker = None
@@ -359,8 +406,10 @@ async def _generate_article_background(
 
 
 @router.post("/generate", response_model=ArticleResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
 async def generate_article(
-    request: ArticleGenerateRequest,
+    request: Request,
+    body: ArticleGenerateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -371,7 +420,7 @@ async def generate_article(
     # Get the outline
     result = await db.execute(
         select(Outline).where(
-            Outline.id == request.outline_id,
+            Outline.id == body.outline_id,
             Outline.user_id == current_user.id,
         )
     )
@@ -392,7 +441,7 @@ async def generate_article(
     # Check usage limit
     project_id = getattr(current_user, 'current_project_id', None)
     tracker = GenerationTracker(db)
-    if not await tracker.check_limit(project_id, "article"):
+    if not await tracker.check_limit(project_id, "article", user_id=current_user.id):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Monthly article generation limit reached. Please upgrade your plan.",
@@ -422,7 +471,7 @@ async def generate_article(
 
     # Kick off generation as an asyncio task on the event loop
     # (more reliable than BackgroundTasks for long-running async work)
-    asyncio.create_task(
+    task = asyncio.create_task(
         _generate_article_background(
             article_id=article_id,
             user_id=current_user.id,
@@ -430,16 +479,18 @@ async def generate_article(
             outline_title=outline.title,
             outline_keyword=outline.keyword,
             outline_sections=outline.sections,
-            outline_tone=request.tone or outline.tone,
-            outline_target_audience=request.target_audience or outline.target_audience,
-            writing_style=request.writing_style or "balanced",
-            voice=request.voice or "second_person",
-            list_usage=request.list_usage or "balanced",
-            custom_instructions=request.custom_instructions,
+            outline_tone=body.tone or outline.tone,
+            outline_target_audience=body.target_audience or outline.target_audience,
+            writing_style=body.writing_style or "balanced",
+            voice=body.voice or "second_person",
+            list_usage=body.list_usage or "balanced",
+            custom_instructions=body.custom_instructions,
             word_count_target=outline.word_count_target or 1500,
-            language=request.language or current_user.language or "en",
+            language=body.language or current_user.language or "en",
         )
     )
+    _active_generation_tasks[article_id] = task
+    task.add_done_callback(lambda t: _active_generation_tasks.pop(article_id, None))
 
     return article
 
@@ -456,12 +507,18 @@ async def list_articles(
     """
     List user's articles with pagination and filtering.
     """
-    query = select(Article).where(Article.user_id == current_user.id)
+    if current_user.current_project_id:
+        query = select(Article).where(Article.project_id == current_user.current_project_id)
+    else:
+        query = select(Article).where(
+            Article.user_id == current_user.id,
+            Article.project_id.is_(None),
+        )
 
     if status:
         query = query.where(Article.status == status)
     if keyword:
-        query = query.where(Article.keyword.ilike(f"%{keyword}%"))
+        query = query.where(Article.keyword.ilike(f"%{_escape_like(keyword)}%"))
 
     count_query = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_query)).scalar() or 0
@@ -490,12 +547,17 @@ async def get_article(
     """
     Get a specific article by ID.
     """
-    result = await db.execute(
-        select(Article).where(
+    if current_user.current_project_id:
+        query = select(Article).where(
+            Article.id == article_id,
+            Article.project_id == current_user.current_project_id,
+        )
+    else:
+        query = select(Article).where(
             Article.id == article_id,
             Article.user_id == current_user.id,
         )
-    )
+    result = await db.execute(query)
     article = result.scalar_one_or_none()
 
     if not article:
@@ -517,12 +579,17 @@ async def update_article(
     """
     Update an article.
     """
-    result = await db.execute(
-        select(Article).where(
+    if current_user.current_project_id:
+        query = select(Article).where(
+            Article.id == article_id,
+            Article.project_id == current_user.current_project_id,
+        )
+    else:
+        query = select(Article).where(
             Article.id == article_id,
             Article.user_id == current_user.id,
         )
-    )
+    result = await db.execute(query)
     article = result.scalar_one_or_none()
 
     if not article:
@@ -579,12 +646,17 @@ async def delete_article(
     """
     Delete an article.
     """
-    result = await db.execute(
-        select(Article).where(
+    if current_user.current_project_id:
+        query = select(Article).where(
+            Article.id == article_id,
+            Article.project_id == current_user.current_project_id,
+        )
+    else:
+        query = select(Article).where(
             Article.id == article_id,
             Article.user_id == current_user.id,
         )
-    )
+    result = await db.execute(query)
     article = result.scalar_one_or_none()
 
     if not article:
@@ -598,21 +670,28 @@ async def delete_article(
 
 
 @router.post("/{article_id}/improve", response_model=ArticleResponse)
+@limiter.limit("10/minute")
 async def improve_article(
+    request: Request,
     article_id: str,
-    request: ArticleImproveRequest,
+    body: ArticleImproveRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Improve article content using AI.
     """
-    result = await db.execute(
-        select(Article).where(
+    if current_user.current_project_id:
+        query = select(Article).where(
+            Article.id == article_id,
+            Article.project_id == current_user.current_project_id,
+        )
+    else:
+        query = select(Article).where(
             Article.id == article_id,
             Article.user_id == current_user.id,
         )
-    )
+    result = await db.execute(query)
     article = result.scalar_one_or_none()
 
     if not article:
@@ -630,7 +709,7 @@ async def improve_article(
     try:
         improved_content = await content_ai_service.improve_content(
             content=article.content,
-            improvement_type=request.improvement_type,
+            improvement_type=body.improvement_type,
             keyword=article.keyword,
         )
 
@@ -670,12 +749,17 @@ async def analyze_article_seo(
     """
     Re-run SEO analysis on an article.
     """
-    result = await db.execute(
-        select(Article).where(
+    if current_user.current_project_id:
+        query = select(Article).where(
+            Article.id == article_id,
+            Article.project_id == current_user.current_project_id,
+        )
+    else:
+        query = select(Article).where(
             Article.id == article_id,
             Article.user_id == current_user.id,
         )
-    )
+    result = await db.execute(query)
     article = result.scalar_one_or_none()
 
     if not article:
@@ -706,7 +790,9 @@ async def analyze_article_seo(
 
 
 @router.post("/{article_id}/generate-image-prompt", response_model=ArticleResponse)
+@limiter.limit("10/minute")
 async def generate_article_image_prompt(
+    request: Request,
     article_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -714,12 +800,17 @@ async def generate_article_image_prompt(
     """
     Generate an image prompt for an existing article that doesn't have one yet.
     """
-    result = await db.execute(
-        select(Article).where(
+    if current_user.current_project_id:
+        query = select(Article).where(
+            Article.id == article_id,
+            Article.project_id == current_user.current_project_id,
+        )
+    else:
+        query = select(Article).where(
             Article.id == article_id,
             Article.user_id == current_user.id,
         )
-    )
+    result = await db.execute(query)
     article = result.scalar_one_or_none()
 
     if not article:
@@ -760,12 +851,17 @@ async def get_social_posts(
     db: AsyncSession = Depends(get_db),
 ):
     """Get social media posts for an article."""
-    result = await db.execute(
-        select(Article).where(
+    if current_user.current_project_id:
+        query = select(Article).where(
+            Article.id == article_id,
+            Article.project_id == current_user.current_project_id,
+        )
+    else:
+        query = select(Article).where(
             Article.id == article_id,
             Article.user_id == current_user.id,
         )
-    )
+    result = await db.execute(query)
     article = result.scalar_one_or_none()
 
     if not article:
@@ -784,18 +880,25 @@ async def get_social_posts(
 
 
 @router.post("/{article_id}/generate-social-posts", response_model=SocialPostsResponse)
+@limiter.limit("10/minute")
 async def generate_social_posts(
+    request: Request,
     article_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Generate AI social media posts for an article."""
-    result = await db.execute(
-        select(Article).where(
+    if current_user.current_project_id:
+        query = select(Article).where(
+            Article.id == article_id,
+            Article.project_id == current_user.current_project_id,
+        )
+    else:
+        query = select(Article).where(
             Article.id == article_id,
             Article.user_id == current_user.id,
         )
-    )
+    result = await db.execute(query)
     article = result.scalar_one_or_none()
 
     if not article:
@@ -857,12 +960,17 @@ async def update_social_post(
     db: AsyncSession = Depends(get_db),
 ):
     """Update a single platform's social post text."""
-    result = await db.execute(
-        select(Article).where(
+    if current_user.current_project_id:
+        query = select(Article).where(
+            Article.id == article_id,
+            Article.project_id == current_user.current_project_id,
+        )
+    else:
+        query = select(Article).where(
             Article.id == article_id,
             Article.user_id == current_user.id,
         )
-    )
+    result = await db.execute(query)
     article = result.scalar_one_or_none()
 
     if not article:

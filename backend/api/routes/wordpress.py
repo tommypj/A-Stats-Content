@@ -3,10 +3,12 @@ WordPress integration API routes.
 """
 
 import base64
+import ipaddress
 import json
 import logging
 from datetime import datetime, timezone
 from typing import List, Optional
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -36,6 +38,29 @@ router = APIRouter(prefix="/wordpress", tags=["WordPress"])
 logger = logging.getLogger(__name__)
 
 WP_USER_AGENT = "A-Stats-Content/1.0 (WordPress Integration)"
+
+
+def _validate_wp_url(url: str) -> str:
+    """Validate WordPress URL is not targeting internal/private networks."""
+    parsed = urlparse(url)
+    hostname = parsed.hostname
+    if not hostname:
+        raise HTTPException(400, "Invalid WordPress URL")
+
+    # Block private/internal hostnames
+    blocked = ["localhost", "127.0.0.1", "0.0.0.0", "::1"]
+    if hostname in blocked:
+        raise HTTPException(400, "WordPress URL cannot point to localhost")
+
+    # Check for private IP ranges
+    try:
+        ip = ipaddress.ip_address(hostname)
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+            raise HTTPException(400, "WordPress URL cannot point to a private network")
+    except ValueError:
+        pass  # hostname is not an IP, that's fine
+
+    return url
 
 
 def _wp_client(timeout: float = 15.0) -> httpx.AsyncClient:
@@ -107,6 +132,8 @@ async def test_wp_connection(site_url: str, username: str, app_password: str) ->
     if not site_url.startswith("http"):
         site_url = f"https://{site_url}"
 
+    _validate_wp_url(site_url)
+
     test_url = f"{site_url}/wp-json/wp/v2/users/me"
     auth_header = create_wp_auth_header(username, app_password)
 
@@ -156,6 +183,9 @@ async def connect_wordpress(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Current project not found",
         )
+
+    # Validate URL before making any HTTP requests
+    _validate_wp_url(request.site_url)
 
     # Test the connection first
     test_result = await test_wp_connection(

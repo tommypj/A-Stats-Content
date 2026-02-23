@@ -8,7 +8,8 @@ import time
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
+from api.middleware.rate_limit import limiter
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,8 +32,10 @@ router = APIRouter(prefix="/images", tags=["images"])
 
 
 @router.post("/generate", response_model=ImageResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
 async def generate_image(
-    request: ImageGenerateRequest,
+    request: Request,
+    body: ImageGenerateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -40,10 +43,10 @@ async def generate_image(
     Generate a new image using AI.
     """
     # Validate article_id if provided
-    if request.article_id:
+    if body.article_id:
         result = await db.execute(
             select(Article).where(
-                Article.id == request.article_id,
+                Article.id == body.article_id,
                 Article.user_id == current_user.id,
             )
         )
@@ -57,7 +60,7 @@ async def generate_image(
     # Check usage limit before creating any records
     project_id = getattr(current_user, 'current_project_id', None)
     tracker = GenerationTracker(db)
-    if not await tracker.check_limit(project_id, "image"):
+    if not await tracker.check_limit(project_id, "image", user_id=current_user.id):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Monthly image generation limit reached. Please upgrade your plan.",
@@ -68,11 +71,11 @@ async def generate_image(
     image = GeneratedImage(
         id=image_id,
         user_id=current_user.id,
-        article_id=request.article_id,
-        prompt=request.prompt,
-        style=request.style,
-        width=request.width,
-        height=request.height,
+        article_id=body.article_id,
+        prompt=body.prompt,
+        style=body.style,
+        width=body.width,
+        height=body.height,
         status="generating",
         url="",  # Will be updated after generation
     )
@@ -86,10 +89,10 @@ async def generate_image(
         resource_type="image",
         resource_id=image_id,
         input_metadata={
-            "prompt": request.prompt,
-            "style": request.style,
-            "width": request.width,
-            "height": request.height,
+            "prompt": body.prompt,
+            "style": body.style,
+            "width": body.width,
+            "height": body.height,
         },
     )
     await db.commit()
@@ -97,15 +100,15 @@ async def generate_image(
     # Generate image using Replicate
     try:
         generated = await image_ai_service.generate_image(
-            prompt=request.prompt,
-            width=request.width,
-            height=request.height,
-            style=request.style,
+            prompt=body.prompt,
+            width=body.width,
+            height=body.height,
+            style=body.style,
         )
 
         # Store the external URL immediately (always accessible, even if local save fails)
         image.url = generated.url
-        image.alt_text = f"AI-generated image: {request.prompt[:100]}"
+        image.alt_text = f"AI-generated image: {body.prompt[:100]}"
         image.model = generated.model if hasattr(generated, "model") else None
         image.status = "completed"
 
@@ -166,7 +169,13 @@ async def list_images(
     List user's images with pagination and optional filtering.
     """
     # Base query
-    query = select(GeneratedImage).where(GeneratedImage.user_id == current_user.id)
+    if current_user.current_project_id:
+        query = select(GeneratedImage).where(GeneratedImage.project_id == current_user.current_project_id)
+    else:
+        query = select(GeneratedImage).where(
+            GeneratedImage.user_id == current_user.id,
+            GeneratedImage.project_id.is_(None),
+        )
 
     # Apply filters
     if article_id:
@@ -201,12 +210,17 @@ async def get_image(
     """
     Get a specific image by ID.
     """
-    result = await db.execute(
-        select(GeneratedImage).where(
+    if current_user.current_project_id:
+        query = select(GeneratedImage).where(
+            GeneratedImage.id == image_id,
+            GeneratedImage.project_id == current_user.current_project_id,
+        )
+    else:
+        query = select(GeneratedImage).where(
             GeneratedImage.id == image_id,
             GeneratedImage.user_id == current_user.id,
         )
-    )
+    result = await db.execute(query)
     image = result.scalar_one_or_none()
 
     if not image:
@@ -227,12 +241,17 @@ async def delete_image(
     """
     Delete an image and its associated files from storage.
     """
-    result = await db.execute(
-        select(GeneratedImage).where(
+    if current_user.current_project_id:
+        query = select(GeneratedImage).where(
+            GeneratedImage.id == image_id,
+            GeneratedImage.project_id == current_user.current_project_id,
+        )
+    else:
+        query = select(GeneratedImage).where(
             GeneratedImage.id == image_id,
             GeneratedImage.user_id == current_user.id,
         )
-    )
+    result = await db.execute(query)
     image = result.scalar_one_or_none()
 
     if not image:
@@ -264,13 +283,18 @@ async def set_featured_image(
     """
     Set an image as the featured image for an article.
     """
-    # Verify image exists and belongs to user
-    image_result = await db.execute(
-        select(GeneratedImage).where(
+    # Verify image exists and belongs to user or project
+    if current_user.current_project_id:
+        image_query = select(GeneratedImage).where(
+            GeneratedImage.id == image_id,
+            GeneratedImage.project_id == current_user.current_project_id,
+        )
+    else:
+        image_query = select(GeneratedImage).where(
             GeneratedImage.id == image_id,
             GeneratedImage.user_id == current_user.id,
         )
-    )
+    image_result = await db.execute(image_query)
     image = image_result.scalar_one_or_none()
 
     if not image:
@@ -279,13 +303,18 @@ async def set_featured_image(
             detail="Image not found",
         )
 
-    # Verify article exists and belongs to user
-    article_result = await db.execute(
-        select(Article).where(
+    # Verify article exists and belongs to user or project
+    if current_user.current_project_id:
+        article_query = select(Article).where(
+            Article.id == request.article_id,
+            Article.project_id == current_user.current_project_id,
+        )
+    else:
+        article_query = select(Article).where(
             Article.id == request.article_id,
             Article.user_id == current_user.id,
         )
-    )
+    article_result = await db.execute(article_query)
     article = article_result.scalar_one_or_none()
 
     if not article:

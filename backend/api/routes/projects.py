@@ -2,7 +2,7 @@
 Project management API routes for multi-tenancy.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Annotated, Optional, List
 import re
 
@@ -125,7 +125,7 @@ async def create_project(
         user_id=current_user.id,
         role=ProjectMemberRole.OWNER.value,
         invited_by=None,  # Self-created
-        joined_at=datetime.now(),
+        joined_at=datetime.now(timezone.utc),
     )
 
     db.add(member)
@@ -174,6 +174,21 @@ async def list_projects(
     result = await db.execute(stmt)
     memberships = result.scalars().all()
 
+    # Batch-fetch member counts for all projects in one query
+    project_ids = [m.project_id for m in memberships]
+    counts: dict = {}
+    if project_ids:
+        count_stmt = (
+            select(ProjectMember.project_id, func.count().label("cnt"))
+            .where(
+                ProjectMember.project_id.in_(project_ids),
+                ProjectMember.deleted_at.is_(None),
+            )
+            .group_by(ProjectMember.project_id)
+        )
+        count_result = await db.execute(count_stmt)
+        counts = {row.project_id: row.cnt for row in count_result}
+
     projects_with_roles = []
     for membership in memberships:
         project = membership.project
@@ -182,15 +197,7 @@ async def list_projects(
         if project.deleted_at is not None:
             continue
 
-        # Count members
-        count_stmt = select(func.count()).select_from(ProjectMember).where(
-            and_(
-                ProjectMember.project_id == project.id,
-                ProjectMember.deleted_at.is_(None),
-            )
-        )
-        count_result = await db.execute(count_stmt)
-        member_count = count_result.scalar()
+        member_count = counts.get(project.id, 0)
 
         projects_with_roles.append({
             "id": project.id,
@@ -345,16 +352,18 @@ async def get_project(
     # Count active members
     member_count = len([m for m in project.members if m.deleted_at is None])
 
+    # Batch-fetch all user records for active members in one query
+    active_members = [m for m in project.members if m.deleted_at is None]
+    users_dict: dict = {}
+    user_ids = [m.user_id for m in active_members]
+    if user_ids:
+        users_result = await db.execute(select(User).where(User.id.in_(user_ids)))
+        users_dict = {u.id: u for u in users_result.scalars().all()}
+
     # Get member details with user info
     members_info = []
-    for member in project.members:
-        if member.deleted_at is not None:
-            continue
-
-        # Get user info
-        user_stmt = select(User).where(User.id == member.user_id)
-        user_result = await db.execute(user_stmt)
-        user = user_result.scalar_one_or_none()
+    for member in active_members:
+        user = users_dict.get(member.user_id)
 
         if user:
             members_info.append({
@@ -412,7 +421,7 @@ async def update_project(
     if data.settings is not None:
         project.settings = data.settings
 
-    project.updated_at = datetime.now()
+    project.updated_at = datetime.now(timezone.utc)
 
     await db.commit()
     await db.refresh(project)
@@ -451,13 +460,13 @@ async def delete_project(
     project = await get_project_by_id(project_id, db)
 
     # Soft delete project
-    project.deleted_at = datetime.now()
+    project.deleted_at = datetime.now(timezone.utc)
 
     # Soft delete all memberships
     stmt = (
         sql_update(ProjectMember)
         .where(ProjectMember.project_id == project_id)
-        .values(deleted_at=datetime.now())
+        .values(deleted_at=datetime.now(timezone.utc))
     )
     await db.execute(stmt)
 

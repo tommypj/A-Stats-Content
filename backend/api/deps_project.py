@@ -18,6 +18,7 @@ from infrastructure.database.models.content import Article, Outline, GeneratedIm
 from infrastructure.database.models.social import SocialAccount, ScheduledPost
 from infrastructure.database.models.knowledge import KnowledgeSource
 from infrastructure.database.models.analytics import GSCConnection
+from infrastructure.database.models.project import ProjectMember
 
 
 # Type alias for content models
@@ -105,22 +106,16 @@ async def verify_project_membership(
           once the Project model and ProjectMember model are created.
         - Currently returns False to prevent unauthorized access until projects are implemented.
     """
-    # TODO: Replace with actual project membership query once Project model exists
-    # Example implementation:
-    # from infrastructure.database.models.project import ProjectMember
-    # stmt = select(ProjectMember).where(
-    #     and_(
-    #         ProjectMember.project_id == project_id,
-    #         ProjectMember.user_id == user.id,
-    #         ProjectMember.is_active == True,
-    #     )
-    # )
-    # result = await db.execute(stmt)
-    # member = result.scalar_one_or_none()
-    # return member is not None
-
-    # Placeholder: Always return False until Project model is implemented
-    return False
+    stmt = select(ProjectMember).where(
+        and_(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == user.id,
+            ProjectMember.deleted_at.is_(None),
+        )
+    )
+    result = await db.execute(stmt)
+    member = result.scalar_one_or_none()
+    return member is not None
 
 
 async def verify_content_access(
@@ -289,12 +284,10 @@ def validate_project_content_creation(
         # Personal content - always allowed
         return
 
-    # TODO: Add actual project membership and role verification
-    # For now, raise error to prevent project content creation until projects are implemented
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Project content creation is not yet implemented. Please create personal content (omit project_id).",
-    )
+    # project_id is set — the caller must also verify membership via verify_project_membership
+    # (validate_project_content_creation is a sync guard; async membership check is separate).
+    # Allow the call to proceed; actual DB-level verification happens in the route.
+    return
 
 
 # Helper function to build content list query with project filtering

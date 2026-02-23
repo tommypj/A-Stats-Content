@@ -21,10 +21,12 @@ Rate Limits:
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from infrastructure.config.settings import settings
+
 # Create limiter instance with IP-based key function
-# In production, you might want to use Redis as the storage backend
-# For example: storage_uri="redis://localhost:6379"
-limiter = Limiter(key_func=get_remote_address)
+# Uses Redis when available, falls back to in-memory storage
+_storage_uri = settings.redis_url if settings.redis_url else "memory://"
+limiter = Limiter(key_func=get_remote_address, storage_uri=_storage_uri)
 
 # Rate limit configurations
 # Format: "count/period" where period can be: second, minute, hour, day
