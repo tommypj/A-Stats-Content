@@ -80,6 +80,3 @@ export function useProjectPermissions(): ProjectPermissions {
   };
 }
 
-// Backward-compatible alias
-export const useTeamPermissions = useProjectPermissions;
-export type TeamPermissions = ProjectPermissions;

@@ -40,6 +40,7 @@ import PublishToWordPressModal from "@/components/publish-to-wordpress-modal";
 import SocialPostsModal from "@/components/social-posts-modal";
 import { clsx } from "clsx";
 import { toast } from "sonner";
+import DOMPurify from "dompurify";
 
 // ---------------------------------------------------------------------------
 // SERP Preview — purely visual, no API calls
@@ -760,7 +761,7 @@ export default function ArticleEditorPage() {
             ) : (
               <div
                 className="prose prose-lg max-w-none min-h-[500px] px-4 py-3"
-                dangerouslySetInnerHTML={{ __html: article.content_html || "" }}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(article.content_html || "") }}
               />
             )}
           </Card>

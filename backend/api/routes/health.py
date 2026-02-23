@@ -1,6 +1,6 @@
 """Health check endpoints."""
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,7 +24,7 @@ async def health_check():
         "app": settings.app_name,
         "version": settings.app_version,
         "environment": settings.environment,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -46,7 +46,7 @@ async def health_check_db(db: AsyncSession = Depends(get_db)):
         "version": settings.app_version,
         "environment": settings.environment,
         "database": db_status,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -93,5 +93,5 @@ async def services_check(admin_user: User = Depends(get_current_admin_user)):
     return {
         "status": "healthy" if all_configured else "degraded",
         "services": services,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
