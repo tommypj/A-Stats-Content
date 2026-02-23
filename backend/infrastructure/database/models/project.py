@@ -2,7 +2,7 @@
 Project and multi-tenancy database models.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Optional
 from uuid import uuid4
@@ -105,13 +105,13 @@ class Project(Base, TimestampMixin):
         "ProjectMember",
         back_populates="project",
         cascade="all, delete-orphan",
-        lazy="selectin",
+        lazy="select",
     )
     invitations = relationship(
         "ProjectInvitation",
         back_populates="project",
         cascade="all, delete-orphan",
-        lazy="selectin",
+        lazy="select",
     )
 
     # Indexes
@@ -253,7 +253,7 @@ class ProjectInvitation(Base, TimestampMixin):
     )
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.utcnow() + timedelta(days=7),
+        default=lambda: datetime.now(timezone.utc) + timedelta(days=7),
         nullable=False,
     )
 
@@ -306,7 +306,7 @@ class ProjectInvitation(Base, TimestampMixin):
         """Check if invitation has expired."""
         if self.status == InvitationStatus.EXPIRED.value:
             return True
-        return datetime.utcnow() > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
 
     def can_accept(self) -> bool:
         """Check if invitation can be accepted."""

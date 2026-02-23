@@ -124,11 +124,44 @@ class GenerationTracker:
         self,
         project_id: Optional[str],
         resource_type: str,
+        user_id: Optional[str] = None,
     ) -> bool:
-        """Check if the project can generate more of this resource type.
-        Returns True if allowed (or no project context). False if limit reached."""
+        """Check if the project (or user) can generate more of this resource type.
+        Returns True if allowed. False if limit reached."""
         if not project_id:
-            return True  # No project = no limit enforcement (personal workspace)
+            # Check user-level limits for personal workspace
+            if not user_id:
+                return True  # No user context — fail open
+
+            try:
+                from infrastructure.database.models.user import User
+                user_result = await self.db.execute(
+                    select(User).where(User.id == user_id)
+                )
+                user = user_result.scalar_one_or_none()
+                if not user:
+                    return False
+
+                # Get plan limits
+                from api.routes.billing import PLANS
+                plan = PLANS.get(user.subscription_tier or "free", PLANS["free"])
+                limits = plan.get("limits", {})
+
+                # Map resource_type to limit key
+                limit_key = f"{resource_type}s_per_month"
+                limit = limits.get(limit_key, 0)
+
+                if limit == -1:
+                    return True  # unlimited
+
+                # Get current month's usage count for this user
+                usage_field = f"{resource_type}s_generated_this_month"
+                current_usage = getattr(user, usage_field, 0) or 0
+
+                return current_usage < limit
+            except Exception as e:
+                logger.warning("Failed to check user-level limit for user %s: %s", user_id, e)
+                return True  # Fail open — don't block generation if limit check fails
 
         try:
             usage_service = ProjectUsageService(self.db)

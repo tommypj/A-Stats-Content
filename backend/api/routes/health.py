@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from infrastructure.database import get_db
 from infrastructure.config import get_settings
+from api.deps_admin import get_current_admin_user
+from infrastructure.database.models.user import User
 
 router = APIRouter()
 settings = get_settings()
@@ -61,7 +63,7 @@ async def liveness_check():
 
 
 @router.get("/health/services")
-async def services_check():
+async def services_check(admin_user: User = Depends(get_current_admin_user)):
     """Check status of external service connections."""
     from adapters.ai.replicate_adapter import image_ai_service
     from adapters.ai.anthropic_adapter import content_ai_service

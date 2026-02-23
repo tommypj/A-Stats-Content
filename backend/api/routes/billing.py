@@ -9,6 +9,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Annotated
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Header
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -300,16 +301,30 @@ async def cancel_subscription(
             detail="No active subscription to cancel",
         )
 
-    # Note: Actual cancellation should be done via LemonSqueezy API
-    # For now, we'll just mark it in our database
-    # TODO: Implement LemonSqueezy API call to cancel subscription
-
     logger.info(f"Subscription cancellation requested for user {current_user.id}")
+
+    async with httpx.AsyncClient() as client:
+        response = await client.delete(
+            f"https://api.lemonsqueezy.com/v1/subscriptions/{current_user.lemonsqueezy_subscription_id}",
+            headers={
+                "Authorization": f"Bearer {settings.lemonsqueezy_api_key}",
+                "Accept": "application/vnd.api+json",
+            },
+        )
+        if response.status_code not in (200, 204):
+            logger.error(
+                "LemonSqueezy cancel failed: %s %s",
+                response.status_code,
+                response.text,
+            )
+            raise HTTPException(
+                500,
+                "Failed to cancel subscription. Please try again or contact support.",
+            )
 
     return SubscriptionCancelResponse(
         success=True,
-        message="Subscription will be cancelled at the end of the billing period. "
-                "Please visit the customer portal to complete cancellation.",
+        message="Subscription will be cancelled at the end of the billing period.",
     )
 
 
@@ -495,7 +510,8 @@ async def handle_webhook(
                 detail="Invalid webhook signature",
             )
     else:
-        logger.warning("Webhook signature verification skipped (secret not configured)")
+        logger.error("Webhook rejected: LEMONSQUEEZY_WEBHOOK_SECRET not configured")
+        raise HTTPException(status_code=500, detail="Webhook verification not configured")
 
     # Parse webhook payload
     try:

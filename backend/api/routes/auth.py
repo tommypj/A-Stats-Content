@@ -80,6 +80,22 @@ async def get_current_user(
             detail="User account is not active",
         )
 
+    # Reject tokens issued before the user's last security event (password change/reset).
+    # updated_at is bumped explicitly on password change and reset, so any token
+    # issued before that moment is no longer valid.
+    if payload.iat and user.updated_at:
+        token_iat = payload.iat
+        # Ensure both datetimes are timezone-aware for comparison
+        user_updated = user.updated_at
+        if user_updated.tzinfo is None:
+            user_updated = user_updated.replace(tzinfo=timezone.utc)
+        if user_updated > token_iat:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token invalidated due to security event",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
     return user
 
 
@@ -332,10 +348,17 @@ async def reset_password(
             detail="Invalid or expired reset token",
         )
 
-    # Update password
+    if not user.password_reset_token or user.password_reset_token != request.token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or already used reset token",
+        )
+
+    # Update password and bump updated_at so existing tokens are invalidated
     user.password_hash = password_hasher.hash(request.new_password)
     user.password_reset_token = None
     user.password_reset_expires = None
+    user.updated_at = datetime.now(timezone.utc)
     await db.commit()
 
     return {"message": "Password has been reset successfully"}
@@ -357,8 +380,9 @@ async def change_password(
             detail="Current password is incorrect",
         )
 
-    # Update password
+    # Update password and bump updated_at so existing tokens are invalidated
     current_user.password_hash = password_hasher.hash(request.new_password)
+    current_user.updated_at = datetime.now(timezone.utc)
     await db.commit()
 
     return {"message": "Password has been changed successfully"}
@@ -435,7 +459,11 @@ async def resend_verification(
         user.email_verification_token = verification_token
         await db.commit()
 
-        # TODO: Send verification email
+        await email_service.send_verification_email(
+            to_email=user.email,
+            user_name=user.name,
+            verification_token=verification_token,
+        )
 
     return {"message": "If the email exists and is not verified, a verification link has been sent"}
 
@@ -447,8 +475,9 @@ async def logout(
     """
     Logout current user.
 
-    Note: JWT tokens are stateless, so this endpoint is mainly for
-    client-side token cleanup. In a production environment, you might
-    want to implement token blacklisting.
+    Note: JWT tokens are stateless, so individual token blacklisting requires
+    Redis or a similar store (not implemented here). The client must discard
+    the token on logout. Password change and password reset do invalidate all
+    previously issued tokens via the updated_at timestamp check in get_current_user().
     """
     return {"message": "Logged out successfully"}

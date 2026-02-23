@@ -36,6 +36,11 @@ from api.schemas.admin import (
 
 router = APIRouter(prefix="/admin", tags=["Admin - Users"])
 
+
+def _escape_like(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 # Initialize token service
 token_service = TokenService(
     secret_key=settings.jwt_secret_key,
@@ -147,7 +152,7 @@ async def list_users(
     filters = []
 
     if search:
-        search_pattern = f"%{search}%"
+        search_pattern = f"%{_escape_like(search)}%"
         filters.append(
             or_(
                 User.email.ilike(search_pattern),
@@ -277,6 +282,14 @@ async def update_user(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Cannot demote yourself from super_admin role",
+            )
+
+    # Prevent privilege escalation: only super_admin can assign admin-level roles
+    if request.role and request.role in [UserRole.SUPER_ADMIN.value, UserRole.ADMIN.value]:
+        if admin_user.role != UserRole.SUPER_ADMIN.value:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only super admins can assign admin roles",
             )
 
     # Update role

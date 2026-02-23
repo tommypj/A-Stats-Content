@@ -75,12 +75,17 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserResponse | null>(null);
 
   useEffect(() => {
+    const token = localStorage.getItem("auth_token");
+    if (!token) {
+      router.push("/login");
+      return;
+    }
     const loadUser = async () => {
       try {
         const data = await api.auth.me();
         setUser(data);
       } catch {
-        // Not logged in
+        router.push("/login");
       }
     };
     loadUser();

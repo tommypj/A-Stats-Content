@@ -29,6 +29,8 @@ async def lifespan(app: FastAPI):
     console.print(f"CORS origins raw: {settings.cors_origins!r}")
     console.print(f"CORS origins list: {settings.cors_origins_list!r}")
 
+    settings.validate_production_secrets()
+
     if settings.is_development:
         console.print("[yellow]Development mode - initializing database...[/yellow]")
         await init_db()
@@ -84,8 +86,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # Serve uploaded files (images, etc.)
