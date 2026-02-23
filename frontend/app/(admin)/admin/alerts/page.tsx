@@ -160,7 +160,7 @@ export default function AdminAlertsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold text-text-primary">Alerts</h1>
           <p className="text-text-muted mt-1">
@@ -246,7 +246,8 @@ export default function AdminAlertsPage() {
                   alert.severity === "info" && !alert.is_read && "border-l-4 border-l-blue-500"
                 )}
               >
-                <div className="flex items-start gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                  <div className="flex items-start gap-4 flex-1 min-w-0">
                   {/* Severity dot */}
                   <div className="mt-1">
                     <SeverityDot severity={alert.severity} />
@@ -314,9 +315,10 @@ export default function AdminAlertsPage() {
                       </span>
                     </div>
                   </div>
+                  </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex items-center gap-2 sm:flex-shrink-0">
                     <button
                       onClick={() => handleToggleRead(alert)}
                       disabled={isUpdating}
@@ -351,7 +353,7 @@ export default function AdminAlertsPage() {
 
       {/* Pagination */}
       {!loading && !error && alerts.length > 0 && (
-        <div className="flex items-center justify-between px-1">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-1">
           <p className="text-sm text-text-muted">
             Showing {(page - 1) * pageSize + 1} to{" "}
             {Math.min(page * pageSize, total)} of {total} alerts

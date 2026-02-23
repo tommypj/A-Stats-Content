@@ -139,7 +139,7 @@ export default function AdminGenerationsPage() {
       </div>
 
       {/* Stats cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {statsLoading ? (
           Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="bg-white rounded-xl border border-surface-tertiary p-5 animate-pulse">
@@ -186,8 +186,8 @@ export default function AdminGenerationsPage() {
 
       {/* Filters */}
       <div className="bg-white rounded-xl border border-surface-tertiary p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1">
+        <div className="flex flex-wrap gap-3">
+          <div className="flex-1 min-w-[200px]">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-text-muted" />
               <input
@@ -260,7 +260,7 @@ export default function AdminGenerationsPage() {
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[600px]">
                 <thead className="bg-surface-secondary">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">
@@ -328,7 +328,7 @@ export default function AdminGenerationsPage() {
             </div>
 
             {/* Pagination */}
-            <div className="flex items-center justify-between px-4 py-3 border-t border-surface-tertiary">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t border-surface-tertiary">
               <p className="text-sm text-text-muted">
                 Showing {(page - 1) * pageSize + 1} to{" "}
                 {Math.min(page * pageSize, total)} of {total} logs

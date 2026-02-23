@@ -177,7 +177,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => (
           <div key={stat.name} className="card p-5">
             <div className="flex items-center justify-between">
@@ -203,7 +203,7 @@ export default function DashboardPage() {
         <h2 className="text-lg font-display font-semibold text-text-primary mb-4">
           Quick Actions
         </h2>
-        <div className="grid sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {quickActions.map((action) => (
             <Link
               key={action.name}
@@ -364,7 +364,7 @@ export default function DashboardPage() {
 
       {/* Usage & Plan */}
       <div className="card p-5">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
           <h2 className="font-display font-semibold text-text-primary">
             Usage This Month
           </h2>
@@ -375,7 +375,7 @@ export default function DashboardPage() {
             Upgrade Plan
           </Link>
         </div>
-        <div className="grid sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <div className="flex items-center justify-between text-sm mb-2">
               <span className="text-text-secondary">Articles</span>

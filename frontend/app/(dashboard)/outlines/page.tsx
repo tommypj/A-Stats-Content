@@ -74,7 +74,7 @@ export default function OutlinesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-display font-bold text-text-primary">
             Outlines
@@ -109,7 +109,7 @@ export default function OutlinesPage() {
           </Button>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {outlines.map((outline) => {
             const status = statusConfig[outline.status];
             const StatusIcon = status.icon;

@@ -204,8 +204,9 @@ export default function AdminLayout({
                             <Link
                               key={subItem.name}
                               href={subItem.href}
+                              onClick={() => setSidebarOpen(false)}
                               className={clsx(
-                                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors min-h-[44px]",
                                 isActive
                                   ? "bg-primary-800 text-cream-50"
                                   : "text-cream-300 hover:bg-primary-900 hover:text-cream-100"
@@ -228,8 +229,9 @@ export default function AdminLayout({
                 <Link
                   key={item.name}
                   href={item.href}
+                  onClick={() => setSidebarOpen(false)}
                   className={clsx(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
+                    "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors min-h-[44px]",
                     isActive
                       ? "bg-primary-800 text-cream-50"
                       : "text-cream-300 hover:bg-primary-900 hover:text-cream-100"
@@ -253,8 +255,9 @@ export default function AdminLayout({
                   <Link
                     key={item.name}
                     href={item.href}
+                    onClick={() => setSidebarOpen(false)}
                     className={clsx(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
+                      "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors min-h-[44px]",
                       isActive
                         ? "bg-primary-800 text-cream-50"
                         : "text-cream-300 hover:bg-primary-900 hover:text-cream-100"
@@ -299,7 +302,7 @@ export default function AdminLayout({
           <div className="flex h-full items-center justify-between px-4 lg:px-8">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden p-2 rounded-lg hover:bg-surface-secondary"
+              className="lg:hidden p-2.5 rounded-lg hover:bg-surface-secondary min-h-[44px] min-w-[44px] flex items-center justify-center"
             >
               <Menu className="h-5 w-5 text-text-secondary" />
             </button>
