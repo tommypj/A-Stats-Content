@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Optional, List
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, JSON, Float, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, JSON, Float, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -243,6 +243,52 @@ class Article(Base, TimestampMixin):
     def is_published(self) -> bool:
         """Check if article is published."""
         return self.status == ContentStatus.PUBLISHED.value and self.published_at is not None
+
+
+class ArticleRevision(Base):
+    """Snapshot of an article's content at a point in time."""
+
+    __tablename__ = "article_revisions"
+
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        primary_key=True,
+        default=lambda: str(uuid4()),
+    )
+
+    # Foreign keys
+    article_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("articles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    created_by: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id"),
+        nullable=False,
+    )
+
+    # Snapshot content
+    content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    content_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    meta_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    word_count: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Revision metadata
+    revision_type: Mapped[str] = mapped_column(
+        String(50), nullable=False
+    )  # "manual_edit", "before_ai_improve_seo", "restore", etc.
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ArticleRevision(id={self.id}, article_id={self.article_id}, type={self.revision_type})>"
 
 
 class GeneratedImage(Base, TimestampMixin):

@@ -2,6 +2,50 @@ import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from "axios";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+// ---------------------------------------------------------------------------
+// Simple in-memory SWR-like cache for GET requests
+// The cache is keyed by URL + serialised params and stores the response data
+// alongside the timestamp at which it was stored.  Entries are considered
+// fresh as long as they are younger than the TTL passed to getCached().
+// The cache lives only in the browser's JS heap — it clears on page reload,
+// which is the desired behaviour (no stale cross-session data).
+// ---------------------------------------------------------------------------
+
+const apiCache = new Map<string, { data: unknown; timestamp: number }>();
+
+function getCached<T>(key: string, ttlMs: number): T | null {
+  const entry = apiCache.get(key);
+  if (entry && Date.now() - entry.timestamp < ttlMs) {
+    return entry.data as T;
+  }
+  return null;
+}
+
+function setCache(key: string, data: unknown): void {
+  apiCache.set(key, { data, timestamp: Date.now() });
+}
+
+export function invalidateCache(prefix?: string): void {
+  if (!prefix) {
+    apiCache.clear();
+    return;
+  }
+  for (const key of apiCache.keys()) {
+    if (key.startsWith(prefix)) {
+      apiCache.delete(key);
+    }
+  }
+}
+
+async function cachedGet<T>(url: string, ttlMs: number, params?: Record<string, unknown>): Promise<T> {
+  const cacheKey = url + (params ? JSON.stringify(params) : "");
+  const cached = getCached<T>(cacheKey, ttlMs);
+  if (cached) return cached;
+  const { data } = await apiClient.get<T>(url, { params });
+  setCache(cacheKey, data);
+  return data;
+}
+
 /**
  * Create a configured Axios instance
  */
@@ -214,10 +258,7 @@ export const api = {
         url: "/auth/register",
         data,
       }),
-    me: () =>
-      apiRequest<UserResponse>({
-        url: "/auth/me",
-      }),
+    me: () => cachedGet<UserResponse>("/auth/me", 60_000),
     refresh: (refreshToken: string) =>
       apiRequest<{ access_token: string; refresh_token: string; token_type: string; expires_in: number }>({
         method: "POST",
@@ -246,12 +287,15 @@ export const api = {
         url: "/auth/verify-email",
         data: { token },
       }),
-    updateProfile: (data: { name?: string; language?: string; timezone?: string }) =>
-      apiRequest<UserResponse>({
+    updateProfile: async (data: { name?: string; language?: string; timezone?: string }) => {
+      const result = await apiRequest<UserResponse>({
         method: "PUT",
         url: "/auth/me",
         data,
-      }),
+      });
+      invalidateCache("/auth/me");
+      return result;
+    },
     changePassword: (currentPassword: string, newPassword: string) =>
       apiRequest<{ message: string }>({
         method: "POST",
@@ -301,12 +345,15 @@ export const api = {
         params,
       }),
     get: (id: string) => apiRequest<Article>({ url: `/articles/${id}` }),
-    create: (data: CreateArticleInput) =>
-      apiRequest<Article>({
+    create: async (data: CreateArticleInput) => {
+      const result = await apiRequest<Article>({
         method: "POST",
         url: "/articles",
         data,
-      }),
+      });
+      invalidateCache("/articles");
+      return result;
+    },
     generate: (data: GenerateArticleInput) =>
       apiRequest<Article>({
         method: "POST",
@@ -314,17 +361,22 @@ export const api = {
         data,
         timeout: AI_TIMEOUT,
       }),
-    update: (id: string, data: UpdateArticleInput) =>
-      apiRequest<Article>({
+    update: async (id: string, data: UpdateArticleInput) => {
+      const result = await apiRequest<Article>({
         method: "PUT",
         url: `/articles/${id}`,
         data,
-      }),
-    delete: (id: string) =>
-      apiRequest<void>({
+      });
+      invalidateCache("/articles");
+      return result;
+    },
+    delete: async (id: string) => {
+      await apiRequest<void>({
         method: "DELETE",
         url: `/articles/${id}`,
-      }),
+      });
+      invalidateCache("/articles");
+    },
     improve: (id: string, improvement_type: string) =>
       apiRequest<Article>({
         method: "POST",
@@ -358,6 +410,20 @@ export const api = {
         method: "PUT",
         url: `/articles/${id}/social-posts`,
         data: { platform, text },
+      }),
+    listRevisions: (articleId: string, params?: { page?: number; page_size?: number }) =>
+      apiRequest<ArticleRevisionListResponse>({
+        url: `/articles/${articleId}/revisions`,
+        params,
+      }),
+    getRevision: (articleId: string, revisionId: string) =>
+      apiRequest<ArticleRevisionDetail>({
+        url: `/articles/${articleId}/revisions/${revisionId}`,
+      }),
+    restoreRevision: (articleId: string, revisionId: string) =>
+      apiRequest<Article>({
+        method: "POST",
+        url: `/articles/${articleId}/revisions/${revisionId}/restore`,
       }),
   },
 
@@ -504,10 +570,7 @@ export const api = {
 
   // Billing / LemonSqueezy
   billing: {
-    pricing: () =>
-      apiRequest<PricingResponse>({
-        url: "/billing/pricing",
-      }),
+    pricing: () => cachedGet<PricingResponse>("/billing/pricing", 300_000),
     subscription: () =>
       apiRequest<SubscriptionStatus>({
         url: "/billing/subscription",
@@ -790,21 +853,22 @@ export const api = {
   // Projects (Multi-tenancy)
   projects: {
     list: async () => {
-      const response = await apiRequest<{ projects: Project[]; total: number }>({
-        url: "/projects",
-      });
+      const response = await cachedGet<{ projects: Project[]; total: number }>("/projects", 30_000);
       return response.projects;
     },
     get: (id: string) =>
       apiRequest<Project>({
         url: `/projects/${id}`,
       }),
-    create: (data: ProjectCreateRequest) =>
-      apiRequest<Project>({
+    create: async (data: ProjectCreateRequest) => {
+      const result = await apiRequest<Project>({
         method: "POST",
         url: "/projects",
         data,
-      }),
+      });
+      invalidateCache("/projects");
+      return result;
+    },
     update: (id: string, data: ProjectUpdateRequest) =>
       apiRequest<Project>({
         method: "PUT",
@@ -816,16 +880,16 @@ export const api = {
         method: "DELETE",
         url: `/projects/${id}`,
       }),
-    switch: (id: string | null) =>
-      apiRequest<void>({
+    switch: async (id: string | null) => {
+      await apiRequest<void>({
         method: "POST",
         url: "/projects/switch",
         data: { project_id: id },
-      }),
-    getCurrent: async (): Promise<Project | null> => {
-      const response = await apiRequest<{ project: Project | null; is_personal_workspace: boolean }>({
-        url: "/projects/current",
       });
+      invalidateCache("/projects");
+    },
+    getCurrent: async (): Promise<Project | null> => {
+      const response = await cachedGet<{ project: Project | null; is_personal_workspace: boolean }>("/projects/current", 30_000);
       return response.project;
     },
     uploadLogo: (projectId: string, file: File) => {
@@ -845,6 +909,17 @@ export const api = {
       apiRequest<void>({
         method: "POST",
         url: `/projects/${projectId}/leave`,
+      }),
+
+    getBrandVoice: () =>
+      apiRequest<BrandVoiceSettings>({
+        url: "/projects/current/brand-voice",
+      }),
+    updateBrandVoice: (data: BrandVoiceSettings) =>
+      apiRequest<BrandVoiceSettings>({
+        method: "PUT",
+        url: "/projects/current/brand-voice",
+        data,
       }),
 
     members: {
@@ -1045,6 +1120,32 @@ export interface Article {
   created_at: string;
   updated_at: string;
 }
+
+// -------------------------------------------------------------------------
+// Article revision types
+// -------------------------------------------------------------------------
+
+export interface ArticleRevision {
+  id: string;
+  article_id: string;
+  revision_type: string;
+  word_count: number;
+  created_at: string;
+}
+
+export interface ArticleRevisionDetail extends ArticleRevision {
+  content?: string;
+  content_html?: string;
+  title: string;
+  meta_description?: string;
+}
+
+export interface ArticleRevisionListResponse {
+  items: ArticleRevision[];
+  total: number;
+}
+
+// -------------------------------------------------------------------------
 
 export interface SocialPostContent {
   text: string;
@@ -1859,6 +1960,14 @@ export interface Project {
   member_count: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface BrandVoiceSettings {
+  tone?: string;
+  writing_style?: string;
+  target_audience?: string;
+  custom_instructions?: string;
+  language?: string;
 }
 
 export interface ProjectMember {

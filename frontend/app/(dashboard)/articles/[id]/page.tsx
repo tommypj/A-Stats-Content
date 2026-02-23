@@ -28,8 +28,12 @@ import {
   Link as LinkIcon,
   Quote,
   Search,
+  History,
+  ChevronDown,
+  ChevronUp,
+  RotateCcw,
 } from "lucide-react";
-import { api, Article } from "@/lib/api";
+import { api, Article, ArticleRevision, ArticleRevisionDetail } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import PublishToWordPressModal from "@/components/publish-to-wordpress-modal";
@@ -157,6 +161,18 @@ function getSeoScoreColor(score: number) {
   return "text-red-600 bg-red-100";
 }
 
+function formatRevisionType(revisionType: string): string {
+  const labels: Record<string, string> = {
+    manual_edit: "Manual Edit",
+    before_ai_improve_seo: "Before AI Improve (SEO)",
+    before_ai_improve_readability: "Before AI Improve (Readability)",
+    before_ai_improve_engagement: "Before AI Improve (Engagement)",
+    before_ai_improve_grammar: "Before AI Improve (Grammar)",
+    restore: "Restore Backup",
+  };
+  return labels[revisionType] ?? revisionType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export default function ArticleEditorPage() {
   const params = useParams();
   const router = useRouter();
@@ -188,6 +204,15 @@ export default function ArticleEditorPage() {
   const lastSavedContentRef = useRef<string>("");
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+
+  // Version history panel state
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [revisions, setRevisions] = useState<ArticleRevision[]>([]);
+  const [revisionsTotal, setRevisionsTotal] = useState(0);
+  const [loadingRevisions, setLoadingRevisions] = useState(false);
+  const [previewRevision, setPreviewRevision] = useState<ArticleRevisionDetail | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [restoringRevisionId, setRestoringRevisionId] = useState<string | null>(null);
 
   useEffect(() => {
     loadArticle();
@@ -388,6 +413,72 @@ export default function ArticleEditorPage() {
     // Reload article to get updated wordpress_post_id
     loadArticle();
     setShowWpModal(false);
+  }
+
+  async function handleToggleVersionHistory() {
+    const nextOpen = !showVersionHistory;
+    setShowVersionHistory(nextOpen);
+    // Lazy-load the first page of revisions when opening for the first time
+    if (nextOpen && revisions.length === 0) {
+      await loadRevisions();
+    }
+  }
+
+  async function loadRevisions() {
+    if (!article) return;
+    setLoadingRevisions(true);
+    try {
+      const data = await api.articles.listRevisions(article.id, { page: 1, page_size: 20 });
+      setRevisions(data.items);
+      setRevisionsTotal(data.total);
+    } catch (error) {
+      console.error("Failed to load revisions:", error);
+      toast.error("Failed to load version history");
+    } finally {
+      setLoadingRevisions(false);
+    }
+  }
+
+  async function handlePreviewRevision(revisionId: string) {
+    if (!article) return;
+    // Toggle off if already previewing this revision
+    if (previewRevision?.id === revisionId) {
+      setPreviewRevision(null);
+      return;
+    }
+    setLoadingPreview(true);
+    try {
+      const detail = await api.articles.getRevision(article.id, revisionId);
+      setPreviewRevision(detail);
+    } catch (error) {
+      console.error("Failed to load revision detail:", error);
+      toast.error("Failed to load revision content");
+    } finally {
+      setLoadingPreview(false);
+    }
+  }
+
+  async function handleRestoreRevision(revisionId: string) {
+    if (!article) return;
+    if (!confirm("Restore this version? The current content will be saved as a backup revision first.")) return;
+    setRestoringRevisionId(revisionId);
+    try {
+      const updated = await api.articles.restoreRevision(article.id, revisionId);
+      setArticle(updated);
+      setTitle(updated.title);
+      setContent(updated.content || "");
+      setMetaDescription(updated.meta_description || "");
+      lastSavedContentRef.current = updated.content || "";
+      setPreviewRevision(null);
+      // Refresh revision list to include the new "restore" backup revision
+      await loadRevisions();
+      toast.success("Article restored to selected version");
+    } catch (error) {
+      console.error("Failed to restore revision:", error);
+      toast.error("Failed to restore revision");
+    } finally {
+      setRestoringRevisionId(null);
+    }
   }
 
   if (loading) {
@@ -854,6 +945,118 @@ export default function ArticleEditorPage() {
                 Delete Article
               </button>
             </div>
+          </Card>
+
+          {/* Version History */}
+          <Card className="p-4">
+            <button
+              type="button"
+              onClick={handleToggleVersionHistory}
+              className="w-full flex items-center justify-between text-left"
+            >
+              <div className="flex items-center gap-2">
+                <History className="h-4 w-4 text-text-secondary" />
+                <span className="font-medium text-text-primary text-sm">Version History</span>
+                {revisionsTotal > 0 && (
+                  <span className="text-xs text-text-muted bg-surface-secondary px-1.5 py-0.5 rounded-full">
+                    {revisionsTotal}
+                  </span>
+                )}
+              </div>
+              {showVersionHistory ? (
+                <ChevronUp className="h-4 w-4 text-text-muted" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-text-muted" />
+              )}
+            </button>
+
+            {showVersionHistory && (
+              <div className="mt-3 space-y-2">
+                {loadingRevisions ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-4 w-4 animate-spin text-text-muted" />
+                  </div>
+                ) : revisions.length === 0 ? (
+                  <p className="text-xs text-text-muted text-center py-3">
+                    No saved versions yet. Versions are saved automatically before AI improvements and manual edits.
+                  </p>
+                ) : (
+                  <>
+                    {revisions.map((rev) => (
+                      <div
+                        key={rev.id}
+                        className={clsx(
+                          "rounded-lg border p-2.5 transition-colors",
+                          previewRevision?.id === rev.id
+                            ? "border-primary-300 bg-primary-50"
+                            : "border-surface-tertiary bg-white hover:bg-surface-secondary"
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-text-primary truncate">
+                              {formatRevisionType(rev.revision_type)}
+                            </p>
+                            <p className="text-xs text-text-muted mt-0.5">
+                              {new Date(rev.created_at).toLocaleString(undefined, {
+                                month: "short",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                              {" · "}
+                              {rev.word_count.toLocaleString()} words
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            title="Restore this version"
+                            onClick={() => handleRestoreRevision(rev.id)}
+                            disabled={restoringRevisionId === rev.id}
+                            className="flex-shrink-0 p-1 rounded hover:bg-surface-tertiary text-text-muted hover:text-text-primary transition-colors"
+                          >
+                            {restoringRevisionId === rev.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <RotateCcw className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Preview toggle */}
+                        <button
+                          type="button"
+                          onClick={() => handlePreviewRevision(rev.id)}
+                          className="mt-1.5 text-xs text-primary-600 hover:text-primary-700 transition-colors"
+                        >
+                          {previewRevision?.id === rev.id ? "Hide preview" : "Preview"}
+                          {loadingPreview && previewRevision?.id !== rev.id && " ..."}
+                        </button>
+
+                        {/* Inline content preview */}
+                        {previewRevision?.id === rev.id && (
+                          <div className="mt-2 p-2 rounded bg-surface-secondary border border-surface-tertiary max-h-40 overflow-y-auto">
+                            <p className="text-xs font-medium text-text-secondary mb-1 truncate">
+                              {previewRevision.title}
+                            </p>
+                            <p className="text-xs text-text-muted whitespace-pre-wrap font-mono leading-relaxed line-clamp-6">
+                              {previewRevision.content?.slice(0, 600) || "(no content)"}
+                              {(previewRevision.content?.length ?? 0) > 600 && "…"}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                    {revisionsTotal > revisions.length && (
+                      <p className="text-xs text-text-muted text-center pt-1">
+                        Showing {revisions.length} of {revisionsTotal} versions
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </Card>
         </div>
       </div>
