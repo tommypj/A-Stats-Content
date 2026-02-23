@@ -110,48 +110,48 @@ export default function AdminAlertsPage() {
       await api.admin.alerts.markAllRead();
       await loadAlerts();
     } catch (err) {
-      alert(parseApiError(err).message);
+      window.alert(parseApiError(err).message);
     } finally {
       setMarkingAllRead(false);
     }
   };
 
-  const handleToggleRead = async (alert: AdminAlert) => {
-    setUpdatingIds((prev) => new Set(prev).add(alert.id));
+  const handleToggleRead = async (alertItem: AdminAlert) => {
+    setUpdatingIds((prev) => new Set(prev).add(alertItem.id));
     try {
-      const updated = await api.admin.alerts.update(alert.id, {
-        is_read: !alert.is_read,
+      const updated = await api.admin.alerts.update(alertItem.id, {
+        is_read: !alertItem.is_read,
       });
       setAlerts((prev) =>
-        prev.map((a) => (a.id === alert.id ? updated : a))
+        prev.map((a) => (a.id === alertItem.id ? updated : a))
       );
     } catch (err) {
-      alert(parseApiError(err).message);
+      window.alert(parseApiError(err).message);
     } finally {
       setUpdatingIds((prev) => {
         const next = new Set(prev);
-        next.delete(alert.id);
+        next.delete(alertItem.id);
         return next;
       });
     }
   };
 
-  const handleResolve = async (alert: AdminAlert) => {
+  const handleResolve = async (alertItem: AdminAlert) => {
     if (!confirm("Mark this alert as resolved?")) return;
-    setUpdatingIds((prev) => new Set(prev).add(alert.id));
+    setUpdatingIds((prev) => new Set(prev).add(alertItem.id));
     try {
-      const updated = await api.admin.alerts.update(alert.id, {
+      const updated = await api.admin.alerts.update(alertItem.id, {
         is_resolved: true,
       });
       setAlerts((prev) =>
-        prev.map((a) => (a.id === alert.id ? updated : a))
+        prev.map((a) => (a.id === alertItem.id ? updated : a))
       );
     } catch (err) {
-      alert(parseApiError(err).message);
+      window.alert(parseApiError(err).message);
     } finally {
       setUpdatingIds((prev) => {
         const next = new Set(prev);
-        next.delete(alert.id);
+        next.delete(alertItem.id);
         return next;
       });
     }
