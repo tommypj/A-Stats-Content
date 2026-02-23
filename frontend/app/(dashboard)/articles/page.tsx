@@ -20,6 +20,8 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  Download,
+  X,
 } from "lucide-react";
 import { api, Article } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -72,6 +74,10 @@ export default function ArticlesPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [debouncedKeyword, setDebouncedKeyword] = useState("");
 
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
   const {
     currentProject,
     isPersonalWorkspace,
@@ -96,6 +102,11 @@ export default function ArticlesPage() {
   useEffect(() => {
     setPage(1);
   }, [statusFilter, contentFilter]);
+
+  // Clear selection when page/filters change
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [page, debouncedKeyword, statusFilter, contentFilter]);
 
   useEffect(() => {
     loadArticles();
@@ -151,6 +162,75 @@ export default function ArticlesPage() {
       console.error("Failed to delete article:", error);
     }
     setActiveMenu(null);
+  }
+
+  // --- Bulk selection helpers ---
+
+  const allVisibleIds = articles.map((a) => a.id);
+  const allSelected =
+    allVisibleIds.length > 0 && allVisibleIds.every((id) => selectedIds.has(id));
+  const someSelected = selectedIds.size > 0;
+
+  function toggleSelectAll() {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(allVisibleIds));
+    }
+  }
+
+  function toggleSelectOne(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  async function handleBulkDelete() {
+    const count = selectedIds.size;
+    if (!confirm(`Delete ${count} article${count !== 1 ? "s" : ""}? This cannot be undone.`)) return;
+
+    setIsBulkDeleting(true);
+    try {
+      await Promise.all(Array.from(selectedIds).map((id) => api.articles.delete(id)));
+      setSelectedIds(new Set());
+      await loadArticles();
+    } catch (error) {
+      console.error("Failed to bulk delete articles:", error);
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  }
+
+  function handleBulkExport() {
+    const selected = articles.filter((a) => selectedIds.has(a.id));
+    const exportData = selected.map((a) => ({
+      title: a.title,
+      keyword: a.keyword,
+      content: a.content ?? "",
+      meta_description: a.meta_description ?? "",
+      status: a.status,
+    }));
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `articles-export-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 
   const showCreateButton = canCreate && !isAtLimit("articles");
@@ -287,6 +367,43 @@ export default function ArticlesPage() {
         </select>
       </div>
 
+      {/* Bulk Action Toolbar */}
+      {someSelected && (
+        <div className="sticky top-4 z-30 bg-primary-50 border border-primary-200 rounded-xl p-3 flex flex-wrap items-center gap-3">
+          <span className="text-sm font-medium text-primary-800">
+            {selectedIds.size} selected
+          </span>
+          <div className="flex items-center gap-2 ml-auto">
+            <button
+              onClick={handleBulkExport}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary-300 bg-white text-sm font-medium text-primary-700 hover:bg-primary-50 transition-colors"
+            >
+              <Download className="h-4 w-4" />
+              Export
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              disabled={isBulkDeleting}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isBulkDeleting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              Delete
+            </button>
+            <button
+              onClick={clearSelection}
+              className="p-1.5 rounded-lg hover:bg-primary-100 text-primary-600 transition-colors"
+              title="Clear selection"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Articles List */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
@@ -316,15 +433,50 @@ export default function ArticlesPage() {
         </Card>
       ) : (
         <div className="space-y-4">
+          {/* Select All header row */}
+          {!isViewer && (
+            <div className="flex items-center gap-3 px-1">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={toggleSelectAll}
+                className="h-4 w-4 rounded border-surface-tertiary text-primary-600 focus:ring-primary-500 cursor-pointer"
+                title="Select all on page"
+              />
+              <span className="text-sm text-text-muted">
+                {allSelected ? "Deselect all" : "Select all on page"}
+              </span>
+            </div>
+          )}
+
           {articles.map((article) => {
             const status = statusConfig[article.status];
             const StatusIcon = status.icon;
             const isProjectContent = !!article.project_id;
             const canModify = canEdit;
+            const isChecked = selectedIds.has(article.id);
 
             return (
-              <Card key={article.id} className="p-4 hover:shadow-md transition-shadow">
+              <Card
+                key={article.id}
+                className={clsx(
+                  "p-4 hover:shadow-md transition-shadow",
+                  isChecked && "ring-2 ring-primary-400 bg-primary-50/30"
+                )}
+              >
                 <div className="flex items-start gap-4">
+                  {/* Checkbox */}
+                  {!isViewer && (
+                    <div className="flex-shrink-0 pt-0.5">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleSelectOne(article.id)}
+                        className="h-4 w-4 rounded border-surface-tertiary text-primary-600 focus:ring-primary-500 cursor-pointer"
+                      />
+                    </div>
+                  )}
+
                   {/* Status & SEO Score */}
                   <div className="flex flex-col items-center gap-2 w-16">
                     <span className={clsx("w-full text-center px-2 py-1 rounded-lg text-xs font-medium", status.color)}>

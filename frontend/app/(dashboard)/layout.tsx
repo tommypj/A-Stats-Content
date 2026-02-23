@@ -40,6 +40,7 @@ const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Outlines", href: "/outlines", icon: FileText },
   { name: "Articles", href: "/articles", icon: Sparkles },
+  { name: "Content Calendar", href: "/content-calendar", icon: Calendar },
   { name: "Images", href: "/images", icon: ImageIcon },
   {
     name: "Social",

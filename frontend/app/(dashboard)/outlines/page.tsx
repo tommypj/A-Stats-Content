@@ -16,6 +16,8 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  Download,
+  X,
 } from "lucide-react";
 import { api, Outline } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -53,6 +55,10 @@ export default function OutlinesPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [debouncedKeyword, setDebouncedKeyword] = useState("");
 
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
   // Debounce search input — reset page to 1 when keyword changes
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -66,6 +72,11 @@ export default function OutlinesPage() {
   useEffect(() => {
     setPage(1);
   }, [statusFilter]);
+
+  // Clear selection when page/filters change
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [page, debouncedKeyword, statusFilter]);
 
   // Load outlines whenever page, debouncedKeyword, or statusFilter changes
   useEffect(() => {
@@ -115,6 +126,74 @@ export default function OutlinesPage() {
     setActiveMenu(null);
   }
 
+  // --- Bulk selection helpers ---
+
+  const allVisibleIds = outlines.map((o) => o.id);
+  const allSelected =
+    allVisibleIds.length > 0 && allVisibleIds.every((id) => selectedIds.has(id));
+  const someSelected = selectedIds.size > 0;
+
+  function toggleSelectAll() {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(allVisibleIds));
+    }
+  }
+
+  function toggleSelectOne(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  async function handleBulkDelete() {
+    const count = selectedIds.size;
+    if (!confirm(`Delete ${count} outline${count !== 1 ? "s" : ""}? This cannot be undone.`)) return;
+
+    setIsBulkDeleting(true);
+    try {
+      await Promise.all(Array.from(selectedIds).map((id) => api.outlines.delete(id)));
+      setSelectedIds(new Set());
+      await loadOutlines();
+    } catch (error) {
+      console.error("Failed to bulk delete outlines:", error);
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  }
+
+  function handleBulkExport() {
+    const selected = outlines.filter((o) => selectedIds.has(o.id));
+    const exportData = selected.map((o) => ({
+      title: o.title,
+      keyword: o.keyword,
+      sections: o.sections,
+      status: o.status,
+    }));
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `outlines-export-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
   // Pagination helpers
   const firstItem = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
   const lastItem = Math.min(page * pageSize, totalItems);
@@ -162,6 +241,43 @@ export default function OutlinesPage() {
         </select>
       </div>
 
+      {/* Bulk Action Toolbar */}
+      {someSelected && (
+        <div className="sticky top-4 z-30 bg-primary-50 border border-primary-200 rounded-xl p-3 flex flex-wrap items-center gap-3">
+          <span className="text-sm font-medium text-primary-800">
+            {selectedIds.size} selected
+          </span>
+          <div className="flex items-center gap-2 ml-auto">
+            <button
+              onClick={handleBulkExport}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary-300 bg-white text-sm font-medium text-primary-700 hover:bg-primary-50 transition-colors"
+            >
+              <Download className="h-4 w-4" />
+              Export
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              disabled={isBulkDeleting}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isBulkDeleting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              Delete
+            </button>
+            <button
+              onClick={clearSelection}
+              className="p-1.5 rounded-lg hover:bg-primary-100 text-primary-600 transition-colors"
+              title="Clear selection"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Outlines Grid */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
@@ -186,85 +302,117 @@ export default function OutlinesPage() {
           )}
         </Card>
       ) : (
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-          {outlines.map((outline) => {
-            const status = statusConfig[outline.status];
-            const StatusIcon = status.icon;
+        <>
+          {/* Select All header row */}
+          <div className="flex items-center gap-3 px-1">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={toggleSelectAll}
+              className="h-4 w-4 rounded border-surface-tertiary text-primary-600 focus:ring-primary-500 cursor-pointer"
+              title="Select all on page"
+            />
+            <span className="text-sm text-text-muted">
+              {allSelected ? "Deselect all" : "Select all on page"}
+            </span>
+          </div>
 
-            return (
-              <Card key={outline.id} className="p-4 hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between mb-3">
-                  <span className={clsx("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium", status.color)}>
-                    <StatusIcon className={clsx("h-3.5 w-3.5", outline.status === "generating" && "animate-spin")} />
-                    {status.label}
-                  </span>
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {outlines.map((outline) => {
+              const status = statusConfig[outline.status];
+              const StatusIcon = status.icon;
+              const isChecked = selectedIds.has(outline.id);
 
-                  <div className="relative">
-                    <button
-                      onClick={() => setActiveMenu(activeMenu === outline.id ? null : outline.id)}
-                      className="p-1.5 rounded-lg hover:bg-surface-secondary"
-                    >
-                      <MoreVertical className="h-4 w-4 text-text-muted" />
-                    </button>
+              return (
+                <Card
+                  key={outline.id}
+                  className={clsx(
+                    "p-4 hover:shadow-md transition-shadow",
+                    isChecked && "ring-2 ring-primary-400 bg-primary-50/30"
+                  )}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      {/* Checkbox */}
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleSelectOne(outline.id)}
+                        className="h-4 w-4 rounded border-surface-tertiary text-primary-600 focus:ring-primary-500 cursor-pointer flex-shrink-0"
+                      />
+                      <span className={clsx("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium", status.color)}>
+                        <StatusIcon className={clsx("h-3.5 w-3.5", outline.status === "generating" && "animate-spin")} />
+                        {status.label}
+                      </span>
+                    </div>
 
-                    {activeMenu === outline.id && (
-                      <>
-                        <div className="fixed inset-0 z-40" onClick={() => setActiveMenu(null)} />
-                        <div className="absolute right-0 mt-1 w-40 bg-white rounded-lg border border-surface-tertiary shadow-lg z-50">
-                          <button
-                            onClick={() => handleRegenerate(outline.id)}
-                            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-surface-secondary"
-                          >
-                            <RefreshCw className="h-4 w-4" />
-                            Regenerate
-                          </button>
-                          <button
-                            onClick={() => handleDelete(outline.id)}
-                            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            Delete
-                          </button>
-                        </div>
-                      </>
-                    )}
+                    <div className="relative">
+                      <button
+                        onClick={() => setActiveMenu(activeMenu === outline.id ? null : outline.id)}
+                        className="p-1.5 rounded-lg hover:bg-surface-secondary"
+                      >
+                        <MoreVertical className="h-4 w-4 text-text-muted" />
+                      </button>
+
+                      {activeMenu === outline.id && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setActiveMenu(null)} />
+                          <div className="absolute right-0 mt-1 w-40 bg-white rounded-lg border border-surface-tertiary shadow-lg z-50">
+                            <button
+                              onClick={() => handleRegenerate(outline.id)}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-surface-secondary"
+                            >
+                              <RefreshCw className="h-4 w-4" />
+                              Regenerate
+                            </button>
+                            <button
+                              onClick={() => handleDelete(outline.id)}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Delete
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                <Link href={`/outlines/${outline.id}`} className="block group">
-                  <h3 className="font-medium text-text-primary group-hover:text-primary-600 line-clamp-2 mb-2">
-                    {outline.title}
-                  </h3>
+                  <Link href={`/outlines/${outline.id}`} className="block group">
+                    <h3 className="font-medium text-text-primary group-hover:text-primary-600 line-clamp-2 mb-2">
+                      {outline.title}
+                    </h3>
 
-                  <div className="flex items-center gap-2 text-sm text-text-muted mb-3">
-                    <span className="px-2 py-0.5 bg-surface-secondary rounded-md">
-                      {outline.keyword}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3.5 w-3.5" />
-                      {outline.estimated_read_time || Math.ceil(outline.word_count_target / 200)} min
-                    </span>
-                  </div>
+                    <div className="flex items-center gap-2 text-sm text-text-muted mb-3">
+                      <span className="px-2 py-0.5 bg-surface-secondary rounded-md">
+                        {outline.keyword}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3.5 w-3.5" />
+                        {outline.estimated_read_time || Math.ceil(outline.word_count_target / 200)} min
+                      </span>
+                    </div>
 
-                  <div className="flex items-center justify-between text-xs text-text-muted">
-                    <span>{outline.sections?.length || 0} sections</span>
-                    <span>{new Date(outline.created_at).toLocaleDateString()}</span>
-                  </div>
-                </Link>
-
-                {outline.status === "completed" && (
-                  <Link
-                    href={`/articles/new?outline=${outline.id}`}
-                    className="mt-4 flex items-center justify-center gap-2 w-full py-2 rounded-lg bg-primary-50 text-primary-600 text-sm font-medium hover:bg-primary-100 transition-colors"
-                  >
-                    <Sparkles className="h-4 w-4" />
-                    Generate Article
+                    <div className="flex items-center justify-between text-xs text-text-muted">
+                      <span>{outline.sections?.length || 0} sections</span>
+                      <span>{new Date(outline.created_at).toLocaleDateString()}</span>
+                    </div>
                   </Link>
-                )}
-              </Card>
-            );
-          })}
-        </div>
+
+                  {outline.status === "completed" && (
+                    <Link
+                      href={`/articles/new?outline=${outline.id}`}
+                      className="mt-4 flex items-center justify-center gap-2 w-full py-2 rounded-lg bg-primary-50 text-primary-600 text-sm font-medium hover:bg-primary-100 transition-colors"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Generate Article
+                    </Link>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        </>
       )}
 
       {/* Pagination Controls */}

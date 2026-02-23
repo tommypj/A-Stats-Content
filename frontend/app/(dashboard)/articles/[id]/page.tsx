@@ -26,6 +26,7 @@ import {
   List,
   ListOrdered,
   Link as LinkIcon,
+  Link2,
   Quote,
   Search,
   History,
@@ -33,7 +34,7 @@ import {
   ChevronUp,
   RotateCcw,
 } from "lucide-react";
-import { api, Article, ArticleRevision, ArticleRevisionDetail } from "@/lib/api";
+import { api, Article, ArticleRevision, ArticleRevisionDetail, LinkSuggestion } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import PublishToWordPressModal from "@/components/publish-to-wordpress-modal";
@@ -214,6 +215,11 @@ export default function ArticleEditorPage() {
   const [previewRevision, setPreviewRevision] = useState<ArticleRevisionDetail | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [restoringRevisionId, setRestoringRevisionId] = useState<string | null>(null);
+
+  // Internal link suggestions panel state
+  const [showLinkSuggestions, setShowLinkSuggestions] = useState(false);
+  const [linkSuggestions, setLinkSuggestions] = useState<LinkSuggestion[]>([]);
+  const [loadingLinks, setLoadingLinks] = useState(false);
 
   useEffect(() => {
     loadArticle();
@@ -480,6 +486,29 @@ export default function ArticleEditorPage() {
     } finally {
       setRestoringRevisionId(null);
     }
+  }
+
+  async function handleToggleLinkSuggestions() {
+    const nextOpen = !showLinkSuggestions;
+    setShowLinkSuggestions(nextOpen);
+    // Lazy-load suggestions only when opening for the first time
+    if (nextOpen && linkSuggestions.length === 0) {
+      setLoadingLinks(true);
+      try {
+        const data = await api.articles.linkSuggestions(articleId);
+        setLinkSuggestions(data.suggestions);
+      } catch (error) {
+        console.error("Failed to load link suggestions:", error);
+        toast.error("Failed to load link suggestions");
+      } finally {
+        setLoadingLinks(false);
+      }
+    }
+  }
+
+  function handleInsertLink(suggestion: LinkSuggestion) {
+    const slug = suggestion.slug || suggestion.id;
+    insertMarkdown(`[${suggestion.title}](/${slug})`, "");
   }
 
   if (loading) {
@@ -1055,6 +1084,79 @@ export default function ArticleEditorPage() {
                       </p>
                     )}
                   </>
+                )}
+              </div>
+            )}
+          </Card>
+
+          {/* Internal Links */}
+          <Card className="p-4">
+            <button
+              type="button"
+              onClick={handleToggleLinkSuggestions}
+              className="w-full flex items-center justify-between text-left"
+            >
+              <div className="flex items-center gap-2">
+                <Link2 className="h-4 w-4 text-text-secondary" />
+                <span className="font-medium text-text-primary text-sm">Internal Links</span>
+              </div>
+              {showLinkSuggestions ? (
+                <ChevronUp className="h-4 w-4 text-text-muted" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-text-muted" />
+              )}
+            </button>
+
+            {showLinkSuggestions && (
+              <div className="mt-3 space-y-2">
+                {loadingLinks ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-4 w-4 animate-spin text-text-muted" />
+                  </div>
+                ) : linkSuggestions.length === 0 ? (
+                  <p className="text-xs text-text-muted text-center py-3">
+                    No related articles found. Try publishing more articles with overlapping keywords.
+                  </p>
+                ) : (
+                  linkSuggestions.map((suggestion) => (
+                    <div
+                      key={suggestion.id}
+                      className="flex items-start gap-2 p-2 rounded-lg border border-surface-tertiary bg-white hover:bg-surface-secondary transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-text-primary leading-snug line-clamp-2">
+                          {suggestion.title}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className="text-xs px-1.5 py-0.5 bg-primary-50 text-primary-700 rounded truncate max-w-[120px]">
+                            {suggestion.keyword}
+                          </span>
+                          {/* Relevance dots: 1-3 filled based on score */}
+                          <span className="flex items-center gap-0.5 flex-shrink-0" title={`Relevance: ${suggestion.relevance_score}`}>
+                            {[1, 2, 3].map((dot) => (
+                              <span
+                                key={dot}
+                                className={clsx(
+                                  "w-1.5 h-1.5 rounded-full",
+                                  suggestion.relevance_score >= dot * 4
+                                    ? "bg-primary-400"
+                                    : "bg-surface-tertiary"
+                                )}
+                              />
+                            ))}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        title="Insert link at cursor"
+                        onClick={() => handleInsertLink(suggestion)}
+                        className="flex-shrink-0 px-2 py-1 rounded text-xs font-medium text-primary-600 border border-primary-200 hover:bg-primary-50 transition-colors"
+                      >
+                        Insert
+                      </button>
+                    </div>
+                  ))
                 )}
               </div>
             )}

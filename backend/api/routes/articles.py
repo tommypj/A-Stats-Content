@@ -1208,3 +1208,95 @@ async def restore_article_revision(
     await db.refresh(article)
 
     return article
+
+
+# ============================================================================
+# Internal linking suggestions
+# ============================================================================
+
+
+@router.get("/{article_id}/link-suggestions")
+async def get_link_suggestions(
+    article_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get internal linking suggestions for an article.
+
+    Returns other completed/published articles in the same project scope
+    that share keywords or title words with the source article, scored by
+    relevance.  No AI is required — this is a pure keyword-matching pass.
+    """
+    # Fetch the source article (project-scoped)
+    result = await db.execute(
+        _article_ownership_query(article_id, current_user)
+    )
+    article = result.scalar_one_or_none()
+    if not article:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
+
+    keyword = (article.keyword or "").lower().strip()
+    title_words = [w.lower() for w in (article.title or "").split() if len(w) > 3]
+
+    # Build candidate query — only completed/published articles, exclude self
+    candidate_query = (
+        select(Article)
+        .options(defer(Article.content), defer(Article.content_html))
+        .where(
+            Article.id != article_id,
+            Article.status.in_(["completed", "published"]),
+        )
+    )
+
+    # Project scoping: mirror the same logic used in list_articles / get_article
+    if current_user.current_project_id:
+        candidate_query = candidate_query.where(
+            Article.project_id == current_user.current_project_id
+        )
+    else:
+        candidate_query = candidate_query.where(
+            Article.user_id == current_user.id,
+            Article.project_id.is_(None),
+        )
+
+    candidate_result = await db.execute(candidate_query.limit(50))
+    candidates = candidate_result.scalars().all()
+
+    # Score each candidate by relevance
+    suggestions = []
+    for candidate in candidates:
+        score = 0
+        candidate_keyword = (candidate.keyword or "").lower().strip()
+        candidate_title = (candidate.title or "").lower()
+
+        if keyword:
+            # Exact keyword match
+            if candidate_keyword == keyword:
+                score += 10
+            # Source keyword appears in candidate title
+            elif keyword in candidate_title:
+                score += 5
+            # Candidate keyword appears in source title
+            elif candidate_keyword and candidate_keyword in (article.title or "").lower():
+                score += 5
+
+        # Shared significant title words
+        for word in title_words:
+            if word in candidate_title:
+                score += 1
+
+        if score > 0:
+            suggestions.append(
+                {
+                    "id": candidate.id,
+                    "title": candidate.title,
+                    "keyword": candidate.keyword,
+                    "slug": candidate.slug,
+                    "relevance_score": score,
+                }
+            )
+
+    # Sort by relevance descending, return top 10
+    suggestions.sort(key=lambda x: x["relevance_score"], reverse=True)
+    return {"suggestions": suggestions[:10]}
