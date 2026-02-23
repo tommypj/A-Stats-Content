@@ -796,14 +796,14 @@ async def team(db_session: AsyncSession, test_user: User) -> dict:
     Used for testing team operations and permissions.
     Returns dict with team data including ID.
     """
-    # Skip if Team model not implemented
+    # Skip if Project model not implemented
     try:
-        from infrastructure.database.models import Team, TeamMember
-        from infrastructure.database.models.team import TeamMemberRole as TeamRole
+        from infrastructure.database.models import Project, ProjectMember
+        from infrastructure.database.models.project import ProjectMemberRole as ProjectRole
     except ImportError:
-        pytest.skip("Team models not yet implemented")
+        pytest.skip("Project models not yet implemented")
 
-    team = Team(
+    team = Project(
         id=str(uuid4()),
         name="Test Team",
         description="Team for testing",
@@ -813,11 +813,11 @@ async def team(db_session: AsyncSession, test_user: User) -> dict:
     db_session.add(team)
 
     # Add test_user as OWNER
-    member = TeamMember(
+    member = ProjectMember(
         id=str(uuid4()),
-        team_id=team.id,
+        project_id=team.id,
         user_id=test_user.id,
-        role=TeamRole.OWNER.value,
+        role=ProjectRole.OWNER.value,
     )
     db_session.add(member)
 
@@ -841,10 +841,10 @@ async def team_admin(db_session: AsyncSession, team: dict) -> dict:
     Returns dict with user data.
     """
     try:
-        from infrastructure.database.models import TeamMember
-        from infrastructure.database.models.team import TeamMemberRole as TeamRole
+        from infrastructure.database.models import ProjectMember
+        from infrastructure.database.models.project import ProjectMemberRole as ProjectRole
     except ImportError:
-        pytest.skip("Team models not yet implemented")
+        pytest.skip("Project models not yet implemented")
 
     # Create admin user
     admin_user = User(
@@ -859,11 +859,11 @@ async def team_admin(db_session: AsyncSession, team: dict) -> dict:
     await db_session.flush()
 
     # Add as ADMIN to team
-    member = TeamMember(
+    member = ProjectMember(
         id=str(uuid4()),
-        team_id=team["id"],
+        project_id=team["id"],
         user_id=admin_user.id,
-        role=TeamRole.ADMIN.value,
+        role=ProjectRole.ADMIN.value,
     )
     db_session.add(member)
     await db_session.commit()
@@ -897,10 +897,10 @@ async def team_member(db_session: AsyncSession, team: dict) -> dict:
     Returns dict with user data.
     """
     try:
-        from infrastructure.database.models import TeamMember
-        from infrastructure.database.models.team import TeamMemberRole as TeamRole
+        from infrastructure.database.models import ProjectMember
+        from infrastructure.database.models.project import ProjectMemberRole as ProjectRole
     except ImportError:
-        pytest.skip("Team models not yet implemented")
+        pytest.skip("Project models not yet implemented")
 
     # Create member user
     member_user = User(
@@ -915,11 +915,11 @@ async def team_member(db_session: AsyncSession, team: dict) -> dict:
     await db_session.flush()
 
     # Add as MEMBER to team
-    member = TeamMember(
+    member = ProjectMember(
         id=str(uuid4()),
-        team_id=team["id"],
+        project_id=team["id"],
         user_id=member_user.id,
-        role=TeamRole.EDITOR.value,
+        role=ProjectRole.EDITOR.value,
     )
     db_session.add(member)
     await db_session.commit()
@@ -953,10 +953,10 @@ async def team_viewer(db_session: AsyncSession, team: dict) -> dict:
     Returns dict with user data.
     """
     try:
-        from infrastructure.database.models import TeamMember
-        from infrastructure.database.models.team import TeamMemberRole as TeamRole
+        from infrastructure.database.models import ProjectMember
+        from infrastructure.database.models.project import ProjectMemberRole as ProjectRole
     except ImportError:
-        pytest.skip("Team models not yet implemented")
+        pytest.skip("Project models not yet implemented")
 
     # Create viewer user
     viewer_user = User(
@@ -971,11 +971,11 @@ async def team_viewer(db_session: AsyncSession, team: dict) -> dict:
     await db_session.flush()
 
     # Add as VIEWER to team
-    member = TeamMember(
+    member = ProjectMember(
         id=str(uuid4()),
-        team_id=team["id"],
+        project_id=team["id"],
         user_id=viewer_user.id,
-        role=TeamRole.VIEWER.value,
+        role=ProjectRole.VIEWER.value,
     )
     db_session.add(member)
     await db_session.commit()
@@ -1009,18 +1009,18 @@ async def team_invitation(db_session: AsyncSession, team: dict, test_user: User)
     Returns dict with invitation data including token.
     """
     try:
-        from infrastructure.database.models import TeamInvitation
-        from infrastructure.database.models.team import TeamMemberRole as TeamRole
+        from infrastructure.database.models import ProjectInvitation
+        from infrastructure.database.models.project import ProjectMemberRole as ProjectRole
     except ImportError:
-        pytest.skip("Team models not yet implemented")
+        pytest.skip("Project models not yet implemented")
 
     import secrets
 
-    invitation = TeamInvitation(
+    invitation = ProjectInvitation(
         id=str(uuid4()),
-        team_id=team["id"],
+        project_id=team["id"],
         email="invited@example.com",
-        role=TeamRole.EDITOR.value,
+        role=ProjectRole.EDITOR.value,
         token=secrets.token_urlsafe(32),
         invited_by=test_user.id,
         expires_at=datetime.utcnow() + timedelta(days=7),
@@ -1032,7 +1032,7 @@ async def team_invitation(db_session: AsyncSession, team: dict, test_user: User)
 
     return {
         "id": invitation.id,
-        "team_id": invitation.team_id,
+        "project_id": invitation.project_id,
         "email": invitation.email,
         "role": invitation.role,
         "token": invitation.token,

@@ -258,7 +258,7 @@ export const api = {
 
   // Outlines
   outlines: {
-    list: (params?: { page?: number; page_size?: number; status?: string; keyword?: string; team_id?: string }) =>
+    list: (params?: { page?: number; page_size?: number; status?: string; keyword?: string; project_id?: string }) =>
       apiRequest<OutlineListResponse>({
         url: "/outlines",
         params,
@@ -291,7 +291,7 @@ export const api = {
 
   // Articles
   articles: {
-    list: (params?: { page?: number; page_size?: number; status?: string; keyword?: string; team_id?: string }) =>
+    list: (params?: { page?: number; page_size?: number; status?: string; keyword?: string; project_id?: string }) =>
       apiRequest<ArticleListResponse>({
         url: "/articles",
         params,
@@ -359,7 +359,7 @@ export const api = {
 
   // Images
   images: {
-    list: (params?: { page?: number; page_size?: number; team_id?: string }) =>
+    list: (params?: { page?: number; page_size?: number; project_id?: string }) =>
       apiRequest<{ items: GeneratedImage[]; total: number }>({
         url: "/images",
         params,
@@ -527,19 +527,19 @@ export const api = {
 
   // Knowledge Vault
   knowledge: {
-    upload: (file: File, title?: string, description?: string, tags?: string, teamId?: string) => {
+    upload: (file: File, title?: string, description?: string, tags?: string, projectId?: string) => {
       const formData = new FormData();
       formData.append("file", file);
       if (title) formData.append("title", title);
       if (description) formData.append("description", description);
       if (tags) formData.append("tags", tags);
-      if (teamId) formData.append("team_id", teamId);
+      if (projectId) formData.append("project_id", projectId);
 
       return apiClient.post<KnowledgeSource>("/knowledge/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       }).then(res => res.data);
     },
-    sources: (params?: { page?: number; page_size?: number; status?: string; search?: string; team_id?: string }) =>
+    sources: (params?: { page?: number; page_size?: number; status?: string; search?: string; project_id?: string }) =>
       apiRequest<KnowledgeSourceList>({
         url: "/knowledge/sources",
         params,
@@ -572,7 +572,7 @@ export const api = {
 
   // Social Media
   social: {
-    posts: (params?: SocialPostQueryParams & { team_id?: string }) =>
+    posts: (params?: SocialPostQueryParams & { project_id?: string }) =>
       apiRequest<SocialPostListResponse>({
         url: "/social/posts",
         params,
@@ -749,109 +749,109 @@ export const api = {
       }),
   },
 
-  // Teams (Multi-tenancy)
-  teams: {
+  // Projects (Multi-tenancy)
+  projects: {
     list: () =>
-      apiRequest<Team[]>({
-        url: "/teams",
+      apiRequest<Project[]>({
+        url: "/projects",
       }),
     get: (id: string) =>
-      apiRequest<Team>({
-        url: `/teams/${id}`,
+      apiRequest<Project>({
+        url: `/projects/${id}`,
       }),
-    create: (data: TeamCreateRequest) =>
-      apiRequest<Team>({
+    create: (data: ProjectCreateRequest) =>
+      apiRequest<Project>({
         method: "POST",
-        url: "/teams",
+        url: "/projects",
         data,
       }),
-    update: (id: string, data: TeamUpdateRequest) =>
-      apiRequest<Team>({
+    update: (id: string, data: ProjectUpdateRequest) =>
+      apiRequest<Project>({
         method: "PUT",
-        url: `/teams/${id}`,
+        url: `/projects/${id}`,
         data,
       }),
     delete: (id: string) =>
       apiRequest<void>({
         method: "DELETE",
-        url: `/teams/${id}`,
+        url: `/projects/${id}`,
       }),
     switch: (id: string | null) =>
       apiRequest<void>({
         method: "POST",
-        url: "/teams/switch",
-        data: { team_id: id },
+        url: "/projects/switch",
+        data: { project_id: id },
       }),
     getCurrent: () =>
-      apiRequest<Team | null>({
-        url: "/teams/current",
+      apiRequest<Project | null>({
+        url: "/projects/current",
       }),
-    uploadLogo: (teamId: string, file: File) => {
+    uploadLogo: (projectId: string, file: File) => {
       const formData = new FormData();
       formData.append("logo", file);
-      return apiClient.post<Team>(`/teams/${teamId}/logo`, formData, {
+      return apiClient.post<Project>(`/projects/${projectId}/logo`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       }).then(res => res.data);
     },
-    transferOwnership: (teamId: string, newOwnerId: string) =>
+    transferOwnership: (projectId: string, newOwnerId: string) =>
       apiRequest<void>({
         method: "POST",
-        url: `/teams/${teamId}/transfer-ownership`,
+        url: `/projects/${projectId}/transfer-ownership`,
         data: { new_owner_id: newOwnerId },
       }),
-    leave: (teamId: string) =>
+    leave: (projectId: string) =>
       apiRequest<void>({
         method: "POST",
-        url: `/teams/${teamId}/leave`,
+        url: `/projects/${projectId}/leave`,
       }),
 
     members: {
-      list: (teamId: string) =>
-        apiRequest<TeamMember[]>({
-          url: `/teams/${teamId}/members`,
+      list: (projectId: string) =>
+        apiRequest<ProjectMember[]>({
+          url: `/projects/${projectId}/members`,
         }),
-      add: (teamId: string, data: TeamMemberAddRequest) =>
-        apiRequest<TeamMember>({
+      add: (projectId: string, data: ProjectMemberAddRequest) =>
+        apiRequest<ProjectMember>({
           method: "POST",
-          url: `/teams/${teamId}/members`,
+          url: `/projects/${projectId}/members`,
           data,
         }),
-      update: (teamId: string, userId: string, data: TeamMemberUpdateRequest) =>
-        apiRequest<TeamMember>({
+      update: (projectId: string, userId: string, data: ProjectMemberUpdateRequest) =>
+        apiRequest<ProjectMember>({
           method: "PUT",
-          url: `/teams/${teamId}/members/${userId}`,
+          url: `/projects/${projectId}/members/${userId}`,
           data,
         }),
-      remove: (teamId: string, userId: string) =>
+      remove: (projectId: string, userId: string) =>
         apiRequest<void>({
           method: "DELETE",
-          url: `/teams/${teamId}/members/${userId}`,
+          url: `/projects/${projectId}/members/${userId}`,
         }),
     },
 
     invitations: {
-      list: (teamId: string) =>
-        apiRequest<TeamInvitation[]>({
-          url: `/teams/${teamId}/invitations`,
+      list: (projectId: string) =>
+        apiRequest<ProjectInvitation[]>({
+          url: `/projects/${projectId}/invitations`,
         }),
-      create: (teamId: string, data: TeamInvitationCreateRequest) =>
-        apiRequest<TeamInvitation>({
+      create: (projectId: string, data: ProjectInvitationCreateRequest) =>
+        apiRequest<ProjectInvitation>({
           method: "POST",
-          url: `/teams/${teamId}/invitations`,
+          url: `/projects/${projectId}/invitations`,
           data,
         }),
-      revoke: (teamId: string, invitationId: string) =>
+      revoke: (projectId: string, invitationId: string) =>
         apiRequest<void>({
           method: "DELETE",
-          url: `/teams/${teamId}/invitations/${invitationId}`,
+          url: `/projects/${projectId}/invitations/${invitationId}`,
         }),
-      resend: (teamId: string, invitationId: string) =>
-        apiRequest<TeamInvitation>({
+      resend: (projectId: string, invitationId: string) =>
+        apiRequest<ProjectInvitation>({
           method: "POST",
-          url: `/teams/${teamId}/invitations/${invitationId}/resend`,
+          url: `/projects/${projectId}/invitations/${invitationId}/resend`,
         }),
       getByToken: (token: string) =>
-        apiRequest<TeamInvitation>({
+        apiRequest<ProjectInvitation>({
           url: `/invitations/${token}`,
         }),
       accept: (token: string) =>
@@ -862,28 +862,28 @@ export const api = {
     },
 
     billing: {
-      subscription: (teamId: string) =>
-        apiRequest<TeamSubscription>({
-          url: `/teams/${teamId}/billing/subscription`,
+      subscription: (projectId: string) =>
+        apiRequest<ProjectSubscription>({
+          url: `/projects/${projectId}/billing/subscription`,
         }),
-      checkout: (teamId: string, variantId: string) =>
+      checkout: (projectId: string, variantId: string) =>
         apiRequest<{ checkout_url: string }>({
           method: "POST",
-          url: `/teams/${teamId}/billing/checkout`,
+          url: `/projects/${projectId}/billing/checkout`,
           data: { variant_id: variantId },
         }),
-      portal: (teamId: string) =>
+      portal: (projectId: string) =>
         apiRequest<{ portal_url: string }>({
-          url: `/teams/${teamId}/billing/portal`,
+          url: `/projects/${projectId}/billing/portal`,
         }),
-      cancel: (teamId: string) =>
+      cancel: (projectId: string) =>
         apiRequest<void>({
           method: "POST",
-          url: `/teams/${teamId}/billing/cancel`,
+          url: `/projects/${projectId}/billing/cancel`,
         }),
-      usage: (teamId: string) =>
-        apiRequest<TeamUsage>({
-          url: `/teams/${teamId}/billing/usage`,
+      usage: (projectId: string) =>
+        apiRequest<ProjectUsage>({
+          url: `/projects/${projectId}/billing/usage`,
         }),
     },
   },
@@ -913,7 +913,7 @@ export interface UserResponse {
 export interface Outline {
   id: string;
   user_id: string;
-  team_id?: string;
+  project_id?: string;
   title: string;
   keyword: string;
   target_audience?: string;
@@ -941,7 +941,7 @@ export interface CreateOutlineInput {
   word_count_target?: number;
   language?: string;
   auto_generate?: boolean;
-  team_id?: string;
+  project_id?: string;
 }
 
 export interface UpdateOutlineInput {
@@ -979,7 +979,7 @@ export interface SEOAnalysis {
 export interface Article {
   id: string;
   user_id: string;
-  team_id?: string;
+  project_id?: string;
   outline_id?: string;
   title: string;
   slug?: string;
@@ -1022,7 +1022,7 @@ export interface CreateArticleInput {
   content?: string;
   meta_description?: string;
   outline_id?: string;
-  team_id?: string;
+  project_id?: string;
 }
 
 export interface GenerateArticleInput {
@@ -1055,7 +1055,7 @@ export interface ArticleListResponse {
 export interface GeneratedImage {
   id: string;
   user_id: string;
-  team_id?: string;
+  project_id?: string;
   article_id?: string;
   prompt: string;
   url: string;
@@ -1075,7 +1075,7 @@ export interface GenerateImageInput {
   style?: string;
   width?: number;
   height?: number;
-  team_id?: string;
+  project_id?: string;
 }
 
 // WordPress types
@@ -1413,7 +1413,7 @@ export interface CustomerPortalResponse {
 export interface KnowledgeSource {
   id: string;
   user_id?: string;
-  team_id?: string;
+  project_id?: string;
   title: string;
   filename: string;
   file_type: string;
@@ -1496,7 +1496,7 @@ export interface SocialPostTarget {
 export interface SocialPost {
   id: string;
   user_id: string;
-  team_id?: string;
+  project_id?: string;
   content: string;
   media_urls?: string[];
   scheduled_at: string;
@@ -1532,7 +1532,7 @@ export interface CreateSocialPostInput {
   scheduled_at: string;
   platforms: SocialPlatform[];
   account_ids?: string[];
-  team_id?: string;
+  project_id?: string;
 }
 
 export interface UpdateSocialPostInput {
@@ -1721,37 +1721,37 @@ export interface AdminAuditLogListResponse {
   total_pages: number;
 }
 
-// Teams (Multi-tenancy) types
-export type TeamRole = "owner" | "admin" | "member" | "viewer";
-export type TeamSubscriptionTier = "free" | "starter" | "professional" | "enterprise";
+// Projects (Multi-tenancy) types
+export type ProjectRole = "owner" | "admin" | "member" | "viewer";
+export type ProjectSubscriptionTier = "free" | "starter" | "professional" | "enterprise";
 
-export interface Team {
+export interface Project {
   id: string;
   name: string;
   slug: string;
   description?: string;
   logo_url?: string;
-  subscription_tier: TeamSubscriptionTier;
-  my_role: TeamRole;
+  subscription_tier: ProjectSubscriptionTier;
+  my_role: ProjectRole;
   member_count: number;
   created_at: string;
   updated_at: string;
 }
 
-export interface TeamMember {
+export interface ProjectMember {
   id: string;
   user_id: string;
   email: string;
   name: string;
   avatar_url?: string;
-  role: TeamRole;
+  role: ProjectRole;
   joined_at: string;
 }
 
-export interface TeamInvitation {
+export interface ProjectInvitation {
   id: string;
   email: string;
-  role: TeamRole;
+  role: ProjectRole;
   status: "pending" | "accepted" | "expired" | "revoked";
   expires_at: string;
   invited_by: string;
@@ -1759,35 +1759,35 @@ export interface TeamInvitation {
   created_at: string;
 }
 
-export interface TeamCreateRequest {
+export interface ProjectCreateRequest {
   name: string;
   slug?: string;
   description?: string;
 }
 
-export interface TeamUpdateRequest {
+export interface ProjectUpdateRequest {
   name?: string;
   slug?: string;
   description?: string;
   logo_url?: string;
 }
 
-export interface TeamMemberAddRequest {
+export interface ProjectMemberAddRequest {
   user_id: string;
-  role: TeamRole;
+  role: ProjectRole;
 }
 
-export interface TeamMemberUpdateRequest {
-  role: TeamRole;
+export interface ProjectMemberUpdateRequest {
+  role: ProjectRole;
 }
 
-export interface TeamInvitationCreateRequest {
+export interface ProjectInvitationCreateRequest {
   email: string;
-  role: TeamRole;
+  role: ProjectRole;
 }
 
-export interface TeamSubscription {
-  subscription_tier: TeamSubscriptionTier;
+export interface ProjectSubscription {
+  subscription_tier: ProjectSubscriptionTier;
   subscription_status: string;
   subscription_expires: string | null;
   can_manage: boolean;
@@ -1803,7 +1803,7 @@ export interface TeamSubscription {
   };
 }
 
-export interface TeamUsage {
+export interface ProjectUsage {
   period_start: string;
   period_end: string;
   articles_used: number;

@@ -27,6 +27,7 @@ from api.schemas.wordpress import (
 from api.routes.auth import get_current_user
 from infrastructure.database.connection import get_db
 from infrastructure.database.models import User, Article, GeneratedImage
+from infrastructure.database.models.project import Project
 from infrastructure.config.settings import settings
 from core.security.encryption import encrypt_credential, decrypt_credential
 
@@ -46,21 +47,21 @@ def _wp_client(timeout: float = 15.0) -> httpx.AsyncClient:
     )
 
 
-def get_wp_credentials(user: User) -> Optional[dict]:
+def get_wp_credentials(project: Project) -> Optional[dict]:
     """
-    Extract and decrypt WordPress credentials from user.
+    Extract and decrypt WordPress credentials from project.
 
     Args:
-        user: User model instance
+        project: Project model instance
 
     Returns:
         Dictionary with site_url, username, and app_password or None
     """
-    if not user.wordpress_credentials:
+    if not project.wordpress_credentials:
         return None
 
     try:
-        creds = user.wordpress_credentials
+        creds = project.wordpress_credentials
         return {
             "site_url": creds.get("site_url", ""),
             "username": creds.get("username", ""),
@@ -138,8 +139,24 @@ async def connect_wordpress(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Store WordPress credentials for the user.
+    Store WordPress credentials for the current project.
     """
+    # Load current project
+    if not current_user.current_project_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active project selected. Please select a project first.",
+        )
+    project_result = await db.execute(
+        select(Project).where(Project.id == current_user.current_project_id)
+    )
+    project = project_result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Current project not found",
+        )
+
     # Test the connection first
     test_result = await test_wp_connection(
         request.site_url,
@@ -161,8 +178,8 @@ async def connect_wordpress(
     if not site_url.startswith("http"):
         site_url = f"https://{site_url}"
 
-    # Store credentials in user model
-    current_user.wordpress_credentials = {
+    # Store credentials in project model
+    project.wordpress_credentials = {
         "site_url": site_url,
         "username": request.username,
         "app_password_encrypted": encrypted_password,
@@ -171,7 +188,7 @@ async def connect_wordpress(
     }
 
     await db.commit()
-    await db.refresh(current_user)
+    await db.refresh(project)
 
     return WordPressConnectionResponse(
         site_url=site_url,
@@ -189,15 +206,24 @@ async def disconnect_wordpress(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Remove WordPress credentials from the user.
+    Remove WordPress credentials from the current project.
     """
-    if not current_user.wordpress_credentials:
+    if not current_user.current_project_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active project selected.",
+        )
+    project_result = await db.execute(
+        select(Project).where(Project.id == current_user.current_project_id)
+    )
+    project = project_result.scalar_one_or_none()
+    if not project or not project.wordpress_credentials:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No WordPress connection found",
         )
 
-    current_user.wordpress_credentials = None
+    project.wordpress_credentials = None
     await db.commit()
 
     return WordPressDisconnectResponse(
@@ -209,20 +235,30 @@ async def disconnect_wordpress(
 async def get_wordpress_status(
     test_connection: bool = False,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
-    Check WordPress connection status.
+    Check WordPress connection status for the current project.
 
     Args:
         test_connection: If True, test the actual connection to WordPress
     """
-    if not current_user.wordpress_credentials:
+    if not current_user.current_project_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active project selected.",
+        )
+    project_result = await db.execute(
+        select(Project).where(Project.id == current_user.current_project_id)
+    )
+    project = project_result.scalar_one_or_none()
+    if not project or not project.wordpress_credentials:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No WordPress connection configured",
         )
 
-    creds = current_user.wordpress_credentials
+    creds = project.wordpress_credentials
     site_url = creds.get("site_url", "")
     username = creds.get("username", "")
 
@@ -239,7 +275,7 @@ async def get_wordpress_status(
     error_message = None
 
     if test_connection:
-        wp_creds = get_wp_credentials(current_user)
+        wp_creds = get_wp_credentials(project)
         if wp_creds:
             test_result = await test_wp_connection(
                 wp_creds["site_url"],
@@ -264,11 +300,21 @@ async def get_wordpress_status(
 @router.get("/categories", response_model=List[WordPressCategoryResponse])
 async def get_wordpress_categories(
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Fetch categories from connected WordPress site.
     """
-    wp_creds = get_wp_credentials(current_user)
+    if not current_user.current_project_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active project selected.",
+        )
+    project_result = await db.execute(
+        select(Project).where(Project.id == current_user.current_project_id)
+    )
+    project = project_result.scalar_one_or_none()
+    wp_creds = get_wp_credentials(project) if project else None
     if not wp_creds:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -313,11 +359,21 @@ async def get_wordpress_categories(
 @router.get("/tags", response_model=List[WordPressTagResponse])
 async def get_wordpress_tags(
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Fetch tags from connected WordPress site.
     """
-    wp_creds = get_wp_credentials(current_user)
+    if not current_user.current_project_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active project selected.",
+        )
+    project_result = await db.execute(
+        select(Project).where(Project.id == current_user.current_project_id)
+    )
+    project = project_result.scalar_one_or_none()
+    wp_creds = get_wp_credentials(project) if project else None
     if not wp_creds:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -367,15 +423,7 @@ async def publish_to_wordpress(
     """
     Publish an article to WordPress.
     """
-    # Get WordPress credentials
-    wp_creds = get_wp_credentials(current_user)
-    if not wp_creds:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No WordPress connection configured",
-        )
-
-    # Get the article
+    # Get the article first to determine its project
     result = await db.execute(
         select(Article).where(
             Article.id == request.article_id,
@@ -394,6 +442,24 @@ async def publish_to_wordpress(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Article has no content to publish",
+        )
+
+    # Get WordPress credentials from the article's project
+    article_project_id = getattr(article, 'project_id', None) or current_user.current_project_id
+    if not article_project_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No WordPress connection configured",
+        )
+    proj_result = await db.execute(
+        select(Project).where(Project.id == article_project_id)
+    )
+    article_project = proj_result.scalar_one_or_none()
+    wp_creds = get_wp_credentials(article_project) if article_project else None
+    if not wp_creds:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No WordPress connection configured",
         )
 
     auth_header = create_wp_auth_header(wp_creds["username"], wp_creds["app_password"])
@@ -611,8 +677,17 @@ async def upload_media_to_wordpress(
     Upload a generated image to the WordPress media library.
     Downloads the image from its URL and uploads it to WordPress.
     """
-    # Get WordPress credentials
-    wp_creds = get_wp_credentials(current_user)
+    # Get WordPress credentials from the current project
+    if not current_user.current_project_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active project selected.",
+        )
+    proj_result = await db.execute(
+        select(Project).where(Project.id == current_user.current_project_id)
+    )
+    current_project = proj_result.scalar_one_or_none()
+    wp_creds = get_wp_credentials(current_project) if current_project else None
     if not wp_creds:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

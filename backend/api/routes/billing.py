@@ -313,9 +313,9 @@ async def cancel_subscription(
     )
 
 
-async def handle_team_subscription_webhook(
+async def handle_project_subscription_webhook(
     db: AsyncSession,
-    team_id: str,
+    project_id: str,
     event_name: str,
     subscription_id: str,
     customer_id: str,
@@ -324,11 +324,11 @@ async def handle_team_subscription_webhook(
     renews_at: str,
 ):
     """
-    Handle LemonSqueezy webhook events for team subscriptions.
+    Handle LemonSqueezy webhook events for project subscriptions.
 
     Args:
         db: Database session
-        team_id: Team ID from custom_data
+        project_id: Project ID from custom_data
         event_name: Webhook event type
         subscription_id: LemonSqueezy subscription ID
         customer_id: LemonSqueezy customer ID
@@ -339,15 +339,15 @@ async def handle_team_subscription_webhook(
     Returns:
         Response dictionary
     """
-    from infrastructure.database.models.team import Team
+    from infrastructure.database.models.project import Project
 
-    # Find team
-    result = await db.execute(select(Team).where(Team.id == team_id))
-    team = result.scalar_one_or_none()
+    # Find project
+    result = await db.execute(select(Project).where(Project.id == project_id))
+    project = result.scalar_one_or_none()
 
-    if not team:
-        logger.error(f"Team {team_id} not found for webhook")
-        return {"status": "error", "message": "Team not found"}
+    if not project:
+        logger.error(f"Project {project_id} not found for webhook")
+        return {"status": "error", "message": "Project not found"}
 
     # Determine subscription tier from variant_id
     tier = SubscriptionTier.FREE.value
@@ -372,87 +372,87 @@ async def handle_team_subscription_webhook(
     # Handle different event types
     try:
         if event_name == WebhookEventType.SUBSCRIPTION_CREATED.value:
-            # New team subscription
-            team.subscription_tier = tier
-            team.lemonsqueezy_customer_id = str(customer_id) if customer_id else None
-            team.lemonsqueezy_subscription_id = str(subscription_id) if subscription_id else None
+            # New project subscription
+            project.subscription_tier = tier
+            project.lemonsqueezy_customer_id = str(customer_id) if customer_id else None
+            project.lemonsqueezy_subscription_id = str(subscription_id) if subscription_id else None
 
             if renews_at:
-                team.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
+                project.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
 
-            logger.info(f"Team subscription created: team_id={team_id}, tier={tier}")
+            logger.info(f"Project subscription created: project_id={project_id}, tier={tier}")
 
         elif event_name == WebhookEventType.SUBSCRIPTION_UPDATED.value:
-            # Team subscription updated
-            team.subscription_tier = tier
+            # Project subscription updated
+            project.subscription_tier = tier
 
             if renews_at:
-                team.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
+                project.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
 
             if subscription_status in ["cancelled", "paused", "expired"]:
-                logger.info(f"Team subscription {subscription_status}: team_id={team_id}, expires={renews_at}")
+                logger.info(f"Project subscription {subscription_status}: project_id={project_id}, expires={renews_at}")
             else:
-                logger.info(f"Team subscription updated: team_id={team_id}, tier={tier}, status={subscription_status}")
+                logger.info(f"Project subscription updated: project_id={project_id}, tier={tier}, status={subscription_status}")
 
         elif event_name == WebhookEventType.SUBSCRIPTION_CANCELLED.value:
-            # Team subscription cancelled - keep tier until expiration
+            # Project subscription cancelled - keep tier until expiration
             if renews_at:
-                team.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
+                project.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
 
-            logger.info(f"Team subscription cancelled: team_id={team_id}, expires={renews_at}")
+            logger.info(f"Project subscription cancelled: project_id={project_id}, expires={renews_at}")
 
         elif event_name == WebhookEventType.SUBSCRIPTION_EXPIRED.value:
-            # Team subscription expired - downgrade to free
-            team.subscription_tier = SubscriptionTier.FREE.value
-            team.subscription_expires = None
-            team.lemonsqueezy_subscription_id = None
+            # Project subscription expired - downgrade to free
+            project.subscription_tier = SubscriptionTier.FREE.value
+            project.subscription_expires = None
+            project.lemonsqueezy_subscription_id = None
 
-            logger.info(f"Team subscription expired: team_id={team_id}, downgraded to free")
+            logger.info(f"Project subscription expired: project_id={project_id}, downgraded to free")
 
         elif event_name == WebhookEventType.SUBSCRIPTION_PAYMENT_SUCCESS.value:
             # Payment successful - update renewal date
             if renews_at:
-                team.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
+                project.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
 
-            logger.info(f"Team payment successful: team_id={team_id}, renews={renews_at}")
+            logger.info(f"Project payment successful: project_id={project_id}, renews={renews_at}")
 
         elif event_name == WebhookEventType.SUBSCRIPTION_PAYMENT_FAILED.value:
             # Payment failed
-            logger.warning(f"Team payment failed: team_id={team_id}")
+            logger.warning(f"Project payment failed: project_id={project_id}")
 
         elif event_name == WebhookEventType.SUBSCRIPTION_RESUMED.value:
-            # Team subscription resumed
-            team.subscription_tier = tier
+            # Project subscription resumed
+            project.subscription_tier = tier
 
             if renews_at:
-                team.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
+                project.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
 
-            logger.info(f"Team subscription resumed: team_id={team_id}")
+            logger.info(f"Project subscription resumed: project_id={project_id}")
 
         elif event_name == WebhookEventType.SUBSCRIPTION_PAUSED.value:
-            # Team subscription paused
-            logger.info(f"Team subscription paused: team_id={team_id}")
+            # Project subscription paused
+            logger.info(f"Project subscription paused: project_id={project_id}")
 
         elif event_name == WebhookEventType.SUBSCRIPTION_UNPAUSED.value:
-            # Team subscription unpaused
-            team.subscription_tier = tier
+            # Project subscription unpaused
+            project.subscription_tier = tier
 
             if renews_at:
-                team.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
+                project.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
 
-            logger.info(f"Team subscription unpaused: team_id={team_id}")
+            logger.info(f"Project subscription unpaused: project_id={project_id}")
 
         else:
             logger.warning(f"Unknown webhook event type: {event_name}")
 
         # Commit changes
         await db.commit()
-        await db.refresh(team)
+        await db.refresh(project)
 
-        logger.info(f"Team webhook processed successfully: team_id={team_id}")
+        logger.info(f"Project webhook processed successfully: project_id={project_id}")
 
     except Exception as e:
-        logger.error(f"Error processing team webhook: {str(e)}", exc_info=True)
+        logger.error(f"Error processing project webhook: {str(e)}", exc_info=True)
         await db.rollback()
 
     # Always return 200 OK
@@ -510,7 +510,7 @@ async def handle_webhook(
     event_name = meta.get("event_name")
     custom_data = meta.get("custom_data", {})
     user_id = custom_data.get("user_id")
-    team_id = custom_data.get("team_id")  # Team subscription support
+    project_id = custom_data.get("project_id")  # Project subscription support
 
     data = payload.get("data", {})
     attributes = data.get("attributes", {})
@@ -523,15 +523,15 @@ async def handle_webhook(
 
     logger.info(
         f"Webhook received: event={event_name}, user_id={user_id}, "
-        f"team_id={team_id}, subscription_id={subscription_id}, status={subscription_status}"
+        f"project_id={project_id}, subscription_id={subscription_id}, status={subscription_status}"
     )
 
-    # Handle team subscription vs user subscription
-    if team_id:
-        # Team subscription - delegate to team webhook handler
-        return await handle_team_subscription_webhook(
+    # Handle project subscription vs user subscription
+    if project_id:
+        # Project subscription - delegate to project webhook handler
+        return await handle_project_subscription_webhook(
             db=db,
-            team_id=team_id,
+            project_id=project_id,
             event_name=event_name,
             subscription_id=subscription_id,
             customer_id=customer_id,

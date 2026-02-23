@@ -36,7 +36,7 @@ class KnowledgeSourceResponse(BaseModel):
 
     id: str
     title: str
-    team_id: Optional[str] = None
+    project_id: Optional[str] = None
     filename: str
     file_type: str
     file_size: int
@@ -82,7 +82,7 @@ class QueryRequest(BaseModel):
     """Request to query the knowledge vault using RAG."""
 
     query: str = Field(..., min_length=1, max_length=1000)
-    team_id: Optional[str] = Field(None, description="Query team sources only")
+    project_id: Optional[str] = Field(None, description="Query project sources only")
     source_ids: Optional[List[str]] = Field(
         None,
         description="Filter to specific sources (empty = search all)",

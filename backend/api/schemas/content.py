@@ -32,7 +32,7 @@ class OutlineCreateRequest(BaseModel):
     word_count_target: int = Field(default=1500, ge=500, le=10000)
     language: Optional[str] = Field(None, max_length=10, description="Content language code (e.g., 'en', 'ro')")
     auto_generate: bool = Field(default=True, description="Auto-generate with AI")
-    team_id: Optional[str] = Field(None, description="Team ID for team content")
+    project_id: Optional[str] = Field(None, description="Project ID for project content")
 
 
 class OutlineUpdateRequest(BaseModel):
@@ -51,7 +51,7 @@ class OutlineResponse(BaseModel):
 
     id: str
     user_id: str
-    team_id: Optional[str] = None
+    project_id: Optional[str] = None
     title: str
     keyword: str
     target_audience: Optional[str]
@@ -119,7 +119,7 @@ class ArticleCreateRequest(BaseModel):
     content: Optional[str] = None
     meta_description: Optional[str] = Field(None, max_length=320)
     outline_id: Optional[str] = None
-    team_id: Optional[str] = Field(None, description="Team ID for team content")
+    project_id: Optional[str] = Field(None, description="Project ID for project content")
 
 
 class ArticleUpdateRequest(BaseModel):
@@ -151,7 +151,7 @@ class ArticleResponse(BaseModel):
 
     id: str
     user_id: str
-    team_id: Optional[str] = None
+    project_id: Optional[str] = None
     outline_id: Optional[str]
     title: str
     slug: Optional[str]
@@ -229,7 +229,7 @@ class ImageGenerateRequest(BaseModel):
     prompt: str = Field(..., min_length=10, max_length=1000)
     style: Optional[str] = Field(None, max_length=50)
     article_id: Optional[str] = None
-    team_id: Optional[str] = Field(None, description="Team ID for team content")
+    project_id: Optional[str] = Field(None, description="Project ID for project content")
     width: int = Field(default=1024, ge=256, le=2048)
     height: int = Field(default=1024, ge=256, le=2048)
 
@@ -245,7 +245,7 @@ class ImageResponse(BaseModel):
 
     id: str
     user_id: str
-    team_id: Optional[str] = None
+    project_id: Optional[str] = None
     article_id: Optional[str]
     prompt: str
     url: str

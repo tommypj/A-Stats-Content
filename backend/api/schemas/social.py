@@ -24,7 +24,7 @@ class SocialAccountResponse(BaseModel):
 
     id: str
     platform: str
-    team_id: Optional[str] = None
+    project_id: Optional[str] = None
     platform_username: Optional[str] = None
     platform_display_name: Optional[str] = None
     profile_image_url: Optional[str] = None
@@ -84,7 +84,7 @@ class CreatePostRequest(BaseModel):
     media_urls: Optional[List[str]] = Field(None, max_length=10)
     link_url: Optional[str] = Field(None, max_length=2048)
     article_id: Optional[str] = None
-    team_id: Optional[str] = Field(None, description="Team ID for team content")
+    project_id: Optional[str] = Field(None, description="Project ID for project content")
     targets: Optional[List[PostTargetRequest]] = Field(
         None, description="Platform-specific overrides"
     )
@@ -123,7 +123,7 @@ class ScheduledPostResponse(BaseModel):
 
     id: str
     content: str
-    team_id: Optional[str] = None
+    project_id: Optional[str] = None
     media_urls: Optional[List[str]] = None
     link_url: Optional[str] = None
     scheduled_at: Optional[datetime] = None

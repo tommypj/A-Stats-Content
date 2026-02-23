@@ -11,8 +11,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Mail, CheckCircle, XCircle, Clock, Building2, Shield, User as UserIcon, Eye, Crown } from "lucide-react";
 
 interface InvitationInfo {
-  team_name: string;
-  team_logo_url?: string;
+  project_name: string;
+  project_logo_url?: string;
   inviter_name: string;
   inviter_email: string;
   role: "owner" | "admin" | "member" | "viewer";
@@ -35,10 +35,10 @@ const roleColors = {
 };
 
 const roleDescriptions = {
-  owner: "Full control over team settings and billing",
-  admin: "Can manage team members and settings",
+  owner: "Full control over project settings and billing",
+  admin: "Can manage project members and settings",
   member: "Can create and manage content",
-  viewer: "Can view team content only",
+  viewer: "Can view project content only",
 };
 
 export default function InviteAcceptPage() {
@@ -67,7 +67,7 @@ export default function InviteAcceptPage() {
       setError("");
       // This endpoint should return invitation details by token
       // For now, using a placeholder structure
-      const data = await api.teams.invitations.getByToken(token);
+      const data = await api.projects.invitations.getByToken(token);
       setInvitation(data as any);
     } catch (err) {
       setError(parseApiError(err).message);
@@ -85,9 +85,9 @@ export default function InviteAcceptPage() {
 
     setIsAccepting(true);
     try {
-      await api.teams.invitations.accept(token);
-      router.push("/teams");
-      alert("Invitation accepted! Welcome to the team.");
+      await api.projects.invitations.accept(token);
+      router.push("/projects");
+      alert("Invitation accepted! Welcome to the project.");
     } catch (err) {
       alert(parseApiError(err).message);
     } finally {
@@ -147,10 +147,10 @@ export default function InviteAcceptPage() {
         {/* Header */}
         <div className="p-8 text-center border-b border-surface-tertiary">
           <div className="h-16 w-16 rounded-full bg-primary-100 flex items-center justify-center mx-auto mb-4">
-            {invitation.team_logo_url ? (
+            {invitation.project_logo_url ? (
               <img
-                src={invitation.team_logo_url}
-                alt={invitation.team_name}
+                src={invitation.project_logo_url}
+                alt={invitation.project_name}
                 className="h-full w-full rounded-full object-cover"
               />
             ) : (
@@ -158,10 +158,10 @@ export default function InviteAcceptPage() {
             )}
           </div>
           <h1 className="text-2xl font-bold text-text-primary mb-2">
-            Team Invitation
+            Project Invitation
           </h1>
           <p className="text-text-muted">
-            You've been invited to join a team
+            You've been invited to join a project
           </p>
         </div>
 
@@ -171,7 +171,7 @@ export default function InviteAcceptPage() {
           <div className="text-center">
             <p className="text-text-secondary mb-2">You're invited to join</p>
             <p className="text-2xl font-bold text-text-primary mb-4">
-              {invitation.team_name}
+              {invitation.project_name}
             </p>
           </div>
 
@@ -209,7 +209,7 @@ export default function InviteAcceptPage() {
                   <p className="font-medium text-yellow-900">Invitation Expired</p>
                   <p className="text-sm text-yellow-800 mt-1">
                     This invitation expired on {new Date(invitation.expires_at).toLocaleDateString()}.
-                    Please contact the team admin for a new invitation.
+                    Please contact the project admin for a new invitation.
                   </p>
                 </div>
               </div>
@@ -223,7 +223,7 @@ export default function InviteAcceptPage() {
                 <div>
                   <p className="font-medium text-red-900">Invitation Revoked</p>
                   <p className="text-sm text-red-800 mt-1">
-                    This invitation has been revoked by the team admin.
+                    This invitation has been revoked by the project admin.
                   </p>
                 </div>
               </div>

@@ -82,14 +82,17 @@ def calculate_trend(current: float, previous: float) -> TrendData:
 
 
 async def get_gsc_connection(
-    user_id: str, db: AsyncSession
+    user_id: str, db: AsyncSession, project_id: Optional[str] = None
 ) -> Optional[GSCConnection]:
-    """Get user's GSC connection."""
+    """Get user's GSC connection, optionally filtered by project_id."""
+    conditions = [
+        GSCConnection.user_id == user_id,
+        GSCConnection.is_active == True,
+    ]
+    if project_id:
+        conditions.append(GSCConnection.project_id == project_id)
     result = await db.execute(
-        select(GSCConnection).where(
-            GSCConnection.user_id == user_id,
-            GSCConnection.is_active == True,
-        )
+        select(GSCConnection).where(*conditions)
     )
     return result.scalar_one_or_none()
 
@@ -184,6 +187,7 @@ async def gsc_oauth_callback(
             # Create new connection
             connection = GSCConnection(
                 user_id=current_user.id,
+                project_id=current_user.current_project_id,
                 site_url="",  # Will be set when user selects a site
                 access_token=encrypted_access_token,
                 refresh_token=encrypted_refresh_token,

@@ -28,10 +28,11 @@ import {
   Search,
   TrendingUp,
   Lightbulb,
+  FolderOpen,
 } from "lucide-react";
 import { clsx } from "clsx";
-import { TeamProvider } from "@/contexts/TeamContext";
-import { TeamSwitcher } from "@/components/team/team-switcher";
+import { ProjectProvider } from "@/contexts/ProjectContext";
+import { ProjectSwitcher } from "@/components/project/project-switcher";
 import { api, UserResponse } from "@/lib/api";
 
 const navigation = [
@@ -62,7 +63,7 @@ const navigation = [
     ],
   },
   { name: "Knowledge", href: "/knowledge", icon: BookOpen },
-  { name: "Teams", href: "/teams", icon: Users },
+  { name: "Projects", href: "/projects", icon: FolderOpen },
 ];
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
@@ -138,9 +139,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             </button>
           </div>
 
-          {/* Team Switcher */}
+          {/* Project Switcher */}
           <div className="px-3 py-4 border-b border-primary-800">
-            <TeamSwitcher />
+            <ProjectSwitcher />
           </div>
 
           {/* Navigation */}
@@ -401,8 +402,8 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <TeamProvider>
+    <ProjectProvider>
       <DashboardContent>{children}</DashboardContent>
-    </TeamProvider>
+    </ProjectProvider>
   );
 }

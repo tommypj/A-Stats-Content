@@ -1,0 +1,448 @@
+"""
+Project management API routes for multi-tenancy.
+"""
+
+from datetime import datetime
+from typing import Annotated, Optional, List
+import re
+
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy import select, func, and_, or_, update as sql_update, delete as sql_delete
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from infrastructure.database.connection import get_db
+from infrastructure.database.models.user import User
+from infrastructure.database.models.project import Project, ProjectMember, ProjectMemberRole
+from api.routes.auth import get_current_user
+from api.deps_project import (
+    get_project_by_id,
+    get_project_member,
+    require_project_membership,
+    require_project_admin,
+    require_project_owner,
+)
+from api.schemas.project import (
+    ProjectCreate,
+    ProjectUpdate,
+    ProjectResponse,
+    ProjectWithMemberRoleResponse,
+    ProjectListResponse,
+    ProjectDetailResponse,
+    ProjectDeleteResponse,
+    SwitchProjectRequest,
+    SwitchProjectResponse,
+    CurrentProjectResponse,
+    ProjectMemberResponse,
+    ProjectMembersListResponse,
+    AddMemberRequest,
+    AddMemberResponse,
+    UpdateMemberRoleRequest,
+    UpdateMemberRoleResponse,
+    RemoveMemberResponse,
+    LeaveProjectResponse,
+    TransferOwnershipRequest,
+    TransferOwnershipResponse,
+)
+
+router = APIRouter(prefix="/projects", tags=["Projects"])
+
+
+# =============================================================================
+# Helper Functions
+# =============================================================================
+
+def generate_unique_slug(name: str) -> str:
+    """Generate a URL-friendly slug from project name."""
+    slug = name.lower()
+    slug = re.sub(r'[^\w\s-]', '', slug)
+    slug = re.sub(r'[-\s]+', '-', slug)
+    slug = slug.strip('-')
+    slug = slug[:100]
+    return slug
+
+
+async def ensure_unique_slug(db: AsyncSession, slug: str, project_id: Optional[str] = None) -> str:
+    """Ensure slug is unique by appending number if necessary."""
+    original_slug = slug
+    counter = 1
+
+    while True:
+        stmt = select(Project).where(Project.slug == slug)
+        if project_id:
+            stmt = stmt.where(Project.id != project_id)
+
+        result = await db.execute(stmt)
+        existing = result.scalar_one_or_none()
+
+        if not existing:
+            return slug
+
+        slug = f"{original_slug}-{counter}"
+        counter += 1
+
+
+# =============================================================================
+# Project CRUD
+# =============================================================================
+
+@router.post("", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
+async def create_project(
+    data: ProjectCreate,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Create a new project.
+
+    The current user becomes the owner of the project.
+    Project is initialized with free tier subscription.
+    """
+    # Generate slug if not provided
+    slug = data.slug or generate_unique_slug(data.name)
+
+    # Ensure slug is unique
+    slug = await ensure_unique_slug(db, slug)
+
+    # Create project
+    project = Project(
+        name=data.name,
+        slug=slug,
+        description=data.description,
+        avatar_url=getattr(data, 'logo_url', None),
+        owner_id=current_user.id,
+        subscription_tier="free",
+        subscription_status="active",
+        max_members=5,  # Free tier default
+    )
+
+    db.add(project)
+    await db.flush()  # Get project ID
+
+    # Add owner as project member
+    member = ProjectMember(
+        project_id=project.id,
+        user_id=current_user.id,
+        role=ProjectMemberRole.OWNER.value,
+        invited_by=None,  # Self-created
+        joined_at=datetime.now(),
+    )
+
+    db.add(member)
+    await db.commit()
+    await db.refresh(project)
+
+    # Calculate member count
+    stmt = select(func.count()).select_from(ProjectMember).where(
+        and_(
+            ProjectMember.project_id == project.id,
+            ProjectMember.deleted_at.is_(None),
+        )
+    )
+    result = await db.execute(stmt)
+    member_count = result.scalar()
+
+    # Build response
+    response_data = ProjectResponse.model_validate(project)
+    response_data.member_count = member_count
+
+    return response_data
+
+
+@router.get("", response_model=ProjectListResponse)
+async def list_projects(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    List all projects the current user is a member of.
+
+    Returns projects with the user's role in each project.
+    """
+    # Get all project memberships for user
+    stmt = (
+        select(ProjectMember)
+        .where(
+            and_(
+                ProjectMember.user_id == current_user.id,
+                ProjectMember.deleted_at.is_(None),
+            )
+        )
+        .options(selectinload(ProjectMember.project))
+    )
+
+    result = await db.execute(stmt)
+    memberships = result.scalars().all()
+
+    projects_with_roles = []
+    for membership in memberships:
+        project = membership.project
+
+        # Skip deleted projects
+        if project.deleted_at is not None:
+            continue
+
+        # Count members
+        count_stmt = select(func.count()).select_from(ProjectMember).where(
+            and_(
+                ProjectMember.project_id == project.id,
+                ProjectMember.deleted_at.is_(None),
+            )
+        )
+        count_result = await db.execute(count_stmt)
+        member_count = count_result.scalar()
+
+        projects_with_roles.append({
+            "id": project.id,
+            "name": project.name,
+            "slug": project.slug,
+            "description": project.description,
+            "avatar_url": project.avatar_url,
+            "owner_id": project.owner_id,
+            "subscription_tier": project.subscription_tier,
+            "subscription_status": project.subscription_status,
+            "member_count": member_count,
+            "current_user_role": membership.role,
+            "created_at": project.created_at,
+        })
+
+    return ProjectListResponse(
+        projects=projects_with_roles,
+        total=len(projects_with_roles),
+    )
+
+
+@router.get("/current", response_model=CurrentProjectResponse)
+async def get_current_project(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Get the user's currently selected project.
+
+    Returns null if using personal workspace.
+    """
+    if not hasattr(current_user, 'current_project_id') or not current_user.current_project_id:
+        return CurrentProjectResponse(
+            project=None,
+            is_personal_workspace=True,
+        )
+
+    # Get project
+    stmt = select(Project).where(
+        and_(
+            Project.id == current_user.current_project_id,
+            Project.deleted_at.is_(None),
+        )
+    )
+    result = await db.execute(stmt)
+    project = result.scalar_one_or_none()
+
+    if not project:
+        return CurrentProjectResponse(
+            project=None,
+            is_personal_workspace=True,
+        )
+
+    # Count members
+    count_stmt = select(func.count()).select_from(ProjectMember).where(
+        and_(
+            ProjectMember.project_id == project.id,
+            ProjectMember.deleted_at.is_(None),
+        )
+    )
+    count_result = await db.execute(count_stmt)
+    member_count = count_result.scalar()
+
+    response = ProjectResponse.model_validate(project)
+    response.member_count = member_count
+
+    return CurrentProjectResponse(
+        project=response,
+        is_personal_workspace=False,
+    )
+
+
+@router.get("/{project_id}", response_model=ProjectDetailResponse)
+async def get_project(
+    project_id: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Get project details including members.
+
+    Requires project membership to access.
+    """
+    # Verify membership
+    membership = await get_project_member(project_id, current_user.id, db)
+
+    # Get project with members
+    stmt = (
+        select(Project)
+        .where(Project.id == project_id)
+        .options(selectinload(Project.members))
+    )
+    result = await db.execute(stmt)
+    project = result.scalar_one_or_none()
+
+    if not project or project.deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
+    # Count active members
+    member_count = len([m for m in project.members if m.deleted_at is None])
+
+    # Get member details with user info
+    members_info = []
+    for member in project.members:
+        if member.deleted_at is not None:
+            continue
+
+        # Get user info
+        user_stmt = select(User).where(User.id == member.user_id)
+        user_result = await db.execute(user_stmt)
+        user = user_result.scalar_one_or_none()
+
+        if user:
+            members_info.append({
+                "id": member.id,
+                "user_id": member.user_id,
+                "role": member.role,
+                "joined_at": member.joined_at,
+                "invited_by": member.invited_by,
+            })
+
+    return {
+        "id": project.id,
+        "name": project.name,
+        "slug": project.slug,
+        "description": project.description,
+        "avatar_url": project.avatar_url,
+        "owner_id": project.owner_id,
+        "subscription_tier": project.subscription_tier,
+        "subscription_status": project.subscription_status,
+        "subscription_expires": project.subscription_expires,
+        "max_members": project.max_members,
+        "member_count": member_count,
+        "members": members_info,
+        "current_user_role": membership.role,
+        "created_at": project.created_at,
+        "updated_at": project.updated_at,
+    }
+
+
+@router.put("/{project_id}", response_model=ProjectResponse)
+async def update_project(
+    project_id: str,
+    data: ProjectUpdate,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Update project information.
+
+    Requires owner or admin role.
+    """
+    # Verify admin access
+    membership = await require_project_admin(project_id, current_user, db)
+
+    # Get project
+    project = await get_project_by_id(project_id, db)
+
+    # Update fields
+    if data.name is not None:
+        project.name = data.name
+    if data.description is not None:
+        project.description = data.description
+    if data.logo_url is not None:
+        project.avatar_url = data.logo_url
+    if data.settings is not None:
+        project.settings = data.settings
+
+    project.updated_at = datetime.now()
+
+    await db.commit()
+    await db.refresh(project)
+
+    # Count members
+    count_stmt = select(func.count()).select_from(ProjectMember).where(
+        and_(
+            ProjectMember.project_id == project.id,
+            ProjectMember.deleted_at.is_(None),
+        )
+    )
+    count_result = await db.execute(count_stmt)
+    member_count = count_result.scalar()
+
+    response = ProjectResponse.model_validate(project)
+    response.member_count = member_count
+
+    return response
+
+
+@router.delete("/{project_id}", response_model=ProjectDeleteResponse)
+async def delete_project(
+    project_id: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Delete a project (soft delete).
+
+    Only the project owner can delete the project.
+    """
+    # Verify owner access
+    membership = await require_project_owner(project_id, current_user, db)
+
+    # Get project
+    project = await get_project_by_id(project_id, db)
+
+    # Soft delete project
+    project.deleted_at = datetime.now()
+
+    # Soft delete all memberships
+    stmt = (
+        sql_update(ProjectMember)
+        .where(ProjectMember.project_id == project_id)
+        .values(deleted_at=datetime.now())
+    )
+    await db.execute(stmt)
+
+    await db.commit()
+
+    return ProjectDeleteResponse(
+        message="Project deleted successfully",
+        project_id=project_id,
+    )
+
+
+# =============================================================================
+# Project Switching
+# =============================================================================
+
+@router.post("/{project_id}/switch", response_model=SwitchProjectResponse)
+async def switch_project(
+    project_id: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Switch to a different project.
+
+    Updates the user's current_project_id.
+    Must be a member of the project to switch to it.
+    """
+    # Verify membership
+    membership = await get_project_member(project_id, current_user.id, db)
+
+    # Update user's current project
+    current_user.current_project_id = project_id
+    await db.commit()
+
+    return SwitchProjectResponse(
+        message="Switched to project successfully",
+        current_project_id=project_id,
+    )
