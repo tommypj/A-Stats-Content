@@ -118,6 +118,7 @@ class SocialAccount(Base, TimestampMixin):
             "platform_user_id",
             unique=True,
         ),
+        Index("ix_social_accounts_created_at", "created_at"),
     )
 
     def __repr__(self) -> str:
@@ -183,6 +184,7 @@ class ScheduledPost(Base, TimestampMixin):
         UUID(as_uuid=False),
         ForeignKey("articles.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
     )
 
     # Relationships
@@ -198,6 +200,7 @@ class ScheduledPost(Base, TimestampMixin):
         Index("ix_scheduled_posts_user_status", "user_id", "status"),
         Index("ix_scheduled_posts_scheduled_at", "scheduled_at"),
         Index("ix_scheduled_posts_user_scheduled", "user_id", "scheduled_at"),
+        Index("ix_scheduled_posts_created_at", "created_at"),
     )
 
     def __repr__(self) -> str:

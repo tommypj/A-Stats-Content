@@ -631,8 +631,10 @@ async def list_scheduled_posts(
     db: AsyncSession = Depends(get_db),
 ):
     """List scheduled posts with filtering."""
-    # Build query
-    query = select(ScheduledPost).where(ScheduledPost.user_id == current_user.id)
+    # Build query with eager loading of targets to avoid N+1
+    query = select(ScheduledPost).options(
+        selectinload(ScheduledPost.targets).selectinload(PostTarget.social_account)
+    ).where(ScheduledPost.user_id == current_user.id)
 
     # Apply filters
     if status:
@@ -665,16 +667,9 @@ async def list_scheduled_posts(
     result = await db.execute(query)
     posts = result.scalars().all()
 
-    # Load targets for each post
+    # Build responses using already-loaded targets (no per-post queries)
     post_responses = []
     for post in posts:
-        targets_result = await db.execute(
-            select(PostTarget)
-            .options(selectinload(PostTarget.social_account))
-            .where(PostTarget.scheduled_post_id == post.id)
-        )
-        targets = targets_result.scalars().all()
-
         target_responses = [
             PostTargetResponse(
                 id=str(t.id),
@@ -689,7 +684,7 @@ async def list_scheduled_posts(
                 publish_error=t.publish_error,
                 analytics_data=t.analytics_data,
             )
-            for t in targets
+            for t in post.targets
         ]
 
         post_responses.append(
@@ -971,9 +966,12 @@ async def get_calendar(
     db: AsyncSession = Depends(get_db),
 ):
     """Get posts for calendar view."""
-    # Build query
+    # Build query with eager loading of targets to avoid N+1
     query = (
         select(ScheduledPost)
+        .options(
+            selectinload(ScheduledPost.targets).selectinload(PostTarget.social_account)
+        )
         .where(
             and_(
                 ScheduledPost.user_id == current_user.id,
@@ -997,16 +995,10 @@ async def get_calendar(
     result = await db.execute(query)
     posts = result.scalars().all()
 
-    # Group posts by date
+    # Group posts by date using already-loaded targets (no per-post queries)
     days_dict = {}
     for post in posts:
-        # Load targets for this post
-        targets_result = await db.execute(
-            select(PostTarget)
-            .options(selectinload(PostTarget.social_account))
-            .where(PostTarget.scheduled_post_id == post.id)
-        )
-        targets = targets_result.scalars().all()
+        targets = post.targets
 
         # Get date key
         post_date = post.scheduled_at.date().isoformat()

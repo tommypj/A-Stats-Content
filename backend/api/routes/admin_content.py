@@ -20,6 +20,7 @@ from infrastructure.database.models.content import Article, Outline, GeneratedIm
 from infrastructure.database.models.social import ScheduledPost, PostTarget
 from infrastructure.database.models.admin import AdminAuditLog, AuditAction, AuditTargetType
 from api.deps_admin import get_current_admin_user
+from api.utils import escape_like
 from api.schemas.admin_content import (
     AdminArticleListResponse,
     AdminArticleListItem,
@@ -42,10 +43,6 @@ router = APIRouter(prefix="/admin/content", tags=["Admin - Content"])
 
 
 # --- Helper Functions ---
-
-
-def _escape_like(value: str) -> str:
-    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def create_author_info(user: User) -> AdminArticleAuthorInfo:
@@ -109,7 +106,7 @@ async def list_all_articles(
     if status:
         query = query.where(Article.status == status)
     if search:
-        search_pattern = f"%{_escape_like(search)}%"
+        search_pattern = f"%{escape_like(search)}%"
         query = query.where(
             or_(
                 Article.title.ilike(search_pattern),
@@ -131,7 +128,7 @@ async def list_all_articles(
     if status:
         count_query = count_query.where(Article.status == status)
     if search:
-        search_pattern = f"%{_escape_like(search)}%"
+        search_pattern = f"%{escape_like(search)}%"
         count_query = count_query.where(
             or_(
                 Article.title.ilike(search_pattern),
@@ -313,7 +310,7 @@ async def list_all_outlines(
     if status:
         query = query.where(Outline.status == status)
     if search:
-        search_pattern = f"%{_escape_like(search)}%"
+        search_pattern = f"%{escape_like(search)}%"
         query = query.where(Outline.title.ilike(search_pattern))
 
     # Order by created_at desc
@@ -326,7 +323,7 @@ async def list_all_outlines(
     if status:
         count_query = count_query.where(Outline.status == status)
     if search:
-        search_pattern = f"%{_escape_like(search)}%"
+        search_pattern = f"%{escape_like(search)}%"
         count_query = count_query.where(Outline.title.ilike(search_pattern))
 
     result = await db.execute(count_query)
@@ -591,7 +588,6 @@ async def list_all_social_posts(
         query = (
             select(ScheduledPost)
             .join(PostTarget, ScheduledPost.id == PostTarget.scheduled_post_id)
-            .options(selectinload(ScheduledPost.user_id))
         )
     else:
         query = select(ScheduledPost)

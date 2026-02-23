@@ -2,13 +2,13 @@
 import asyncio
 import logging
 import os
+import time
 import uuid
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from rich.console import Console
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -21,7 +21,6 @@ from api.middleware.rate_limit import limiter
 from services.social_scheduler import scheduler_service
 from services.post_queue import post_queue
 
-console = Console()
 settings = get_settings()
 
 
@@ -29,10 +28,10 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     # Startup
-    console.print(f"[bold green]Starting {settings.app_name} v{settings.app_version}[/bold green]")
-    console.print(f"Environment: {settings.environment}")
-    console.print(f"CORS origins raw: {settings.cors_origins!r}")
-    console.print(f"CORS origins list: {settings.cors_origins_list!r}")
+    logger.info("Starting %s v%s", settings.app_name, settings.app_version)
+    logger.info("Environment: %s", settings.environment)
+    logger.info("CORS origins raw: %r", settings.cors_origins)
+    logger.info("CORS origins list: %r", settings.cors_origins_list)
 
     settings.validate_production_secrets()
 
@@ -69,26 +68,26 @@ async def lifespan(app: FastAPI):
             )
 
     if settings.is_development:
-        console.print("[yellow]Development mode - initializing database...[/yellow]")
+        logger.info("Development mode - initializing database...")
         await init_db()
 
     # Initialize Redis post queue (optional)
-    console.print("[cyan]Connecting to Redis for post queue...[/cyan]")
+    logger.info("Connecting to Redis for post queue...")
     await post_queue.connect()
 
     # Start social media scheduler in background
-    console.print("[cyan]Starting social media scheduler...[/cyan]")
+    logger.info("Starting social media scheduler...")
     scheduler_task = asyncio.create_task(scheduler_service.start())
 
-    console.print("[green]Application started successfully![/green]")
+    logger.info("Application started successfully!")
 
     yield
 
     # Shutdown
-    console.print("[yellow]Shutting down...[/yellow]")
+    logger.info("Shutting down...")
 
     # Stop scheduler
-    console.print("[cyan]Stopping social media scheduler...[/cyan]")
+    logger.info("Stopping social media scheduler...")
     await scheduler_service.stop()
     scheduler_task.cancel()
 
@@ -101,7 +100,7 @@ async def lifespan(app: FastAPI):
     await post_queue.disconnect()
 
     await close_db()
-    console.print("[red]Application stopped.[/red]")
+    logger.info("Application stopped.")
 
 
 # Create FastAPI application
@@ -126,6 +125,26 @@ async def global_exception_handler(request: Request, exc: Exception):
         status_code=500,
         content={"detail": "Internal server error"},
     )
+
+
+@app.middleware("http")
+async def request_logging_middleware(request: Request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = (time.perf_counter() - start) * 1000
+    response.headers["X-Response-Time"] = f"{duration_ms:.1f}ms"
+
+    # Skip logging for health check endpoints to avoid log noise
+    path = request.url.path
+    if not path.startswith("/api/v1/health"):
+        logger.info(
+            "%s %s %d %.1fms",
+            request.method,
+            path,
+            response.status_code,
+            duration_ms,
+        )
+    return response
 
 
 @app.middleware("http")

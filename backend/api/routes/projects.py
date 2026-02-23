@@ -2,6 +2,7 @@
 Project management API routes for multi-tenancy.
 """
 
+import math
 from datetime import datetime, timezone
 from typing import Annotated, Optional, List
 import re
@@ -153,6 +154,8 @@ async def create_project(
 async def list_projects(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
 ):
     """
     List all projects the current user is a member of.
@@ -189,7 +192,7 @@ async def list_projects(
         count_result = await db.execute(count_stmt)
         counts = {row.project_id: row.cnt for row in count_result}
 
-    projects_with_roles = []
+    all_projects_with_roles = []
     for membership in memberships:
         project = membership.project
 
@@ -199,7 +202,7 @@ async def list_projects(
 
         member_count = counts.get(project.id, 0)
 
-        projects_with_roles.append({
+        all_projects_with_roles.append({
             "id": project.id,
             "name": project.name,
             "slug": project.slug,
@@ -216,9 +219,17 @@ async def list_projects(
             "updated_at": project.updated_at,
         })
 
+    total = len(all_projects_with_roles)
+    total_pages = math.ceil(total / page_size) if total > 0 else 0
+    offset = (page - 1) * page_size
+    paginated = all_projects_with_roles[offset: offset + page_size]
+
     return ProjectListResponse(
-        projects=projects_with_roles,
-        total=len(projects_with_roles),
+        projects=paginated,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
     )
 
 

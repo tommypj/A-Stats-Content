@@ -212,7 +212,7 @@ class SocialPostUpdateRequest(BaseModel):
 class ArticleImproveRequest(BaseModel):
     """Request to improve article content."""
 
-    improvement_type: str = Field(
+    improvement_type: Literal["seo", "readability", "engagement", "grammar"] = Field(
         default="seo",
         description="Type: seo, readability, engagement, grammar",
     )

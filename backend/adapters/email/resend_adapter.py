@@ -2,10 +2,16 @@
 Resend email service adapter.
 """
 
+import asyncio
+import logging
+from html import escape as html_escape
 from typing import Optional
+
 import resend
 
 from infrastructure.config.settings import settings
+
+logger = logging.getLogger(__name__)
 
 
 class ResendEmailService:
@@ -35,13 +41,13 @@ class ResendEmailService:
             True if sent successfully, False otherwise
         """
         if not settings.resend_api_key:
-            print(f"[DEV] Verification email for {to_email}: {self._frontend_url}/verify-email?token={verification_token}")
+            logger.info("[DEV] Verification email for %s: %s/verify-email?token=%s", to_email, self._frontend_url, verification_token)
             return True
 
         verification_url = f"{self._frontend_url}/verify-email?token={verification_token}"
 
         try:
-            resend.Emails.send({
+            await asyncio.to_thread(resend.Emails.send, {
                 "from": self._from_email,
                 "to": to_email,
                 "subject": "Verify your A-Stats Content account",
@@ -49,7 +55,7 @@ class ResendEmailService:
             })
             return True
         except Exception as e:
-            print(f"Failed to send verification email: {e}")
+            logger.error("Failed to send verification email: %s", e)
             return False
 
     async def send_password_reset_email(
@@ -70,13 +76,13 @@ class ResendEmailService:
             True if sent successfully, False otherwise
         """
         if not settings.resend_api_key:
-            print(f"[DEV] Password reset email for {to_email}: {self._frontend_url}/reset-password?token={reset_token}")
+            logger.info("[DEV] Password reset email for %s: %s/reset-password?token=%s", to_email, self._frontend_url, reset_token)
             return True
 
         reset_url = f"{self._frontend_url}/reset-password?token={reset_token}"
 
         try:
-            resend.Emails.send({
+            await asyncio.to_thread(resend.Emails.send, {
                 "from": self._from_email,
                 "to": to_email,
                 "subject": "Reset your A-Stats Content password",
@@ -84,7 +90,7 @@ class ResendEmailService:
             })
             return True
         except Exception as e:
-            print(f"Failed to send password reset email: {e}")
+            logger.error("Failed to send password reset email: %s", e)
             return False
 
     async def send_welcome_email(
@@ -103,11 +109,11 @@ class ResendEmailService:
             True if sent successfully, False otherwise
         """
         if not settings.resend_api_key:
-            print(f"[DEV] Welcome email for {to_email}")
+            logger.info("[DEV] Welcome email for %s", to_email)
             return True
 
         try:
-            resend.Emails.send({
+            await asyncio.to_thread(resend.Emails.send, {
                 "from": self._from_email,
                 "to": to_email,
                 "subject": "Welcome to A-Stats Content!",
@@ -115,7 +121,7 @@ class ResendEmailService:
             })
             return True
         except Exception as e:
-            print(f"Failed to send welcome email: {e}")
+            logger.error("Failed to send welcome email: %s", e)
             return False
 
     async def send_project_invitation_email(
@@ -140,11 +146,11 @@ class ResendEmailService:
             True if sent successfully, False otherwise
         """
         if not settings.resend_api_key:
-            print(f"[DEV] Project invitation email for {to_email}: {invitation_url}")
+            logger.info("[DEV] Project invitation email for %s: %s", to_email, invitation_url)
             return True
 
         try:
-            resend.Emails.send({
+            await asyncio.to_thread(resend.Emails.send, {
                 "from": self._from_email,
                 "to": to_email,
                 "subject": f"You've been invited to join {project_name} on A-Stats",
@@ -154,11 +160,12 @@ class ResendEmailService:
             })
             return True
         except Exception as e:
-            print(f"Failed to send project invitation email: {e}")
+            logger.error("Failed to send project invitation email: %s", e)
             return False
 
     def _get_verification_email_html(self, user_name: str, verification_url: str) -> str:
         """Generate verification email HTML."""
+        safe_name = html_escape(user_name or "")
         return f"""
         <!DOCTYPE html>
         <html>
@@ -176,7 +183,7 @@ class ResendEmailService:
                 <h2 style="color: #1A1A2E; font-size: 20px; margin-bottom: 16px;">Verify your email address</h2>
 
                 <p style="color: #4A4A68; line-height: 1.6; margin-bottom: 24px;">
-                    Hi {user_name},<br><br>
+                    Hi {safe_name},<br><br>
                     Thanks for signing up for A-Stats Content! Please verify your email address by clicking the button below.
                 </p>
 
@@ -202,6 +209,7 @@ class ResendEmailService:
 
     def _get_password_reset_email_html(self, user_name: str, reset_url: str) -> str:
         """Generate password reset email HTML."""
+        safe_name = html_escape(user_name or "")
         return f"""
         <!DOCTYPE html>
         <html>
@@ -219,7 +227,7 @@ class ResendEmailService:
                 <h2 style="color: #1A1A2E; font-size: 20px; margin-bottom: 16px;">Reset your password</h2>
 
                 <p style="color: #4A4A68; line-height: 1.6; margin-bottom: 24px;">
-                    Hi {user_name},<br><br>
+                    Hi {safe_name},<br><br>
                     We received a request to reset your password. Click the button below to choose a new password.
                 </p>
 
@@ -245,6 +253,7 @@ class ResendEmailService:
 
     def _get_welcome_email_html(self, user_name: str) -> str:
         """Generate welcome email HTML."""
+        safe_name = html_escape(user_name or "")
         return f"""
         <!DOCTYPE html>
         <html>
@@ -262,7 +271,7 @@ class ResendEmailService:
                 <h2 style="color: #1A1A2E; font-size: 20px; margin-bottom: 16px;">Welcome to A-Stats Content!</h2>
 
                 <p style="color: #4A4A68; line-height: 1.6; margin-bottom: 24px;">
-                    Hi {user_name},<br><br>
+                    Hi {safe_name},<br><br>
                     Your email has been verified and your account is now active. You're ready to start creating amazing therapeutic content with AI!
                 </p>
 
@@ -296,8 +305,10 @@ class ResendEmailService:
         self, inviter_name: str, project_name: str, role: str, invitation_url: str
     ) -> str:
         """Generate project invitation email HTML."""
+        safe_inviter = html_escape(inviter_name or "")
+        safe_project = html_escape(project_name or "")
         # Format role nicely
-        role_display = role.title()
+        role_display = html_escape(role.title() if role else "")
 
         return f"""
         <!DOCTYPE html>
@@ -316,15 +327,15 @@ class ResendEmailService:
                 <h2 style="color: #1A1A2E; font-size: 20px; margin-bottom: 16px;">You've been invited to join a project!</h2>
 
                 <p style="color: #4A4A68; line-height: 1.6; margin-bottom: 24px;">
-                    {inviter_name} has invited you to join <strong>{project_name}</strong> on A-Stats Content.
+                    {safe_inviter} has invited you to join <strong>{safe_project}</strong> on A-Stats Content.
                 </p>
 
                 <div style="background: #F8F9FA; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
                     <h3 style="color: #1A1A2E; font-size: 16px; margin: 0 0 16px;">Invitation Details:</h3>
                     <ul style="color: #4A4A68; margin: 0; padding-left: 20px; line-height: 1.8;">
-                        <li><strong>Project:</strong> {project_name}</li>
+                        <li><strong>Project:</strong> {safe_project}</li>
                         <li><strong>Your role:</strong> {role_display}</li>
-                        <li><strong>Invited by:</strong> {inviter_name}</li>
+                        <li><strong>Invited by:</strong> {safe_inviter}</li>
                     </ul>
                 </div>
 

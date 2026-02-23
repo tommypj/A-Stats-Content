@@ -90,12 +90,12 @@ class GenerationLog(Base, TimestampMixin):
     user: Mapped[Optional["User"]] = relationship(
         "User",
         foreign_keys=[user_id],
-        lazy="joined",
+        lazy="select",
     )
     project: Mapped[Optional["Project"]] = relationship(
         "Project",
         foreign_keys=[project_id],
-        lazy="joined",
+        lazy="select",
     )
 
     # Indexes
@@ -174,12 +174,12 @@ class AdminAlert(Base, TimestampMixin):
     user: Mapped[Optional["User"]] = relationship(
         "User",
         foreign_keys=[user_id],
-        lazy="joined",
+        lazy="select",
     )
     project: Mapped[Optional["Project"]] = relationship(
         "Project",
         foreign_keys=[project_id],
-        lazy="joined",
+        lazy="select",
     )
 
     # Indexes

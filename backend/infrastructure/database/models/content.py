@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Optional, List
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, JSON, Float, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, JSON, Float, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -73,7 +73,7 @@ class Outline(Base, TimestampMixin):
     )
 
     # Structure (JSON array of sections)
-    sections: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    sections: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     """
     Structure:
     [
@@ -108,7 +108,10 @@ class Outline(Base, TimestampMixin):
         back_populates="outline",
         cascade="all, delete-orphan",
     )
-    # team: Mapped[Optional["Team"]] = relationship(back_populates="outlines")  # Uncomment when Team model exists
+
+    __table_args__ = (
+        Index("ix_outlines_created_at", "created_at"),
+    )
 
     def __repr__(self) -> str:
         return f"<Outline(id={self.id}, title={self.title[:30]}, status={self.status})>"
@@ -214,6 +217,7 @@ class Article(Base, TimestampMixin):
         UUID(as_uuid=False),
         ForeignKey("generated_images.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
     )
 
     # Relationships
@@ -226,10 +230,10 @@ class Article(Base, TimestampMixin):
         back_populates="article",
         foreign_keys="GeneratedImage.article_id",
     )
-    # team: Mapped[Optional["Team"]] = relationship(back_populates="articles")  # Uncomment when Team model exists
 
     __table_args__ = (
         UniqueConstraint("project_id", "slug", name="uq_article_project_slug"),
+        Index("ix_articles_created_at", "created_at"),
     )
 
     def __repr__(self) -> str:
@@ -302,7 +306,10 @@ class GeneratedImage(Base, TimestampMixin):
         back_populates="images",
         foreign_keys=[article_id],
     )
-    # team: Mapped[Optional["Team"]] = relationship(back_populates="images")  # Uncomment when Team model exists
+
+    __table_args__ = (
+        Index("ix_generated_images_created_at", "created_at"),
+    )
 
     def __repr__(self) -> str:
         return f"<GeneratedImage(id={self.id}, prompt={self.prompt[:30]})>"
