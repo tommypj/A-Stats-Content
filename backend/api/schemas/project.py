@@ -79,6 +79,7 @@ class ProjectResponse(BaseModel):
     slug: str
     description: Optional[str] = None
     avatar_url: Optional[str] = None
+    logo_url: Optional[str] = None  # Alias for avatar_url (frontend compatibility)
 
     # Billing
     subscription_tier: str
@@ -101,6 +102,7 @@ class ProjectResponse(BaseModel):
     # Member info (only when requested)
     member_count: Optional[int] = None
     current_user_role: Optional[str] = None
+    my_role: Optional[str] = None  # Alias for current_user_role (frontend compatibility)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -297,13 +299,13 @@ class ProjectSettings(BaseModel):
 class ProjectSwitchRequest(BaseModel):
     """Schema for switching current project."""
 
-    project_id: str = Field(..., description="Project ID to switch to")
+    project_id: Optional[str] = Field(None, description="Project ID to switch to, or null for personal workspace")
 
 
 class ProjectSwitchResponse(BaseModel):
     """Response after switching projects."""
 
-    current_project_id: str
+    current_project_id: Optional[str] = None
     message: Optional[str] = None
     project_name: Optional[str] = None
     project_slug: Optional[str] = None
