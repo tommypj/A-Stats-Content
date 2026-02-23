@@ -3,6 +3,7 @@ WordPress integration API routes.
 """
 
 import base64
+import io
 import ipaddress
 import json
 import logging
@@ -11,6 +12,7 @@ from typing import List, Optional
 from urllib.parse import urlparse
 
 import httpx
+from PIL import Image as PILImage
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -604,6 +606,47 @@ async def publish_to_wordpress(
         )
 
 
+def _convert_to_webp(image_bytes: bytes, quality: int = 82) -> tuple[bytes, bool]:
+    """
+    Convert image bytes to WebP format.
+
+    Skips conversion if the image is already WebP or is a GIF (animated GIFs
+    do not convert well). On any PIL error the original bytes are returned
+    unchanged so the caller can proceed without interruption.
+
+    Args:
+        image_bytes: Raw bytes of the source image.
+        quality: WebP quality (0-100). Default 82 is visually lossless with
+                 significant size reduction.
+
+    Returns:
+        A tuple of (result_bytes, converted). ``converted`` is True only when
+        a new WebP payload was produced.
+    """
+    try:
+        img = PILImage.open(io.BytesIO(image_bytes))
+
+        # Skip if already WebP
+        if img.format and img.format.upper() == "WEBP":
+            return image_bytes, False
+
+        # Skip GIFs — animated frames are not preserved by PIL WebP export
+        if img.format and img.format.upper() == "GIF":
+            return image_bytes, False
+
+        buf = io.BytesIO()
+        if img.mode in ("RGBA", "LA", "PA"):
+            img.save(buf, format="WEBP", quality=quality, method=4)
+        else:
+            img.convert("RGB").save(buf, format="WEBP", quality=quality, method=4)
+
+        return buf.getvalue(), True
+
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("WebP conversion skipped due to PIL error: %s", exc)
+        return image_bytes, False
+
+
 async def _upload_image_to_wp(
     client: httpx.AsyncClient,
     image: GeneratedImage,
@@ -640,6 +683,21 @@ async def _upload_image_to_wp(
 
     image_data = img_response.content
     content_type = img_response.headers.get("content-type", "image/png")
+
+    # Convert to WebP before uploading (graceful fallback on any error)
+    webp_data, converted = _convert_to_webp(image_data)
+    if converted:
+        original_kb = len(image_data) / 1024
+        webp_kb = len(webp_data) / 1024
+        reduction_pct = (1 - webp_kb / original_kb) * 100 if original_kb else 0
+        logger.info(
+            "Converted image to WebP: %.0fKB -> %.0fKB (%.0f%% reduction)",
+            original_kb,
+            webp_kb,
+            reduction_pct,
+        )
+        image_data = webp_data
+        content_type = "image/webp"
 
     # Determine file extension from content type
     ext_map = {
