@@ -598,9 +598,12 @@ async def update_article(
             detail="Article not found",
         )
 
+    ALLOWED_UPDATE_FIELDS = {"title", "keyword", "meta_description", "content", "status"}
     update_data = request.model_dump(exclude_unset=True)
 
     for field, value in update_data.items():
+        if field not in ALLOWED_UPDATE_FIELDS:
+            continue
         setattr(article, field, value)
 
     # Update derived fields

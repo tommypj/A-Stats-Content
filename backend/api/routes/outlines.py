@@ -250,9 +250,12 @@ async def update_outline(
             detail="Outline not found",
         )
 
+    ALLOWED_UPDATE_FIELDS = {"title", "keyword", "target_audience", "tone", "sections", "word_count_target"}
     # Update fields
     update_data = request.model_dump(exclude_unset=True)
     for field, value in update_data.items():
+        if field not in ALLOWED_UPDATE_FIELDS:
+            continue
         if field == "sections" and value is not None:
             # Convert Pydantic models to dicts
             value = [s.model_dump() if hasattr(s, "model_dump") else s for s in value]

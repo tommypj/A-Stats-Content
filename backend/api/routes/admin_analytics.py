@@ -5,7 +5,7 @@ Provides comprehensive analytics endpoints for admin users to monitor
 platform health, user activity, content generation, revenue, and system metrics.
 """
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -56,7 +56,7 @@ router = APIRouter(prefix="/admin/analytics", tags=["Admin - Analytics"])
 
 def get_date_range(days: int) -> tuple[datetime, datetime]:
     """Get datetime range for the past N days."""
-    end_date = datetime.now()
+    end_date = datetime.now(timezone.utc)
     start_date = end_date - timedelta(days=days)
     return start_date, end_date
 
@@ -99,7 +99,7 @@ async def get_dashboard_stats(
 
     **Admin access required.**
     """
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     week_ago = now - timedelta(days=7)
     month_ago = now - timedelta(days=30)
 
@@ -330,7 +330,7 @@ async def get_user_analytics(
 
     **Note:** Cache recommended for this endpoint (heavy queries).
     """
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     thirty_days_ago = now - timedelta(days=30)
 
     # ========== SIGNUP TRENDS ==========
@@ -515,7 +515,7 @@ async def get_content_analytics(
 
     **Note:** Cache recommended for this endpoint (heavy queries).
     """
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
 
     # ========== CONTENT TRENDS ==========
     content_trends = []
@@ -715,7 +715,7 @@ async def get_revenue_analytics(
     **Note:** Revenue is estimated based on subscription tier pricing.
     Actual payment data would require LemonSqueezy webhook integration.
     """
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
 
     # ========== MONTHLY REVENUE (Last 12 months) ==========
     # NOTE: This is a simplified estimation. In production, you would track

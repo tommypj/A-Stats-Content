@@ -467,11 +467,9 @@ async def handle_project_subscription_webhook(
         logger.info(f"Project webhook processed successfully: project_id={project_id}")
 
     except Exception as e:
-        logger.error(f"Error processing project webhook: {str(e)}", exc_info=True)
+        logger.error("Webhook processing failed for project %s: %s", project_id, str(e), exc_info=True)
         await db.rollback()
-
-    # Always return 200 OK
-    return {"status": "success"}
+        raise HTTPException(status_code=500, detail="Webhook processing failed")
 
 
 @router.post("/webhook")
@@ -674,9 +672,6 @@ async def handle_webhook(
         logger.info(f"Webhook processed successfully for user {user_id}")
 
     except Exception as e:
-        logger.error(f"Error processing webhook: {str(e)}", exc_info=True)
+        logger.error("Webhook processing failed: %s", str(e), exc_info=True)
         await db.rollback()
-        # Still return 200 to prevent retries
-
-    # Always return 200 OK to acknowledge receipt
-    return {"status": "success"}
+        raise HTTPException(status_code=500, detail="Webhook processing failed")

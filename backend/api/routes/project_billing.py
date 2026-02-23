@@ -9,6 +9,7 @@ import logging
 from typing import Annotated
 from uuid import UUID
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -302,20 +303,34 @@ async def cancel_project_subscription(
             detail="No active project subscription to cancel",
         )
 
-    # TODO: Implement actual LemonSqueezy API call to cancel subscription
-    # For now, just log the cancellation request
-
     logger.info(
         f"Project subscription cancellation requested: "
         f"project_id={project_id}, subscription_id={project.lemonsqueezy_subscription_id}"
     )
 
+    async with httpx.AsyncClient() as client:
+        response = await client.delete(
+            f"https://api.lemonsqueezy.com/v1/subscriptions/{project.lemonsqueezy_subscription_id}",
+            headers={
+                "Authorization": f"Bearer {settings.lemonsqueezy_api_key}",
+                "Accept": "application/vnd.api+json",
+            },
+        )
+        if response.status_code not in (200, 204):
+            logger.error(
+                "LemonSqueezy cancel failed for project %s: %s %s",
+                project_id,
+                response.status_code,
+                response.text,
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to cancel project subscription. Please try again or contact support.",
+            )
+
     return ProjectCancelResponse(
         success=True,
-        message=(
-            "Project subscription will be cancelled at the end of the billing period. "
-            "Please visit the customer portal to complete cancellation."
-        ),
+        message="Project subscription will be cancelled at the end of the billing period.",
     )
 
 

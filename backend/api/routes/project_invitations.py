@@ -3,7 +3,7 @@ Project invitation API routes.
 """
 
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -240,7 +240,7 @@ async def create_project_invitation(
         role=invitation.role,
         token=token,
         status=InvitationStatus.PENDING.value,
-        expires_at=datetime.utcnow() + timedelta(days=7),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
     )
 
     db.add(new_invitation)
@@ -321,7 +321,7 @@ async def revoke_project_invitation(
 
     # Update invitation
     invitation.status = InvitationStatus.REVOKED.value
-    invitation.revoked_at = datetime.utcnow()
+    invitation.revoked_at = datetime.now(timezone.utc)
     invitation.revoked_by = current_user.id
 
     await db.commit()
@@ -369,7 +369,7 @@ async def resend_project_invitation(
         )
 
     # Reset expiration
-    invitation.expires_at = datetime.utcnow() + timedelta(days=7)
+    invitation.expires_at = datetime.now(timezone.utc) + timedelta(days=7)
     await db.commit()
     await db.refresh(invitation)
 
@@ -542,14 +542,14 @@ async def accept_invitation(
         user_id=current_user.id,
         role=invitation.role,
         invited_by=invitation.invited_by,
-        joined_at=datetime.utcnow(),
+        joined_at=datetime.now(timezone.utc),
     )
 
     db.add(new_member)
 
     # Update invitation status
     invitation.status = InvitationStatus.ACCEPTED.value
-    invitation.accepted_at = datetime.utcnow()
+    invitation.accepted_at = datetime.now(timezone.utc)
     invitation.accepted_by_user_id = current_user.id
 
     # Set user's current project to this project if they don't have one

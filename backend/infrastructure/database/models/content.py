@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Optional, List
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, JSON, Float
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, JSON, Float, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -159,7 +159,7 @@ class Article(Base, TimestampMixin):
 
     # Content
     title: Mapped[str] = mapped_column(String(500), nullable=False)
-    slug: Mapped[Optional[str]] = mapped_column(String(500), nullable=True, unique=True)
+    slug: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     keyword: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     meta_description: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
     content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -227,6 +227,10 @@ class Article(Base, TimestampMixin):
         foreign_keys="GeneratedImage.article_id",
     )
     # team: Mapped[Optional["Team"]] = relationship(back_populates="articles")  # Uncomment when Team model exists
+
+    __table_args__ = (
+        UniqueConstraint("project_id", "slug", name="uq_article_project_slug"),
+    )
 
     def __repr__(self) -> str:
         return f"<Article(id={self.id}, title={self.title[:30]}, status={self.status})>"

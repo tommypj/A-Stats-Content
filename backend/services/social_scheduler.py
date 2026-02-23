@@ -7,7 +7,7 @@ platforms, and tracks results.
 """
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 import logging
 
@@ -70,7 +70,7 @@ class SocialSchedulerService:
         async with async_session_maker() as db:
             try:
                 # Find posts that are due for publishing
-                now = datetime.utcnow()
+                now = datetime.now(timezone.utc)
 
                 stmt = (
                     select(ScheduledPost)
@@ -204,7 +204,7 @@ class SocialSchedulerService:
                 ),
                 token_expiry=account.token_expiry,
                 account_id=account.account_id,
-                platform_username=account.platform_username,
+                account_name=account.platform_username,
                 account_username=account.account_username,
                 profile_image_url=account.profile_image_url,
             )
@@ -213,7 +213,7 @@ class SocialSchedulerService:
             adapter = get_social_adapter(SocialPlatform(account.platform))
 
             # Check if token needs refresh
-            if credentials.token_expiry and credentials.token_expiry < datetime.utcnow():
+            if credentials.token_expiry and credentials.token_expiry < datetime.now(timezone.utc):
                 logger.info(f"Refreshing expired token for {account.platform}")
                 credentials = await adapter.refresh_token(credentials)
                 # Update stored credentials
@@ -235,10 +235,10 @@ class SocialSchedulerService:
                 target.platform_post_id = result.post_id
                 target.platform_post_url = result.post_url
                 target.error_message = None
-                target.posted_at = datetime.utcnow()
+                target.posted_at = datetime.now(timezone.utc)
 
                 # Update account last_used
-                account.last_used = datetime.utcnow()
+                account.last_used = datetime.now(timezone.utc)
 
                 logger.info(
                     f"Successfully published to {account.platform}: {result.post_url}"
@@ -407,7 +407,7 @@ class SocialSchedulerService:
             )
 
         account.token_expiry = credentials.token_expiry
-        account.last_used = datetime.utcnow()
+        account.last_used = datetime.now(timezone.utc)
 
         await db.flush()
         logger.info(f"Updated tokens for {account.platform} account")

@@ -4,7 +4,7 @@ Knowledge vault service for RAG operations.
 
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 
@@ -84,7 +84,7 @@ class KnowledgeService:
 
             # 2. Update status to 'processing'
             source.status = SourceStatus.PROCESSING.value
-            source.processing_started_at = datetime.utcnow()
+            source.processing_started_at = datetime.now(timezone.utc)
             await db.commit()
 
             logger.info(f"Processing document: {source.title} ({source_id})")
@@ -97,10 +97,15 @@ class KnowledgeService:
                 "file_type": source.file_type,
             }
 
-            chunks = await self.processor.process_file(
-                file_path=file_path,
-                source_metadata=source_metadata,
-            )
+            with open(file_path, "rb") as fh:
+                processed_doc = await self.processor.process_file(
+                    file=fh,
+                    filename=Path(file_path).name,
+                    source_id=source_id,
+                    metadata=source_metadata,
+                )
+
+            chunks = processed_doc.chunks
 
             if not chunks:
                 raise ValueError("No chunks extracted from document")
@@ -114,17 +119,20 @@ class KnowledgeService:
             logger.info(f"Generated {len(embeddings)} embeddings")
 
             # 5. Store in ChromaDB
-            chunk_ids = [
-                f"{source_id}_chunk_{i}" for i in range(len(chunks))
+            from adapters.knowledge.chroma_adapter import Document as ChromaDocument
+            chroma_docs = [
+                ChromaDocument(
+                    id=f"{source_id}_chunk_{i}",
+                    content=chunk.content,
+                    metadata=chunk.metadata,
+                )
+                for i, chunk in enumerate(chunks)
             ]
-            chunk_metadatas = [chunk.metadata for chunk in chunks]
 
-            await self.chroma.add_chunks(
+            await self.chroma.add_documents(
                 user_id=user_id,
-                chunks=chunk_texts,
+                documents=chroma_docs,
                 embeddings=embeddings,
-                metadata=chunk_metadatas,
-                chunk_ids=chunk_ids,
             )
 
             logger.info(f"Stored {len(chunks)} chunks in ChromaDB")
@@ -134,7 +142,7 @@ class KnowledgeService:
             source.chunk_count = len(chunks)
             source.char_count = total_chars
             source.status = SourceStatus.COMPLETED.value
-            source.processing_completed_at = datetime.utcnow()
+            source.processing_completed_at = datetime.now(timezone.utc)
             source.error_message = None
 
             await db.commit()
@@ -159,7 +167,7 @@ class KnowledgeService:
                 if source:
                     source.status = SourceStatus.FAILED.value
                     source.error_message = str(e)[:1000]  # Truncate if too long
-                    source.processing_completed_at = datetime.utcnow()
+                    source.processing_completed_at = datetime.now(timezone.utc)
                     await db.commit()
 
             except Exception as db_error:

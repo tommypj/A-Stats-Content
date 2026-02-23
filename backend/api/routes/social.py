@@ -2,6 +2,7 @@
 Social media scheduling API routes.
 """
 
+import json
 import secrets
 import time
 from datetime import datetime, timezone, date
@@ -53,30 +54,52 @@ from core.security.encryption import encrypt_credential, decrypt_credential
 
 router = APIRouter(prefix="/social", tags=["Social Media"])
 
-# In-memory OAuth state store (state -> {user_id, created_at})
-# For production with multiple instances, use Redis instead.
+# OAuth state TTL (10 minutes)
+_OAUTH_STATE_TTL = 600
+
+# In-memory fallback for OAuth state (used only when Redis is unavailable)
 _oauth_states: dict[str, dict] = {}
-_OAUTH_STATE_TTL = 600  # 10 minutes
 
 
-def _store_oauth_state(state: str, user_id: str) -> None:
-    """Store OAuth state with TTL. Also cleans up expired entries."""
-    now = time.time()
-    # Clean expired
-    expired = [k for k, v in _oauth_states.items() if now - v["created_at"] > _OAUTH_STATE_TTL]
-    for k in expired:
-        _oauth_states.pop(k, None)
-    _oauth_states[state] = {"user_id": str(user_id), "created_at": now}
+async def _store_oauth_state(state: str, user_id: str) -> None:
+    """Store OAuth state in Redis with a 10-minute TTL.
+
+    Falls back to an in-memory dict when Redis is not reachable so that
+    single-process development environments continue to work.
+    """
+    data = json.dumps({"user_id": str(user_id)})
+    try:
+        import redis.asyncio as aioredis
+        r = aioredis.from_url(settings.redis_url)
+        await r.setex(f"oauth_state:{state}", _OAUTH_STATE_TTL, data)
+        await r.aclose()
+    except Exception:
+        # Fallback: in-memory store with manual TTL tracking
+        _oauth_states[state] = {"user_id": str(user_id), "created_at": time.time()}
 
 
-def _verify_oauth_state(state: str) -> Optional[str]:
-    """Verify and consume an OAuth state. Returns user_id or None."""
-    entry = _oauth_states.pop(state, None)
-    if not entry:
-        return None
-    if time.time() - entry["created_at"] > _OAUTH_STATE_TTL:
-        return None
-    return entry["user_id"]
+async def _verify_oauth_state(state: str) -> Optional[str]:
+    """Verify and consume an OAuth state. Returns user_id or None.
+
+    Attempts Redis first; falls back to the in-memory dict when Redis is
+    not reachable.
+    """
+    try:
+        import redis.asyncio as aioredis
+        r = aioredis.from_url(settings.redis_url)
+        raw = await r.getdel(f"oauth_state:{state}")
+        await r.aclose()
+        if raw is None:
+            return None
+        return json.loads(raw)["user_id"]
+    except Exception:
+        # Fallback: in-memory pop with expiry check
+        entry = _oauth_states.pop(state, None)
+        if not entry:
+            return None
+        if time.time() - entry["created_at"] > _OAUTH_STATE_TTL:
+            return None
+        return entry["user_id"]
 
 
 # ============================================
@@ -158,7 +181,7 @@ async def initiate_connection(
 
     # Generate CSRF state token
     state = secrets.token_urlsafe(32)
-    _store_oauth_state(state, str(current_user.id))
+    await _store_oauth_state(state, str(current_user.id))
 
     if platform == "facebook":
         if not settings.facebook_app_id or not settings.facebook_app_secret:
@@ -223,7 +246,7 @@ async def oauth_callback(
         )
 
     # Verify state and get user_id
-    user_id = _verify_oauth_state(state)
+    user_id = await _verify_oauth_state(state)
     if not user_id:
         return RedirectResponse(
             url=f"{frontend_callback}?error=invalid_state&platform={platform}"
