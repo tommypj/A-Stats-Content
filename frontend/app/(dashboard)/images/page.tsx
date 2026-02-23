@@ -20,6 +20,7 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  X,
 } from "lucide-react";
 import { api, getImageUrl, parseApiError, GeneratedImage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,10 @@ export default function ImagesPage() {
   const [styleFilter, setStyleFilter] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
   // Debounce search input; reset to page 1 when search changes
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -69,6 +74,11 @@ export default function ImagesPage() {
   useEffect(() => {
     setPage(1);
   }, [styleFilter]);
+
+  // Clear selection when page changes
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [page]);
 
   useEffect(() => {
     loadImages();
@@ -179,6 +189,77 @@ export default function ImagesPage() {
     }
   }
 
+  // --- Bulk selection helpers ---
+
+  // Only allow selecting completed images that are currently visible after filtering
+  const selectableIds = filteredImages
+    .filter((img) => img.status === "completed")
+    .map((img) => img.id);
+  const allSelected =
+    selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id));
+  const someSelected = selectedIds.size > 0;
+
+  function toggleSelectAll() {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(selectableIds));
+    }
+  }
+
+  function toggleSelectOne(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  async function handleBulkDelete() {
+    const count = selectedIds.size;
+    if (!confirm(`Delete ${count} image${count !== 1 ? "s" : ""}? This cannot be undone.`)) return;
+
+    setIsBulkDeleting(true);
+    try {
+      await Promise.all(Array.from(selectedIds).map((id) => api.images.delete(id)));
+      setSelectedIds(new Set());
+      await loadImages();
+    } catch (error) {
+      console.error("Failed to bulk delete images:", error);
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  }
+
+  function handleBulkExport() {
+    const selected = filteredImages.filter((img) => selectedIds.has(img.id));
+    const exportData = selected.map((img) => ({
+      prompt: img.prompt,
+      style: img.style ?? "",
+      url: img.url ? getImageUrl(img.url) : "",
+      alt_text: img.alt_text ?? "",
+    }));
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `images-export-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -227,6 +308,43 @@ export default function ImagesPage() {
         )}
       </div>
 
+      {/* Bulk Action Toolbar */}
+      {someSelected && (
+        <div className="sticky top-4 z-30 bg-primary-50 border border-primary-200 rounded-xl p-3 flex flex-wrap items-center gap-3">
+          <span className="text-sm font-medium text-primary-800">
+            {selectedIds.size} selected
+          </span>
+          <div className="flex items-center gap-2 ml-auto">
+            <button
+              onClick={handleBulkExport}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary-300 bg-white text-sm font-medium text-primary-700 hover:bg-primary-50 transition-colors"
+            >
+              <Download className="h-4 w-4" />
+              Export
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              disabled={isBulkDeleting}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isBulkDeleting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              Delete
+            </button>
+            <button
+              onClick={clearSelection}
+              className="p-1.5 rounded-lg hover:bg-primary-100 text-primary-600 transition-colors"
+              title="Clear selection"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Images Grid */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
@@ -253,147 +371,195 @@ export default function ImagesPage() {
           )}
         </Card>
       ) : (
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filteredImages.map((image) => {
-            const status = statusConfig[image.status as keyof typeof statusConfig];
-            const StatusIcon = status?.icon;
+        <>
+          {/* Select All header row */}
+          {selectableIds.length > 0 && (
+            <div className="flex items-center gap-3 px-1">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={toggleSelectAll}
+                className="h-4 w-4 rounded border-surface-tertiary text-primary-600 focus:ring-primary-500 cursor-pointer"
+                title="Select all on page"
+              />
+              <span className="text-sm text-text-muted">
+                {allSelected ? "Deselect all" : "Select all on page"}
+              </span>
+            </div>
+          )}
 
-            return (
-              <Card key={image.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                {/* Image Thumbnail */}
-                <div className="relative aspect-square bg-surface-secondary">
-                  {image.status === "completed" && image.url ? (
-                    <button
-                      onClick={() => setSelectedImage(image)}
-                      className="w-full h-full group cursor-pointer"
-                    >
-                      <Image
-                        src={getImageUrl(image.url)}
-                        alt={image.alt_text || image.prompt}
-                        fill
-                        className="object-cover group-hover:opacity-90 transition-opacity"
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
-                      />
-                    </button>
-                  ) : image.status === "generating" ? (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="text-center">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary-500 mx-auto mb-2" />
-                        <p className="text-sm text-text-muted">Generating...</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <XCircle className="h-8 w-8 text-red-500" />
-                    </div>
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {filteredImages.map((image) => {
+              const status = statusConfig[image.status as keyof typeof statusConfig];
+              const StatusIcon = status?.icon;
+              const isChecked = selectedIds.has(image.id);
+              const isSelectable = image.status === "completed";
+
+              return (
+                <Card
+                  key={image.id}
+                  className={clsx(
+                    "overflow-hidden hover:shadow-md transition-shadow",
+                    isChecked && "ring-2 ring-primary-400"
                   )}
+                >
+                  {/* Image Thumbnail */}
+                  <div className="relative aspect-square bg-surface-secondary">
+                    {image.status === "completed" && image.url ? (
+                      <button
+                        onClick={() => setSelectedImage(image)}
+                        className="w-full h-full group cursor-pointer"
+                      >
+                        <Image
+                          src={getImageUrl(image.url)}
+                          alt={image.alt_text || image.prompt}
+                          fill
+                          className="object-cover group-hover:opacity-90 transition-opacity"
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                        />
+                      </button>
+                    ) : image.status === "generating" ? (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-center">
+                          <Loader2 className="h-8 w-8 animate-spin text-primary-500 mx-auto mb-2" />
+                          <p className="text-sm text-text-muted">Generating...</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <XCircle className="h-8 w-8 text-red-500" />
+                      </div>
+                    )}
 
-                  {/* Status Badge */}
-                  {status && (
-                    <div className="absolute top-2 left-2">
-                      <span className={clsx("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium", status.color)}>
-                        <StatusIcon className={clsx("h-3.5 w-3.5", image.status === "generating" && "animate-spin")} />
-                        {status.label}
+                    {/* Checkbox overlay (top-left) — only for selectable images */}
+                    {isSelectable && (
+                      <div className="absolute top-2 left-2 z-20">
+                        <label
+                          className={clsx(
+                            "flex items-center justify-center w-6 h-6 rounded cursor-pointer transition-opacity",
+                            isChecked
+                              ? "opacity-100"
+                              : "opacity-0 group-hover:opacity-100"
+                          )}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleSelectOne(image.id)}
+                            className="h-4 w-4 rounded border-white bg-white/90 text-primary-600 focus:ring-primary-500 cursor-pointer shadow"
+                          />
+                        </label>
+                      </div>
+                    )}
+
+                    {/* Status Badge */}
+                    {status && (
+                      <div className={clsx("absolute top-2", isSelectable ? "left-9" : "left-2")}>
+                        <span className={clsx("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium", status.color)}>
+                          <StatusIcon className={clsx("h-3.5 w-3.5", image.status === "generating" && "animate-spin")} />
+                          {status.label}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Actions Menu */}
+                    {image.status === "completed" && (
+                      <div className="absolute top-2 right-2">
+                        <button
+                          onClick={() => setActiveMenu(activeMenu === image.id ? null : image.id)}
+                          className="p-1.5 rounded-lg bg-white/90 hover:bg-white shadow-sm backdrop-blur-sm"
+                        >
+                          <MoreVertical className="h-4 w-4 text-text-muted" />
+                        </button>
+
+                        {activeMenu === image.id && (
+                          <>
+                            <div className="fixed inset-0 z-40" onClick={() => setActiveMenu(null)} />
+                            <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg border border-surface-tertiary shadow-lg z-50">
+                              <button
+                                onClick={() => handleCopyUrl(getImageUrl(image.url), image.id)}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-surface-secondary"
+                              >
+                                <Copy className="h-4 w-4" />
+                                {copiedId === image.id ? "Copied!" : "Copy URL"}
+                              </button>
+                              <button
+                                onClick={() => handleDownload(getImageUrl(image.url), image.id)}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-surface-secondary"
+                              >
+                                <Download className="h-4 w-4" />
+                                Download
+                              </button>
+                              <a
+                                href={getImageUrl(image.url)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-surface-secondary"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                                Open in New Tab
+                              </a>
+                              {wpConnected && (
+                                <button
+                                  onClick={() => handleSendToWordPress(image)}
+                                  disabled={wpUploading === image.id || wpUploaded.has(image.id)}
+                                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-surface-secondary disabled:opacity-50"
+                                >
+                                  {wpUploading === image.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : wpUploaded.has(image.id) ? (
+                                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                  ) : (
+                                    <Globe className="h-4 w-4" />
+                                  )}
+                                  {wpUploaded.has(image.id) ? "Sent to WordPress" : "Send to WordPress"}
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleDelete(image.id)}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 border-t border-surface-tertiary"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Delete
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Image Details */}
+                  <div className="p-3">
+                    <p className="text-sm text-text-primary line-clamp-2 mb-2">
+                      {image.prompt}
+                    </p>
+
+                    <div className="flex items-center justify-between text-xs text-text-muted">
+                      <div className="flex items-center gap-2">
+                        {image.style && (
+                          <span className="px-2 py-0.5 bg-surface-secondary rounded-md">
+                            {image.style}
+                          </span>
+                        )}
+                        {image.width && image.height && (
+                          <span>
+                            {image.width}x{image.height}
+                          </span>
+                        )}
+                      </div>
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {new Date(image.created_at).toLocaleDateString()}
                       </span>
                     </div>
-                  )}
-
-                  {/* Actions Menu */}
-                  {image.status === "completed" && (
-                    <div className="absolute top-2 right-2">
-                      <button
-                        onClick={() => setActiveMenu(activeMenu === image.id ? null : image.id)}
-                        className="p-1.5 rounded-lg bg-white/90 hover:bg-white shadow-sm backdrop-blur-sm"
-                      >
-                        <MoreVertical className="h-4 w-4 text-text-muted" />
-                      </button>
-
-                      {activeMenu === image.id && (
-                        <>
-                          <div className="fixed inset-0 z-40" onClick={() => setActiveMenu(null)} />
-                          <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg border border-surface-tertiary shadow-lg z-50">
-                            <button
-                              onClick={() => handleCopyUrl(getImageUrl(image.url), image.id)}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-surface-secondary"
-                            >
-                              <Copy className="h-4 w-4" />
-                              {copiedId === image.id ? "Copied!" : "Copy URL"}
-                            </button>
-                            <button
-                              onClick={() => handleDownload(getImageUrl(image.url), image.id)}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-surface-secondary"
-                            >
-                              <Download className="h-4 w-4" />
-                              Download
-                            </button>
-                            <a
-                              href={getImageUrl(image.url)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-surface-secondary"
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                              Open in New Tab
-                            </a>
-                            {wpConnected && (
-                              <button
-                                onClick={() => handleSendToWordPress(image)}
-                                disabled={wpUploading === image.id || wpUploaded.has(image.id)}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-surface-secondary disabled:opacity-50"
-                              >
-                                {wpUploading === image.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : wpUploaded.has(image.id) ? (
-                                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                                ) : (
-                                  <Globe className="h-4 w-4" />
-                                )}
-                                {wpUploaded.has(image.id) ? "Sent to WordPress" : "Send to WordPress"}
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleDelete(image.id)}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 border-t border-surface-tertiary"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              Delete
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Image Details */}
-                <div className="p-3">
-                  <p className="text-sm text-text-primary line-clamp-2 mb-2">
-                    {image.prompt}
-                  </p>
-
-                  <div className="flex items-center justify-between text-xs text-text-muted">
-                    <div className="flex items-center gap-2">
-                      {image.style && (
-                        <span className="px-2 py-0.5 bg-surface-secondary rounded-md">
-                          {image.style}
-                        </span>
-                      )}
-                      {image.width && image.height && (
-                        <span>
-                          {image.width}x{image.height}
-                        </span>
-                      )}
-                    </div>
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {new Date(image.created_at).toLocaleDateString()}
-                    </span>
                   </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
+                </Card>
+              );
+            })}
+          </div>
+        </>
       )}
 
       {/* Pagination Controls */}

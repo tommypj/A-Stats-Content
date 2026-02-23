@@ -425,6 +425,10 @@ export const api = {
         method: "POST",
         url: `/articles/${articleId}/revisions/${revisionId}/restore`,
       }),
+    linkSuggestions: (articleId: string) =>
+      apiRequest<LinkSuggestionsResponse>({
+        url: `/articles/${articleId}/link-suggestions`,
+      }),
   },
 
   // Images
@@ -1143,6 +1147,22 @@ export interface ArticleRevisionDetail extends ArticleRevision {
 export interface ArticleRevisionListResponse {
   items: ArticleRevision[];
   total: number;
+}
+
+// -------------------------------------------------------------------------
+// Internal linking suggestion types
+// -------------------------------------------------------------------------
+
+export interface LinkSuggestion {
+  id: string;
+  title: string;
+  keyword: string;
+  slug: string | null;
+  relevance_score: number;
+}
+
+export interface LinkSuggestionsResponse {
+  suggestions: LinkSuggestion[];
 }
 
 // -------------------------------------------------------------------------
