@@ -14,6 +14,9 @@ import {
   Loader2,
   BarChart2,
   XCircle,
+  Rocket,
+  X,
+  Circle,
 } from "lucide-react";
 import { api, Article, Outline, PlanInfo, UserResponse } from "@/lib/api";
 
@@ -57,6 +60,154 @@ const statusColors: Record<string, string> = {
   failed: "text-red-600",
 };
 
+interface OnboardingChecklistProps {
+  user: UserResponse | null;
+  totalArticles: number;
+  totalOutlines: number;
+  onDismiss: () => void;
+}
+
+function OnboardingChecklist({
+  user,
+  totalArticles,
+  totalOutlines,
+  onDismiss,
+}: OnboardingChecklistProps) {
+  const steps = [
+    {
+      id: "profile",
+      label: "Complete your profile",
+      description: "Add your name so we can personalise your experience.",
+      done: Boolean(user?.name && user.name.trim().length > 0),
+      href: "/settings",
+    },
+    {
+      id: "wordpress",
+      label: "Connect WordPress",
+      description: "Publish articles directly to your WordPress site.",
+      done: false, // not available from user object — link-only step
+      href: "/settings",
+      linkOnly: true,
+    },
+    {
+      id: "gsc",
+      label: "Connect Google Search Console",
+      description: "Track keyword rankings and content performance.",
+      done: false, // not available from user object — link-only step
+      href: "/analytics",
+      linkOnly: true,
+    },
+    {
+      id: "outline",
+      label: "Create your first outline",
+      description: "Generate an AI-structured content plan for any keyword.",
+      done: totalOutlines > 0,
+      href: "/outlines/new",
+    },
+    {
+      id: "article",
+      label: "Generate your first article",
+      description: "Turn an outline into a full SEO-optimised article.",
+      done: totalArticles > 0,
+      href: "/articles/new",
+    },
+  ];
+
+  const completedCount = steps.filter((s) => s.done).length;
+  const progressPercent = Math.round((completedCount / steps.length) * 100);
+
+  return (
+    <div className="card p-5">
+      {/* Header row */}
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-primary-50 flex items-center justify-center shrink-0">
+            <Rocket className="h-5 w-5 text-primary-500" />
+          </div>
+          <div>
+            <h2 className="font-display font-semibold text-text-primary leading-tight">
+              Get Started
+            </h2>
+            <p className="text-sm text-text-muted">
+              {completedCount} of {steps.length} complete
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={onDismiss}
+          aria-label="Dismiss onboarding checklist"
+          className="p-1.5 rounded-lg hover:bg-surface-secondary text-text-muted hover:text-text-secondary transition-colors shrink-0"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Progress bar */}
+      <div className="h-2 bg-surface-tertiary rounded-full overflow-hidden mb-5">
+        <div
+          className="h-full bg-primary-500 rounded-full transition-all duration-500"
+          style={{ width: `${progressPercent}%` }}
+        />
+      </div>
+
+      {/* Steps */}
+      <div className="space-y-3">
+        {steps.map((step) => (
+          <div
+            key={step.id}
+            className="flex items-center gap-3 group"
+          >
+            {/* Status icon */}
+            <div className="shrink-0">
+              {step.done ? (
+                <CheckCircle2 className="h-5 w-5 text-green-500" />
+              ) : (
+                <Circle className="h-5 w-5 text-surface-tertiary" />
+              )}
+            </div>
+
+            {/* Text */}
+            <div className="flex-1 min-w-0">
+              <p
+                className={`text-sm font-medium leading-tight ${
+                  step.done
+                    ? "line-through text-text-muted"
+                    : "text-text-primary"
+                }`}
+              >
+                {step.label}
+                {step.linkOnly && !step.done && (
+                  <span className="ml-1.5 text-xs font-normal text-text-muted">
+                    (set up)
+                  </span>
+                )}
+              </p>
+              <p
+                className={`text-xs mt-0.5 ${
+                  step.done ? "text-text-muted" : "text-text-secondary"
+                }`}
+              >
+                {step.description}
+              </p>
+            </div>
+
+            {/* Arrow link */}
+            {!step.done && (
+              <Link
+                href={step.href}
+                className="shrink-0 flex items-center gap-1 text-xs font-medium text-primary-500 hover:text-primary-600 transition-colors group-hover:translate-x-0.5"
+                aria-label={`Go to ${step.label}`}
+              >
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<UserResponse | null>(null);
@@ -67,6 +218,22 @@ export default function DashboardPage() {
   const [totalImages, setTotalImages] = useState(0);
   const [avgSeoScore, setAvgSeoScore] = useState<number | null>(null);
   const [planLimits, setPlanLimits] = useState<PlanInfo | null>(null);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOnboardingDismissed(
+        localStorage.getItem("onboarding_dismissed") === "true"
+      );
+    }
+  }, []);
+
+  function dismissOnboarding() {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("onboarding_dismissed", "true");
+    }
+    setOnboardingDismissed(true);
+  }
 
   useEffect(() => {
     loadDashboardData();
@@ -175,6 +342,16 @@ export default function DashboardPage() {
           Here's an overview of your content creation activity.
         </p>
       </div>
+
+      {/* Onboarding checklist — shown only to new users who haven't dismissed it */}
+      {!onboardingDismissed && totalArticles === 0 && totalOutlines === 0 && (
+        <OnboardingChecklist
+          user={user}
+          totalArticles={totalArticles}
+          totalOutlines={totalOutlines}
+          onDismiss={dismissOnboarding}
+        />
+      )}
 
       {/* Stats grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
