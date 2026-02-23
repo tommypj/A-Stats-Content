@@ -120,7 +120,7 @@ export default function ImagesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-display font-bold text-text-primary">
             Images
@@ -159,7 +159,7 @@ export default function ImagesPage() {
           </Link>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {images.map((image) => {
             const status = statusConfig[image.status as keyof typeof statusConfig];
             const StatusIcon = status?.icon;
@@ -354,7 +354,7 @@ export default function ImagesPage() {
                   </div>
                 )}
 
-                <div className="flex gap-3 pt-4">
+                <div className="flex flex-wrap gap-3 pt-4">
                   <Button
                     variant="outline"
                     onClick={() => handleCopyUrl(getImageUrl(selectedImage.url), selectedImage.id)}

@@ -120,7 +120,7 @@ export default function ArticlesPage() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-display font-bold text-text-primary">
             Articles
@@ -131,7 +131,7 @@ export default function ArticlesPage() {
               : `Managing articles for ${currentProject?.name}`}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {/* Content Filter (only show in project context) */}
           {!isPersonalWorkspace && currentProject && (
             <div className="flex items-center gap-1 bg-surface-secondary rounded-lg p-1">
@@ -278,7 +278,7 @@ export default function ArticlesPage() {
                       </p>
                     )}
 
-                    <div className="flex items-center gap-4 mt-2 text-sm text-text-muted">
+                    <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-text-muted">
                       <span className="px-2 py-0.5 bg-surface-secondary rounded-md">
                         {article.keyword}
                       </span>

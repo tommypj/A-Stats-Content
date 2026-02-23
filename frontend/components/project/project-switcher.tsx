@@ -67,13 +67,13 @@ export function ProjectSwitcher() {
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 mt-2 w-64 bg-white rounded-xl border border-surface-tertiary shadow-lg z-50">
+          <div className="absolute left-0 mt-2 w-64 max-w-[calc(100vw-2rem)] bg-white rounded-xl border border-surface-tertiary shadow-lg z-50 max-h-[60vh] overflow-y-auto">
             <div className="p-2">
               {/* Personal Workspace */}
               <button
                 onClick={() => handleSwitch(null)}
                 className={clsx(
-                  "flex w-full items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+                  "flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-[44px]",
                   isPersonalWorkspace
                     ? "bg-primary-50 text-primary-600"
                     : "text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
@@ -98,7 +98,7 @@ export function ProjectSwitcher() {
                   key={project.id}
                   onClick={() => handleSwitch(project.id)}
                   className={clsx(
-                    "flex w-full items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+                    "flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-[44px]",
                     currentProject?.id === project.id
                       ? "bg-primary-50 text-primary-600"
                       : "text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
@@ -128,7 +128,7 @@ export function ProjectSwitcher() {
                     setIsOpen(false);
                     setShowCreateModal(true);
                   }}
-                  className="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-sm text-text-secondary hover:bg-surface-secondary hover:text-text-primary transition-colors"
+                  className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-text-secondary hover:bg-surface-secondary hover:text-text-primary transition-colors min-h-[44px]"
                 >
                   <div className="h-8 w-8 rounded border-2 border-dashed border-surface-tertiary flex items-center justify-center">
                     <Plus className="h-4 w-4 text-text-muted" />

@@ -81,7 +81,7 @@ export default function ProjectsPage() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-text-primary">Projects</h1>
             <p className="text-text-secondary mt-1">Manage your project workspaces</p>
@@ -104,7 +104,7 @@ export default function ProjectsPage() {
   if (error) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-text-primary">Projects</h1>
             <p className="text-text-secondary mt-1">Manage your project workspaces</p>
@@ -124,26 +124,26 @@ export default function ProjectsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Projects</h1>
           <p className="text-text-secondary mt-1">
             Switch between workspaces or create a new project
           </p>
         </div>
-        <Link href="/projects/new">
+        <Link href="/projects/new" className="sm:flex-shrink-0">
           <Button leftIcon={<Plus className="h-4 w-4" />}>Create Project</Button>
         </Link>
       </div>
 
       {/* Personal Workspace Card */}
       <Card className="p-6 hover:shadow-lg transition-shadow border-2 border-primary-200">
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="flex items-start gap-4 flex-1">
-            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center">
+            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center flex-shrink-0">
               <UserIcon className="h-6 w-6 text-white" />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-text-primary text-lg">
                 Personal Workspace
               </h3>
@@ -161,6 +161,7 @@ export default function ProjectsPage() {
             isLoading={switchingProject === "personal"}
             disabled={switchingProject !== null}
             rightIcon={<ArrowRight className="h-4 w-4" />}
+            className="sm:flex-shrink-0"
           >
             Switch
           </Button>
@@ -228,7 +229,7 @@ export default function ProjectsPage() {
                     </div>
 
                     {/* Role & Actions */}
-                    <div className="flex items-center justify-between pt-2 border-t border-surface-tertiary">
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-surface-tertiary">
                       <div className="flex items-center gap-1.5">
                         <RoleIcon className={`h-4 w-4 ${roleColors[project.my_role]}`} />
                         <span className="text-sm font-medium text-text-secondary capitalize">

@@ -321,7 +321,7 @@ export default function SettingsPage() {
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
-          <div className="flex items-center gap-3 pt-2">
+          <div className="flex flex-wrap items-center gap-3 pt-2">
             <Button onClick={handleSaveProfile} disabled={saving}>
               {saving ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -383,7 +383,7 @@ export default function SettingsPage() {
 
           {passwordError && <p className="text-sm text-red-600">{passwordError}</p>}
 
-          <div className="flex items-center gap-3 pt-2">
+          <div className="flex flex-wrap items-center gap-3 pt-2">
             <Button
               onClick={handleChangePassword}
               disabled={!currentPassword || !newPassword || !confirmPassword}
@@ -407,7 +407,7 @@ export default function SettingsPage() {
           <h2 className="text-lg font-display font-semibold text-text-primary">Subscription</h2>
         </div>
 
-        <div className="flex items-center justify-between p-4 bg-surface-secondary rounded-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-surface-secondary rounded-xl">
           <div>
             <p className="font-medium text-text-primary capitalize">
               {profile?.subscription_tier || "Free"} Plan
@@ -530,7 +530,7 @@ export default function SettingsPage() {
 
                 {wpError && <p className="text-sm text-red-600">{wpError}</p>}
 
-                <div className="flex gap-2 pt-1">
+                <div className="flex flex-wrap gap-2 pt-1">
                   <Button onClick={handleWpConnect} disabled={wpConnecting}>
                     {wpConnecting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                     Connect

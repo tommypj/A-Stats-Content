@@ -119,7 +119,7 @@ export default function AdminUsersPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold text-text-primary">
             User Management
@@ -133,7 +133,7 @@ export default function AdminUsersPage() {
       <Card className="p-6">
         <div className="space-y-4">
           {/* Search and Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <div className="md:col-span-2">
               <Input
                 placeholder="Search by name or email..."
@@ -174,8 +174,8 @@ export default function AdminUsersPage() {
             </select>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               <select
                 value={statusFilter}
                 onChange={(e) => {
@@ -227,19 +227,21 @@ export default function AdminUsersPage() {
           </div>
         ) : (
           <>
-            <UserTable
-              users={users}
-              onEdit={handleEdit}
-              onSuspend={handleSuspend}
-              onUnsuspend={handleUnsuspend}
-              selectedUsers={selectedUsers}
-              onSelectUser={handleSelectUser}
-              onSelectAll={handleSelectAll}
-            />
+            <div className="overflow-x-auto">
+              <UserTable
+                users={users}
+                onEdit={handleEdit}
+                onSuspend={handleSuspend}
+                onUnsuspend={handleUnsuspend}
+                selectedUsers={selectedUsers}
+                onSelectUser={handleSelectUser}
+                onSelectAll={handleSelectAll}
+              />
+            </div>
 
             {/* Pagination */}
             {pages > 1 && (
-              <div className="p-4 border-t border-surface-tertiary flex items-center justify-between">
+              <div className="p-4 border-t border-surface-tertiary flex flex-wrap items-center justify-between gap-2">
                 <div className="text-sm text-text-muted">
                   Page {page} of {pages}
                 </div>

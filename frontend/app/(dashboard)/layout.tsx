@@ -190,8 +190,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                             <Link
                               key={subItem.name}
                               href={subItem.href}
+                              onClick={() => setSidebarOpen(false)}
                               className={clsx(
-                                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                                 isActive
                                   ? "bg-primary-800 text-cream-50"
                                   : "text-cream-300 hover:bg-primary-900 hover:text-cream-100"
@@ -214,6 +215,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.name}
                   href={item.href}
+                  onClick={() => setSidebarOpen(false)}
                   className={clsx(
                     "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
                     isActive
@@ -237,7 +239,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                   className="fixed inset-0 z-40"
                   onClick={() => setUserMenuOpen(false)}
                 />
-                <div className="absolute bottom-full left-0 right-0 z-50 mx-2 mb-1 rounded-xl bg-primary-900/95 backdrop-blur-md border border-primary-700 shadow-lg animate-in">
+                <div className="absolute bottom-full left-0 right-0 z-50 mx-2 mb-1 rounded-xl bg-primary-900/95 backdrop-blur-md border border-primary-700 shadow-lg animate-in max-h-[70vh] overflow-y-auto">
                   <div className="px-3 py-3 space-y-3">
                     {/* Connections */}
                     <div>
@@ -368,7 +370,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           <div className="flex h-full items-center justify-between px-4 lg:px-8">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden p-2 rounded-lg hover:bg-surface-secondary"
+              className="lg:hidden p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-surface-secondary"
             >
               <Menu className="h-5 w-5 text-text-secondary" />
             </button>

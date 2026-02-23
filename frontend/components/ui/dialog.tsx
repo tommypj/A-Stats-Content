@@ -62,11 +62,11 @@ const Dialog = forwardRef<HTMLDivElement, DialogProps>(
       md: "max-w-lg",
       lg: "max-w-2xl",
       xl: "max-w-4xl",
-      full: "max-w-full mx-4",
+      full: "max-w-full",
     };
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         {/* Backdrop */}
         <div
           className="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -83,6 +83,7 @@ const Dialog = forwardRef<HTMLDivElement, DialogProps>(
           aria-describedby={description ? descriptionId : undefined}
           className={cn(
             "relative bg-surface rounded-2xl shadow-xl border border-surface-tertiary w-full",
+            "flex flex-col max-h-[calc(100dvh-2rem)]",
             sizeClasses[size],
             className
           )}
@@ -90,7 +91,7 @@ const Dialog = forwardRef<HTMLDivElement, DialogProps>(
         >
           {/* Header */}
           {(title || description) && (
-            <div className="flex items-start justify-between p-6 border-b border-surface-tertiary">
+            <div className="flex items-start justify-between p-6 border-b border-surface-tertiary flex-shrink-0">
               <div>
                 {title && (
                   <h2 id={titleId} className="font-display text-2xl font-bold text-text-primary">
@@ -114,7 +115,7 @@ const Dialog = forwardRef<HTMLDivElement, DialogProps>(
           )}
 
           {/* Content */}
-          <div className="p-6">{children}</div>
+          <div className="p-6 overflow-y-auto">{children}</div>
         </div>
       </div>
     );

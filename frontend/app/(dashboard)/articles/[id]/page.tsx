@@ -207,19 +207,19 @@ export default function ArticleEditorPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div className="flex items-start gap-4 min-w-0">
           <Link
             href="/articles"
-            className="p-2 rounded-lg hover:bg-surface-secondary transition-colors"
+            className="p-2 rounded-lg hover:bg-surface-secondary transition-colors flex-shrink-0"
           >
             <ArrowLeft className="h-5 w-5 text-text-secondary" />
           </Link>
-          <div>
-            <h1 className="text-2xl font-display font-bold text-text-primary line-clamp-1">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-display font-bold text-text-primary line-clamp-2">
               {article.title}
             </h1>
-            <div className="flex items-center gap-3 mt-2 text-sm text-text-secondary">
+            <div className="flex flex-wrap items-center gap-2 mt-2 text-sm text-text-secondary">
               <span className="px-2 py-0.5 bg-surface-secondary rounded-md">
                 {article.keyword}
               </span>
@@ -229,7 +229,7 @@ export default function ArticleEditorPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:flex-shrink-0">
           {/* WordPress Status/Action */}
           {article.wordpress_post_url ? (
             <a
