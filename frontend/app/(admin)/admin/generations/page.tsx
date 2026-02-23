@@ -170,7 +170,7 @@ export default function AdminGenerationsPage() {
             />
             <StatCard
               label="Avg Duration"
-              value={formatDuration(stats.avg_duration_ms)}
+              value={formatDuration(stats.avg_duration_ms ?? undefined)}
               icon={Clock}
               color="bg-yellow-100 text-yellow-700"
             />
