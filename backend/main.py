@@ -15,6 +15,7 @@ from slowapi.errors import RateLimitExceeded
 logger = logging.getLogger(__name__)
 
 from infrastructure.config import get_settings
+from infrastructure.logging_config import setup_logging
 from infrastructure.database import init_db, close_db
 from api.routes import api_router
 from api.middleware.rate_limit import limiter
@@ -27,6 +28,13 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
+    # Configure logging before anything else so all startup messages use the
+    # correct format: JSON in production/staging, human-readable in development.
+    setup_logging(
+        json_output=not settings.debug and settings.is_production,
+        level="DEBUG" if settings.debug else "INFO",
+    )
+
     # Startup
     logger.info("Starting %s v%s", settings.app_name, settings.app_version)
     logger.info("Environment: %s", settings.environment)
@@ -138,11 +146,17 @@ async def request_logging_middleware(request: Request, call_next):
     path = request.url.path
     if not path.startswith("/api/v1/health"):
         logger.info(
-            "%s %s %d %.1fms",
+            "%s %s %s %.1fms",
             request.method,
             path,
             response.status_code,
-            duration_ms,
+            round(duration_ms, 1),
+            extra={
+                "method": request.method,
+                "path": path,
+                "status_code": response.status_code,
+                "duration_ms": round(duration_ms, 1),
+            },
         )
     return response
 
