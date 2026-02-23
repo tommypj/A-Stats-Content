@@ -143,6 +143,7 @@ class User(Base, TimestampMixin):
     login_count: Mapped[int] = mapped_column(default=0, nullable=False)
 
     # Suspension fields
+    # Note: redundant with status == "suspended", kept for backward compatibility
     is_suspended: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     suspended_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True

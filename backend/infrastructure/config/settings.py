@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/astats"
     database_echo: bool = False
+    db_pool_size: int = 5
+    db_max_overflow: int = 10
 
     @field_validator("database_url", mode="before")
     @classmethod

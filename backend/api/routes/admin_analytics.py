@@ -257,45 +257,29 @@ async def get_dashboard_stats(
     )
 
     # ========== PLATFORM USAGE TRENDS ==========
-    # 7-day trend: count active users per day
+    # Single GROUP BY query for active users per day over last 30 days
+    start_30d = now - timedelta(days=30)
+    usage_daily_result = await db.execute(
+        select(
+            func.date(User.last_login).label("day"),
+            func.count(User.id).label("count"),
+        )
+        .where(User.last_login >= start_30d)
+        .group_by(func.date(User.last_login))
+    )
+    usage_daily_counts = {row.day: row.count for row in usage_daily_result}
+
+    # Build 7-day list from the cached daily counts
     usage_7d = []
-    for i in range(7):
-        day_start = now - timedelta(days=i)
-        day_end = day_start + timedelta(days=1)
-        day_date = day_start.date()
+    for i in range(6, -1, -1):
+        day_date = (now - timedelta(days=i)).date()
+        usage_7d.append(TimeSeriesData(date=day_date, value=usage_daily_counts.get(day_date, 0)))
 
-        active_count_result = await db.execute(
-            select(func.count(User.id)).where(
-                and_(
-                    User.last_login >= day_start,
-                    User.last_login < day_end
-                )
-            )
-        )
-        active_count = active_count_result.scalar() or 0
-        usage_7d.append(TimeSeriesData(date=day_date, value=active_count))
-
-    usage_7d.reverse()  # Chronological order
-
-    # 30-day trend
+    # Build 30-day list from the cached daily counts
     usage_30d = []
-    for i in range(30):
-        day_start = now - timedelta(days=i)
-        day_end = day_start + timedelta(days=1)
-        day_date = day_start.date()
-
-        active_count_result = await db.execute(
-            select(func.count(User.id)).where(
-                and_(
-                    User.last_login >= day_start,
-                    User.last_login < day_end
-                )
-            )
-        )
-        active_count = active_count_result.scalar() or 0
-        usage_30d.append(TimeSeriesData(date=day_date, value=active_count))
-
-    usage_30d.reverse()  # Chronological order
+    for i in range(29, -1, -1):
+        day_date = (now - timedelta(days=i)).date()
+        usage_30d.append(TimeSeriesData(date=day_date, value=usage_daily_counts.get(day_date, 0)))
 
     return DashboardStatsResponse(
         users=user_stats,
@@ -334,40 +318,43 @@ async def get_user_analytics(
     thirty_days_ago = now - timedelta(days=30)
 
     # ========== SIGNUP TRENDS ==========
+    # Single GROUP BY query for total signups per day
+    signups_daily_result = await db.execute(
+        select(
+            func.date(User.created_at).label("day"),
+            func.count(User.id).label("count"),
+        )
+        .where(User.created_at >= thirty_days_ago)
+        .group_by(func.date(User.created_at))
+    )
+    signups_daily_counts = {row.day: row.count for row in signups_daily_result}
+
+    # Single GROUP BY query for verified signups per day
+    verified_daily_result = await db.execute(
+        select(
+            func.date(User.created_at).label("day"),
+            func.count(User.id).label("count"),
+        )
+        .where(
+            and_(
+                User.created_at >= thirty_days_ago,
+                User.email_verified == True,
+            )
+        )
+        .group_by(func.date(User.created_at))
+    )
+    verified_daily_counts = {row.day: row.count for row in verified_daily_result}
+
     signup_trends = []
-    for i in range(30):
-        day_start = now - timedelta(days=i)
-        day_end = day_start + timedelta(days=1)
-        day_date = day_start.date()
-
-        # Count signups
-        signups_result = await db.execute(
-            select(func.count(User.id)).where(
-                and_(
-                    User.created_at >= day_start,
-                    User.created_at < day_end
-                )
-            )
-        )
-        signups = signups_result.scalar() or 0
-
-        # Count verified signups on that day
-        verified_result = await db.execute(
-            select(func.count(User.id)).where(
-                and_(
-                    User.created_at >= day_start,
-                    User.created_at < day_end,
-                    User.email_verified == True
-                )
-            )
-        )
-        verified = verified_result.scalar() or 0
-
+    for i in range(29, -1, -1):
+        day_date = (now - timedelta(days=i)).date()
         signup_trends.append(
-            SignupTrend(date=day_date, signups=signups, verified=verified)
+            SignupTrend(
+                date=day_date,
+                signups=signups_daily_counts.get(day_date, 0),
+                verified=verified_daily_counts.get(day_date, 0),
+            )
         )
-
-    signup_trends.reverse()  # Chronological order
 
     # ========== RETENTION METRICS ==========
     # Day 1 retention: % of users who logged in 1 day after signup
@@ -518,50 +505,50 @@ async def get_content_analytics(
     now = datetime.now(timezone.utc)
 
     # ========== CONTENT TRENDS ==========
+    thirty_days_ago = now - timedelta(days=30)
+
+    # Single GROUP BY query per content type, then merge
+    articles_daily_result = await db.execute(
+        select(
+            func.date(Article.created_at).label("day"),
+            func.count(Article.id).label("count"),
+        )
+        .where(Article.created_at >= thirty_days_ago)
+        .group_by(func.date(Article.created_at))
+    )
+    articles_daily = {row.day: row.count for row in articles_daily_result}
+
+    outlines_daily_result = await db.execute(
+        select(
+            func.date(Outline.created_at).label("day"),
+            func.count(Outline.id).label("count"),
+        )
+        .where(Outline.created_at >= thirty_days_ago)
+        .group_by(func.date(Outline.created_at))
+    )
+    outlines_daily = {row.day: row.count for row in outlines_daily_result}
+
+    images_daily_result = await db.execute(
+        select(
+            func.date(GeneratedImage.created_at).label("day"),
+            func.count(GeneratedImage.id).label("count"),
+        )
+        .where(GeneratedImage.created_at >= thirty_days_ago)
+        .group_by(func.date(GeneratedImage.created_at))
+    )
+    images_daily = {row.day: row.count for row in images_daily_result}
+
     content_trends = []
-    for i in range(30):
-        day_start = now - timedelta(days=i)
-        day_end = day_start + timedelta(days=1)
-        day_date = day_start.date()
-
-        # Count articles created
-        articles_result = await db.execute(
-            select(func.count(Article.id)).where(
-                and_(
-                    Article.created_at >= day_start,
-                    Article.created_at < day_end
-                )
-            )
-        )
-        articles = articles_result.scalar() or 0
-
-        # Count outlines created
-        outlines_result = await db.execute(
-            select(func.count(Outline.id)).where(
-                and_(
-                    Outline.created_at >= day_start,
-                    Outline.created_at < day_end
-                )
-            )
-        )
-        outlines = outlines_result.scalar() or 0
-
-        # Count images created
-        images_result = await db.execute(
-            select(func.count(GeneratedImage.id)).where(
-                and_(
-                    GeneratedImage.created_at >= day_start,
-                    GeneratedImage.created_at < day_end
-                )
-            )
-        )
-        images = images_result.scalar() or 0
-
+    for i in range(29, -1, -1):
+        day_date = (now - timedelta(days=i)).date()
         content_trends.append(
-            ContentTrend(date=day_date, articles=articles, outlines=outlines, images=images)
+            ContentTrend(
+                date=day_date,
+                articles=articles_daily.get(day_date, 0),
+                outlines=outlines_daily.get(day_date, 0),
+                images=images_daily.get(day_date, 0),
+            )
         )
-
-    content_trends.reverse()  # Chronological order
 
     # ========== TOP USERS BY CONTENT ==========
     # Use subqueries to count content per user

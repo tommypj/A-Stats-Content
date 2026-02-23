@@ -20,6 +20,7 @@ from api.schemas.content import (
     OutlineListResponse,
 )
 from api.routes.auth import get_current_user
+from api.utils import escape_like
 from infrastructure.database.connection import get_db
 from infrastructure.database.models import Outline, User, ContentStatus
 from adapters.ai.anthropic_adapter import content_ai_service
@@ -29,10 +30,6 @@ from services.generation_tracker import GenerationTracker
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/outlines", tags=["outlines"])
-
-
-def _escape_like(value: str) -> str:
-    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 @router.post("", response_model=OutlineResponse, status_code=status.HTTP_201_CREATED)
@@ -168,7 +165,7 @@ async def list_outlines(
     if status:
         query = query.where(Outline.status == status)
     if keyword:
-        query = query.where(Outline.keyword.ilike(f"%{_escape_like(keyword)}%"))
+        query = query.where(Outline.keyword.ilike(f"%{escape_like(keyword)}%"))
 
     # Count total
     count_query = select(func.count()).select_from(query.subquery())

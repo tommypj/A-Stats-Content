@@ -4,6 +4,7 @@ Replicate adapter for AI image generation using Ideogram V3 Turbo.
 
 import asyncio
 import logging
+import random
 from typing import Optional
 from dataclasses import dataclass
 
@@ -15,6 +16,21 @@ except ImportError:
 from infrastructure.config.settings import settings
 
 logger = logging.getLogger(__name__)
+
+
+async def _retry_with_backoff(coro_factory, max_retries=3, base_delay=1.0):
+    """Retry an async operation with exponential backoff + jitter."""
+    for attempt in range(max_retries + 1):
+        try:
+            return await coro_factory()
+        except Exception as e:
+            error_str = str(e).lower()
+            is_transient = any(k in error_str for k in ["rate_limit", "429", "500", "502", "503", "504", "overloaded", "connection", "timeout"])
+            if not is_transient or attempt == max_retries:
+                raise
+            delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
+            logger.warning("Transient API error (attempt %d/%d), retrying in %.1fs: %s", attempt + 1, max_retries, delay, str(e))
+            await asyncio.sleep(delay)
 
 
 @dataclass
@@ -122,12 +138,22 @@ class ReplicateImageService:
                 enhanced_prompt = f"{prompt}, {style_cfg['prompt_suffix']}"
 
             # Run Replicate model in a thread pool (synchronous client)
-            output = await asyncio.to_thread(
-                self._run_model,
-                enhanced_prompt,
-                width,
-                height,
-                style_cfg,
+            # Capture locals for lambda closure
+            _prompt_cap = enhanced_prompt
+            _width_cap = width
+            _height_cap = height
+            _style_cfg_cap = style_cfg
+            output = await _retry_with_backoff(
+                lambda: asyncio.wait_for(
+                    asyncio.to_thread(
+                        self._run_model,
+                        _prompt_cap,
+                        _width_cap,
+                        _height_cap,
+                        _style_cfg_cap,
+                    ),
+                    timeout=300,  # 5 minute timeout
+                )
             )
 
             # Replicate models return various types: URL string, list of URLs, or FileOutput

@@ -40,6 +40,7 @@ from api.schemas.analytics import (
     ContentSuggestionsResponse,
 )
 from api.routes.auth import get_current_user
+from api.utils import escape_like
 from infrastructure.database.connection import get_db
 from infrastructure.database.models import User
 from infrastructure.database.models.analytics import (
@@ -57,10 +58,6 @@ router = APIRouter(prefix="/analytics", tags=["analytics"])
 # ============================================================================
 # Helper Functions
 # ============================================================================
-
-
-def _escape_like(value: str) -> str:
-    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def calculate_trend(current: float, previous: float) -> TrendData:
@@ -565,7 +562,7 @@ async def get_keyword_rankings(
     if end_date:
         query = query.where(KeywordRanking.date <= end_date)
     if keyword:
-        query = query.where(KeywordRanking.keyword.ilike(f"%{_escape_like(keyword)}%"))
+        query = query.where(KeywordRanking.keyword.ilike(f"%{escape_like(keyword)}%"))
 
     # Get total count
     count_query = select(func.count()).select_from(query.subquery())
@@ -615,7 +612,7 @@ async def get_page_performances(
     if end_date:
         query = query.where(PagePerformance.date <= end_date)
     if page_url:
-        query = query.where(PagePerformance.page_url.ilike(f"%{_escape_like(page_url)}%"))
+        query = query.where(PagePerformance.page_url.ilike(f"%{escape_like(page_url)}%"))
 
     # Get total count
     count_query = select(func.count()).select_from(query.subquery())
@@ -858,86 +855,118 @@ async def get_article_performance(
     previous_start = start_date - timedelta(days=period_length)
     previous_end = start_date - timedelta(days=1)
 
-    # Fetch all published articles for this user
-    articles_query = select(Article).where(
-        and_(
-            Article.user_id == current_user.id,
-            Article.published_url.isnot(None),
-            Article.published_url != "",
+    # Count total published articles (for pagination metadata)
+    total_published_result = await db.execute(
+        select(func.count(Article.id)).where(
+            and_(
+                Article.user_id == current_user.id,
+                Article.published_url.isnot(None),
+                Article.published_url != "",
+            )
         )
     )
-    articles_result = await db.execute(articles_query)
-    articles = articles_result.scalars().all()
+    total_published = total_published_result.scalar() or 0
 
-    total_published = len(articles)
+    # Aggregate current-period performance per page_url in a single query
+    current_agg_result = await db.execute(
+        select(
+            PagePerformance.page_url,
+            func.sum(PagePerformance.clicks).label("total_clicks"),
+            func.sum(PagePerformance.impressions).label("total_impressions"),
+            func.avg(PagePerformance.ctr).label("avg_ctr"),
+            func.avg(PagePerformance.position).label("avg_position"),
+            func.count(PagePerformance.id).label("row_count"),
+        )
+        .where(
+            and_(
+                PagePerformance.user_id == current_user.id,
+                PagePerformance.date >= start_date,
+                PagePerformance.date <= end_date,
+            )
+        )
+        .group_by(PagePerformance.page_url)
+    )
+    current_agg: dict[str, dict] = {
+        normalize_url(row.page_url): {
+            "total_clicks": row.total_clicks or 0,
+            "total_impressions": row.total_impressions or 0,
+            "avg_ctr": float(row.avg_ctr or 0.0),
+            "avg_position": float(row.avg_position or 0.0),
+            "row_count": row.row_count,
+        }
+        for row in current_agg_result
+    }
 
-    # Fetch all page performance rows in the current period
-    current_perf_query = select(PagePerformance).where(
-        and_(
-            PagePerformance.user_id == current_user.id,
-            PagePerformance.date >= start_date,
-            PagePerformance.date <= end_date,
+    # Aggregate previous-period performance per page_url in a single query
+    previous_agg_result = await db.execute(
+        select(
+            PagePerformance.page_url,
+            func.sum(PagePerformance.clicks).label("prev_clicks"),
+            func.avg(PagePerformance.position).label("prev_position"),
+            func.count(PagePerformance.id).label("row_count"),
+        )
+        .where(
+            and_(
+                PagePerformance.user_id == current_user.id,
+                PagePerformance.date >= previous_start,
+                PagePerformance.date <= previous_end,
+            )
+        )
+        .group_by(PagePerformance.page_url)
+    )
+    previous_agg: dict[str, dict] = {
+        normalize_url(row.page_url): {
+            "prev_clicks": row.prev_clicks or 0,
+            "prev_position": float(row.prev_position or 0.0),
+            "row_count": row.row_count,
+        }
+        for row in previous_agg_result
+    }
+
+    # Fetch published articles for this user (all, for cross-referencing with perf data)
+    articles_result = await db.execute(
+        select(
+            Article.id,
+            Article.title,
+            Article.keyword,
+            Article.published_url,
+            Article.published_at,
+            Article.seo_score,
+        ).where(
+            and_(
+                Article.user_id == current_user.id,
+                Article.published_url.isnot(None),
+                Article.published_url != "",
+            )
         )
     )
-    current_perf_result = await db.execute(current_perf_query)
-    current_perf_rows = current_perf_result.scalars().all()
+    articles = articles_result.all()
 
-    # Fetch previous period performance
-    previous_perf_query = select(PagePerformance).where(
-        and_(
-            PagePerformance.user_id == current_user.id,
-            PagePerformance.date >= previous_start,
-            PagePerformance.date <= previous_end,
-        )
-    )
-    previous_perf_result = await db.execute(previous_perf_query)
-    previous_perf_rows = previous_perf_result.scalars().all()
-
-    # Build lookup maps by normalized URL
-    current_by_url: dict[str, list] = {}
-    for row in current_perf_rows:
-        key = normalize_url(row.page_url)
-        current_by_url.setdefault(key, []).append(row)
-
-    previous_by_url: dict[str, list] = {}
-    for row in previous_perf_rows:
-        key = normalize_url(row.page_url)
-        previous_by_url.setdefault(key, []).append(row)
-
-    # Cross-reference articles with performance data
+    # Cross-reference articles with aggregated performance data
     items: list[ArticlePerformanceItem] = []
     articles_with_data = 0
 
     for article in articles:
         norm_url = normalize_url(article.published_url)
-        current_rows = current_by_url.get(norm_url, [])
-        previous_rows = previous_by_url.get(norm_url, [])
+        cur = current_agg.get(norm_url)
+        prev = previous_agg.get(norm_url)
 
-        total_clicks = sum(r.clicks for r in current_rows)
-        total_impressions = sum(r.impressions for r in current_rows)
-        avg_ctr = (
-            sum(r.ctr for r in current_rows) / len(current_rows)
-            if current_rows
-            else 0.0
-        )
-        avg_position = (
-            sum(r.position for r in current_rows) / len(current_rows)
-            if current_rows
-            else 0.0
-        )
+        total_clicks = cur["total_clicks"] if cur else 0
+        total_impressions = cur["total_impressions"] if cur else 0
+        avg_ctr = cur["avg_ctr"] if cur else 0.0
+        avg_position = cur["avg_position"] if cur else 0.0
 
-        prev_clicks = sum(r.clicks for r in previous_rows)
-        prev_position = (
-            sum(r.position for r in previous_rows) / len(previous_rows)
-            if previous_rows
-            else 0.0
-        )
+        prev_clicks = prev["prev_clicks"] if prev else 0
+        prev_position = prev["prev_position"] if prev else 0.0
 
-        clicks_trend = calculate_trend(total_clicks, prev_clicks) if current_rows or previous_rows else None
-        position_trend = calculate_trend(avg_position, prev_position) if current_rows or previous_rows else None
+        has_current = cur is not None
+        has_previous = prev is not None
+
+        clicks_trend = calculate_trend(total_clicks, prev_clicks) if has_current or has_previous else None
+        position_trend = calculate_trend(avg_position, prev_position) if has_current or has_previous else None
 
         # Determine performance status
-        if not current_rows and not previous_rows:
+        if not has_current and not has_previous:
             perf_status = "new"
         elif clicks_trend and clicks_trend.change_percent > 5:
             perf_status = "improving"
@@ -946,7 +975,7 @@ async def get_article_performance(
         else:
             perf_status = "neutral"
 
-        if current_rows:
+        if has_current:
             articles_with_data += 1
 
         items.append(
@@ -980,6 +1009,7 @@ async def get_article_performance(
 
     total = len(items)
     pages_count = math.ceil(total / page_size) if total > 0 else 0
+    # Apply pagination at Python level after sorting (DB-level OFFSET requires pre-sorted subquery)
     paginated = items[(page - 1) * page_size : page * page_size]
 
     return ArticlePerformanceListResponse(

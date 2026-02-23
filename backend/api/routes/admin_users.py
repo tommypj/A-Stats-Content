@@ -18,6 +18,7 @@ from core.security.tokens import TokenService
 from infrastructure.config.settings import settings
 from adapters.email.resend_adapter import email_service
 from api.deps_admin import get_current_admin_user, get_current_super_admin_user
+from api.utils import escape_like
 from api.schemas.admin import (
     UserListResponse,
     UserListItemResponse,
@@ -35,10 +36,6 @@ from api.schemas.admin import (
 )
 
 router = APIRouter(prefix="/admin", tags=["Admin - Users"])
-
-
-def _escape_like(value: str) -> str:
-    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 # Initialize token service
@@ -152,7 +149,7 @@ async def list_users(
     filters = []
 
     if search:
-        search_pattern = f"%{_escape_like(search)}%"
+        search_pattern = f"%{escape_like(search)}%"
         filters.append(
             or_(
                 User.email.ilike(search_pattern),

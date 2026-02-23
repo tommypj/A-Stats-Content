@@ -2,8 +2,10 @@
 Anthropic Claude adapter for AI content generation.
 """
 
+import asyncio
 import json
 import logging
+import random
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 
@@ -12,6 +14,21 @@ import anthropic
 from infrastructure.config.settings import settings
 
 logger = logging.getLogger(__name__)
+
+
+async def _retry_with_backoff(coro_factory, max_retries=3, base_delay=1.0):
+    """Retry an async operation with exponential backoff + jitter."""
+    for attempt in range(max_retries + 1):
+        try:
+            return await coro_factory()
+        except Exception as e:
+            error_str = str(e).lower()
+            is_transient = any(k in error_str for k in ["rate_limit", "429", "500", "502", "503", "504", "overloaded", "connection", "timeout"])
+            if not is_transient or attempt == max_retries:
+                raise
+            delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
+            logger.warning("Transient API error (attempt %d/%d), retrying in %.1fs: %s", attempt + 1, max_retries, delay, str(e))
+            await asyncio.sleep(delay)
 
 
 @dataclass
@@ -206,12 +223,12 @@ Respond in JSON format:
     "estimated_read_time": 7
 }}"""
 
-        message = await self._client.messages.create(
+        message = await _retry_with_backoff(lambda: self._client.messages.create(
             model=self._model,
             max_tokens=self._max_tokens,
             system=self._get_system_prompt(writing_style="balanced", voice="second_person", list_usage="balanced", language=language),
             messages=[{"role": "user", "content": prompt}],
-        )
+        ))
 
         # Parse the response
         response_text = message.content[0].text
@@ -335,12 +352,13 @@ META_DESCRIPTION: [A compelling 150-160 character meta description]"""
         # Generate with retry on truncation
         max_attempts = 2
         for attempt in range(max_attempts):
-            message = await self._client.messages.create(
+            _max_tokens_capture = max_tokens
+            message = await _retry_with_backoff(lambda: self._client.messages.create(
                 model=self._model,
-                max_tokens=max_tokens,
+                max_tokens=_max_tokens_capture,
                 system=self._get_system_prompt(writing_style=writing_style, voice=voice, list_usage=list_usage, language=language),
                 messages=[{"role": "user", "content": prompt}],
-            )
+            ))
 
             if message.stop_reason == "max_tokens" and attempt < max_attempts - 1:
                 # Response was truncated — retry with 50% more tokens
@@ -417,11 +435,12 @@ Return ONLY the corrected article in markdown format. No explanations or notes.
 ARTICLE:
 {content}"""
 
-        message = await self._client.messages.create(
+        _proofread_max_tokens = max(len(content.split()) * 3, 4000)
+        message = await _retry_with_backoff(lambda: self._client.messages.create(
             model=self._model,
-            max_tokens=max(len(content.split()) * 3, 4000),
+            max_tokens=_proofread_max_tokens,
             messages=[{"role": "user", "content": prompt}],
-        )
+        ))
 
         return message.content[0].text
 
@@ -459,12 +478,12 @@ Original content:
 
 Provide the improved version in markdown format."""
 
-        message = await self._client.messages.create(
+        message = await _retry_with_backoff(lambda: self._client.messages.create(
             model=self._model,
             max_tokens=8000,
             system=self._get_system_prompt(writing_style="balanced", voice="second_person", list_usage="balanced"),
             messages=[{"role": "user", "content": prompt}],
-        )
+        ))
 
         return message.content[0].text
 
@@ -492,11 +511,11 @@ Requirements:
 
 Respond with ONLY the meta description, nothing else."""
 
-        message = await self._client.messages.create(
+        message = await _retry_with_backoff(lambda: self._client.messages.create(
             model=self._model,
             max_tokens=200,
             messages=[{"role": "user", "content": prompt}],
-        )
+        ))
 
         return message.content[0].text.strip()[:160]
 
@@ -611,11 +630,11 @@ Respond in JSON format:
     "instagram": "instagram caption here"
 }}"""
 
-        message = await self._client.messages.create(
+        message = await _retry_with_backoff(lambda: self._client.messages.create(
             model=self._model,
             max_tokens=2000,
             messages=[{"role": "user", "content": prompt}],
-        )
+        ))
 
         response_text = message.content[0].text
 
@@ -669,11 +688,11 @@ Requirements:
 
 Respond with ONLY the image prompt, nothing else."""
 
-        message = await self._client.messages.create(
+        message = await _retry_with_backoff(lambda: self._client.messages.create(
             model=self._model,
             max_tokens=200,
             messages=[{"role": "user", "content": prompt}],
-        )
+        ))
 
         return message.content[0].text.strip()
 
@@ -754,11 +773,11 @@ Respond in JSON format:
 }}"""
 
         try:
-            message = await self._client.messages.create(
+            message = await _retry_with_backoff(lambda: self._client.messages.create(
                 model=self._model,
                 max_tokens=2000,
                 messages=[{"role": "user", "content": prompt}],
-            )
+            ))
 
             response_text = message.content[0].text
 
@@ -798,12 +817,15 @@ Respond in JSON format:
             return "This is a mock response for development. Configure ANTHROPIC_API_KEY to use real AI."
 
         try:
-            message = await self._client.messages.create(
+            _gt_max_tokens = max_tokens
+            _gt_temperature = temperature
+            _gt_prompt = prompt
+            message = await _retry_with_backoff(lambda: self._client.messages.create(
                 model=self._model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                messages=[{"role": "user", "content": prompt}],
-            )
+                max_tokens=_gt_max_tokens,
+                temperature=_gt_temperature,
+                messages=[{"role": "user", "content": _gt_prompt}],
+            ))
 
             response_text = message.content[0].text
             logger.debug(f"Generated text response ({len(response_text)} chars)")

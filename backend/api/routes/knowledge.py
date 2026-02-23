@@ -34,6 +34,7 @@ from api.schemas.knowledge import (
     ReprocessResponse,
 )
 from api.routes.auth import get_current_user
+from api.utils import escape_like
 from infrastructure.database.connection import get_db
 from infrastructure.database.models import KnowledgeSource, KnowledgeQuery, User, SourceStatus
 
@@ -49,10 +50,6 @@ ALLOWED_FILE_TYPES = {
     "text/html": "html",
 }
 ALLOWED_EXTENSIONS = {"pdf", "txt", "md", "docx", "html"}
-
-
-def _escape_like(value: str) -> str:
-    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def get_file_extension(filename: str) -> str:
@@ -190,7 +187,7 @@ async def list_sources(
         query = query.where(KnowledgeSource.file_type == file_type)
 
     if search:
-        search_pattern = f"%{_escape_like(search)}%"
+        search_pattern = f"%{escape_like(search)}%"
         query = query.where(
             (KnowledgeSource.title.ilike(search_pattern))
             | (KnowledgeSource.filename.ilike(search_pattern))

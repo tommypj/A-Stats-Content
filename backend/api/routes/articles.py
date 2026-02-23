@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from api.middleware.rate_limit import limiter
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 from api.schemas.content import (
     ArticleCreateRequest,
@@ -28,6 +29,7 @@ from api.schemas.content import (
     SocialPostUpdateRequest,
 )
 from api.routes.auth import get_current_user
+from api.utils import escape_like
 from infrastructure.database.connection import get_db, async_session_maker
 from infrastructure.database.models import Article, Outline, User, ContentStatus
 from adapters.ai.anthropic_adapter import content_ai_service, GeneratedArticle
@@ -43,10 +45,6 @@ _generation_semaphore = asyncio.Semaphore(5)
 
 # Track active generation tasks so they are not garbage-collected mid-flight
 _active_generation_tasks: dict[str, asyncio.Task] = {}
-
-
-def _escape_like(value: str) -> str:
-    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def slugify(text: str) -> str:
@@ -508,9 +506,13 @@ async def list_articles(
     List user's articles with pagination and filtering.
     """
     if current_user.current_project_id:
-        query = select(Article).where(Article.project_id == current_user.current_project_id)
+        query = select(Article).options(
+            defer(Article.content), defer(Article.content_html)
+        ).where(Article.project_id == current_user.current_project_id)
     else:
-        query = select(Article).where(
+        query = select(Article).options(
+            defer(Article.content), defer(Article.content_html)
+        ).where(
             Article.user_id == current_user.id,
             Article.project_id.is_(None),
         )
@@ -518,7 +520,7 @@ async def list_articles(
     if status:
         query = query.where(Article.status == status)
     if keyword:
-        query = query.where(Article.keyword.ilike(f"%{_escape_like(keyword)}%"))
+        query = query.where(Article.keyword.ilike(f"%{escape_like(keyword)}%"))
 
     count_query = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_query)).scalar() or 0

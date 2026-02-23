@@ -181,7 +181,7 @@ class GenerationTracker:
                     return False
 
                 # Get plan limits
-                from api.routes.billing import PLANS
+                from core.plans import PLANS
                 plan = PLANS.get(user.subscription_tier or "free", PLANS["free"])
                 limits = plan.get("limits", {})
 
@@ -237,7 +237,7 @@ class GenerationTracker:
                 return tier_limits.get(resource_key)
             elif user_id:
                 from infrastructure.database.models.user import User
-                from api.routes.billing import PLANS
+                from core.plans import PLANS
                 user_result = await self.db.execute(
                     select(User).where(User.id == user_id)
                 )
