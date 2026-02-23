@@ -751,10 +751,12 @@ export const api = {
 
   // Projects (Multi-tenancy)
   projects: {
-    list: () =>
-      apiRequest<Project[]>({
+    list: async () => {
+      const response = await apiRequest<{ projects: Project[]; total: number }>({
         url: "/projects",
-      }),
+      });
+      return response.projects;
+    },
     get: (id: string) =>
       apiRequest<Project>({
         url: `/projects/${id}`,
@@ -782,10 +784,12 @@ export const api = {
         url: "/projects/switch",
         data: { project_id: id },
       }),
-    getCurrent: () =>
-      apiRequest<Project | null>({
+    getCurrent: async (): Promise<Project | null> => {
+      const response = await apiRequest<{ project: Project | null; is_personal_workspace: boolean }>({
         url: "/projects/current",
-      }),
+      });
+      return response.project;
+    },
     uploadLogo: (projectId: string, file: File) => {
       const formData = new FormData();
       formData.append("logo", file);

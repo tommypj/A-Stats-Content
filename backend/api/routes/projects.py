@@ -198,12 +198,15 @@ async def list_projects(
             "slug": project.slug,
             "description": project.description,
             "avatar_url": project.avatar_url,
+            "logo_url": project.avatar_url,
             "owner_id": project.owner_id,
             "subscription_tier": project.subscription_tier,
             "subscription_status": project.subscription_status,
             "member_count": member_count,
             "current_user_role": membership.role,
+            "my_role": membership.role,
             "created_at": project.created_at,
+            "updated_at": project.updated_at,
         })
 
     return ProjectListResponse(
@@ -254,12 +257,59 @@ async def get_current_project(
     count_result = await db.execute(count_stmt)
     member_count = count_result.scalar()
 
+    # Get user's role in this project
+    role_stmt = select(ProjectMember.role).where(
+        and_(
+            ProjectMember.project_id == project.id,
+            ProjectMember.user_id == current_user.id,
+            ProjectMember.deleted_at.is_(None),
+        )
+    )
+    role_result = await db.execute(role_stmt)
+    user_role = role_result.scalar()
+
     response = ProjectResponse.model_validate(project)
     response.member_count = member_count
+    response.current_user_role = user_role
+    response.my_role = user_role
+    response.logo_url = project.avatar_url
 
     return CurrentProjectResponse(
         project=response,
         is_personal_workspace=False,
+    )
+
+
+@router.post("/switch", response_model=SwitchProjectResponse)
+async def switch_project_by_body(
+    request: SwitchProjectRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Switch to a different project or back to personal workspace.
+
+    Accepts project_id in the request body. Pass null to switch to personal workspace.
+    """
+    if request.project_id is None:
+        # Switch to personal workspace
+        current_user.current_project_id = None
+        await db.commit()
+        return SwitchProjectResponse(
+            message="Switched to personal workspace",
+            current_project_id=None,
+        )
+
+    # Verify membership before switching
+    membership = await get_project_member(request.project_id, current_user.id, db)
+
+    # Update user's current project
+    current_user.current_project_id = request.project_id
+    await db.commit()
+
+    return SwitchProjectResponse(
+        message="Switched to project successfully",
+        current_project_id=request.project_id,
     )
 
 
