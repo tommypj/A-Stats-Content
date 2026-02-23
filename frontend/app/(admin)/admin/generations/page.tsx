@@ -126,7 +126,6 @@ export default function AdminGenerationsPage() {
 
   const handleSearch = () => {
     setPage(1);
-    loadLogs();
   };
 
   return (

@@ -115,13 +115,18 @@ async def create_outline(
             outline.status = ContentStatus.FAILED.value
             outline.generation_error = str(e)
 
+            # Log failure in a separate session to avoid corrupting the main session
             duration_ms = int((time.time() - start_time) * 1000)
             try:
-                await tracker.log_failure(
-                    log_id=gen_log.id,
-                    error_message=str(e),
-                    duration_ms=duration_ms,
-                )
+                from infrastructure.database.connection import async_session_maker
+                async with async_session_maker() as tracker_db:
+                    fail_tracker = GenerationTracker(tracker_db)
+                    await fail_tracker.log_failure(
+                        log_id=gen_log.id,
+                        error_message=str(e),
+                        duration_ms=duration_ms,
+                    )
+                    await tracker_db.commit()
             except Exception:
                 logger.warning("Failed to log outline generation failure for %s", outline_id)
 
@@ -343,13 +348,18 @@ async def regenerate_outline(
         outline.status = ContentStatus.FAILED.value
         outline.generation_error = str(e)
 
+        # Log failure in a separate session to avoid corrupting the main session
         duration_ms = int((time.time() - start_time) * 1000)
         try:
-            await tracker.log_failure(
-                log_id=gen_log.id,
-                error_message=str(e),
-                duration_ms=duration_ms,
-            )
+            from infrastructure.database.connection import async_session_maker
+            async with async_session_maker() as tracker_db:
+                fail_tracker = GenerationTracker(tracker_db)
+                await fail_tracker.log_failure(
+                    log_id=gen_log.id,
+                    error_message=str(e),
+                    duration_ms=duration_ms,
+                )
+                await tracker_db.commit()
         except Exception:
             logger.warning("Failed to log outline regeneration failure for %s", outline_id)
 

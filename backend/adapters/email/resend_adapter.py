@@ -118,43 +118,43 @@ class ResendEmailService:
             print(f"Failed to send welcome email: {e}")
             return False
 
-    async def send_team_invitation_email(
+    async def send_project_invitation_email(
         self,
         to_email: str,
         inviter_name: str,
-        team_name: str,
+        project_name: str,
         role: str,
         invitation_url: str,
     ) -> bool:
         """
-        Send team invitation email.
+        Send project invitation email.
 
         Args:
             to_email: Recipient email address
             inviter_name: Name of the person who sent the invitation
-            team_name: Name of the team
-            role: Role the user will have in the team
+            project_name: Name of the project
+            role: Role the user will have in the project
             invitation_url: URL to accept the invitation
 
         Returns:
             True if sent successfully, False otherwise
         """
         if not settings.resend_api_key:
-            print(f"[DEV] Team invitation email for {to_email}: {invitation_url}")
+            print(f"[DEV] Project invitation email for {to_email}: {invitation_url}")
             return True
 
         try:
             resend.Emails.send({
                 "from": self._from_email,
                 "to": to_email,
-                "subject": f"You've been invited to join {team_name} on A-Stats",
-                "html": self._get_team_invitation_email_html(
-                    inviter_name, team_name, role, invitation_url
+                "subject": f"You've been invited to join {project_name} on A-Stats",
+                "html": self._get_project_invitation_email_html(
+                    inviter_name, project_name, role, invitation_url
                 ),
             })
             return True
         except Exception as e:
-            print(f"Failed to send team invitation email: {e}")
+            print(f"Failed to send project invitation email: {e}")
             return False
 
     def _get_verification_email_html(self, user_name: str, verification_url: str) -> str:
@@ -292,10 +292,10 @@ class ResendEmailService:
         </html>
         """
 
-    def _get_team_invitation_email_html(
-        self, inviter_name: str, team_name: str, role: str, invitation_url: str
+    def _get_project_invitation_email_html(
+        self, inviter_name: str, project_name: str, role: str, invitation_url: str
     ) -> str:
-        """Generate team invitation email HTML."""
+        """Generate project invitation email HTML."""
         # Format role nicely
         role_display = role.title()
 
@@ -313,16 +313,16 @@ class ResendEmailService:
                     <h1 style="color: #1A1A2E; font-size: 24px; margin: 16px 0 0;">A-Stats Content</h1>
                 </div>
 
-                <h2 style="color: #1A1A2E; font-size: 20px; margin-bottom: 16px;">You've been invited to join a team!</h2>
+                <h2 style="color: #1A1A2E; font-size: 20px; margin-bottom: 16px;">You've been invited to join a project!</h2>
 
                 <p style="color: #4A4A68; line-height: 1.6; margin-bottom: 24px;">
-                    {inviter_name} has invited you to join <strong>{team_name}</strong> on A-Stats Content.
+                    {inviter_name} has invited you to join <strong>{project_name}</strong> on A-Stats Content.
                 </p>
 
                 <div style="background: #F8F9FA; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
                     <h3 style="color: #1A1A2E; font-size: 16px; margin: 0 0 16px;">Invitation Details:</h3>
                     <ul style="color: #4A4A68; margin: 0; padding-left: 20px; line-height: 1.8;">
-                        <li><strong>Team:</strong> {team_name}</li>
+                        <li><strong>Project:</strong> {project_name}</li>
                         <li><strong>Your role:</strong> {role_display}</li>
                         <li><strong>Invited by:</strong> {inviter_name}</li>
                     </ul>
