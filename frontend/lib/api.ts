@@ -72,7 +72,10 @@ function processQueue(error: unknown, token: string | null) {
   failedQueue = [];
 }
 
+let isLoggingOut = false;
 function forceLogout() {
+  if (isLoggingOut) return;
+  isLoggingOut = true;
   localStorage.removeItem("auth_token");
   localStorage.removeItem("refresh_token");
   window.location.href = "/login";
@@ -104,6 +107,7 @@ apiClient.interceptors.response.use(
         return new Promise((resolve, reject) => {
           failedQueue.push({
             resolve: (token: string) => {
+              originalRequest._retry = true;
               if (originalRequest.headers) {
                 originalRequest.headers.Authorization = `Bearer ${token}`;
               }

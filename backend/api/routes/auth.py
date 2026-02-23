@@ -102,7 +102,7 @@ async def get_current_user(
         user_updated = user.updated_at
         if user_updated.tzinfo is None:
             user_updated = user_updated.replace(tzinfo=timezone.utc)
-        if user_updated > token_iat:
+        if user_updated > token_iat + timedelta(seconds=5):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token invalidated due to security event",

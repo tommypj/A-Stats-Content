@@ -80,7 +80,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         const data = await api.auth.me();
         setUser(data);
       } catch {
-        router.push("/login");
+        // Token refresh interceptor handles 401→redirect automatically.
+        // Only set user to null to show loading state.
       }
     };
     loadUser();
