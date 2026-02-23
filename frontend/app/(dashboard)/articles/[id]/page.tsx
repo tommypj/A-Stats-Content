@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -27,6 +27,7 @@ import {
   ListOrdered,
   Link as LinkIcon,
   Quote,
+  Search,
 } from "lucide-react";
 import { api, Article } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,120 @@ import PublishToWordPressModal from "@/components/publish-to-wordpress-modal";
 import SocialPostsModal from "@/components/social-posts-modal";
 import { clsx } from "clsx";
 import { toast } from "sonner";
+
+// ---------------------------------------------------------------------------
+// SERP Preview — purely visual, no API calls
+// ---------------------------------------------------------------------------
+const TITLE_LIMIT = 60;
+const DESC_LIMIT = 160;
+const DESC_WARN_MIN = 120;
+
+function highlightKeyword(text: string, keyword: string): React.ReactNode {
+  if (!keyword.trim()) return text;
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const parts = text.split(new RegExp(`(${escaped})`, "gi"));
+  return parts.map((part, i) =>
+    part.toLowerCase() === keyword.toLowerCase() ? (
+      <span key={i} className="font-semibold">
+        {part}
+      </span>
+    ) : (
+      part
+    )
+  );
+}
+
+interface SerpPreviewProps {
+  title: string;
+  slug: string;
+  metaDescription: string;
+  keyword: string;
+}
+
+function SerpPreview({ title, slug, metaDescription, keyword }: SerpPreviewProps) {
+  const displayTitle = title.length > TITLE_LIMIT ? title.slice(0, TITLE_LIMIT) + "..." : title;
+  const titleLen = title.length;
+  const titleOver = titleLen > TITLE_LIMIT;
+
+  const displayDesc =
+    metaDescription.length > DESC_LIMIT
+      ? metaDescription.slice(0, DESC_LIMIT) + "..."
+      : metaDescription;
+  const descLen = metaDescription.length;
+  const descOver = descLen > DESC_LIMIT;
+  const descUnder = descLen > 0 && descLen < DESC_WARN_MIN;
+
+  const breadcrumb = `yoursite.com › blog › ${slug || "article-slug"}`;
+
+  return (
+    <div className="bg-white rounded-xl border border-surface-tertiary p-4 space-y-3">
+      {/* Header */}
+      <div className="flex items-center gap-2">
+        <Eye className="h-4 w-4 text-text-muted flex-shrink-0" />
+        <div>
+          <p className="text-sm font-medium text-text-primary leading-tight">SERP Preview</p>
+          <p className="text-xs text-text-muted leading-tight">
+            How your article may appear in Google search results
+          </p>
+        </div>
+      </div>
+
+      {/* Decorative search bar */}
+      <div className="flex items-center gap-2 px-3 py-2 rounded-full border border-surface-tertiary bg-surface-secondary">
+        <Search className="h-3.5 w-3.5 text-text-muted flex-shrink-0" />
+        <span className="text-xs text-text-muted truncate">{keyword || "search query..."}</span>
+      </div>
+
+      {/* Google-style result card */}
+      <div className="rounded-lg border border-surface-tertiary bg-white px-4 py-3 space-y-0.5 shadow-sm">
+        {/* URL breadcrumb */}
+        <p className="text-xs text-green-700 truncate">{breadcrumb}</p>
+
+        {/* Title */}
+        <p className="text-base font-medium text-blue-700 leading-snug line-clamp-2">
+          {displayTitle
+            ? highlightKeyword(displayTitle, keyword)
+            : <span className="text-text-muted italic">No title yet</span>}
+        </p>
+
+        {/* Meta description */}
+        <p className="text-xs text-text-secondary leading-relaxed line-clamp-2 mt-0.5">
+          {displayDesc
+            ? highlightKeyword(displayDesc, keyword)
+            : <span className="text-text-muted italic">No meta description yet</span>}
+        </p>
+      </div>
+
+      {/* Character counters */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-text-muted">Title length</span>
+          <span className={clsx("font-medium tabular-nums", titleOver ? "text-red-500" : titleLen >= 50 ? "text-green-600" : "text-text-secondary")}>
+            {titleLen} / {TITLE_LIMIT}
+            {titleOver && <span className="ml-1">— too long</span>}
+          </span>
+        </div>
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-text-muted">Description length</span>
+          <span className={clsx(
+            "font-medium tabular-nums",
+            descOver
+              ? "text-red-500"
+              : descUnder
+              ? "text-yellow-600"
+              : descLen >= DESC_WARN_MIN
+              ? "text-green-600"
+              : "text-text-secondary"
+          )}>
+            {descLen} / {DESC_LIMIT}
+            {descOver && <span className="ml-1">— too long</span>}
+            {descUnder && <span className="ml-1">— too short</span>}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function getSeoScoreColor(score: number) {
   if (score >= 80) return "text-green-600 bg-green-100";
@@ -596,6 +711,14 @@ export default function ArticleEditorPage() {
 
         {/* SEO Sidebar */}
         <div className="space-y-4">
+          {/* SERP Preview */}
+          <SerpPreview
+            title={title}
+            slug={article.slug || ""}
+            metaDescription={metaDescription}
+            keyword={keyword}
+          />
+
           {/* SEO Score */}
           <Card className="p-4">
             <div className="flex items-center justify-between mb-4">
