@@ -16,6 +16,7 @@ from .social import (
 )
 from .admin import AdminAuditLog, AuditAction, AuditTargetType
 from .project import Project, ProjectMember, ProjectInvitation, ProjectMemberRole, InvitationStatus
+from .generation import GenerationLog, AdminAlert
 
 __all__ = [
     "Base",
@@ -49,4 +50,6 @@ __all__ = [
     "ProjectInvitation",
     "ProjectMemberRole",
     "InvitationStatus",
+    "GenerationLog",
+    "AdminAlert",
 ]

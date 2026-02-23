@@ -2,7 +2,9 @@
 Image generation and management API routes.
 """
 
+import logging
 import math
+import time
 from typing import Optional
 from uuid import uuid4
 
@@ -21,6 +23,9 @@ from infrastructure.database.connection import get_db
 from infrastructure.database.models import GeneratedImage, Article, User, ContentStatus
 from adapters.ai.replicate_adapter import image_ai_service
 from adapters.storage.image_storage import storage_adapter, download_image
+from services.generation_tracker import GenerationTracker
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/images", tags=["images"])
 
@@ -66,6 +71,30 @@ async def generate_image(
     db.add(image)
     await db.commit()
 
+    # Check usage limit
+    project_id = getattr(current_user, 'current_project_id', None)
+    tracker = GenerationTracker(db)
+    if not await tracker.check_limit(project_id, "image"):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Monthly image generation limit reached. Please upgrade your plan.",
+        )
+
+    start_time = time.time()
+    gen_log = await tracker.log_start(
+        user_id=current_user.id,
+        project_id=project_id,
+        resource_type="image",
+        resource_id=image_id,
+        input_metadata={
+            "prompt": request.prompt,
+            "style": request.style,
+            "width": request.width,
+            "height": request.height,
+        },
+    )
+    await db.commit()
+
     # Generate image using Replicate
     try:
         generated = await image_ai_service.generate_image(
@@ -81,6 +110,13 @@ async def generate_image(
         image.model = generated.model if hasattr(generated, "model") else None
         image.status = "completed"
 
+        duration_ms = int((time.time() - start_time) * 1000)
+        await tracker.log_success(
+            log_id=gen_log.id,
+            ai_model=getattr(generated, 'model', None),
+            duration_ms=duration_ms,
+        )
+
         # Try to download and cache locally (non-critical — external URL is the fallback)
         try:
             image_data = await download_image(generated.url)
@@ -92,13 +128,22 @@ async def generate_image(
             image.local_path = local_path
         except Exception as dl_err:
             # Local caching failed — image is still accessible via external URL
-            import logging
-            logging.getLogger(__name__).warning(
+            logger.warning(
                 "Failed to cache image locally for %s: %s", image_id, dl_err
             )
 
     except Exception as e:
         image.status = "failed"
+        duration_ms = int((time.time() - start_time) * 1000)
+        try:
+            await tracker.log_failure(
+                log_id=gen_log.id,
+                error_message=str(e),
+                duration_ms=duration_ms,
+            )
+            await db.commit()
+        except Exception:
+            logger.warning("Failed to log image generation failure for %s", image_id)
         await db.commit()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

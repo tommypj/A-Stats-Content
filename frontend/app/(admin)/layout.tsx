@@ -18,6 +18,7 @@ import {
   FileCheck,
   Image as ImageIcon,
   Sparkles,
+  Bell,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { api } from "@/lib/api";
@@ -36,6 +37,8 @@ const navigation = [
   },
   { name: "Analytics", href: "/admin/analytics", icon: BarChart3 },
   { name: "Audit Logs", href: "/admin/audit-logs", icon: FileSearch },
+  { name: "Generations", href: "/admin/generations", icon: Sparkles },
+  { name: "Alerts", href: "/admin/alerts", icon: Bell },
 ];
 
 const secondaryNavigation = [
@@ -54,6 +57,23 @@ export default function AdminLayout({
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set(["Content"]));
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [alertCount, setAlertCount] = useState(0);
+
+  useEffect(() => {
+    const fetchAlertCount = async () => {
+      try {
+        const data = await api.admin.alerts.count();
+        setAlertCount(data.unread_count || 0);
+      } catch {
+        // Silently fail — alert count is non-critical
+      }
+    };
+    if (isAdmin) {
+      fetchAlertCount();
+      const interval = setInterval(fetchAlertCount, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [isAdmin]);
 
   useEffect(() => {
     const checkAdminRole = async () => {
@@ -216,7 +236,12 @@ export default function AdminLayout({
                   )}
                 >
                   <item.icon className="h-5 w-5" />
-                  {item.name}
+                  <span className="flex-1">{item.name}</span>
+                  {item.name === "Alerts" && alertCount > 0 && (
+                    <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-red-500 text-white text-xs font-bold">
+                      {alertCount > 99 ? "99+" : alertCount}
+                    </span>
+                  )}
                 </Link>
               );
             })}

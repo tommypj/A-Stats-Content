@@ -15,6 +15,8 @@ from .social import router as social_router
 from .admin_analytics import router as admin_analytics_router
 from .admin_content import router as admin_content_router
 from .admin_users import router as admin_users_router
+from .admin_generations import router as admin_generations_router
+from .admin_alerts import router as admin_alerts_router
 from .project_invitations import router as project_invitations_router
 from .projects import router as projects_router
 
@@ -36,6 +38,8 @@ api_router.include_router(social_router)
 api_router.include_router(admin_analytics_router)
 api_router.include_router(admin_content_router)
 api_router.include_router(admin_users_router)
+api_router.include_router(admin_generations_router)
+api_router.include_router(admin_alerts_router)
 api_router.include_router(project_invitations_router)
 api_router.include_router(projects_router)
 

@@ -2,7 +2,9 @@
 Outline API routes.
 """
 
+import logging
 import math
+import time
 from typing import Optional
 from uuid import uuid4
 
@@ -21,6 +23,9 @@ from infrastructure.database.connection import get_db
 from infrastructure.database.models import Outline, User, ContentStatus
 from adapters.ai.anthropic_adapter import content_ai_service
 from infrastructure.config.settings import settings
+from services.generation_tracker import GenerationTracker
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/outlines", tags=["outlines"])
 
@@ -51,8 +56,28 @@ async def create_outline(
     db.add(outline)
     await db.commit()
 
+    project_id = getattr(current_user, 'current_project_id', None)
+
     # Auto-generate with AI if requested
     if request.auto_generate:
+        # Check usage limit
+        tracker = GenerationTracker(db)
+        if not await tracker.check_limit(project_id, "outline"):
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Monthly outline generation limit reached. Please upgrade your plan.",
+            )
+
+        start_time = time.time()
+        gen_log = await tracker.log_start(
+            user_id=current_user.id,
+            project_id=project_id,
+            resource_type="outline",
+            resource_id=outline_id,
+            input_metadata={"keyword": request.keyword, "tone": request.tone},
+        )
+        await db.commit()
+
         try:
             generated = await content_ai_service.generate_outline(
                 keyword=request.keyword,
@@ -77,9 +102,26 @@ async def create_outline(
             outline.ai_model = settings.anthropic_model
             outline.status = ContentStatus.COMPLETED.value
 
+            duration_ms = int((time.time() - start_time) * 1000)
+            await tracker.log_success(
+                log_id=gen_log.id,
+                ai_model=settings.anthropic_model,
+                duration_ms=duration_ms,
+            )
+
         except Exception as e:
             outline.status = ContentStatus.FAILED.value
             outline.generation_error = str(e)
+
+            duration_ms = int((time.time() - start_time) * 1000)
+            try:
+                await tracker.log_failure(
+                    log_id=gen_log.id,
+                    error_message=str(e),
+                    duration_ms=duration_ms,
+                )
+            except Exception:
+                logger.warning("Failed to log outline generation failure for %s", outline_id)
 
         await db.commit()
 
@@ -245,6 +287,25 @@ async def regenerate_outline(
     outline.status = ContentStatus.GENERATING.value
     await db.commit()
 
+    # Check usage limit and log regeneration
+    project_id = getattr(current_user, 'current_project_id', None)
+    tracker = GenerationTracker(db)
+    if not await tracker.check_limit(project_id, "outline"):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Monthly outline generation limit reached. Please upgrade your plan.",
+        )
+
+    start_time = time.time()
+    gen_log = await tracker.log_start(
+        user_id=current_user.id,
+        project_id=project_id,
+        resource_type="outline",
+        resource_id=outline_id,
+        input_metadata={"keyword": outline.keyword, "tone": outline.tone},
+    )
+    await db.commit()
+
     try:
         generated = await content_ai_service.generate_outline(
             keyword=outline.keyword,
@@ -269,9 +330,26 @@ async def regenerate_outline(
         outline.status = ContentStatus.COMPLETED.value
         outline.generation_error = None
 
+        duration_ms = int((time.time() - start_time) * 1000)
+        await tracker.log_success(
+            log_id=gen_log.id,
+            ai_model=settings.anthropic_model,
+            duration_ms=duration_ms,
+        )
+
     except Exception as e:
         outline.status = ContentStatus.FAILED.value
         outline.generation_error = str(e)
+
+        duration_ms = int((time.time() - start_time) * 1000)
+        try:
+            await tracker.log_failure(
+                log_id=gen_log.id,
+                error_message=str(e),
+                duration_ms=duration_ms,
+            )
+        except Exception:
+            logger.warning("Failed to log outline regeneration failure for %s", outline_id)
 
     await db.commit()
     await db.refresh(outline)

@@ -747,6 +747,40 @@ export const api = {
         url: "/admin/audit-logs",
         params,
       }),
+    generations: {
+      list: (params?: AdminGenerationQueryParams) =>
+        apiRequest<AdminGenerationListResponse>({
+          url: "/admin/generations",
+          params,
+        }),
+      stats: () =>
+        apiRequest<AdminGenerationStats>({
+          url: "/admin/generations/stats",
+        }),
+    },
+    alerts: {
+      list: (params?: AdminAlertQueryParams) =>
+        apiRequest<AdminAlertListResponse>({
+          url: "/admin/alerts",
+          params,
+        }),
+      count: () =>
+        apiRequest<AdminAlertCount>({
+          url: "/admin/alerts/count",
+        }),
+      update: (id: string, data: { is_read?: boolean; is_resolved?: boolean }) =>
+        apiRequest<AdminAlert>({
+          method: "PUT",
+          url: `/admin/alerts/${id}`,
+          data,
+        }),
+      markAllRead: () =>
+        apiRequest<{ updated: number }>({
+          method: "POST",
+          url: "/admin/alerts/mark-all-read",
+          data: {},
+        }),
+    },
   },
 
   // Projects (Multi-tenancy)
@@ -1723,6 +1757,88 @@ export interface AdminAuditLogListResponse {
   page: number;
   page_size: number;
   total_pages: number;
+}
+
+export interface AdminGenerationQueryParams {
+  page?: number;
+  page_size?: number;
+  resource_type?: string;
+  status?: string;
+  user_id?: string;
+}
+
+export interface AdminGenerationLog {
+  id: string;
+  user_id: string;
+  user_email?: string;
+  resource_type: string;
+  resource_id?: string;
+  status: string;
+  duration_ms?: number;
+  credits_used?: number;
+  error_message?: string;
+  created_at: string;
+}
+
+export interface AdminGenerationListResponse {
+  items: AdminGenerationLog[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+export interface AdminGenerationStats {
+  total_generations: number;
+  successful: number;
+  failed: number;
+  success_rate: number;
+  articles_generated: number;
+  outlines_generated: number;
+  images_generated: number;
+  articles_failed: number;
+  outlines_failed: number;
+  images_failed: number;
+  avg_duration_ms: number;
+  total_credits: number;
+}
+
+export interface AdminAlertQueryParams {
+  page?: number;
+  page_size?: number;
+  is_read?: boolean;
+  severity?: string;
+  alert_type?: string;
+}
+
+export interface AdminAlert {
+  id: string;
+  title: string;
+  message: string;
+  severity: string;
+  alert_type?: string;
+  resource_type?: string;
+  resource_id?: string;
+  user_id?: string;
+  user_email?: string;
+  is_read: boolean;
+  is_resolved: boolean;
+  created_at: string;
+  read_at?: string;
+  resolved_at?: string;
+}
+
+export interface AdminAlertListResponse {
+  items: AdminAlert[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+export interface AdminAlertCount {
+  unread_count: number;
+  critical_count: number;
 }
 
 // Projects (Multi-tenancy) types

@@ -6,6 +6,7 @@ import asyncio
 import logging
 import math
 import re
+import time
 import markdown
 from datetime import datetime, timezone
 from typing import Optional
@@ -30,6 +31,7 @@ from infrastructure.database.connection import get_db, async_session_maker
 from infrastructure.database.models import Article, Outline, User, ContentStatus
 from adapters.ai.anthropic_adapter import content_ai_service, GeneratedArticle
 from infrastructure.config.settings import settings
+from services.generation_tracker import GenerationTracker
 
 logger = logging.getLogger(__name__)
 
@@ -188,6 +190,8 @@ async def create_article(
 
 async def _generate_article_background(
     article_id: str,
+    user_id: str,
+    project_id: Optional[str],
     outline_title: str,
     outline_keyword: str,
     outline_sections: list,
@@ -201,6 +205,9 @@ async def _generate_article_background(
     language: str = "en",
 ):
     """Background task that generates article content and updates the DB."""
+    start_time = time.time()
+    gen_log = None
+    tracker = None
     async with async_session_maker() as db:
         try:
             result = await db.execute(
@@ -210,6 +217,21 @@ async def _generate_article_background(
             if not article:
                 logger.error("Background generation: article %s not found", article_id)
                 return
+
+            # Log the generation start
+            tracker = GenerationTracker(db)
+            gen_log = await tracker.log_start(
+                user_id=user_id,
+                project_id=project_id,
+                resource_type="article",
+                resource_id=article_id,
+                input_metadata={
+                    "keyword": outline_keyword,
+                    "word_count_target": word_count_target,
+                    "language": language,
+                },
+            )
+            await db.commit()  # Commit the log entry
 
             generated = await asyncio.wait_for(
                 content_ai_service.generate_article(
@@ -292,6 +314,15 @@ async def _generate_article_background(
                 )
 
             await db.commit()
+
+            # Log successful generation and increment usage
+            duration_ms = int((time.time() - start_time) * 1000)
+            await tracker.log_success(
+                log_id=gen_log.id,
+                ai_model=settings.anthropic_model,
+                duration_ms=duration_ms,
+            )
+            await db.commit()
             logger.info("Article %s generated successfully", article_id)
 
         except Exception as e:
@@ -310,6 +341,21 @@ async def _generate_article_background(
                         logger.info("Marked article %s as failed", article_id)
             except Exception:
                 logger.error("Failed to mark article %s as failed", article_id, exc_info=True)
+
+            # Log failure in a separate session (original session may be broken)
+            if gen_log is not None:
+                duration_ms = int((time.time() - start_time) * 1000)
+                try:
+                    async with async_session_maker() as tracker_db:
+                        failure_tracker = GenerationTracker(tracker_db)
+                        await failure_tracker.log_failure(
+                            log_id=gen_log.id,
+                            error_message=str(e),
+                            duration_ms=duration_ms,
+                        )
+                        await tracker_db.commit()
+                except Exception:
+                    logger.error("Failed to log generation failure for article %s", article_id, exc_info=True)
 
 
 @router.post("/generate", response_model=ArticleResponse, status_code=status.HTTP_201_CREATED)
@@ -343,6 +389,15 @@ async def generate_article(
             detail="Outline has no sections. Generate outline first.",
         )
 
+    # Check usage limit
+    project_id = getattr(current_user, 'current_project_id', None)
+    tracker = GenerationTracker(db)
+    if not await tracker.check_limit(project_id, "article"):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Monthly article generation limit reached. Please upgrade your plan.",
+        )
+
     # Create article in generating status
     article_id = str(uuid4())
     slug = slugify(outline.title)
@@ -370,6 +425,8 @@ async def generate_article(
     asyncio.create_task(
         _generate_article_background(
             article_id=article_id,
+            user_id=current_user.id,
+            project_id=project_id,
             outline_title=outline.title,
             outline_keyword=outline.keyword,
             outline_sections=outline.sections,
