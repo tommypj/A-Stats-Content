@@ -428,3 +428,28 @@ class TransferOwnershipResponse(BaseModel):
     message: str
     new_owner_id: str
     previous_owner_role: str = "admin"
+
+
+# =============================================================================
+# Brand Voice Schemas
+# =============================================================================
+
+
+class BrandVoiceSettings(BaseModel):
+    """Brand voice settings for a project."""
+
+    tone: Optional[str] = Field(
+        None, description="Tone of voice (e.g., professional, casual, authoritative)"
+    )
+    writing_style: Optional[str] = Field(
+        None, description="Writing style (e.g., informative, conversational, persuasive)"
+    )
+    target_audience: Optional[str] = Field(
+        None, description="Target audience description"
+    )
+    custom_instructions: Optional[str] = Field(
+        None, max_length=500, description="Free-text custom instructions for AI generation"
+    )
+    language: Optional[str] = Field(
+        None, description="Default language code (e.g., en, es, de)"
+    )

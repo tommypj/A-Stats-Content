@@ -94,6 +94,9 @@ class Project(Base, TimestampMixin):
     # WordPress integration
     wordpress_credentials: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
+    # Brand voice settings (tone, writing_style, target_audience, custom_instructions, language)
+    brand_voice: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
     # Soft delete
     deleted_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True

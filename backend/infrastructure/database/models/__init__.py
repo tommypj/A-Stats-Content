@@ -4,7 +4,7 @@ SQLAlchemy database models.
 
 from .base import Base, TimestampMixin
 from .user import User, UserRole, UserStatus, SubscriptionTier
-from .content import Outline, Article, GeneratedImage, ContentStatus, ContentTone
+from .content import Outline, Article, ArticleRevision, GeneratedImage, ContentStatus, ContentTone
 from .analytics import GSCConnection, KeywordRanking, PagePerformance, DailyAnalytics
 from .knowledge import KnowledgeSource, KnowledgeQuery, SourceStatus
 from .social import (
@@ -27,6 +27,7 @@ __all__ = [
     "SubscriptionTier",
     "Outline",
     "Article",
+    "ArticleRevision",
     "GeneratedImage",
     "ContentStatus",
     "ContentTone",

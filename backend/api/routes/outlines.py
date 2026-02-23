@@ -23,6 +23,7 @@ from api.routes.auth import get_current_user
 from api.utils import escape_like
 from infrastructure.database.connection import get_db
 from infrastructure.database.models import Outline, User, ContentStatus
+from infrastructure.database.models.project import Project
 from adapters.ai.anthropic_adapter import content_ai_service
 from infrastructure.config.settings import settings
 from services.generation_tracker import GenerationTracker
@@ -46,6 +47,21 @@ async def create_outline(
     outline_id = str(uuid4())
     project_id = getattr(current_user, 'current_project_id', None)
 
+    # Load brand voice defaults from the current project (if any)
+    brand_voice: dict = {}
+    if project_id:
+        proj_result = await db.execute(
+            select(Project).where(Project.id == project_id, Project.deleted_at.is_(None))
+        )
+        proj = proj_result.scalar_one_or_none()
+        if proj and proj.brand_voice:
+            brand_voice = proj.brand_voice
+
+    # Apply brand voice defaults when the caller did not supply explicit values
+    effective_tone = body.tone or brand_voice.get("tone")
+    effective_target_audience = body.target_audience or brand_voice.get("target_audience")
+    effective_language = body.language or brand_voice.get("language") or current_user.language or "en"
+
     # Check usage limit before creating any records
     if body.auto_generate:
         tracker = GenerationTracker(db)
@@ -55,14 +71,14 @@ async def create_outline(
                 detail="Monthly outline generation limit reached. Please upgrade your plan.",
             )
 
-    # Create base outline
+    # Create base outline (use effective values that may include brand voice defaults)
     outline = Outline(
         id=outline_id,
         user_id=current_user.id,
         title=f"Article about {body.keyword}",
         keyword=body.keyword,
-        target_audience=body.target_audience,
-        tone=body.tone,
+        target_audience=effective_target_audience,
+        tone=effective_tone,
         word_count_target=body.word_count_target,
         status=ContentStatus.GENERATING.value if body.auto_generate else ContentStatus.DRAFT.value,
     )
@@ -80,17 +96,17 @@ async def create_outline(
             project_id=project_id,
             resource_type="outline",
             resource_id=outline_id,
-            input_metadata={"keyword": body.keyword, "tone": body.tone},
+            input_metadata={"keyword": body.keyword, "tone": effective_tone},
         )
         await db.commit()
 
         try:
             generated = await content_ai_service.generate_outline(
                 keyword=body.keyword,
-                target_audience=body.target_audience,
-                tone=body.tone,
+                target_audience=effective_target_audience,
+                tone=effective_tone,
                 word_count_target=body.word_count_target,
-                language=body.language or current_user.language or "en",
+                language=effective_language,
             )
 
             # Update outline with generated content

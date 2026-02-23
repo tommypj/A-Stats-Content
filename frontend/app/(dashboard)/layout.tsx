@@ -29,6 +29,7 @@ import {
   TrendingUp,
   Lightbulb,
   FolderOpen,
+  MessageSquare,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { ProjectProvider } from "@/contexts/ProjectContext";
@@ -63,7 +64,14 @@ const navigation = [
     ],
   },
   { name: "Knowledge", href: "/knowledge", icon: BookOpen },
-  { name: "Projects", href: "/projects", icon: FolderOpen },
+  {
+    name: "Projects",
+    icon: FolderOpen,
+    submenu: [
+      { name: "All Projects", href: "/projects", icon: FolderOpen },
+      { name: "Brand Voice", href: "/projects/brand-voice", icon: MessageSquare },
+    ],
+  },
 ];
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
@@ -71,7 +79,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set(["Social", "Analytics"]));
+  const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set(["Social", "Analytics", "Projects"]));
   const [user, setUser] = useState<UserResponse | null>(null);
 
   useEffect(() => {

@@ -44,6 +44,7 @@ from api.schemas.project import (
     LeaveProjectResponse,
     TransferOwnershipRequest,
     TransferOwnershipResponse,
+    BrandVoiceSettings,
 )
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
@@ -296,6 +297,80 @@ async def get_current_project(
         project=response,
         is_personal_workspace=False,
     )
+
+
+# =============================================================================
+# Brand Voice
+# =============================================================================
+
+@router.get("/current/brand-voice", response_model=BrandVoiceSettings)
+async def get_brand_voice(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Get the brand voice settings for the current project.
+
+    Returns empty defaults if no project is selected or brand voice is not set.
+    """
+    project_id = getattr(current_user, 'current_project_id', None)
+    if not project_id:
+        return BrandVoiceSettings()
+
+    stmt = select(Project).where(
+        and_(
+            Project.id == project_id,
+            Project.deleted_at.is_(None),
+        )
+    )
+    result = await db.execute(stmt)
+    project = result.scalar_one_or_none()
+
+    if not project or not project.brand_voice:
+        return BrandVoiceSettings()
+
+    return BrandVoiceSettings(**project.brand_voice)
+
+
+@router.put("/current/brand-voice", response_model=BrandVoiceSettings)
+async def update_brand_voice(
+    data: BrandVoiceSettings,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Update the brand voice settings for the current project.
+
+    Requires an active project to be selected.
+    """
+    project_id = getattr(current_user, 'current_project_id', None)
+    if not project_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No project selected. Switch to a project before updating brand voice.",
+        )
+
+    stmt = select(Project).where(
+        and_(
+            Project.id == project_id,
+            Project.deleted_at.is_(None),
+        )
+    )
+    result = await db.execute(stmt)
+    project = result.scalar_one_or_none()
+
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Current project not found.",
+        )
+
+    project.brand_voice = data.model_dump(exclude_none=True)
+    project.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(project)
+
+    return BrandVoiceSettings(**(project.brand_voice or {}))
 
 
 @router.post("/switch", response_model=SwitchProjectResponse)

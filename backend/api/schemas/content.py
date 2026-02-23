@@ -247,6 +247,39 @@ class ArticleImproveRequest(BaseModel):
 
 
 # ============================================================================
+# Article Revision Schemas
+# ============================================================================
+
+
+class ArticleRevisionResponse(BaseModel):
+    """Lightweight revision item — for list endpoints (no heavy content fields)."""
+
+    id: str
+    article_id: str
+    revision_type: str
+    word_count: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ArticleRevisionDetailResponse(ArticleRevisionResponse):
+    """Full revision with content — for single-revision fetch and restore preview."""
+
+    content: Optional[str] = None
+    content_html: Optional[str] = None
+    title: str
+    meta_description: Optional[str] = None
+
+
+class ArticleRevisionListResponse(BaseModel):
+    """Paginated list of revisions."""
+
+    items: List[ArticleRevisionResponse]
+    total: int
+
+
+# ============================================================================
 # Generated Image Schemas
 # ============================================================================
 

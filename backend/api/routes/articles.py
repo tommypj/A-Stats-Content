@@ -27,11 +27,14 @@ from api.schemas.content import (
     ArticleImproveRequest,
     SocialPostsResponse,
     SocialPostUpdateRequest,
+    ArticleRevisionResponse,
+    ArticleRevisionDetailResponse,
+    ArticleRevisionListResponse,
 )
 from api.routes.auth import get_current_user
 from api.utils import escape_like
 from infrastructure.database.connection import get_db, async_session_maker
-from infrastructure.database.models import Article, Outline, User, ContentStatus
+from infrastructure.database.models import Article, ArticleRevision, Outline, User, ContentStatus
 from adapters.ai.anthropic_adapter import content_ai_service, GeneratedArticle
 from infrastructure.config.settings import settings
 from services.generation_tracker import GenerationTracker
@@ -45,6 +48,56 @@ _generation_semaphore = asyncio.Semaphore(5)
 
 # Track active generation tasks so they are not garbage-collected mid-flight
 _active_generation_tasks: dict[str, asyncio.Task] = {}
+
+# Maximum revisions kept per article (oldest are pruned beyond this limit)
+_MAX_REVISIONS_PER_ARTICLE = 20
+
+
+async def _save_revision(
+    db: AsyncSession,
+    article: Article,
+    revision_type: str,
+    user_id: str,
+) -> None:
+    """
+    Snapshot the article's current content as a new ArticleRevision.
+    If the article already has _MAX_REVISIONS_PER_ARTICLE revisions,
+    the oldest one is deleted before inserting the new one so the table
+    stays bounded.
+    """
+    # Skip if there is nothing meaningful to save
+    if not article.content and not article.title:
+        return
+
+    revision = ArticleRevision(
+        id=str(uuid4()),
+        article_id=article.id,
+        created_by=user_id,
+        content=article.content,
+        content_html=article.content_html,
+        title=article.title,
+        meta_description=article.meta_description,
+        word_count=article.word_count or 0,
+        revision_type=revision_type,
+    )
+    db.add(revision)
+
+    # Prune oldest revisions if the article exceeds the limit
+    count_result = await db.execute(
+        select(func.count()).where(ArticleRevision.article_id == article.id)
+    )
+    existing_count = count_result.scalar() or 0
+
+    if existing_count >= _MAX_REVISIONS_PER_ARTICLE:
+        # Find and delete the oldest revision(s)
+        oldest_result = await db.execute(
+            select(ArticleRevision)
+            .where(ArticleRevision.article_id == article.id)
+            .order_by(ArticleRevision.created_at.asc())
+            .limit(existing_count - _MAX_REVISIONS_PER_ARTICLE + 1)
+        )
+        for old_rev in oldest_result.scalars().all():
+            await db.delete(old_rev)
 
 
 def slugify(text: str) -> str:
@@ -603,6 +656,10 @@ async def update_article(
     ALLOWED_UPDATE_FIELDS = {"title", "keyword", "meta_description", "content", "status"}
     update_data = request.model_dump(exclude_unset=True)
 
+    # Save a revision before overwriting content (only when content actually changes)
+    if "content" in update_data and update_data["content"] != article.content:
+        await _save_revision(db, article, "manual_edit", current_user.id)
+
     for field, value in update_data.items():
         if field not in ALLOWED_UPDATE_FIELDS:
             continue
@@ -710,6 +767,10 @@ async def improve_article(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Article has no content to improve",
         )
+
+    # Save current content as a revision so the user can revert after AI changes it
+    revision_type = f"before_ai_improve_{body.improvement_type}"
+    await _save_revision(db, article, revision_type, current_user.id)
 
     try:
         improved_content = await content_ai_service.improve_content(
@@ -1000,3 +1061,150 @@ async def update_social_post(
         facebook=social_posts.get("facebook"),
         instagram=social_posts.get("instagram"),
     )
+
+
+# ============================================================================
+# Revision endpoints
+# ============================================================================
+
+
+def _article_ownership_query(article_id: str, current_user: User):
+    """Return a select() that fetches the article respecting project context."""
+    if current_user.current_project_id:
+        return select(Article).where(
+            Article.id == article_id,
+            Article.project_id == current_user.current_project_id,
+        )
+    return select(Article).where(
+        Article.id == article_id,
+        Article.user_id == current_user.id,
+    )
+
+
+@router.get("/{article_id}/revisions", response_model=ArticleRevisionListResponse)
+async def list_article_revisions(
+    article_id: str,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=50),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    List revision history for an article (newest first).
+    Returns lightweight items — no full content — for fast list rendering.
+    """
+    # Verify the caller owns / has access to the article
+    article_result = await db.execute(
+        _article_ownership_query(article_id, current_user)
+    )
+    if not article_result.scalar_one_or_none():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
+
+    count_result = await db.execute(
+        select(func.count()).where(ArticleRevision.article_id == article_id)
+    )
+    total = count_result.scalar() or 0
+
+    revisions_result = await db.execute(
+        select(ArticleRevision)
+        .where(ArticleRevision.article_id == article_id)
+        .order_by(ArticleRevision.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    revisions = revisions_result.scalars().all()
+
+    return ArticleRevisionListResponse(items=list(revisions), total=total)
+
+
+@router.get(
+    "/{article_id}/revisions/{revision_id}",
+    response_model=ArticleRevisionDetailResponse,
+)
+async def get_article_revision(
+    article_id: str,
+    revision_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get a specific revision with full content for preview.
+    """
+    article_result = await db.execute(
+        _article_ownership_query(article_id, current_user)
+    )
+    if not article_result.scalar_one_or_none():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
+
+    revision_result = await db.execute(
+        select(ArticleRevision).where(
+            ArticleRevision.id == revision_id,
+            ArticleRevision.article_id == article_id,
+        )
+    )
+    revision = revision_result.scalar_one_or_none()
+    if not revision:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Revision not found")
+
+    return revision
+
+
+@router.post(
+    "/{article_id}/revisions/{revision_id}/restore",
+    response_model=ArticleResponse,
+)
+async def restore_article_revision(
+    article_id: str,
+    revision_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Restore an article to a previous revision.
+
+    Before overwriting the article, a "restore" backup revision is saved
+    with the article's current content so the user can undo the restore.
+    """
+    article_result = await db.execute(
+        _article_ownership_query(article_id, current_user)
+    )
+    article = article_result.scalar_one_or_none()
+    if not article:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
+
+    revision_result = await db.execute(
+        select(ArticleRevision).where(
+            ArticleRevision.id == revision_id,
+            ArticleRevision.article_id == article_id,
+        )
+    )
+    revision = revision_result.scalar_one_or_none()
+    if not revision:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Revision not found")
+
+    # Backup the current state before overwriting
+    await _save_revision(db, article, "restore", current_user.id)
+
+    # Apply the revision content back to the article
+    article.content = revision.content
+    article.content_html = revision.content_html
+    article.title = revision.title
+    article.meta_description = revision.meta_description
+    article.word_count = revision.word_count
+
+    # Recompute read time and SEO if content is present
+    if article.content:
+        article.read_time = calculate_read_time(article.content)
+        seo_result = analyze_seo(
+            article.content,
+            article.keyword,
+            article.title,
+            article.meta_description or "",
+        )
+        article.seo_score = seo_result["score"]
+        article.seo_analysis = seo_result
+
+    await db.commit()
+    await db.refresh(article)
+
+    return article
