@@ -54,6 +54,15 @@ async def generate_image(
                 detail="Article not found",
             )
 
+    # Check usage limit before creating any records
+    project_id = getattr(current_user, 'current_project_id', None)
+    tracker = GenerationTracker(db)
+    if not await tracker.check_limit(project_id, "image"):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Monthly image generation limit reached. Please upgrade your plan.",
+        )
+
     # Create image record in generating status
     image_id = str(uuid4())
     image = GeneratedImage(
@@ -69,16 +78,6 @@ async def generate_image(
     )
 
     db.add(image)
-    await db.commit()
-
-    # Check usage limit
-    project_id = getattr(current_user, 'current_project_id', None)
-    tracker = GenerationTracker(db)
-    if not await tracker.check_limit(project_id, "image"):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Monthly image generation limit reached. Please upgrade your plan.",
-        )
 
     start_time = time.time()
     gen_log = await tracker.log_start(
@@ -141,7 +140,6 @@ async def generate_image(
                 error_message=str(e),
                 duration_ms=duration_ms,
             )
-            await db.commit()
         except Exception:
             logger.warning("Failed to log image generation failure for %s", image_id)
         await db.commit()

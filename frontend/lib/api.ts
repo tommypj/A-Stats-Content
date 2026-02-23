@@ -1775,7 +1775,7 @@ export interface AdminGenerationLog {
   resource_id?: string;
   status: string;
   duration_ms?: number;
-  credits_used?: number;
+  cost_credits?: number;
   error_message?: string;
   created_at: string;
 }
@@ -1799,7 +1799,7 @@ export interface AdminGenerationStats {
   articles_failed: number;
   outlines_failed: number;
   images_failed: number;
-  avg_duration_ms: number;
+  avg_duration_ms: number | null;
   total_credits: number;
 }
 
@@ -1814,7 +1814,7 @@ export interface AdminAlertQueryParams {
 export interface AdminAlert {
   id: string;
   title: string;
-  message: string;
+  message: string | null;
   severity: string;
   alert_type?: string;
   resource_type?: string;
@@ -1824,8 +1824,7 @@ export interface AdminAlert {
   is_read: boolean;
   is_resolved: boolean;
   created_at: string;
-  read_at?: string;
-  resolved_at?: string;
+
 }
 
 export interface AdminAlertListResponse {

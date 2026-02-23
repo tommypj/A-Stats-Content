@@ -40,6 +40,16 @@ async def create_outline(
     Create a new outline, optionally auto-generating with AI.
     """
     outline_id = str(uuid4())
+    project_id = getattr(current_user, 'current_project_id', None)
+
+    # Check usage limit before creating any records
+    if request.auto_generate:
+        tracker = GenerationTracker(db)
+        if not await tracker.check_limit(project_id, "outline"):
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Monthly outline generation limit reached. Please upgrade your plan.",
+            )
 
     # Create base outline
     outline = Outline(
@@ -56,17 +66,9 @@ async def create_outline(
     db.add(outline)
     await db.commit()
 
-    project_id = getattr(current_user, 'current_project_id', None)
-
     # Auto-generate with AI if requested
     if request.auto_generate:
-        # Check usage limit
         tracker = GenerationTracker(db)
-        if not await tracker.check_limit(project_id, "outline"):
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Monthly outline generation limit reached. Please upgrade your plan.",
-            )
 
         start_time = time.time()
         gen_log = await tracker.log_start(
@@ -284,10 +286,7 @@ async def regenerate_outline(
             detail="Outline not found",
         )
 
-    outline.status = ContentStatus.GENERATING.value
-    await db.commit()
-
-    # Check usage limit and log regeneration
+    # Check usage limit before changing status
     project_id = getattr(current_user, 'current_project_id', None)
     tracker = GenerationTracker(db)
     if not await tracker.check_limit(project_id, "outline"):
@@ -295,6 +294,9 @@ async def regenerate_outline(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Monthly outline generation limit reached. Please upgrade your plan.",
         )
+
+    outline.status = ContentStatus.GENERATING.value
+    await db.commit()
 
     start_time = time.time()
     gen_log = await tracker.log_start(

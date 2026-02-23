@@ -311,7 +311,7 @@ export default function AdminGenerationsPage() {
                         {formatDuration(log.duration_ms)}
                       </td>
                       <td className="px-4 py-3 text-sm text-text-secondary">
-                        {log.credits_used != null ? log.credits_used : "—"}
+                        {log.cost_credits != null ? log.cost_credits : "—"}
                       </td>
                       <td className="px-4 py-3 text-sm text-text-secondary">
                         {new Date(log.created_at).toLocaleDateString()}{" "}
