@@ -103,9 +103,13 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Initial load
+  // Initial load — only fire if a token is present; the interceptor handles
+  // the redirect when no token exists or when refresh fails.
   useEffect(() => {
-    loadProjects();
+    const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+    if (token) {
+      loadProjects();
+    }
   }, [loadProjects]);
 
   // Switch to a different project (or null for personal workspace)

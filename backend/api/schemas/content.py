@@ -176,10 +176,38 @@ class ArticleResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ArticleListItemResponse(BaseModel):
+    """Article response for list endpoints (excludes heavy content fields)."""
+
+    id: str
+    user_id: str
+    project_id: Optional[str] = None
+    outline_id: Optional[str]
+    title: str
+    slug: Optional[str]
+    keyword: str
+    meta_description: Optional[str]
+    status: str
+    word_count: int
+    read_time: Optional[int]
+    seo_score: Optional[float]
+    seo_analysis: Optional[Dict[str, Any]]
+    ai_model: Optional[str]
+    image_prompt: Optional[str] = None
+    published_at: Optional[datetime]
+    published_url: Optional[str]
+    featured_image_id: Optional[str]
+    social_posts: Optional[Dict[str, Any]] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ArticleListResponse(BaseModel):
     """List of articles response."""
 
-    items: List[ArticleResponse]
+    items: List[ArticleListItemResponse]
     total: int
     page: int
     page_size: int
