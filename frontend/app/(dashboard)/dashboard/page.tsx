@@ -17,8 +17,9 @@ import {
   Rocket,
   X,
   Circle,
+  Activity,
 } from "lucide-react";
-import { api, Article, Outline, PlanInfo, UserResponse } from "@/lib/api";
+import { api, Article, Outline, PlanInfo, UserResponse, ContentHealthSummary } from "@/lib/api";
 
 const quickActions = [
   {
@@ -218,6 +219,7 @@ export default function DashboardPage() {
   const [totalImages, setTotalImages] = useState(0);
   const [avgSeoScore, setAvgSeoScore] = useState<number | null>(null);
   const [planLimits, setPlanLimits] = useState<PlanInfo | null>(null);
+  const [contentHealth, setContentHealth] = useState<ContentHealthSummary | null>(null);
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
 
   useEffect(() => {
@@ -243,13 +245,14 @@ export default function DashboardPage() {
     try {
       setLoading(true);
 
-      const [userRes, articlesRes, outlinesRes, imagesRes, pricingRes] =
+      const [userRes, articlesRes, outlinesRes, imagesRes, pricingRes, healthRes] =
         await Promise.all([
           api.auth.me(),
           api.articles.list({ page: 1, page_size: 5 }),
           api.outlines.list({ page: 1, page_size: 5 }),
           api.images.list({ page: 1, page_size: 1 }),
           api.billing.pricing().catch(() => null),
+          api.articles.healthSummary().catch(() => null),
         ]);
 
       setUser(userRes);
@@ -258,6 +261,7 @@ export default function DashboardPage() {
       setRecentOutlines(outlinesRes.items);
       setTotalOutlines(outlinesRes.total);
       setTotalImages(imagesRes.total);
+      setContentHealth(healthRes);
 
       // Calculate average SEO score from articles that have one
       const articlesWithSeo = articlesRes.items.filter(
@@ -597,6 +601,176 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Content Health */}
+      {contentHealth && contentHealth.total_articles > 0 && (
+        <div className="card p-5">
+          {/* Header */}
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-5">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-primary-50 flex items-center justify-center shrink-0">
+                <Activity className="h-5 w-5 text-primary-500" />
+              </div>
+              <div>
+                <h2 className="font-display font-semibold text-text-primary leading-tight">
+                  Content Health
+                </h2>
+                <p className="text-xs text-text-muted">
+                  {contentHealth.total_articles} completed article{contentHealth.total_articles !== 1 ? "s" : ""} analysed
+                </p>
+              </div>
+            </div>
+            {contentHealth.avg_seo_score !== null && (
+              <div className="text-right">
+                <p className={`text-2xl font-display font-bold ${getSeoScoreColor(contentHealth.avg_seo_score)}`}>
+                  {contentHealth.avg_seo_score}
+                </p>
+                <p className="text-xs text-text-muted">avg SEO score</p>
+              </div>
+            )}
+          </div>
+
+          {/* Score distribution bar */}
+          {(() => {
+            const total =
+              contentHealth.excellent_count +
+              contentHealth.good_count +
+              contentHealth.needs_work_count +
+              contentHealth.no_score_count;
+            if (total === 0) return null;
+            const excellentPct = (contentHealth.excellent_count / total) * 100;
+            const goodPct = (contentHealth.good_count / total) * 100;
+            const needsWorkPct = (contentHealth.needs_work_count / total) * 100;
+            const noScorePct = (contentHealth.no_score_count / total) * 100;
+            return (
+              <div className="mb-4">
+                <div className="h-3 rounded-full overflow-hidden flex mb-2">
+                  {excellentPct > 0 && (
+                    <div
+                      className="bg-green-500 transition-all duration-500"
+                      style={{ width: `${excellentPct}%` }}
+                      title={`Excellent (≥80): ${contentHealth.excellent_count}`}
+                    />
+                  )}
+                  {goodPct > 0 && (
+                    <div
+                      className="bg-yellow-400 transition-all duration-500"
+                      style={{ width: `${goodPct}%` }}
+                      title={`Good (60–79): ${contentHealth.good_count}`}
+                    />
+                  )}
+                  {needsWorkPct > 0 && (
+                    <div
+                      className="bg-red-400 transition-all duration-500"
+                      style={{ width: `${needsWorkPct}%` }}
+                      title={`Needs Work (<60): ${contentHealth.needs_work_count}`}
+                    />
+                  )}
+                  {noScorePct > 0 && (
+                    <div
+                      className="bg-surface-tertiary transition-all duration-500"
+                      style={{ width: `${noScorePct}%` }}
+                      title={`No Score: ${contentHealth.no_score_count}`}
+                    />
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-muted">
+                  {contentHealth.excellent_count > 0 && (
+                    <span className="flex items-center gap-1">
+                      <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                      Excellent ({contentHealth.excellent_count})
+                    </span>
+                  )}
+                  {contentHealth.good_count > 0 && (
+                    <span className="flex items-center gap-1">
+                      <span className="inline-block h-2 w-2 rounded-full bg-yellow-400" />
+                      Good ({contentHealth.good_count})
+                    </span>
+                  )}
+                  {contentHealth.needs_work_count > 0 && (
+                    <span className="flex items-center gap-1">
+                      <span className="inline-block h-2 w-2 rounded-full bg-red-400" />
+                      Needs Work ({contentHealth.needs_work_count})
+                    </span>
+                  )}
+                  {contentHealth.no_score_count > 0 && (
+                    <span className="flex items-center gap-1">
+                      <span className="inline-block h-2 w-2 rounded-full bg-surface-tertiary border border-surface-secondary" />
+                      No Score ({contentHealth.no_score_count})
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Needs Improvement list */}
+          {contentHealth.needs_work.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-text-primary mb-3">
+                Needs Improvement
+              </h3>
+              <div className="space-y-2">
+                {contentHealth.needs_work.map((article) => (
+                  <div
+                    key={article.id}
+                    className="flex items-center gap-3 p-2 -mx-2 rounded-lg hover:bg-surface-secondary transition-colors"
+                  >
+                    {/* Score badge */}
+                    <span
+                      className={`shrink-0 inline-flex items-center justify-center w-10 h-6 rounded text-xs font-bold ${
+                        article.seo_score !== undefined && article.seo_score >= 60
+                          ? "bg-yellow-100 text-yellow-700"
+                          : "bg-red-100 text-red-700"
+                      }`}
+                    >
+                      {article.seo_score !== undefined ? Math.round(article.seo_score) : "—"}
+                    </span>
+
+                    {/* Title + keyword */}
+                    <div className="flex-1 min-w-0">
+                      <Link
+                        href={`/articles/${article.id}`}
+                        className="text-sm font-medium text-text-primary hover:text-primary-600 truncate block"
+                      >
+                        {article.title}
+                      </Link>
+                      <p className="text-xs text-text-muted truncate">{article.keyword}</p>
+                    </div>
+
+                    {/* Improve link */}
+                    <Link
+                      href={`/articles/${article.id}`}
+                      className="shrink-0 text-xs font-medium text-primary-500 hover:text-primary-600 transition-colors"
+                    >
+                      Improve
+                      <ArrowRight className="inline h-3 w-3 ml-0.5" />
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* No score articles notice */}
+          {contentHealth.no_score.length > 0 && contentHealth.needs_work.length === 0 && (
+            <p className="text-sm text-text-muted mt-2">
+              {contentHealth.no_score_count} article{contentHealth.no_score_count !== 1 ? "s" : ""} have not been analysed yet.{" "}
+              <Link href="/articles" className="text-primary-500 hover:text-primary-600 font-medium">
+                View articles
+              </Link>
+            </p>
+          )}
+
+          {/* All good state */}
+          {contentHealth.needs_work.length === 0 && contentHealth.no_score.length === 0 && (
+            <div className="flex items-center gap-2 text-sm text-green-600">
+              <CheckCircle2 className="h-4 w-4" />
+              All articles are in good health.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

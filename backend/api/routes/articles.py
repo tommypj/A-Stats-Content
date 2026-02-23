@@ -12,6 +12,8 @@ from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
+from pydantic import BaseModel, Field
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from api.middleware.rate_limit import limiter
 from sqlalchemy import select, func
@@ -591,6 +593,120 @@ async def list_articles(
         page_size=page_size,
         pages=math.ceil(total / page_size) if total > 0 else 0,
     )
+
+
+@router.get("/health-summary")
+async def get_content_health(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get content health summary for the current user/project."""
+    # Build base query with project scoping
+    if current_user.current_project_id:
+        base = select(Article).where(Article.project_id == current_user.current_project_id)
+    else:
+        base = select(Article).where(
+            Article.user_id == current_user.id,
+            Article.project_id.is_(None),
+        )
+
+    # Only include completed/published articles (not drafts/generating)
+    base = base.where(Article.status.in_(["completed", "published"]))
+
+    result = await db.execute(base)
+    articles = result.scalars().all()
+
+    total = len(articles)
+    with_score = [a for a in articles if a.seo_score is not None]
+
+    avg_score = sum(a.seo_score for a in with_score) / len(with_score) if with_score else None
+
+    # Categorize by score
+    excellent = [
+        {"id": a.id, "title": a.title, "seo_score": a.seo_score, "keyword": a.keyword}
+        for a in with_score if a.seo_score >= 80
+    ]
+    good = [
+        {"id": a.id, "title": a.title, "seo_score": a.seo_score, "keyword": a.keyword}
+        for a in with_score if 60 <= a.seo_score < 80
+    ]
+    needs_work = [
+        {"id": a.id, "title": a.title, "seo_score": a.seo_score, "keyword": a.keyword}
+        for a in with_score if a.seo_score < 60
+    ]
+    no_score = [
+        {"id": a.id, "title": a.title, "keyword": a.keyword}
+        for a in articles if a.seo_score is None
+    ]
+
+    return {
+        "total_articles": total,
+        "avg_seo_score": round(avg_score, 1) if avg_score else None,
+        "excellent_count": len(excellent),
+        "good_count": len(good),
+        "needs_work_count": len(needs_work),
+        "no_score_count": len(no_score),
+        "needs_work": sorted(needs_work, key=lambda x: x["seo_score"])[:10],  # worst 10
+        "no_score": no_score[:10],
+    }
+
+
+class KeywordSuggestionRequest(BaseModel):
+    seed_keyword: str = Field(..., min_length=1, max_length=200)
+    count: int = Field(10, ge=5, le=20)
+
+
+@router.post("/keyword-suggestions")
+@limiter.limit("10/minute")
+async def get_keyword_suggestions(
+    request: Request,
+    body: KeywordSuggestionRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Get AI-powered keyword suggestions based on a seed keyword."""
+    prompt = f"""Given the seed keyword "{body.seed_keyword}", suggest {body.count} related keywords for SEO content creation.
+
+For each keyword, provide:
+1. The keyword phrase
+2. Estimated search intent (informational, commercial, transactional, navigational)
+3. Estimated difficulty (low, medium, high)
+4. A brief content angle suggestion (1 sentence)
+
+Return as a JSON array with objects having: keyword, intent, difficulty, content_angle
+
+Only return the JSON array, no other text."""
+
+    try:
+        import json
+        from adapters.ai.anthropic_adapter import content_ai_service
+
+        client = content_ai_service._client
+        if not client:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="AI service not configured",
+            )
+
+        response = await client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1000,
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        text = response.content[0].text
+        # Extract JSON from response (handle markdown code blocks)
+        if "```" in text:
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+
+        suggestions = json.loads(text.strip())
+        return {"seed_keyword": body.seed_keyword, "suggestions": suggestions}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Keyword suggestion failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to generate keyword suggestions")
 
 
 @router.get("/{article_id}", response_model=ArticleResponse)
