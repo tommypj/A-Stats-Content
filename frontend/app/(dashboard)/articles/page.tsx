@@ -17,6 +17,9 @@ import {
   Filter,
   User,
   Users,
+  Search,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { api, Article } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -34,6 +37,15 @@ const statusConfig = {
   failed: { label: "Failed", color: "bg-red-100 text-red-700", icon: XCircle },
 };
 
+const STATUS_OPTIONS = [
+  { value: "", label: "All Statuses" },
+  { value: "draft", label: "Draft" },
+  { value: "generating", label: "Generating" },
+  { value: "completed", label: "Completed" },
+  { value: "published", label: "Published" },
+  { value: "failed", label: "Failed" },
+];
+
 type ContentFilter = "all" | "personal" | "project";
 
 function getSeoScoreColor(score: number | undefined) {
@@ -49,6 +61,17 @@ export default function ArticlesPage() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [contentFilter, setContentFilter] = useState<ContentFilter>("all");
 
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalArticles, setTotalArticles] = useState(0);
+
+  // Search/filter state
+  const [searchKeyword, setSearchKeyword] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [debouncedKeyword, setDebouncedKeyword] = useState("");
+
   const {
     currentProject,
     isPersonalWorkspace,
@@ -60,14 +83,39 @@ export default function ArticlesPage() {
     isAtLimit,
   } = useProject();
 
+  // Debounce search keyword — reset to page 1 when keyword changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedKeyword(searchKeyword);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchKeyword]);
+
+  // Reset page when status filter or content filter changes
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, contentFilter]);
+
   useEffect(() => {
     loadArticles();
-  }, [currentProject, contentFilter]);
+  }, [currentProject, contentFilter, page, debouncedKeyword, statusFilter]);
 
   async function loadArticles() {
     try {
       setLoading(true);
-      const params: any = { page_size: 50 };
+      const params: any = {
+        page,
+        page_size: pageSize,
+      };
+
+      if (debouncedKeyword) {
+        params.keyword = debouncedKeyword;
+      }
+
+      if (statusFilter) {
+        params.status = statusFilter;
+      }
 
       // Apply project context
       if (!isPersonalWorkspace && currentProject) {
@@ -83,6 +131,8 @@ export default function ArticlesPage() {
 
       const response = await api.articles.list(params);
       setArticles(response.items);
+      setTotalArticles(response.total);
+      setTotalPages(response.pages ?? Math.ceil(response.total / pageSize));
     } catch (error) {
       console.error("Failed to load articles:", error);
     } finally {
@@ -96,6 +146,7 @@ export default function ArticlesPage() {
     try {
       await api.articles.delete(id);
       setArticles(articles.filter((a) => a.id !== id));
+      setTotalArticles((prev) => Math.max(0, prev - 1));
     } catch (error) {
       console.error("Failed to delete article:", error);
     }
@@ -105,6 +156,10 @@ export default function ArticlesPage() {
   const showCreateButton = canCreate && !isAtLimit("articles");
   const articlesUsed = usage?.articles_used || 0;
   const articlesLimit = limits?.articles_per_month || Infinity;
+
+  // Calculate displayed range for "Showing X-Y of Z"
+  const rangeStart = totalArticles === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeEnd = Math.min(page * pageSize, totalArticles);
 
   return (
     <div className="space-y-6">
@@ -207,6 +262,31 @@ export default function ArticlesPage() {
         </div>
       </div>
 
+      {/* Search and Filter Bar */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search articles by keyword or title..."
+            value={searchKeyword}
+            onChange={(e) => setSearchKeyword(e.target.value)}
+            className="w-full bg-surface rounded-xl border border-surface-tertiary pl-9 pr-4 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="bg-surface rounded-xl border border-surface-tertiary px-4 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent sm:w-44"
+        >
+          {STATUS_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {/* Articles List */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
@@ -216,14 +296,16 @@ export default function ArticlesPage() {
         <Card className="p-12 text-center">
           <Sparkles className="h-12 w-12 text-text-muted mx-auto mb-4" />
           <h3 className="text-lg font-medium text-text-primary mb-2">
-            No articles yet
+            {debouncedKeyword || statusFilter ? "No articles match your search" : "No articles yet"}
           </h3>
           <p className="text-text-secondary mb-6">
-            {isViewer
+            {debouncedKeyword || statusFilter
+              ? "Try adjusting your search or filter to find what you're looking for"
+              : isViewer
               ? "Your project has not created any articles yet"
               : "Create an outline first, then generate an article from it"}
           </p>
-          {!isViewer && (
+          {!isViewer && !debouncedKeyword && !statusFilter && (
             <Link href="/outlines">
               <Button>
                 <FileText className="h-4 w-4 mr-2" />
@@ -364,6 +446,50 @@ export default function ArticlesPage() {
             );
           })}
         </div>
+      )}
+
+      {/* Pagination Controls */}
+      {!loading && totalPages > 0 && (
+        <Card className="p-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+            <p className="text-sm text-text-muted">
+              {totalArticles === 0
+                ? "No articles"
+                : `Showing ${rangeStart}\u2013${rangeEnd} of ${totalArticles} article${totalArticles !== 1 ? "s" : ""}`}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className={clsx(
+                  "flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+                  page <= 1
+                    ? "text-text-muted cursor-not-allowed"
+                    : "text-text-secondary hover:bg-surface-secondary"
+                )}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Previous
+              </button>
+              <span className="px-3 py-1.5 text-sm text-text-primary font-medium">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className={clsx(
+                  "flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+                  page >= totalPages
+                    ? "text-text-muted cursor-not-allowed"
+                    : "text-text-secondary hover:bg-surface-secondary"
+                )}
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </Card>
       )}
     </div>
   );

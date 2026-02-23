@@ -13,6 +13,9 @@ import {
   CheckCircle2,
   XCircle,
   Sparkles,
+  Search,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { api, Outline } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -27,21 +30,61 @@ const statusConfig = {
   failed: { label: "Failed", color: "bg-red-100 text-red-700", icon: XCircle },
 };
 
+const STATUS_OPTIONS = [
+  { value: "", label: "All Statuses" },
+  { value: "draft", label: "Draft" },
+  { value: "generating", label: "Generating" },
+  { value: "completed", label: "Completed" },
+  { value: "failed", label: "Failed" },
+];
+
 export default function OutlinesPage() {
   const [outlines, setOutlines] = useState<Outline[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
+  // Pagination & filter state
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(20);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalItems, setTotalItems] = useState(0);
+  const [searchKeyword, setSearchKeyword] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [debouncedKeyword, setDebouncedKeyword] = useState("");
+
+  // Debounce search input — reset page to 1 when keyword changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedKeyword(searchKeyword);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchKeyword]);
+
+  // Reset page to 1 when status filter changes
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter]);
+
+  // Load outlines whenever page, debouncedKeyword, or statusFilter changes
   useEffect(() => {
     loadOutlines();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, debouncedKeyword, statusFilter]);
 
   async function loadOutlines() {
     try {
       setLoading(true);
-      const response = await api.outlines.list({ page_size: 50 });
+      const response = await api.outlines.list({
+        page,
+        page_size: pageSize,
+        keyword: debouncedKeyword || undefined,
+        status: statusFilter || undefined,
+      });
       setOutlines(response.items);
+      setTotalItems(response.total);
+      setTotalPages(response.pages);
     } catch (error) {
       console.error("Failed to load outlines:", error);
     } finally {
@@ -55,6 +98,7 @@ export default function OutlinesPage() {
     try {
       await api.outlines.delete(id);
       setOutlines(outlines.filter((o) => o.id !== id));
+      setTotalItems((prev) => Math.max(0, prev - 1));
     } catch (error) {
       console.error("Failed to delete outline:", error);
     }
@@ -70,6 +114,10 @@ export default function OutlinesPage() {
     }
     setActiveMenu(null);
   }
+
+  // Pagination helpers
+  const firstItem = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
+  const lastItem = Math.min(page * pageSize, totalItems);
 
   return (
     <div className="space-y-6">
@@ -89,6 +137,31 @@ export default function OutlinesPage() {
         </Button>
       </div>
 
+      {/* Search & Filter Bar */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted pointer-events-none" />
+          <input
+            type="text"
+            value={searchKeyword}
+            onChange={(e) => setSearchKeyword(e.target.value)}
+            placeholder="Search by keyword or title..."
+            className="w-full pl-9 pr-4 py-2 bg-surface rounded-xl border border-surface-tertiary text-sm text-text-primary placeholder:text-text-muted focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="bg-surface rounded-xl border border-surface-tertiary px-4 py-2 text-sm text-text-primary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all"
+        >
+          {STATUS_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {/* Outlines Grid */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
@@ -98,15 +171,19 @@ export default function OutlinesPage() {
         <Card className="p-12 text-center">
           <FileText className="h-12 w-12 text-text-muted mx-auto mb-4" />
           <h3 className="text-lg font-medium text-text-primary mb-2">
-            No outlines yet
+            {debouncedKeyword || statusFilter ? "No outlines match your filters" : "No outlines yet"}
           </h3>
           <p className="text-text-secondary mb-6">
-            Create your first outline to start generating content
+            {debouncedKeyword || statusFilter
+              ? "Try adjusting your search or filter criteria"
+              : "Create your first outline to start generating content"}
           </p>
-          <Button onClick={() => setShowCreateModal(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Outline
-          </Button>
+          {!debouncedKeyword && !statusFilter && (
+            <Button onClick={() => setShowCreateModal(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Outline
+            </Button>
+          )}
         </Card>
       ) : (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
@@ -190,12 +267,46 @@ export default function OutlinesPage() {
         </div>
       )}
 
+      {/* Pagination Controls */}
+      {!loading && totalPages > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+          <p className="text-sm text-text-muted">
+            Showing {firstItem}&ndash;{lastItem} of {totalItems} outline{totalItems !== 1 ? "s" : ""}
+          </p>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-surface-tertiary text-sm text-text-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </button>
+
+            <span className="px-3 py-1.5 text-sm text-text-secondary">
+              Page {page} of {totalPages}
+            </span>
+
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-surface-tertiary text-sm text-text-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Create Modal */}
       {showCreateModal && (
         <CreateOutlineModal
           onClose={() => setShowCreateModal(false)}
           onCreate={(outline) => {
             setOutlines([outline, ...outlines]);
+            setTotalItems((prev) => prev + 1);
             setShowCreateModal(false);
           }}
         />
