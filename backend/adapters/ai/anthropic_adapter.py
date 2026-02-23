@@ -120,6 +120,7 @@ You MUST write the ENTIRE article in {language_name}. Every word, heading, subhe
 Use native-level grammar, correct gender agreements, proper declensions, and natural idiomatic expressions.
 Do NOT mix languages. Do NOT use English words unless they are commonly used loanwords in {language_name}.
 Write as a native {language_name} speaker would — with correct syntax, word order, and cultural context.
+Before finalizing each paragraph, mentally verify grammar: correct gender agreements, proper case declensions, accurate verb conjugations, and natural word order for {language_name}.
 """
         else:
             language_instruction = "\nLANGUAGE: Write in English.\n"
@@ -143,7 +144,8 @@ CRITICAL RULES:
 5. Include specific examples, analogies, and scenarios rather than generic advice.
 6. Do NOT start multiple consecutive paragraphs with the same word or structure.
 7. Avoid filler phrases like "In conclusion", "It's important to note that", "As mentioned above".
-8. When citing research or studies, be specific — name the institution, year, or researcher when possible. Do not say "studies show" without attribution."""
+8. When citing research or studies, be specific — name the institution, year, or researcher when possible. Do not say "studies show" without attribution.
+9. GRAMMAR AND LANGUAGE QUALITY: Use impeccable grammar throughout. Ensure subject-verb agreement, correct tense consistency, proper use of articles (a/an/the), correct prepositions, and natural sentence flow. Every sentence must be grammatically correct and publication-ready."""
 
     async def generate_outline(
         self,
@@ -378,6 +380,51 @@ META_DESCRIPTION: [A compelling 150-160 character meta description]"""
             word_count=word_count,
         )
 
+    async def proofread_grammar(
+        self,
+        content: str,
+        language: str = "en",
+    ) -> str:
+        """
+        Proofread and fix grammar issues in generated content.
+        Preserves markdown structure, headings, and meaning.
+
+        Args:
+            content: Article content in markdown format
+            language: Language code
+
+        Returns:
+            Grammar-corrected content
+        """
+        if not self._client:
+            return content
+
+        language_name = self._get_language_name(language)
+
+        prompt = f"""Proofread the following article and fix ALL grammar mistakes.
+
+RULES:
+1. Fix grammar errors: subject-verb agreement, tense consistency, articles, prepositions, punctuation, and sentence fragments.
+2. Do NOT change the meaning, tone, or structure of the content.
+3. Do NOT add or remove sections, headings, or paragraphs.
+4. Do NOT change markdown formatting (##, ###, **, [], etc.).
+5. Do NOT rephrase sentences that are already grammatically correct.
+6. Do NOT change the word count significantly (stay within 2% of original).
+7. Language: {language_name}
+
+Return ONLY the corrected article in markdown format. No explanations or notes.
+
+ARTICLE:
+{content}"""
+
+        message = await self._client.messages.create(
+            model=self._model,
+            max_tokens=max(len(content.split()) * 3, 4000),
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        return message.content[0].text
+
     async def improve_content(
         self,
         content: str,
@@ -402,6 +449,7 @@ META_DESCRIPTION: [A compelling 150-160 character meta description]"""
             "seo": f"Optimize this content for SEO, naturally incorporating the keyword '{keyword}' where appropriate. Improve headings, meta tags, and keyword placement.",
             "readability": "Improve the readability of this content. Use shorter sentences, clearer language, and better paragraph structure.",
             "engagement": "Make this content more engaging. Add hooks, rhetorical questions, and emotional appeals while maintaining professionalism.",
+            "grammar": "Proofread and fix all grammar mistakes in this content. Fix subject-verb agreement, tense consistency, articles, prepositions, punctuation, and sentence fragments. Do NOT change the meaning, structure, or tone. Do NOT add or remove sections.",
         }
 
         prompt = f"""{improvement_instructions.get(improvement_type, improvement_instructions['seo'])}

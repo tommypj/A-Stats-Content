@@ -214,7 +214,7 @@ class ArticleImproveRequest(BaseModel):
 
     improvement_type: str = Field(
         default="seo",
-        description="Type: seo, readability, engagement",
+        description="Type: seo, readability, engagement, grammar",
     )
 
 

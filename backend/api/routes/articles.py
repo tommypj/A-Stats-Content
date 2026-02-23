@@ -28,7 +28,7 @@ from api.schemas.content import (
 from api.routes.auth import get_current_user
 from infrastructure.database.connection import get_db, async_session_maker
 from infrastructure.database.models import Article, Outline, User, ContentStatus
-from adapters.ai.anthropic_adapter import content_ai_service
+from adapters.ai.anthropic_adapter import content_ai_service, GeneratedArticle
 from infrastructure.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -227,6 +227,34 @@ async def _generate_article_background(
                 ),
                 timeout=270.0,  # 4.5 min hard limit
             )
+
+            # Grammar proofreading pass
+            try:
+                proofread_content = await asyncio.wait_for(
+                    content_ai_service.proofread_grammar(
+                        content=generated.content,
+                        language=language,
+                    ),
+                    timeout=60.0,
+                )
+                # Update generated content with proofread version
+                generated = GeneratedArticle(
+                    title=generated.title,
+                    content=proofread_content,
+                    meta_description=generated.meta_description,
+                    word_count=len(proofread_content.split()),
+                )
+                logger.info("Grammar proofread completed for article %s", article_id)
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Grammar proofread timed out for article %s, using original content",
+                    article_id,
+                )
+            except Exception as proof_err:
+                logger.warning(
+                    "Grammar proofread failed for article %s, using original: %s",
+                    article_id, proof_err,
+                )
 
             article.content = generated.content
             article.content_html = markdown.markdown(generated.content)
