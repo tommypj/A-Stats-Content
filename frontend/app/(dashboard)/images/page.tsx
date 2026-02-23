@@ -17,6 +17,9 @@ import {
   ExternalLink,
   Sparkles,
   Globe,
+  Search,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { api, getImageUrl, parseApiError, GeneratedImage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -29,6 +32,8 @@ const statusConfig = {
   failed: { label: "Failed", color: "bg-red-100 text-red-700", icon: XCircle },
 };
 
+const PAGE_SIZE = 20;
+
 export default function ImagesPage() {
   const [images, setImages] = useState<GeneratedImage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,16 +45,46 @@ export default function ImagesPage() {
   const [wpUploaded, setWpUploaded] = useState<Set<string>>(new Set());
   const [wpError, setWpError] = useState("");
 
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(PAGE_SIZE);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+
+  // Search / filter state
+  const [searchPrompt, setSearchPrompt] = useState("");
+  const [styleFilter, setStyleFilter] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Debounce search input; reset to page 1 when search changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchPrompt);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchPrompt]);
+
+  // Reset page when style filter changes
+  useEffect(() => {
+    setPage(1);
+  }, [styleFilter]);
+
   useEffect(() => {
     loadImages();
+  }, [page, pageSize]);
+
+  useEffect(() => {
     checkWpConnection();
   }, []);
 
   async function loadImages() {
     try {
       setLoading(true);
-      const response = await api.images.list({ page_size: 50 });
+      const response = await api.images.list({ page, page_size: pageSize });
       setImages(response.items);
+      setTotalCount(response.total);
+      setTotalPages(Math.ceil(response.total / pageSize));
     } catch (error) {
       console.error("Failed to load images:", error);
     } finally {
@@ -57,12 +92,39 @@ export default function ImagesPage() {
     }
   }
 
+  // Client-side filtering applied after load
+  const filteredImages = images.filter((img) => {
+    const matchesSearch =
+      debouncedSearch === "" ||
+      img.prompt.toLowerCase().includes(debouncedSearch.toLowerCase());
+    const matchesStyle =
+      styleFilter === "" ||
+      (img.style ?? "").toLowerCase() === styleFilter.toLowerCase();
+    return matchesSearch && matchesStyle;
+  });
+
+  // Collect unique styles from the current page for the dropdown
+  const availableStyles = Array.from(
+    new Set(images.map((img) => img.style).filter((s): s is string => Boolean(s)))
+  ).sort();
+
+  // When filters are active the visible count is the filtered set; otherwise use server total
+  const isFiltering = debouncedSearch !== "" || styleFilter !== "";
+  const displayTotal = isFiltering ? filteredImages.length : totalCount;
+
+  // Items shown on this page (filtered)
+  const pageStart = isFiltering ? 1 : (page - 1) * pageSize + 1;
+  const pageEnd = isFiltering
+    ? filteredImages.length
+    : Math.min(page * pageSize, totalCount);
+
   async function handleDelete(id: string) {
     if (!confirm("Are you sure you want to delete this image?")) return;
 
     try {
       await api.images.delete(id);
       setImages(images.filter((img) => img.id !== id));
+      setTotalCount((prev) => prev - 1);
     } catch (error) {
       console.error("Failed to delete image:", error);
     }
@@ -137,30 +199,62 @@ export default function ImagesPage() {
         </Link>
       </div>
 
+      {/* Search and Filter Bar */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search by prompt..."
+            value={searchPrompt}
+            onChange={(e) => setSearchPrompt(e.target.value)}
+            className="w-full bg-surface rounded-xl border border-surface-tertiary pl-9 pr-4 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
+          />
+        </div>
+        {availableStyles.length > 0 && (
+          <select
+            value={styleFilter}
+            onChange={(e) => setStyleFilter(e.target.value)}
+            className="bg-surface rounded-xl border border-surface-tertiary px-4 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
+          >
+            <option value="">All styles</option>
+            {availableStyles.map((style) => (
+              <option key={style} value={style}>
+                {style}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
       {/* Images Grid */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
         </div>
-      ) : images.length === 0 ? (
+      ) : filteredImages.length === 0 ? (
         <Card className="p-12 text-center">
           <ImageIcon className="h-12 w-12 text-text-muted mx-auto mb-4" />
           <h3 className="text-lg font-medium text-text-primary mb-2">
-            No images yet
+            {isFiltering ? "No images match your search" : "No images yet"}
           </h3>
           <p className="text-text-secondary mb-6">
-            Generate your first AI image to get started
+            {isFiltering
+              ? "Try adjusting your search or filter"
+              : "Generate your first AI image to get started"}
           </p>
-          <Link href="/images/generate">
-            <Button>
-              <Sparkles className="h-4 w-4 mr-2" />
-              Generate Image
-            </Button>
-          </Link>
+          {!isFiltering && (
+            <Link href="/images/generate">
+              <Button>
+                <Sparkles className="h-4 w-4 mr-2" />
+                Generate Image
+              </Button>
+            </Link>
+          )}
         </Card>
       ) : (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {images.map((image) => {
+          {filteredImages.map((image) => {
             const status = statusConfig[image.status as keyof typeof statusConfig];
             const StatusIcon = status?.icon;
 
@@ -286,7 +380,7 @@ export default function ImagesPage() {
                       )}
                       {image.width && image.height && (
                         <span>
-                          {image.width}×{image.height}
+                          {image.width}x{image.height}
                         </span>
                       )}
                     </div>
@@ -302,6 +396,45 @@ export default function ImagesPage() {
         </div>
       )}
 
+      {/* Pagination Controls */}
+      {!loading && !isFiltering && totalCount > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+          <p className="text-sm text-text-secondary">
+            Showing {pageStart}-{pageEnd} of {totalCount} images
+          </p>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Previous
+            </Button>
+            <span className="text-sm text-text-secondary">
+              Page {page} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+            >
+              Next
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Filter result count when filtering */}
+      {!loading && isFiltering && filteredImages.length > 0 && (
+        <p className="text-sm text-text-secondary pt-2">
+          Showing {displayTotal} {displayTotal === 1 ? "image" : "images"} matching your search
+        </p>
+      )}
+
       {/* Full Size Image Modal */}
       {selectedImage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -311,7 +444,7 @@ export default function ImagesPage() {
               <div>
                 <h3 className="font-medium text-text-primary">Generated Image</h3>
                 <p className="text-sm text-text-secondary mt-0.5">
-                  {selectedImage.width}×{selectedImage.height} · {selectedImage.style}
+                  {selectedImage.width}x{selectedImage.height} · {selectedImage.style}
                 </p>
               </div>
               <button

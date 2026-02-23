@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -19,6 +19,14 @@ import {
   ExternalLink,
   Trash2,
   Share2,
+  Bold,
+  Italic,
+  Heading2,
+  Heading3,
+  List,
+  ListOrdered,
+  Link as LinkIcon,
+  Quote,
 } from "lucide-react";
 import { api, Article } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -60,6 +68,12 @@ export default function ArticleEditorPage() {
   const [metaDescription, setMetaDescription] = useState("");
   const [keyword, setKeyword] = useState("");
 
+  // Markdown toolbar
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const lastSavedContentRef = useRef<string>("");
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+
   useEffect(() => {
     loadArticle();
     checkWordPressConnection();
@@ -74,6 +88,7 @@ export default function ArticleEditorPage() {
       setContent(data.content || "");
       setMetaDescription(data.meta_description || "");
       setKeyword(data.keyword);
+      lastSavedContentRef.current = data.content || "";
 
       // Fetch featured image URL if article has one
       if (data.featured_image_id) {
@@ -166,6 +181,83 @@ export default function ArticleEditorPage() {
     navigator.clipboard.writeText(text);
     toast.success("Copied to clipboard!");
   }
+
+  // Markdown toolbar helpers
+  const insertMarkdown = useCallback((prefix: string, suffix: string) => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const selected = content.slice(start, end);
+    const placeholder = selected || "text";
+    const replacement = prefix + placeholder + suffix;
+
+    const newContent =
+      content.slice(0, start) + replacement + content.slice(end);
+    setContent(newContent);
+
+    // Restore cursor: if no selection, place cursor inside the inserted syntax
+    const cursorStart = start + prefix.length;
+    const cursorEnd = cursorStart + placeholder.length;
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.setSelectionRange(cursorStart, cursorEnd);
+    });
+  }, [content]);
+
+  const insertLinePrefix = useCallback((prefix: string) => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+
+    const pos = ta.selectionStart;
+    // Find the beginning of the current line
+    const lineStart = content.lastIndexOf("\n", pos - 1) + 1;
+
+    const newContent =
+      content.slice(0, lineStart) + prefix + content.slice(lineStart);
+    setContent(newContent);
+
+    const newCursor = pos + prefix.length;
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.setSelectionRange(newCursor, newCursor);
+    });
+  }, [content]);
+
+  // Auto-save: debounce 3 s after last keystroke
+  useEffect(() => {
+    if (!article) return;
+    if (content === lastSavedContentRef.current) return;
+
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
+    autoSaveTimerRef.current = setTimeout(async () => {
+      if (content === lastSavedContentRef.current) return;
+      setAutoSaveStatus("saving");
+      try {
+        await api.articles.update(article.id, {
+          title,
+          content,
+          meta_description: metaDescription,
+          keyword,
+        });
+        lastSavedContentRef.current = content;
+        setAutoSaveStatus("saved");
+        setTimeout(() => setAutoSaveStatus("idle"), 2000);
+      } catch {
+        setAutoSaveStatus("idle");
+      }
+    }, 3000);
+
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [content, article, title, metaDescription, keyword]);
 
   function handlePublishToWordPress() {
     if (!wpConnected) {
@@ -348,12 +440,117 @@ export default function ArticleEditorPage() {
 
           <Card className="p-4">
             {viewMode === "edit" ? (
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                className="w-full min-h-[500px] px-4 py-3 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all resize-none font-mono text-sm leading-relaxed"
-                placeholder="Write your article content in Markdown format..."
-              />
+              <div>
+                {/* Markdown toolbar */}
+                <div className="flex items-center gap-1 p-2 bg-surface-secondary rounded-t-xl border border-surface-tertiary border-b-0">
+                  {/* Inline formatting group */}
+                  <button
+                    type="button"
+                    title="Bold"
+                    onClick={() => insertMarkdown("**", "**")}
+                    className="p-1.5 rounded-lg hover:bg-surface-tertiary text-text-secondary hover:text-text-primary transition-colors"
+                  >
+                    <Bold className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    title="Italic"
+                    onClick={() => insertMarkdown("*", "*")}
+                    className="p-1.5 rounded-lg hover:bg-surface-tertiary text-text-secondary hover:text-text-primary transition-colors"
+                  >
+                    <Italic className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    title="Inline Code"
+                    onClick={() => insertMarkdown("`", "`")}
+                    className="p-1.5 rounded-lg hover:bg-surface-tertiary text-text-secondary hover:text-text-primary transition-colors"
+                  >
+                    <Code className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    title="Link"
+                    onClick={() => insertMarkdown("[", "](url)")}
+                    className="p-1.5 rounded-lg hover:bg-surface-tertiary text-text-secondary hover:text-text-primary transition-colors"
+                  >
+                    <LinkIcon className="h-4 w-4" />
+                  </button>
+
+                  <div className="w-px h-5 bg-surface-tertiary mx-1" />
+
+                  {/* Block / heading group */}
+                  <button
+                    type="button"
+                    title="Heading 2"
+                    onClick={() => insertLinePrefix("## ")}
+                    className="p-1.5 rounded-lg hover:bg-surface-tertiary text-text-secondary hover:text-text-primary transition-colors"
+                  >
+                    <Heading2 className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    title="Heading 3"
+                    onClick={() => insertLinePrefix("### ")}
+                    className="p-1.5 rounded-lg hover:bg-surface-tertiary text-text-secondary hover:text-text-primary transition-colors"
+                  >
+                    <Heading3 className="h-4 w-4" />
+                  </button>
+
+                  <div className="w-px h-5 bg-surface-tertiary mx-1" />
+
+                  {/* List group */}
+                  <button
+                    type="button"
+                    title="Bullet List"
+                    onClick={() => insertLinePrefix("- ")}
+                    className="p-1.5 rounded-lg hover:bg-surface-tertiary text-text-secondary hover:text-text-primary transition-colors"
+                  >
+                    <List className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    title="Numbered List"
+                    onClick={() => insertLinePrefix("1. ")}
+                    className="p-1.5 rounded-lg hover:bg-surface-tertiary text-text-secondary hover:text-text-primary transition-colors"
+                  >
+                    <ListOrdered className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    title="Blockquote"
+                    onClick={() => insertLinePrefix("> ")}
+                    className="p-1.5 rounded-lg hover:bg-surface-tertiary text-text-secondary hover:text-text-primary transition-colors"
+                  >
+                    <Quote className="h-4 w-4" />
+                  </button>
+
+                  {/* Auto-save status — pushed to far right */}
+                  <div className="ml-auto flex items-center gap-1.5 text-xs text-text-muted pr-1 select-none">
+                    {autoSaveStatus === "saving" && (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        <span>Saving...</span>
+                      </>
+                    )}
+                    {autoSaveStatus === "saved" && (
+                      <>
+                        <CheckCircle className="h-3 w-3 text-green-500" />
+                        <span className="text-green-600">Saved</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Textarea — top corners removed because toolbar sits above */}
+                <textarea
+                  ref={textareaRef}
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  className="w-full min-h-[500px] px-4 py-3 rounded-b-xl rounded-t-none border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all resize-none font-mono text-sm leading-relaxed"
+                  placeholder="Write your article content in Markdown format..."
+                />
+              </div>
             ) : (
               <div
                 className="prose prose-lg max-w-none min-h-[500px] px-4 py-3"
