@@ -80,7 +80,7 @@ class SocialSchedulerService:
                     .where(
                         and_(
                             ScheduledPost.scheduled_at <= now,
-                            ScheduledPost.status == PostStatus.PENDING.value,
+                            ScheduledPost.status == PostStatus.SCHEDULED.value,
                         )
                     )
                     .order_by(ScheduledPost.scheduled_at)
