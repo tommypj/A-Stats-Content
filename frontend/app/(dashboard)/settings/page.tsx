@@ -1,24 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
-import { api, parseApiError } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import {
   User,
-  Globe,
   Lock,
   CreditCard,
-  Plug,
   Save,
   Loader2,
   CheckCircle,
   AlertCircle,
-  ExternalLink,
-  Search,
-  Unplug,
+  Trash2,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -46,7 +44,6 @@ interface UserProfile {
 const TABS = [
   { id: "profile", label: "Profile", icon: User },
   { id: "password", label: "Password", icon: Lock },
-  { id: "integrations", label: "Integrations", icon: Plug },
   { id: "billing", label: "Billing", icon: CreditCard },
 ] as const;
 
@@ -265,250 +262,6 @@ function PasswordSection({
 }
 
 // ---------------------------------------------------------------------------
-// IntegrationsSection
-// ---------------------------------------------------------------------------
-
-interface IntegrationsSectionProps {
-  // WordPress
-  wpConnected: boolean;
-  wpSiteUrl: string;
-  wpUsername: string;
-  wpSiteName: string;
-  wpLoadingStatus: boolean;
-  showWpForm: boolean;
-  setShowWpForm: (v: boolean) => void;
-  wpFormSiteUrl: string;
-  setWpFormSiteUrl: (v: string) => void;
-  wpFormUsername: string;
-  setWpFormUsername: (v: string) => void;
-  wpFormAppPassword: string;
-  setWpFormAppPassword: (v: string) => void;
-  wpConnecting: boolean;
-  wpDisconnecting: boolean;
-  wpError: string;
-  setWpError: (v: string) => void;
-  onWpConnect: () => void;
-  onWpDisconnect: () => void;
-  // GSC
-  gscConnected: boolean;
-  gscSiteUrl: string;
-  gscLastSync: string;
-  gscLoadingStatus: boolean;
-  gscConnecting: boolean;
-  gscDisconnecting: boolean;
-  gscError: string;
-  onGscConnect: () => void;
-  onGscDisconnect: () => void;
-}
-
-function IntegrationsSection({
-  wpConnected,
-  wpSiteUrl,
-  wpUsername,
-  wpSiteName,
-  wpLoadingStatus,
-  showWpForm,
-  setShowWpForm,
-  wpFormSiteUrl,
-  setWpFormSiteUrl,
-  wpFormUsername,
-  setWpFormUsername,
-  wpFormAppPassword,
-  setWpFormAppPassword,
-  wpConnecting,
-  wpDisconnecting,
-  wpError,
-  setWpError,
-  onWpConnect,
-  onWpDisconnect,
-  gscConnected,
-  gscSiteUrl,
-  gscLastSync,
-  gscLoadingStatus,
-  gscConnecting,
-  gscDisconnecting,
-  gscError,
-  onGscConnect,
-  onGscDisconnect,
-}: IntegrationsSectionProps) {
-  return (
-    <div className="space-y-6">
-      {/* WordPress Integration */}
-      <Card className="p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <Globe className="h-5 w-5 text-primary-500" />
-          <h2 className="text-lg font-display font-semibold text-text-primary">WordPress</h2>
-        </div>
-
-        {wpLoadingStatus ? (
-          <div className="flex items-center gap-2 text-text-secondary">
-            <Loader2 className="h-4 w-4 animate-spin" /> Checking connection...
-          </div>
-        ) : wpConnected ? (
-          <div className="space-y-4">
-            <div className="p-4 bg-green-50 border border-green-200 rounded-xl space-y-1">
-              <p className="flex items-center gap-2 text-sm font-medium text-green-800">
-                <CheckCircle className="h-4 w-4" /> Connected
-              </p>
-              {wpSiteName && (
-                <p className="text-sm text-green-700">Site: {wpSiteName}</p>
-              )}
-              <p className="text-sm text-green-700">URL: {wpSiteUrl}</p>
-              <p className="text-sm text-green-700">Username: {wpUsername}</p>
-            </div>
-            <Button
-              variant="outline"
-              onClick={onWpDisconnect}
-              disabled={wpDisconnecting}
-              className="text-red-600 border-red-200 hover:bg-red-50"
-            >
-              {wpDisconnecting ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <Unplug className="h-4 w-4 mr-2" />
-              )}
-              Disconnect
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <p className="text-sm text-text-secondary">
-              Connect your WordPress site to publish articles directly from the dashboard.
-            </p>
-
-            {!showWpForm ? (
-              <Button onClick={() => setShowWpForm(true)}>
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Connect WordPress
-              </Button>
-            ) : (
-              <div className="space-y-3 p-4 bg-surface-secondary rounded-xl">
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1">
-                    Site URL
-                  </label>
-                  <Input
-                    value={wpFormSiteUrl}
-                    onChange={(e) => setWpFormSiteUrl(e.target.value)}
-                    placeholder="https://yoursite.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1">
-                    Username
-                  </label>
-                  <Input
-                    value={wpFormUsername}
-                    onChange={(e) => setWpFormUsername(e.target.value)}
-                    placeholder="WordPress username"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1">
-                    Application Password
-                  </label>
-                  <Input
-                    type="password"
-                    value={wpFormAppPassword}
-                    onChange={(e) => setWpFormAppPassword(e.target.value)}
-                    placeholder="xxxx xxxx xxxx xxxx xxxx xxxx"
-                  />
-                  <p className="mt-1 text-xs text-text-muted">
-                    Generate one in WordPress &rarr; Users &rarr; Profile &rarr; Application
-                    Passwords
-                  </p>
-                </div>
-
-                {wpError && <p className="text-sm text-red-600">{wpError}</p>}
-
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <Button onClick={onWpConnect} disabled={wpConnecting}>
-                    {wpConnecting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                    Connect
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setShowWpForm(false);
-                      setWpError("");
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </Card>
-
-      {/* Google Search Console Integration */}
-      <Card className="p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <Search className="h-5 w-5 text-primary-500" />
-          <h2 className="text-lg font-display font-semibold text-text-primary">
-            Google Search Console
-          </h2>
-        </div>
-
-        {gscLoadingStatus ? (
-          <div className="flex items-center gap-2 text-text-secondary">
-            <Loader2 className="h-4 w-4 animate-spin" /> Checking connection...
-          </div>
-        ) : gscConnected ? (
-          <div className="space-y-4">
-            <div className="p-4 bg-green-50 border border-green-200 rounded-xl space-y-1">
-              <p className="flex items-center gap-2 text-sm font-medium text-green-800">
-                <CheckCircle className="h-4 w-4" /> Connected
-              </p>
-              {gscSiteUrl && (
-                <p className="text-sm text-green-700">Site: {gscSiteUrl}</p>
-              )}
-              {gscLastSync && (
-                <p className="text-sm text-green-700">
-                  Last sync: {new Date(gscLastSync).toLocaleDateString()}
-                </p>
-              )}
-            </div>
-            <Button
-              variant="outline"
-              onClick={onGscDisconnect}
-              disabled={gscDisconnecting}
-              className="text-red-600 border-red-200 hover:bg-red-50"
-            >
-              {gscDisconnecting ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <Unplug className="h-4 w-4 mr-2" />
-              )}
-              Disconnect
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <p className="text-sm text-text-secondary">
-              Connect Google Search Console to track your search performance and get keyword
-              insights.
-            </p>
-
-            {gscError && <p className="text-sm text-red-600">{gscError}</p>}
-
-            <Button onClick={onGscConnect} disabled={gscConnecting}>
-              {gscConnecting ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <ExternalLink className="h-4 w-4 mr-2" />
-              )}
-              Connect Google Search Console
-            </Button>
-          </div>
-        )}
-      </Card>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // BillingSection
 // ---------------------------------------------------------------------------
 
@@ -563,6 +316,204 @@ function BillingSection({ profile }: BillingSectionProps) {
 }
 
 // ---------------------------------------------------------------------------
+// DeleteAccountDialog
+// A self-contained modal that requires the user to type a confirmation phrase
+// before the delete button becomes active.
+// ---------------------------------------------------------------------------
+
+const DELETE_PHRASE = "DELETE MY ACCOUNT";
+
+interface DeleteAccountDialogProps {
+  isOpen: boolean;
+  isDeleting: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}
+
+function DeleteAccountDialog({
+  isOpen,
+  isDeleting,
+  onClose,
+  onConfirm,
+}: DeleteAccountDialogProps) {
+  const [typed, setTyped] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Reset typed value whenever dialog opens/closes
+  useEffect(() => {
+    if (!isOpen) {
+      setTyped("");
+    }
+  }, [isOpen]);
+
+  // Focus the input when opened; handle Escape + focus trap
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const frame = requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isDeleting) {
+        onClose();
+        return;
+      }
+      if (e.key === "Tab" && dialogRef.current) {
+        const focusable = Array.from(
+          dialogRef.current.querySelectorAll<HTMLElement>(
+            "button:not([disabled]), input:not([disabled])"
+          )
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, isDeleting, onClose]);
+
+  if (!isOpen) return null;
+
+  const confirmed = typed === DELETE_PHRASE;
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+        onClick={() => {
+          if (!isDeleting) onClose();
+        }}
+        aria-hidden="true"
+      />
+
+      {/* Dialog */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-account-title"
+          className="bg-surface rounded-2xl border border-red-200 shadow-lg max-w-md w-full p-6 space-y-4"
+        >
+          {/* Icon + Title */}
+          <div className="flex items-start gap-3">
+            <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-red-50">
+              <Trash2 className="h-5 w-5 text-red-500" />
+            </div>
+            <div>
+              <h3
+                id="delete-account-title"
+                className="text-lg font-display font-semibold text-text-primary"
+              >
+                Delete Account
+              </h3>
+              <p className="mt-1 text-sm text-text-secondary">
+                This action is{" "}
+                <span className="font-semibold text-red-600">permanent and irreversible</span>.
+                All your articles, outlines, images, projects, and integrations will be deleted
+                immediately. There is no undo.
+              </p>
+            </div>
+          </div>
+
+          {/* Confirmation input */}
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1">
+              Type{" "}
+              <span className="font-mono font-semibold text-red-600">{DELETE_PHRASE}</span> to
+              confirm
+            </label>
+            <Input
+              ref={inputRef}
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              placeholder={DELETE_PHRASE}
+              disabled={isDeleting}
+              className="font-mono"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
+
+          {/* Buttons */}
+          <div className="flex justify-end gap-3 pt-1">
+            <button onClick={onClose} disabled={isDeleting} className="btn-secondary">
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={!confirmed || isDeleting}
+              className="px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isDeleting ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Deleting...
+                </span>
+              ) : (
+                "Delete My Account"
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DangerZoneSection
+// ---------------------------------------------------------------------------
+
+interface DangerZoneSectionProps {
+  onDeleteAccount: () => void;
+}
+
+function DangerZoneSection({ onDeleteAccount }: DangerZoneSectionProps) {
+  return (
+    <Card className="p-6 border-red-200">
+      <div className="flex items-center gap-3 mb-4">
+        <Trash2 className="h-5 w-5 text-red-500" />
+        <h2 className="text-lg font-display font-semibold text-red-600">Danger Zone</h2>
+      </div>
+
+      <div className="rounded-xl border border-red-200 p-4 bg-red-50 space-y-3">
+        <div>
+          <p className="font-medium text-text-primary">Delete your account</p>
+          <p className="text-sm text-text-secondary mt-1">
+            Permanently delete your account and all associated data including articles, outlines,
+            images, and project memberships. This cannot be undone.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={onDeleteAccount}
+          className="text-red-600 border-red-300 hover:bg-red-100 hover:border-red-400"
+        >
+          <Trash2 className="h-4 w-4 mr-2" />
+          Delete My Account
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
 
@@ -573,6 +524,7 @@ function getInitialTab(): TabId {
 }
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabId>(getInitialTab);
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -593,28 +545,9 @@ export default function SettingsPage() {
   const [passwordError, setPasswordError] = useState("");
   const [passwordSaved, setPasswordSaved] = useState(false);
 
-  // WordPress integration
-  const [wpConnected, setWpConnected] = useState(false);
-  const [wpSiteUrl, setWpSiteUrl] = useState("");
-  const [wpUsername, setWpUsername] = useState("");
-  const [wpSiteName, setWpSiteName] = useState("");
-  const [wpLoadingStatus, setWpLoadingStatus] = useState(true);
-  const [showWpForm, setShowWpForm] = useState(false);
-  const [wpFormSiteUrl, setWpFormSiteUrl] = useState("");
-  const [wpFormUsername, setWpFormUsername] = useState("");
-  const [wpFormAppPassword, setWpFormAppPassword] = useState("");
-  const [wpConnecting, setWpConnecting] = useState(false);
-  const [wpDisconnecting, setWpDisconnecting] = useState(false);
-  const [wpError, setWpError] = useState("");
-
-  // GSC integration
-  const [gscConnected, setGscConnected] = useState(false);
-  const [gscSiteUrl, setGscSiteUrl] = useState("");
-  const [gscLastSync, setGscLastSync] = useState("");
-  const [gscLoadingStatus, setGscLoadingStatus] = useState(true);
-  const [gscConnecting, setGscConnecting] = useState(false);
-  const [gscDisconnecting, setGscDisconnecting] = useState(false);
-  const [gscError, setGscError] = useState("");
+  // Account deletion
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Sync hash when tab changes
   const handleTabChange = (tab: TabId) => {
@@ -624,20 +557,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadProfile();
-    loadWordPressStatus();
-    loadGscStatus();
   }, []);
-
-  // Re-check GSC status when window regains focus (after OAuth redirect)
-  useEffect(() => {
-    const onFocus = () => {
-      if (!gscConnected) {
-        loadGscStatus();
-      }
-    };
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, [gscConnected]);
 
   const loadProfile = async () => {
     try {
@@ -693,98 +613,18 @@ export default function SettingsPage() {
     }
   };
 
-  const loadWordPressStatus = async () => {
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
     try {
-      const status = await api.wordpress.status();
-      setWpConnected(status.is_connected);
-      setWpSiteUrl(status.site_url || "");
-      setWpUsername(status.username || "");
-      setWpSiteName(status.site_name || "");
+      await api.auth.deleteAccount();
+      // Clear auth tokens and redirect to login
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("refresh_token");
+      toast.success("Your account has been deleted.");
+      router.push("/login");
     } catch {
-      // 404 means not connected
-      setWpConnected(false);
-    } finally {
-      setWpLoadingStatus(false);
-    }
-  };
-
-  const handleWpConnect = async () => {
-    setWpError("");
-    if (!wpFormSiteUrl || !wpFormUsername || !wpFormAppPassword) {
-      setWpError("All fields are required");
-      return;
-    }
-    setWpConnecting(true);
-    try {
-      await api.wordpress.connect({
-        site_url: wpFormSiteUrl,
-        username: wpFormUsername,
-        app_password: wpFormAppPassword,
-      });
-      setShowWpForm(false);
-      setWpFormSiteUrl("");
-      setWpFormUsername("");
-      setWpFormAppPassword("");
-      await loadWordPressStatus();
-    } catch (err) {
-      setWpError(parseApiError(err).message);
-    } finally {
-      setWpConnecting(false);
-    }
-  };
-
-  const handleWpDisconnect = async () => {
-    setWpDisconnecting(true);
-    try {
-      await api.wordpress.disconnect();
-      setWpConnected(false);
-      setWpSiteUrl("");
-      setWpUsername("");
-      setWpSiteName("");
-    } catch (err) {
-      setWpError(parseApiError(err).message);
-    } finally {
-      setWpDisconnecting(false);
-    }
-  };
-
-  const loadGscStatus = async () => {
-    try {
-      const status = await api.analytics.status();
-      setGscConnected(status.connected);
-      setGscSiteUrl(status.site_url || "");
-      setGscLastSync(status.last_sync || "");
-    } catch {
-      setGscConnected(false);
-    } finally {
-      setGscLoadingStatus(false);
-    }
-  };
-
-  const handleGscConnect = async () => {
-    setGscError("");
-    setGscConnecting(true);
-    try {
-      const { auth_url } = await api.analytics.getAuthUrl();
-      window.open(auth_url, "_blank");
-    } catch (err) {
-      setGscError(parseApiError(err).message);
-    } finally {
-      setGscConnecting(false);
-    }
-  };
-
-  const handleGscDisconnect = async () => {
-    setGscDisconnecting(true);
-    try {
-      await api.analytics.disconnect();
-      setGscConnected(false);
-      setGscSiteUrl("");
-      setGscLastSync("");
-    } catch (err) {
-      setGscError(parseApiError(err).message);
-    } finally {
-      setGscDisconnecting(false);
+      toast.error("Failed to delete account. Please try again.");
+      setIsDeleting(false);
     }
   };
 
@@ -824,19 +664,23 @@ export default function SettingsPage() {
 
       {/* Active section */}
       {activeTab === "profile" && (
-        <ProfileSection
-          profile={profile}
-          name={name}
-          setName={setName}
-          language={language}
-          setLanguage={setLanguage}
-          timezone={timezone}
-          setTimezone={setTimezone}
-          saving={saving}
-          saved={saved}
-          error={error}
-          onSave={handleSaveProfile}
-        />
+        <div className="space-y-6">
+          <ProfileSection
+            profile={profile}
+            name={name}
+            setName={setName}
+            language={language}
+            setLanguage={setLanguage}
+            timezone={timezone}
+            setTimezone={setTimezone}
+            saving={saving}
+            saved={saved}
+            error={error}
+            onSave={handleSaveProfile}
+          />
+
+          <DangerZoneSection onDeleteAccount={() => setShowDeleteDialog(true)} />
+        </div>
       )}
 
       {activeTab === "password" && (
@@ -853,40 +697,15 @@ export default function SettingsPage() {
         />
       )}
 
-      {activeTab === "integrations" && (
-        <IntegrationsSection
-          wpConnected={wpConnected}
-          wpSiteUrl={wpSiteUrl}
-          wpUsername={wpUsername}
-          wpSiteName={wpSiteName}
-          wpLoadingStatus={wpLoadingStatus}
-          showWpForm={showWpForm}
-          setShowWpForm={setShowWpForm}
-          wpFormSiteUrl={wpFormSiteUrl}
-          setWpFormSiteUrl={setWpFormSiteUrl}
-          wpFormUsername={wpFormUsername}
-          setWpFormUsername={setWpFormUsername}
-          wpFormAppPassword={wpFormAppPassword}
-          setWpFormAppPassword={setWpFormAppPassword}
-          wpConnecting={wpConnecting}
-          wpDisconnecting={wpDisconnecting}
-          wpError={wpError}
-          setWpError={setWpError}
-          onWpConnect={handleWpConnect}
-          onWpDisconnect={handleWpDisconnect}
-          gscConnected={gscConnected}
-          gscSiteUrl={gscSiteUrl}
-          gscLastSync={gscLastSync}
-          gscLoadingStatus={gscLoadingStatus}
-          gscConnecting={gscConnecting}
-          gscDisconnecting={gscDisconnecting}
-          gscError={gscError}
-          onGscConnect={handleGscConnect}
-          onGscDisconnect={handleGscDisconnect}
-        />
-      )}
-
       {activeTab === "billing" && <BillingSection profile={profile} />}
+
+      {/* Account deletion confirmation dialog */}
+      <DeleteAccountDialog
+        isOpen={showDeleteDialog}
+        isDeleting={isDeleting}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={handleDeleteAccount}
+      />
     </div>
   );
 }

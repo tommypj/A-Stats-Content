@@ -2,6 +2,7 @@
 Image generation and management API routes.
 """
 
+import asyncio
 import logging
 import math
 import time
@@ -22,18 +23,177 @@ from api.schemas.content import (
     BulkDeleteResponse,
 )
 from api.routes.auth import get_current_user
-from infrastructure.database.connection import get_db
+from infrastructure.database.connection import get_db, async_session_maker
 from infrastructure.database.models import GeneratedImage, Article, User, ContentStatus
 from adapters.ai.replicate_adapter import image_ai_service
 from adapters.storage.image_storage import storage_adapter, download_image
 from services.generation_tracker import GenerationTracker
+from services.task_queue import task_queue
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/images", tags=["images"])
 
+# Limit concurrent AI image generation tasks to prevent resource exhaustion
+_image_generation_semaphore = asyncio.Semaphore(3)
 
-@router.post("/generate", response_model=ImageResponse, status_code=status.HTTP_201_CREATED)
+
+# ---------------------------------------------------------------------------
+# Background image generation helpers
+# ---------------------------------------------------------------------------
+
+async def _run_image_generation(
+    image_id: str,
+    user_id: str,
+    project_id: Optional[str],
+    prompt: str,
+    style: Optional[str],
+    width: Optional[int],
+    height: Optional[int],
+) -> None:
+    """
+    Inner implementation of background image generation.
+
+    Opens its own DB session so it can safely run outside the request
+    context (mirrors the article generation pattern).
+    """
+    start_time = time.time()
+
+    async with async_session_maker() as db:
+        gen_log = None
+        tracker = GenerationTracker(db)
+
+        try:
+            # Fetch the image record that was pre-created by the endpoint
+            result = await db.execute(
+                select(GeneratedImage).where(GeneratedImage.id == image_id)
+            )
+            image = result.scalar_one_or_none()
+            if not image:
+                logger.error("Background image generation: record %s not found", image_id)
+                return
+
+            # Log generation start
+            gen_log = await tracker.log_start(
+                user_id=user_id,
+                project_id=project_id,
+                resource_type="image",
+                resource_id=image_id,
+                input_metadata={
+                    "prompt": prompt,
+                    "style": style,
+                    "width": width,
+                    "height": height,
+                },
+            )
+            await db.commit()
+
+            # Call the AI service (Replicate)
+            generated = await asyncio.wait_for(
+                image_ai_service.generate_image(
+                    prompt=prompt,
+                    width=width,
+                    height=height,
+                    style=style,
+                ),
+                timeout=120.0,  # 2-minute hard limit
+            )
+
+            # Store the external URL immediately
+            image.url = generated.url
+            image.alt_text = f"AI-generated image: {prompt[:100]}"
+            image.model = generated.model if hasattr(generated, "model") else None
+            image.status = "completed"
+
+            duration_ms = int((time.time() - start_time) * 1000)
+            await tracker.log_success(
+                log_id=gen_log.id,
+                ai_model=getattr(generated, "model", None),
+                duration_ms=duration_ms,
+            )
+            await db.commit()
+
+            # Try to download and cache locally (non-critical — external URL is the fallback)
+            try:
+                image_data = await download_image(generated.url)
+                filename = f"image_{image_id}.jpg"
+                local_path = await storage_adapter.save_image(
+                    image_data=image_data,
+                    filename=filename,
+                )
+                image.local_path = local_path
+                await db.commit()
+            except Exception as dl_err:
+                logger.warning(
+                    "Failed to cache image locally for %s: %s", image_id, dl_err
+                )
+
+            logger.info("Image %s generated successfully", image_id)
+
+        except Exception as e:
+            logger.error(
+                "Background image generation failed for %s: %s", image_id, e, exc_info=True
+            )
+            # Use a fresh session to mark as failed (original session may be broken)
+            try:
+                async with async_session_maker() as err_db:
+                    err_result = await err_db.execute(
+                        select(GeneratedImage).where(GeneratedImage.id == image_id)
+                    )
+                    failed_image = err_result.scalar_one_or_none()
+                    if failed_image:
+                        failed_image.status = "failed"
+                        await err_db.commit()
+            except Exception:
+                logger.error(
+                    "Failed to mark image %s as failed", image_id, exc_info=True
+                )
+
+            # Log failure in a separate session
+            if gen_log is not None:
+                duration_ms = int((time.time() - start_time) * 1000)
+                try:
+                    async with async_session_maker() as tracker_db:
+                        failure_tracker = GenerationTracker(tracker_db)
+                        await failure_tracker.log_failure(
+                            log_id=gen_log.id,
+                            error_message=str(e),
+                            duration_ms=duration_ms,
+                        )
+                        await tracker_db.commit()
+                except Exception:
+                    logger.error(
+                        "Failed to log image generation failure for %s", image_id, exc_info=True
+                    )
+
+
+async def _generate_image_background(
+    image_id: str,
+    user_id: str,
+    project_id: Optional[str],
+    prompt: str,
+    style: Optional[str],
+    width: Optional[int],
+    height: Optional[int],
+) -> None:
+    """Background task wrapper that acquires the semaphore before calling the inner impl."""
+    async with _image_generation_semaphore:
+        await _run_image_generation(
+            image_id=image_id,
+            user_id=user_id,
+            project_id=project_id,
+            prompt=prompt,
+            style=style,
+            width=width,
+            height=height,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+
+@router.post("/generate", response_model=ImageResponse, status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit("10/minute")
 async def generate_image(
     request: Request,
@@ -42,7 +202,12 @@ async def generate_image(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Generate a new image using AI.
+    Enqueue an AI image generation job.
+
+    Returns HTTP 202 immediately with a record in *generating* status.
+    The actual Replicate call runs as a background asyncio task.
+    Poll GET /images/{id} (status field) or GET /notifications/tasks/{task_id}/status
+    to track progress.  The notification bell will also pick up completion.
     """
     # Validate article_id if provided
     if body.article_id:
@@ -60,7 +225,7 @@ async def generate_image(
             )
 
     # Check usage limit before creating any records
-    project_id = getattr(current_user, 'current_project_id', None)
+    project_id = getattr(current_user, "current_project_id", None)
     tracker = GenerationTracker(db)
     if not await tracker.check_limit(project_id, "image", user_id=current_user.id):
         raise HTTPException(
@@ -79,82 +244,26 @@ async def generate_image(
         width=body.width,
         height=body.height,
         status="generating",
-        url="",  # Will be updated after generation
+        url="",  # Will be updated when the background task completes
     )
 
     db.add(image)
-
-    start_time = time.time()
-    gen_log = await tracker.log_start(
-        user_id=current_user.id,
-        project_id=project_id,
-        resource_type="image",
-        resource_id=image_id,
-        input_metadata={
-            "prompt": body.prompt,
-            "style": body.style,
-            "width": body.width,
-            "height": body.height,
-        },
-    )
-    await db.commit()
-
-    # Generate image using Replicate
-    try:
-        generated = await image_ai_service.generate_image(
-            prompt=body.prompt,
-            width=body.width,
-            height=body.height,
-            style=body.style,
-        )
-
-        # Store the external URL immediately (always accessible, even if local save fails)
-        image.url = generated.url
-        image.alt_text = f"AI-generated image: {body.prompt[:100]}"
-        image.model = generated.model if hasattr(generated, "model") else None
-        image.status = "completed"
-
-        duration_ms = int((time.time() - start_time) * 1000)
-        await tracker.log_success(
-            log_id=gen_log.id,
-            ai_model=getattr(generated, 'model', None),
-            duration_ms=duration_ms,
-        )
-
-        # Try to download and cache locally (non-critical — external URL is the fallback)
-        try:
-            image_data = await download_image(generated.url)
-            filename = f"image_{image_id}.jpg"
-            local_path = await storage_adapter.save_image(
-                image_data=image_data,
-                filename=filename,
-            )
-            image.local_path = local_path
-        except Exception as dl_err:
-            # Local caching failed — image is still accessible via external URL
-            logger.warning(
-                "Failed to cache image locally for %s: %s", image_id, dl_err
-            )
-
-    except Exception as e:
-        image.status = "failed"
-        duration_ms = int((time.time() - start_time) * 1000)
-        try:
-            await tracker.log_failure(
-                log_id=gen_log.id,
-                error_message=str(e),
-                duration_ms=duration_ms,
-            )
-        except Exception:
-            logger.warning("Failed to log image generation failure for %s", image_id)
-        await db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate image: {str(e)}",
-        )
-
     await db.commit()
     await db.refresh(image)
+
+    # Enqueue background generation (non-blocking)
+    await task_queue.enqueue(
+        image_id,
+        _generate_image_background(
+            image_id=image_id,
+            user_id=current_user.id,
+            project_id=project_id,
+            prompt=body.prompt,
+            style=body.style,
+            width=body.width,
+            height=body.height,
+        ),
+    )
 
     return image
 
@@ -311,8 +420,7 @@ async def delete_image(
     if image.local_path:
         try:
             await storage_adapter.delete_image(image.local_path)
-        except Exception as e:
-            # Log error but don't fail the deletion
+        except Exception:
             pass
 
     # Delete from database

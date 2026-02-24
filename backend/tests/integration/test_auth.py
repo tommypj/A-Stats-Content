@@ -420,3 +420,125 @@ class TestLogout:
         """Test logout without authentication."""
         response = await async_client.post("/api/v1/auth/logout")
         assert response.status_code == 401
+
+
+class TestDeleteAccount:
+    """Tests for the DELETE /auth/account endpoint."""
+
+    async def test_delete_account_success(
+        self,
+        async_client: AsyncClient,
+        test_user: User,
+        auth_headers: dict,
+        db_session,
+    ):
+        """Authenticated user can delete their account with correct confirmation."""
+        import json as json_lib
+        from sqlalchemy import select
+        from infrastructure.database.models.user import User as UserModel
+
+        response = await async_client.request(
+            "DELETE",
+            "/api/v1/auth/account",
+            content=json_lib.dumps({"confirmation": "DELETE MY ACCOUNT"}),
+            headers={**auth_headers, "Content-Type": "application/json"},
+        )
+        assert response.status_code == 200
+        assert response.json()["message"] == "Account deleted successfully"
+
+        # Verify the user row no longer exists in the database
+        result = await db_session.execute(
+            select(UserModel).where(UserModel.id == test_user.id)
+        )
+        assert result.scalar_one_or_none() is None
+
+    async def test_delete_account_wrong_confirmation(
+        self,
+        async_client: AsyncClient,
+        auth_headers: dict,
+    ):
+        """Request with wrong confirmation phrase is rejected."""
+        import json as json_lib
+
+        response = await async_client.request(
+            "DELETE",
+            "/api/v1/auth/account",
+            content=json_lib.dumps({"confirmation": "delete my account"}),
+            headers={**auth_headers, "Content-Type": "application/json"},
+        )
+        assert response.status_code == 400
+        assert "DELETE MY ACCOUNT" in response.json()["detail"]
+
+    async def test_delete_account_missing_confirmation(
+        self,
+        async_client: AsyncClient,
+        auth_headers: dict,
+    ):
+        """Request with missing body field is rejected with 422."""
+        import json as json_lib
+
+        response = await async_client.request(
+            "DELETE",
+            "/api/v1/auth/account",
+            content=json_lib.dumps({}),
+            headers={**auth_headers, "Content-Type": "application/json"},
+        )
+        assert response.status_code == 422
+
+    async def test_delete_account_unauthenticated(self, async_client: AsyncClient):
+        """Unauthenticated request is rejected with 401."""
+        import json as json_lib
+
+        response = await async_client.request(
+            "DELETE",
+            "/api/v1/auth/account",
+            content=json_lib.dumps({"confirmation": "DELETE MY ACCOUNT"}),
+            headers={"Content-Type": "application/json"},
+        )
+        assert response.status_code == 401
+
+    async def test_delete_account_deletes_owned_project(
+        self,
+        async_client: AsyncClient,
+        test_user: User,
+        auth_headers: dict,
+        db_session,
+    ):
+        """Sole-owner projects are deleted along with the account."""
+        import json as json_lib
+        from sqlalchemy import select
+        from infrastructure.database.models.project import Project, ProjectMember, ProjectMemberRole
+
+        # Create a project owned by the test user
+        project = Project(
+            name="Test Project",
+            slug=f"test-project-{test_user.id[:8]}",
+            owner_id=test_user.id,
+        )
+        db_session.add(project)
+        await db_session.commit()
+        await db_session.refresh(project)
+        project_id = project.id
+
+        # Add the owner as a member
+        member = ProjectMember(
+            project_id=project_id,
+            user_id=test_user.id,
+            role=ProjectMemberRole.OWNER.value,
+        )
+        db_session.add(member)
+        await db_session.commit()
+
+        response = await async_client.request(
+            "DELETE",
+            "/api/v1/auth/account",
+            content=json_lib.dumps({"confirmation": "DELETE MY ACCOUNT"}),
+            headers={**auth_headers, "Content-Type": "application/json"},
+        )
+        assert response.status_code == 200
+
+        # The sole-owner project should have been deleted
+        result = await db_session.execute(
+            select(Project).where(Project.id == project_id)
+        )
+        assert result.scalar_one_or_none() is None

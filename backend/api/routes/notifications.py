@@ -3,13 +3,14 @@
 import logging
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.routes.auth import get_current_user
 from infrastructure.database.connection import get_db
 from infrastructure.database.models import User
+from services.task_queue import task_queue
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
@@ -140,3 +141,28 @@ async def get_generation_status(
     )
 
     return {"notifications": notifications[:10]}
+
+
+@router.get("/tasks/{task_id}/status", tags=["Tasks"])
+async def get_task_status(
+    task_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Return the current status of a background task.
+
+    Status values: running | completed | failed
+
+    This endpoint is intentionally generic — it works for any task enqueued
+    through the in-memory TaskQueue (article generation, image generation, etc.).
+    The resource-specific DB record (Article / GeneratedImage) is the source of
+    truth for the *final* result; this endpoint gives a fast in-memory snapshot
+    that is useful before the DB record is committed.
+    """
+    info = task_queue.get_status(task_id)
+    if info is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task not found or has expired",
+        )
+    return info

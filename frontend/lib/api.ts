@@ -307,6 +307,12 @@ export const api = {
         url: "/auth/password/change",
         data: { current_password: currentPassword, new_password: newPassword },
       }),
+    deleteAccount: () =>
+      apiRequest<{ message: string }>({
+        method: "DELETE",
+        url: "/auth/account",
+        data: { confirmation: "DELETE MY ACCOUNT" },
+      }),
   },
 
   // Outlines
@@ -495,7 +501,8 @@ export const api = {
         method: "POST",
         url: "/images/generate",
         data,
-        timeout: AI_TIMEOUT,
+        // Generation now returns 202 immediately; no long timeout needed.
+        timeout: 15000,
       }),
     delete: (id: string) =>
       apiRequest<void>({
@@ -1071,6 +1078,14 @@ export const api = {
     generationStatus: () =>
       apiRequest<GenerationStatusResponse>({
         url: "/notifications/generation-status",
+      }),
+  },
+
+  // Background task status polling
+  tasks: {
+    getStatus: (taskId: string) =>
+      apiRequest<TaskStatus>({
+        url: `/notifications/tasks/${taskId}/status`,
       }),
   },
 };
@@ -2173,4 +2188,18 @@ export interface GenerationNotification {
 
 export interface GenerationStatusResponse {
   notifications: GenerationNotification[];
+}
+
+/**
+ * Status snapshot returned by GET /notifications/tasks/{task_id}/status
+ * Reflects the in-memory TaskQueue record (not the DB row).
+ */
+export interface TaskStatus {
+  task_id: string;
+  /** "running" | "completed" | "failed" */
+  status: "running" | "completed" | "failed";
+  result: unknown | null;
+  error: string | null;
+  created_at: string;
+  completed_at: string | null;
 }

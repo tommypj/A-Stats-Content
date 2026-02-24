@@ -2,16 +2,19 @@
 Authentication API routes.
 """
 
+import logging
 from datetime import datetime, timezone, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header, Request
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from infrastructure.database.connection import get_db
 from infrastructure.database.models.user import User, UserStatus
+from infrastructure.database.models.project import Project, ProjectMember
+from infrastructure.database.models.analytics import GSCConnection
 from infrastructure.config.settings import settings
 from core.security.password import password_hasher
 from core.security.tokens import TokenService
@@ -27,7 +30,10 @@ from api.schemas.auth import (
     PasswordResetRequest,
     PasswordResetConfirm,
     PasswordChangeRequest,
+    DeleteAccountRequest,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -486,3 +492,107 @@ async def logout(
     previously issued tokens via the updated_at timestamp check in get_current_user().
     """
     return {"message": "Logged out successfully"}
+
+
+@router.delete("/account", status_code=status.HTTP_200_OK)
+async def delete_account(
+    body: DeleteAccountRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Permanently delete the current user's account and all associated data.
+
+    The request body must contain {"confirmation": "DELETE MY ACCOUNT"} to
+    prevent accidental deletion.  Deletion is hard (no soft-delete) and
+    cascades in the following order:
+
+    1. Projects where the user is the *sole* owner are fully deleted
+       (cascade removes their content — articles, outlines, images — via
+       the database-level ON DELETE CASCADE constraints on project_id).
+    2. The user's membership rows in projects they do *not* solely own are
+       deleted so other members retain their data.
+    3. GSC connections owned by the user are deleted.
+    4. Content (articles, outlines, images) that is tied to the user but
+       belongs to no project is removed via the ON DELETE CASCADE on user_id,
+       triggered when the user row itself is deleted.
+    5. The user row is deleted.
+    """
+    _CONFIRMATION_PHRASE = "DELETE MY ACCOUNT"
+
+    if body.confirmation != _CONFIRMATION_PHRASE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Confirmation text must be exactly '{_CONFIRMATION_PHRASE}'",
+        )
+
+    user_id = current_user.id
+
+    logger.info("Account deletion initiated for user_id=%s email=%s", user_id, current_user.email)
+
+    # ------------------------------------------------------------------
+    # Step 1: Find all projects where this user is the owner.
+    # ------------------------------------------------------------------
+    owned_projects_result = await db.execute(
+        select(Project).where(Project.owner_id == user_id, Project.deleted_at.is_(None))
+    )
+    owned_projects = owned_projects_result.scalars().all()
+
+    for project in owned_projects:
+        # Count *other* owners (members with role == "owner" who are not this user)
+        other_owners_result = await db.execute(
+            select(ProjectMember).where(
+                ProjectMember.project_id == project.id,
+                ProjectMember.user_id != user_id,
+                ProjectMember.role == "owner",
+                ProjectMember.deleted_at.is_(None),
+            )
+        )
+        other_owners = other_owners_result.scalars().all()
+
+        if not other_owners:
+            # Sole owner — delete the project entirely.
+            # ON DELETE CASCADE on project_id will remove all content,
+            # memberships and invitations for this project.
+            await db.delete(project)
+            logger.info("Deleted project project_id=%s (sole owner)", project.id)
+        else:
+            # Other owners exist — just remove this user's membership row so
+            # the project survives.
+            await db.execute(
+                delete(ProjectMember).where(
+                    ProjectMember.project_id == project.id,
+                    ProjectMember.user_id == user_id,
+                )
+            )
+            logger.info(
+                "Removed ownership membership from project_id=%s (other owners remain)",
+                project.id,
+            )
+
+    # ------------------------------------------------------------------
+    # Step 2: Remove this user from projects they do NOT own (member rows).
+    # ------------------------------------------------------------------
+    await db.execute(
+        delete(ProjectMember).where(ProjectMember.user_id == user_id)
+    )
+
+    # ------------------------------------------------------------------
+    # Step 3: Delete GSC connections.
+    # ------------------------------------------------------------------
+    await db.execute(
+        delete(GSCConnection).where(GSCConnection.user_id == user_id)
+    )
+
+    # ------------------------------------------------------------------
+    # Step 4: Delete the user record itself.
+    #
+    # ON DELETE CASCADE on user_id in articles, outlines, generated_images,
+    # article_revisions etc. handles any remaining user-level content.
+    # ------------------------------------------------------------------
+    await db.delete(current_user)
+    await db.commit()
+
+    logger.info("Account deleted successfully for user_id=%s", user_id)
+
+    return {"message": "Account deleted successfully"}
