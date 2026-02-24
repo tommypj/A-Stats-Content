@@ -145,7 +145,7 @@ class Settings(BaseSettings):
         return self.environment == "development"
 
     def validate_production_secrets(self) -> None:
-        """Validate that production secrets are properly configured."""
+        """Validate that production secrets and critical API keys are configured."""
         if self.environment in ("production", "staging"):
             if "change-me" in self.secret_key.lower():
                 raise ValueError("SECRET_KEY must be changed for production!")
@@ -155,6 +155,12 @@ class Settings(BaseSettings):
                 raise ValueError("SECRET_KEY must be at least 32 characters!")
             if len(self.jwt_secret_key) < 32:
                 raise ValueError("JWT_SECRET_KEY must be at least 32 characters!")
+            if not self.anthropic_api_key:
+                raise ValueError("ANTHROPIC_API_KEY is required in production!")
+            if not self.lemonsqueezy_api_key:
+                raise ValueError("LEMONSQUEEZY_API_KEY is required in production!")
+            if not self.lemonsqueezy_webhook_secret:
+                raise ValueError("LEMONSQUEEZY_WEBHOOK_SECRET is required in production!")
 
 
 @lru_cache

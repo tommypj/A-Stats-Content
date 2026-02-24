@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Dict
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from infrastructure.database.models.project import Project
@@ -200,7 +200,10 @@ class ProjectUsageService:
 
     async def increment_usage(self, project_id: UUID, resource: str) -> None:
         """
-        Increment project usage counter for a resource.
+        Atomically increment project usage counter for a resource.
+
+        Uses SQL-level increment to avoid read-modify-write race conditions
+        under concurrent requests.
 
         Args:
             project_id: Project ID
@@ -209,37 +212,47 @@ class ProjectUsageService:
         Raises:
             ValueError: If resource type is invalid or project not found
         """
-        project = await self.get_project(project_id)
-
-        # Map resource type to usage field
-        if resource == "articles":
-            project.articles_generated_this_month += 1
-        elif resource == "outlines":
-            project.outlines_generated_this_month += 1
-        elif resource == "images":
-            project.images_generated_this_month += 1
-        else:
+        # Map resource type to column
+        column_map = {
+            "articles": Project.articles_generated_this_month,
+            "outlines": Project.outlines_generated_this_month,
+            "images": Project.images_generated_this_month,
+        }
+        column = column_map.get(resource)
+        if column is None:
             raise ValueError(
                 f"Invalid resource type: {resource}. "
                 f"Must be one of: articles, outlines, images"
             )
 
-        # Set usage reset date if not set (first day of next month)
-        if not project.usage_reset_date:
-            now = datetime.now(timezone.utc)
-            # Calculate first day of next month
-            if now.month == 12:
-                next_month = now.replace(year=now.year + 1, month=1, day=1)
-            else:
-                next_month = now.replace(month=now.month + 1, day=1)
-            project.usage_reset_date = next_month
+        # Atomic SQL increment — no read-modify-write race
+        values = {column.key: column + 1}
+
+        # Set usage reset date if not already set
+        now = datetime.now(timezone.utc)
+        if now.month == 12:
+            next_month = now.replace(year=now.year + 1, month=1, day=1)
+        else:
+            next_month = now.replace(month=now.month + 1, day=1)
+
+        result = await self.db.execute(
+            update(Project)
+            .where(Project.id == str(project_id))
+            .where(Project.usage_reset_date.is_(None))
+            .values(**values, usage_reset_date=next_month)
+        )
+
+        if result.rowcount == 0:
+            # usage_reset_date was already set — just increment the counter
+            await self.db.execute(
+                update(Project)
+                .where(Project.id == str(project_id))
+                .values(**values)
+            )
 
         await self.db.flush()
 
-        logger.info(
-            f"Incremented {resource} usage for project {project_id}: "
-            f"{getattr(project, f'{resource}_generated_this_month')}"
-        )
+        logger.info(f"Incremented {resource} usage for project {project_id}")
 
     async def reset_project_usage_if_needed(self, project_id: UUID) -> bool:
         """

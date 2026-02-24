@@ -108,7 +108,7 @@ async def get_current_user(
         user_updated = user.updated_at
         if user_updated.tzinfo is None:
             user_updated = user_updated.replace(tzinfo=timezone.utc)
-        if user_updated > token_iat + timedelta(seconds=5):
+        if user_updated > token_iat:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token invalidated due to security event",
@@ -222,14 +222,16 @@ async def login(
 
 
 @router.post("/refresh", response_model=TokenResponse)
+@limiter.limit("10/minute")
 async def refresh_token(
-    request: RefreshTokenRequest,
+    request: Request,
+    body: RefreshTokenRequest,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """
     Refresh access token using refresh token.
     """
-    payload = token_service.verify_refresh_token(request.refresh_token)
+    payload = token_service.verify_refresh_token(body.refresh_token)
 
     if not payload:
         raise HTTPException(
