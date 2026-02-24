@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ProjectMember } from "@/lib/api";
 import { Crown, AlertTriangle } from "lucide-react";
 
@@ -21,13 +22,14 @@ export function TransferOwnershipModal({
 }: TransferOwnershipModalProps) {
   const [selectedMember, setSelectedMember] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string } | null>(null);
 
   // Filter out owner and viewers
   const eligibleMembers = members.filter(
     (m) => m.role === "admin" || m.role === "member"
   );
 
-  const handleTransfer = async () => {
+  const handleTransfer = () => {
     if (!selectedMember) {
       alert("Please select a member to transfer ownership to");
       return;
@@ -36,21 +38,33 @@ export function TransferOwnershipModal({
     const member = members.find((m) => m.user_id === selectedMember);
     if (!member) return;
 
-    if (!confirm(`Are you sure you want to transfer ownership to ${member.name}? This action cannot be undone and you will become an Admin.`)) {
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      await onTransfer(selectedMember);
-      onClose();
-    } finally {
-      setIsLoading(false);
-    }
+    setConfirmAction({
+      action: async () => {
+        setIsLoading(true);
+        try {
+          await onTransfer(selectedMember);
+          onClose();
+        } finally {
+          setIsLoading(false);
+        }
+      },
+      title: "Transfer Ownership",
+      message: `Are you sure you want to transfer ownership to ${member.name}? This action cannot be undone and you will become an Admin.`,
+    });
   };
 
   return (
-    <Dialog isOpen={isOpen} onClose={onClose} title="Transfer Project Ownership">
+    <>
+      <ConfirmDialog
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        title={confirmAction?.title ?? ""}
+        message={confirmAction?.message ?? ""}
+        variant="warning"
+        confirmLabel="Transfer"
+      />
+      <Dialog isOpen={isOpen} onClose={onClose} title="Transfer Project Ownership">
       <div className="space-y-4">
         {/* Warning */}
         <div className="p-4 rounded-lg bg-yellow-50 border border-yellow-200">
@@ -139,5 +153,6 @@ export function TransferOwnershipModal({
         </div>
       </div>
     </Dialog>
+    </>
   );
 }

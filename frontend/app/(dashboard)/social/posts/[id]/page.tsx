@@ -8,6 +8,7 @@ import { PostAnalyticsCard } from "@/components/social/post-analytics-card";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   ArrowLeft,
   Edit,
@@ -43,6 +44,7 @@ export default function PostDetailPage() {
   const [analytics, setAnalytics] = useState<SocialAnalytics[]>([]);
   const [loading, setLoading] = useState(true);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string; confirmLabel?: string; variant?: "danger" | "warning" | "default" } | null>(null);
 
   useEffect(() => {
     loadPost();
@@ -83,28 +85,40 @@ export default function PostDetailPage() {
     router.push(`/social/compose?edit=${postId}`);
   };
 
-  const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this post?")) return;
-
-    try {
-      await api.social.deletePost(postId);
-      router.push("/social/history");
-    } catch (error) {
-      console.error("Failed to delete post:", error);
-      alert("Failed to delete post");
-    }
+  const handleDelete = () => {
+    setConfirmAction({
+      action: async () => {
+        try {
+          await api.social.deletePost(postId);
+          router.push("/social/history");
+        } catch (error) {
+          console.error("Failed to delete post:", error);
+          alert("Failed to delete post");
+        }
+      },
+      title: "Delete Post",
+      message: "Are you sure you want to delete this post? This action cannot be undone.",
+      confirmLabel: "Delete",
+      variant: "danger",
+    });
   };
 
-  const handlePublishNow = async () => {
-    if (!confirm("Are you sure you want to publish this post now?")) return;
-
-    try {
-      await api.social.publishNow(postId);
-      loadPost();
-    } catch (error) {
-      console.error("Failed to publish post:", error);
-      alert("Failed to publish post");
-    }
+  const handlePublishNow = () => {
+    setConfirmAction({
+      action: async () => {
+        try {
+          await api.social.publishNow(postId);
+          loadPost();
+        } catch (error) {
+          console.error("Failed to publish post:", error);
+          alert("Failed to publish post");
+        }
+      },
+      title: "Publish Now",
+      message: "Are you sure you want to publish this post now?",
+      confirmLabel: "Publish",
+      variant: "default",
+    });
   };
 
   const handleRetry = async (targetIds?: string[]) => {
@@ -149,6 +163,16 @@ export default function PostDetailPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
+      <ConfirmDialog
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        title={confirmAction?.title ?? ""}
+        message={confirmAction?.message ?? ""}
+        variant={confirmAction?.variant ?? "default"}
+        confirmLabel={confirmAction?.confirmLabel ?? "Confirm"}
+      />
+
       {/* Header */}
       <div className="mb-6">
         <Button

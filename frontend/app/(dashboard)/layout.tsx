@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -30,11 +30,14 @@ import {
   Lightbulb,
   FolderOpen,
   MessageSquare,
+  Bell,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { ProjectProvider } from "@/contexts/ProjectContext";
 import { ProjectSwitcher } from "@/components/project/project-switcher";
-import { api, UserResponse } from "@/lib/api";
+import { api, UserResponse, GenerationNotification } from "@/lib/api";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -75,6 +78,190 @@ const navigation = [
     ],
   },
 ];
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const SEEN_KEY = "notification_seen_ids";
+
+function getSeenIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(SEEN_KEY);
+    return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function saveSeenIds(ids: Set<string>): void {
+  if (typeof window === "undefined") return;
+  // Keep at most 200 IDs to avoid unbounded growth
+  const trimmed = Array.from(ids).slice(-200);
+  localStorage.setItem(SEEN_KEY, JSON.stringify(trimmed));
+}
+
+function getResourceHref(n: GenerationNotification): string {
+  if (n.type === "article") return `/articles/${n.resource_id}`;
+  if (n.type === "outline") return `/outlines/${n.resource_id}`;
+  return "/images";
+}
+
+function formatRelativeTime(isoTimestamp: string): string {
+  const diff = Date.now() - new Date(isoTimestamp).getTime();
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
+function typeLabel(type: GenerationNotification["type"]): string {
+  if (type === "article") return "Article";
+  if (type === "outline") return "Outline";
+  return "Image";
+}
+
+// ---------------------------------------------------------------------------
+// NotificationBell component
+// ---------------------------------------------------------------------------
+
+function NotificationBell() {
+  const router = useRouter();
+  const [notifications, setNotifications] = useState<GenerationNotification[]>([]);
+  const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Load seen IDs from localStorage on mount
+  useEffect(() => {
+    setSeenIds(getSeenIds());
+  }, []);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    if (open) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const data = await api.notifications.generationStatus();
+      setNotifications(data.notifications);
+    } catch {
+      // Silent fail — polling is best-effort
+    }
+  }, []);
+
+  // Initial fetch + 30-second polling interval
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30_000);
+    return () => clearInterval(interval);
+  }, [fetchNotifications]);
+
+  const unseenCount = notifications.filter((n) => !seenIds.has(n.id)).length;
+
+  function handleOpen() {
+    setOpen((prev) => !prev);
+    if (!open) {
+      // Mark all current notifications as seen when opening
+      const newSeen = new Set(seenIds);
+      notifications.forEach((n) => newSeen.add(n.id));
+      setSeenIds(newSeen);
+      saveSeenIds(newSeen);
+    }
+  }
+
+  function handleNotificationClick(n: GenerationNotification) {
+    setOpen(false);
+    router.push(getResourceHref(n));
+  }
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={handleOpen}
+        aria-label="Notifications"
+        className="relative flex items-center justify-center h-9 w-9 rounded-xl hover:bg-surface-secondary transition-colors"
+      >
+        <Bell className="h-5 w-5 text-text-secondary" />
+        {unseenCount > 0 && (
+          <span className="absolute top-1 right-1 h-2.5 w-2.5 rounded-full bg-red-500 border-2 border-white" />
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-2 w-80 rounded-xl bg-white border border-surface-tertiary shadow-lg z-50 overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-surface-tertiary">
+            <span className="text-sm font-semibold text-text-primary">Recent Generations</span>
+            {notifications.length > 0 && (
+              <span className="text-xs text-text-secondary">
+                {notifications.length} item{notifications.length === 1 ? "" : "s"}
+              </span>
+            )}
+          </div>
+
+          {/* Notification list */}
+          {notifications.length === 0 ? (
+            <div className="px-4 py-8 text-center">
+              <Bell className="h-8 w-8 text-surface-tertiary mx-auto mb-2" />
+              <p className="text-sm text-text-secondary">No recent completions</p>
+              <p className="text-xs text-text-tertiary mt-1">
+                Notifications appear when generation finishes
+              </p>
+            </div>
+          ) : (
+            <ul className="max-h-72 overflow-y-auto divide-y divide-surface-tertiary">
+              {notifications.map((n) => (
+                <li key={n.id}>
+                  <button
+                    onClick={() => handleNotificationClick(n)}
+                    className="w-full flex items-start gap-3 px-4 py-3 hover:bg-surface-secondary transition-colors text-left"
+                  >
+                    {/* Status icon */}
+                    {n.status === "completed" ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                    )}
+
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">
+                        {typeLabel(n.type)} {n.status}
+                      </p>
+                      <p className="text-sm text-text-primary truncate mt-0.5">{n.title}</p>
+                      <p className="text-xs text-text-tertiary mt-0.5">
+                        {formatRelativeTime(n.timestamp)}
+                      </p>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main layout
+// ---------------------------------------------------------------------------
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -388,8 +575,10 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
             <div className="flex-1" />
 
-            {/* Top-right user avatar (mobile/quick access) */}
-            <div className="relative">
+            {/* Top-right actions: notification bell + user avatar */}
+            <div className="flex items-center gap-2">
+              <NotificationBell />
+
               <button
                 onClick={() => router.push("/settings")}
                 className="flex items-center gap-2 p-2 rounded-xl hover:bg-surface-secondary transition-colors"

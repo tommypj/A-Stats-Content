@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { PostListItem } from "@/components/social/post-list-item";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { api, SocialPost, SocialPostStatus, SocialPlatform } from "@/lib/api";
 import { History, Search, Filter, Download, Trash2, List, Grid } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -23,6 +24,7 @@ export default function SocialHistoryPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [selectedPosts, setSelectedPosts] = useState<Set<string>>(new Set());
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string } | null>(null);
 
   useEffect(() => {
     loadPosts();
@@ -57,16 +59,20 @@ export default function SocialHistoryPage() {
     router.push(`/social/compose?edit=${id}`);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this post?")) return;
-
-    try {
-      await api.social.deletePost(id);
-      loadPosts();
-    } catch (error) {
-      console.error("Failed to delete post:", error);
-      alert("Failed to delete post");
-    }
+  const handleDelete = (id: string) => {
+    setConfirmAction({
+      action: async () => {
+        try {
+          await api.social.deletePost(id);
+          loadPosts();
+        } catch (error) {
+          console.error("Failed to delete post:", error);
+          alert("Failed to delete post");
+        }
+      },
+      title: "Delete Post",
+      message: "Are you sure you want to delete this post? This action cannot be undone.",
+    });
   };
 
   const handleRetry = async (id: string) => {
@@ -79,20 +85,25 @@ export default function SocialHistoryPage() {
     }
   };
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     if (selectedPosts.size === 0) return;
-    if (!confirm(`Are you sure you want to delete ${selectedPosts.size} posts?`)) return;
-
-    try {
-      await Promise.all(
-        Array.from(selectedPosts).map((id) => api.social.deletePost(id))
-      );
-      setSelectedPosts(new Set());
-      loadPosts();
-    } catch (error) {
-      console.error("Failed to delete posts:", error);
-      alert("Failed to delete some posts");
-    }
+    const count = selectedPosts.size;
+    setConfirmAction({
+      action: async () => {
+        try {
+          await Promise.all(
+            Array.from(selectedPosts).map((id) => api.social.deletePost(id))
+          );
+          setSelectedPosts(new Set());
+          loadPosts();
+        } catch (error) {
+          console.error("Failed to delete posts:", error);
+          alert("Failed to delete some posts");
+        }
+      },
+      title: `Delete ${count} Post${count !== 1 ? "s" : ""}`,
+      message: `Are you sure you want to delete ${count} post${count !== 1 ? "s" : ""}? This action cannot be undone.`,
+    });
   };
 
   const toggleSelectPost = (id: string) => {
@@ -130,6 +141,16 @@ export default function SocialHistoryPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <ConfirmDialog
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        title={confirmAction?.title ?? ""}
+        message={confirmAction?.message ?? ""}
+        variant="danger"
+        confirmLabel="Delete"
+      />
+
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold flex items-center gap-3">

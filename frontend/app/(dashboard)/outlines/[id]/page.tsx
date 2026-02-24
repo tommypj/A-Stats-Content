@@ -16,6 +16,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { api, Outline, OutlineSection } from "@/lib/api";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -43,6 +44,7 @@ export default function OutlineDetailPage() {
       setEditedSections(data.sections || []);
     } catch (error) {
       console.error("Failed to load outline:", error);
+      toast.error("Failed to load outline. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -59,6 +61,7 @@ export default function OutlineDetailPage() {
       setOutline(updated);
     } catch (error) {
       console.error("Failed to save outline:", error);
+      toast.error("Failed to save changes.");
     } finally {
       setSaving(false);
     }
@@ -74,6 +77,7 @@ export default function OutlineDetailPage() {
       setEditedSections(updated.sections || []);
     } catch (error) {
       console.error("Failed to regenerate outline:", error);
+      toast.error("Failed to regenerate outline. Please try again.");
     } finally {
       setRegenerating(false);
     }

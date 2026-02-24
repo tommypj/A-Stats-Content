@@ -19,6 +19,7 @@ from .admin_generations import router as admin_generations_router
 from .admin_alerts import router as admin_alerts_router
 from .project_invitations import router as project_invitations_router
 from .projects import router as projects_router
+from .notifications import router as notifications_router
 
 # Create main API router
 api_router = APIRouter()
@@ -42,6 +43,7 @@ api_router.include_router(admin_generations_router)
 api_router.include_router(admin_alerts_router)
 api_router.include_router(project_invitations_router)
 api_router.include_router(projects_router)
+api_router.include_router(notifications_router)
 
 # Future routes will be added here:
 # api_router.include_router(content_router, prefix="/content", tags=["Content"])

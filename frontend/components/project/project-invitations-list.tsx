@@ -5,6 +5,7 @@ import { ProjectInvitation, ProjectRole } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Mail, X, RefreshCw, Clock, CheckCircle, XCircle } from "lucide-react";
 import { format, isPast } from "date-fns";
 
@@ -30,18 +31,21 @@ const roleColors = {
 
 export function ProjectInvitationsList({ invitations, onRevoke, onResend }: ProjectInvitationsListProps) {
   const [loadingInvitation, setLoadingInvitation] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string } | null>(null);
 
-  const handleRevoke = async (invitationId: string) => {
-    if (!confirm("Are you sure you want to revoke this invitation?")) {
-      return;
-    }
-
-    setLoadingInvitation(invitationId);
-    try {
-      await onRevoke(invitationId);
-    } finally {
-      setLoadingInvitation(null);
-    }
+  const handleRevoke = (invitationId: string) => {
+    setConfirmAction({
+      action: async () => {
+        setLoadingInvitation(invitationId);
+        try {
+          await onRevoke(invitationId);
+        } finally {
+          setLoadingInvitation(null);
+        }
+      },
+      title: "Revoke Invitation",
+      message: "Are you sure you want to revoke this invitation?",
+    });
   };
 
   const handleResend = async (invitationId: string) => {
@@ -58,7 +62,17 @@ export function ProjectInvitationsList({ invitations, onRevoke, onResend }: Proj
   };
 
   return (
-    <Card className="p-6">
+    <>
+      <ConfirmDialog
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        title={confirmAction?.title ?? ""}
+        message={confirmAction?.message ?? ""}
+        variant="warning"
+        confirmLabel="Revoke"
+      />
+      <Card className="p-6">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-text-primary">
           Pending Invitations ({invitations.filter(i => i.status === "pending").length})
@@ -145,5 +159,6 @@ export function ProjectInvitationsList({ invitations, onRevoke, onResend }: Proj
         )}
       </div>
     </Card>
+    </>
   );
 }

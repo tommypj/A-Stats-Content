@@ -25,7 +25,7 @@ export function useRequireAuth(redirectTo: string = "/login") {
             email: user.email,
             name: user.name,
             role: user.role as "user" | "admin",
-            subscription_tier: "free",
+            subscription_tier: (user.subscription_tier || "free") as "free" | "starter" | "professional" | "enterprise",
           });
         } catch {
           // Token invalid, clear it

@@ -11,6 +11,7 @@ import { DeleteUserModal } from "@/components/admin/delete-user-modal";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   ArrowLeft,
   Edit,
@@ -39,6 +40,7 @@ export default function AdminUserDetailPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSuspendModal, setShowSuspendModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string } | null>(null);
 
   const fetchUser = async () => {
     try {
@@ -82,19 +84,23 @@ export default function AdminUserDetailPage() {
     }
   };
 
-  const handleResetPassword = async () => {
+  const handleResetPassword = () => {
     if (!user) return;
-    if (!confirm("Are you sure you want to reset this user's password?")) return;
-
-    try {
-      const response = await api.admin.users.resetPassword(user.id);
-      alert(
-        `Password reset successfully! Temporary password: ${response.temporary_password}`
-      );
-    } catch (err) {
-      const apiError = parseApiError(err);
-      alert(`Failed to reset password: ${apiError.message}`);
-    }
+    setConfirmAction({
+      action: async () => {
+        try {
+          const response = await api.admin.users.resetPassword(user.id);
+          alert(
+            `Password reset successfully! Temporary password: ${response.temporary_password}`
+          );
+        } catch (err) {
+          const apiError = parseApiError(err);
+          alert(`Failed to reset password: ${apiError.message}`);
+        }
+      },
+      title: "Reset Password",
+      message: "Are you sure you want to reset this user's password? A temporary password will be generated.",
+    });
   };
 
   const handleSuccess = () => {
@@ -138,6 +144,16 @@ export default function AdminUserDetailPage() {
 
   return (
     <div className="p-6 space-y-6">
+      <ConfirmDialog
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        title={confirmAction?.title ?? ""}
+        message={confirmAction?.message ?? ""}
+        variant="warning"
+        confirmLabel="Reset Password"
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
