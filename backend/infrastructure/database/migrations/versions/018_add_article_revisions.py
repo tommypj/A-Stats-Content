@@ -7,6 +7,7 @@ Create Date: 2026-02-23
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "018"
@@ -18,16 +19,16 @@ depends_on = None
 def upgrade() -> None:
     op.create_table(
         "article_revisions",
-        sa.Column("id", sa.String(36), primary_key=True),
+        sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True),
         sa.Column(
             "article_id",
-            sa.String(36),
+            postgresql.UUID(as_uuid=False),
             sa.ForeignKey("articles.id", ondelete="CASCADE"),
             nullable=False,
         ),
         sa.Column(
             "created_by",
-            sa.String(36),
+            postgresql.UUID(as_uuid=False),
             sa.ForeignKey("users.id"),
             nullable=False,
         ),
