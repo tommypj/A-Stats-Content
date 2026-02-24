@@ -37,6 +37,7 @@ import {
 import { api, Article, ArticleRevision, ArticleRevisionDetail, LinkSuggestion } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import PublishToWordPressModal from "@/components/publish-to-wordpress-modal";
 import SocialPostsModal from "@/components/social-posts-modal";
 import { clsx } from "clsx";
@@ -221,6 +222,9 @@ export default function ArticleEditorPage() {
   const [linkSuggestions, setLinkSuggestions] = useState<LinkSuggestion[]>([]);
   const [loadingLinks, setLoadingLinks] = useState(false);
 
+  // Confirmation dialog state
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string; confirmLabel?: string; variant?: "danger" | "warning" | "default" } | null>(null);
+
   useEffect(() => {
     loadArticle();
     checkWordPressConnection();
@@ -248,6 +252,7 @@ export default function ArticleEditorPage() {
       }
     } catch (error) {
       console.error("Failed to load article:", error);
+      toast.error("Failed to load article. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -260,6 +265,7 @@ export default function ArticleEditorPage() {
       setWpConnected(status.is_connected);
     } catch (error) {
       console.error("Failed to check WordPress connection:", error);
+      toast.error("Failed to check WordPress connection.");
       setWpConnected(false);
     } finally {
       setCheckingWpConnection(false);
@@ -280,6 +286,7 @@ export default function ArticleEditorPage() {
       setArticle(updated);
     } catch (error) {
       console.error("Failed to save article:", error);
+      toast.error("Failed to save changes.");
     } finally {
       setSaving(false);
     }
@@ -295,6 +302,7 @@ export default function ArticleEditorPage() {
       setContent(updated.content || "");
     } catch (error) {
       console.error("Failed to improve article:", error);
+      toast.error("AI improvement failed. Please try again.");
     } finally {
       setImproving(false);
     }
@@ -308,20 +316,27 @@ export default function ArticleEditorPage() {
       setArticle(updated);
     } catch (error) {
       console.error("Failed to analyze SEO:", error);
+      toast.error("SEO analysis failed. Please try again.");
     }
   }
 
-  async function handleDelete() {
+  function handleDelete() {
     if (!article) return;
-    if (!confirm("Are you sure you want to delete this article? This cannot be undone.")) return;
-
-    try {
-      await api.articles.delete(article.id);
-      router.push("/articles");
-    } catch (error) {
-      console.error("Failed to delete article:", error);
-      toast.error("Failed to delete article");
-    }
+    setConfirmAction({
+      action: async () => {
+        try {
+          await api.articles.delete(article.id);
+          router.push("/articles");
+        } catch (error) {
+          console.error("Failed to delete article:", error);
+          toast.error("Failed to delete article");
+        }
+      },
+      title: "Delete Article",
+      message: "Are you sure you want to delete this article? This cannot be undone.",
+      confirmLabel: "Delete",
+      variant: "danger",
+    });
   }
 
   function copyToClipboard(text: string) {
@@ -465,27 +480,34 @@ export default function ArticleEditorPage() {
     }
   }
 
-  async function handleRestoreRevision(revisionId: string) {
+  function handleRestoreRevision(revisionId: string) {
     if (!article) return;
-    if (!confirm("Restore this version? The current content will be saved as a backup revision first.")) return;
-    setRestoringRevisionId(revisionId);
-    try {
-      const updated = await api.articles.restoreRevision(article.id, revisionId);
-      setArticle(updated);
-      setTitle(updated.title);
-      setContent(updated.content || "");
-      setMetaDescription(updated.meta_description || "");
-      lastSavedContentRef.current = updated.content || "";
-      setPreviewRevision(null);
-      // Refresh revision list to include the new "restore" backup revision
-      await loadRevisions();
-      toast.success("Article restored to selected version");
-    } catch (error) {
-      console.error("Failed to restore revision:", error);
-      toast.error("Failed to restore revision");
-    } finally {
-      setRestoringRevisionId(null);
-    }
+    setConfirmAction({
+      action: async () => {
+        setRestoringRevisionId(revisionId);
+        try {
+          const updated = await api.articles.restoreRevision(article.id, revisionId);
+          setArticle(updated);
+          setTitle(updated.title);
+          setContent(updated.content || "");
+          setMetaDescription(updated.meta_description || "");
+          lastSavedContentRef.current = updated.content || "";
+          setPreviewRevision(null);
+          // Refresh revision list to include the new "restore" backup revision
+          await loadRevisions();
+          toast.success("Article restored to selected version");
+        } catch (error) {
+          console.error("Failed to restore revision:", error);
+          toast.error("Failed to restore revision");
+        } finally {
+          setRestoringRevisionId(null);
+        }
+      },
+      title: "Restore Version",
+      message: "Restore this version? The current content will be saved as a backup revision first.",
+      confirmLabel: "Restore",
+      variant: "warning",
+    });
   }
 
   async function handleToggleLinkSuggestions() {
@@ -534,6 +556,16 @@ export default function ArticleEditorPage() {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        title={confirmAction?.title ?? ""}
+        message={confirmAction?.message ?? ""}
+        variant={confirmAction?.variant ?? "default"}
+        confirmLabel={confirmAction?.confirmLabel ?? "Confirm"}
+      />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div className="flex items-start gap-4 min-w-0">

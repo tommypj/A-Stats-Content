@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api, SocialAccount, SocialPlatform } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Twitter,
   Linkedin,
@@ -22,6 +23,7 @@ export default function AccountsPage() {
   const [loading, setLoading] = useState(true);
   const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string } | null>(null);
 
   useEffect(() => {
     loadAccounts();
@@ -53,18 +55,20 @@ export default function AccountsPage() {
     }
   };
 
-  const handleDisconnect = async (accountId: string, platform: string) => {
-    if (!confirm(`Are you sure you want to disconnect this ${platform} account?`)) {
-      return;
-    }
-
-    try {
-      setError(null);
-      await api.social.disconnectAccount(accountId);
-      await loadAccounts();
-    } catch (err) {
-      setError(parseApiError(err).message);
-    }
+  const handleDisconnect = (accountId: string, platform: string) => {
+    setConfirmAction({
+      action: async () => {
+        try {
+          setError(null);
+          await api.social.disconnectAccount(accountId);
+          await loadAccounts();
+        } catch (err) {
+          setError(parseApiError(err).message);
+        }
+      },
+      title: "Disconnect Account",
+      message: `Are you sure you want to disconnect this ${platform} account?`,
+    });
   };
 
   const handleVerify = async (accountId: string) => {
@@ -126,6 +130,16 @@ export default function AccountsPage() {
 
   return (
     <div className="container mx-auto p-6 space-y-8">
+      <ConfirmDialog
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        title={confirmAction?.title ?? ""}
+        message={confirmAction?.message ?? ""}
+        variant="warning"
+        confirmLabel="Disconnect"
+      />
+
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-text-primary">Social Accounts</h1>

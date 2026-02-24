@@ -1019,6 +1019,14 @@ export const api = {
         }),
     },
   },
+
+  // Notifications
+  notifications: {
+    generationStatus: () =>
+      apiRequest<GenerationStatusResponse>({
+        url: "/notifications/generation-status",
+      }),
+  },
 };
 
 // Type definitions
@@ -2105,4 +2113,18 @@ export interface ProjectUsage {
   articles_limit: number;
   outlines_limit: number;
   images_limit: number;
+}
+
+// Notification types
+export interface GenerationNotification {
+  id: string;
+  type: "article" | "outline" | "image";
+  resource_id: string;
+  title: string;
+  status: "completed" | "failed";
+  timestamp: string;
+}
+
+export interface GenerationStatusResponse {
+  notifications: GenerationNotification[];
 }

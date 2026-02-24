@@ -20,8 +20,10 @@ import {
   X,
 } from "lucide-react";
 import { api, Outline } from "@/lib/api";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AIGenerationProgress } from "@/components/ui/ai-generation-progress";
 import { clsx } from "clsx";
 
@@ -58,6 +60,7 @@ export default function OutlinesPage() {
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string } | null>(null);
 
   // Debounce search input — reset page to 1 when keyword changes
   useEffect(() => {
@@ -98,22 +101,28 @@ export default function OutlinesPage() {
       setTotalPages(response.pages);
     } catch (error) {
       console.error("Failed to load outlines:", error);
+      toast.error("Failed to load outlines. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Are you sure you want to delete this outline?")) return;
-
-    try {
-      await api.outlines.delete(id);
-      setOutlines(outlines.filter((o) => o.id !== id));
-      setTotalItems((prev) => Math.max(0, prev - 1));
-    } catch (error) {
-      console.error("Failed to delete outline:", error);
-    }
+  function handleDelete(id: string) {
     setActiveMenu(null);
+    setConfirmAction({
+      action: async () => {
+        try {
+          await api.outlines.delete(id);
+          setOutlines((prev) => prev.filter((o) => o.id !== id));
+          setTotalItems((prev) => Math.max(0, prev - 1));
+        } catch (error) {
+          console.error("Failed to delete outline:", error);
+          toast.error("Failed to delete outline.");
+        }
+      },
+      title: "Delete Outline",
+      message: "Are you sure you want to delete this outline? This action cannot be undone.",
+    });
   }
 
   async function handleRegenerate(id: string) {
@@ -122,6 +131,7 @@ export default function OutlinesPage() {
       setOutlines(outlines.map((o) => (o.id === id ? updated : o)));
     } catch (error) {
       console.error("Failed to regenerate outline:", error);
+      toast.error("Failed to regenerate outline. Please try again.");
     }
     setActiveMenu(null);
   }
@@ -157,20 +167,25 @@ export default function OutlinesPage() {
     setSelectedIds(new Set());
   }
 
-  async function handleBulkDelete() {
+  function handleBulkDelete() {
     const count = selectedIds.size;
-    if (!confirm(`Delete ${count} outline${count !== 1 ? "s" : ""}? This cannot be undone.`)) return;
-
-    setIsBulkDeleting(true);
-    try {
-      await Promise.all(Array.from(selectedIds).map((id) => api.outlines.delete(id)));
-      setSelectedIds(new Set());
-      await loadOutlines();
-    } catch (error) {
-      console.error("Failed to bulk delete outlines:", error);
-    } finally {
-      setIsBulkDeleting(false);
-    }
+    setConfirmAction({
+      action: async () => {
+        setIsBulkDeleting(true);
+        try {
+          await Promise.all(Array.from(selectedIds).map((id) => api.outlines.delete(id)));
+          setSelectedIds(new Set());
+          await loadOutlines();
+        } catch (error) {
+          console.error("Failed to bulk delete outlines:", error);
+          toast.error("Failed to delete outlines. Please try again.");
+        } finally {
+          setIsBulkDeleting(false);
+        }
+      },
+      title: `Delete ${count} Outline${count !== 1 ? "s" : ""}`,
+      message: `Delete ${count} outline${count !== 1 ? "s" : ""}? This cannot be undone.`,
+    });
   }
 
   function handleBulkExport() {
@@ -200,6 +215,16 @@ export default function OutlinesPage() {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        title={confirmAction?.title ?? ""}
+        message={confirmAction?.message ?? ""}
+        variant="danger"
+        confirmLabel="Delete"
+      />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, parseApiError } from "@/lib/api";
 import type { Outline, AdminContentQueryParams } from "@/lib/api";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Search, Trash2, Eye, ChevronLeft, ChevronRight, FileCheck } from "lucide-react";
 import Link from "next/link";
 
@@ -16,6 +17,7 @@ export default function AdminOutlinesPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string } | null>(null);
 
   const pageSize = 20;
 
@@ -48,36 +50,45 @@ export default function AdminOutlinesPage() {
     loadOutlines();
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this outline?")) return;
-
-    try {
-      setDeleting(true);
-      await api.admin.content.deleteOutline(id);
-      await loadOutlines();
-    } catch (err) {
-      alert(parseApiError(err).message);
-    } finally {
-      setDeleting(false);
-    }
+  const handleDelete = (id: string) => {
+    setConfirmAction({
+      action: async () => {
+        try {
+          setDeleting(true);
+          await api.admin.content.deleteOutline(id);
+          await loadOutlines();
+        } catch (err) {
+          alert(parseApiError(err).message);
+        } finally {
+          setDeleting(false);
+        }
+      },
+      title: "Delete Outline",
+      message: "Are you sure you want to delete this outline? This action cannot be undone.",
+    });
   };
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     if (selectedIds.size === 0) return;
-    if (!confirm(`Delete ${selectedIds.size} selected outlines?`)) return;
-
-    try {
-      setDeleting(true);
-      await Promise.all(
-        Array.from(selectedIds).map(id => api.admin.content.deleteOutline(id))
-      );
-      setSelectedIds(new Set());
-      await loadOutlines();
-    } catch (err) {
-      alert(parseApiError(err).message);
-    } finally {
-      setDeleting(false);
-    }
+    const count = selectedIds.size;
+    setConfirmAction({
+      action: async () => {
+        try {
+          setDeleting(true);
+          await Promise.all(
+            Array.from(selectedIds).map(id => api.admin.content.deleteOutline(id))
+          );
+          setSelectedIds(new Set());
+          await loadOutlines();
+        } catch (err) {
+          alert(parseApiError(err).message);
+        } finally {
+          setDeleting(false);
+        }
+      },
+      title: `Delete ${count} Outline${count !== 1 ? "s" : ""}`,
+      message: `Delete ${count} selected outline${count !== 1 ? "s" : ""}? This action cannot be undone.`,
+    });
   };
 
   const toggleSelect = (id: string) => {
@@ -100,6 +111,16 @@ export default function AdminOutlinesPage() {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        title={confirmAction?.title ?? ""}
+        message={confirmAction?.message ?? ""}
+        variant="danger"
+        confirmLabel="Delete"
+      />
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-text-primary">Outlines</h1>

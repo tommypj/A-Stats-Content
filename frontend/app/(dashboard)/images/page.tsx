@@ -23,8 +23,10 @@ import {
   X,
 } from "lucide-react";
 import { api, getImageUrl, parseApiError, GeneratedImage } from "@/lib/api";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { clsx } from "clsx";
 
 const statusConfig = {
@@ -60,6 +62,7 @@ export default function ImagesPage() {
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string } | null>(null);
 
   // Debounce search input; reset to page 1 when search changes
   useEffect(() => {
@@ -97,6 +100,7 @@ export default function ImagesPage() {
       setTotalPages(Math.ceil(response.total / pageSize));
     } catch (error) {
       console.error("Failed to load images:", error);
+      toast.error("Failed to load images. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -128,17 +132,22 @@ export default function ImagesPage() {
     ? filteredImages.length
     : Math.min(page * pageSize, totalCount);
 
-  async function handleDelete(id: string) {
-    if (!confirm("Are you sure you want to delete this image?")) return;
-
-    try {
-      await api.images.delete(id);
-      setImages(images.filter((img) => img.id !== id));
-      setTotalCount((prev) => prev - 1);
-    } catch (error) {
-      console.error("Failed to delete image:", error);
-    }
+  function handleDelete(id: string) {
     setActiveMenu(null);
+    setConfirmAction({
+      action: async () => {
+        try {
+          await api.images.delete(id);
+          setImages((prev) => prev.filter((img) => img.id !== id));
+          setTotalCount((prev) => prev - 1);
+        } catch (error) {
+          console.error("Failed to delete image:", error);
+          toast.error("Failed to delete image.");
+        }
+      },
+      title: "Delete Image",
+      message: "Are you sure you want to delete this image? This action cannot be undone.",
+    });
   }
 
   async function handleCopyUrl(url: string, id: string) {
@@ -223,20 +232,25 @@ export default function ImagesPage() {
     setSelectedIds(new Set());
   }
 
-  async function handleBulkDelete() {
+  function handleBulkDelete() {
     const count = selectedIds.size;
-    if (!confirm(`Delete ${count} image${count !== 1 ? "s" : ""}? This cannot be undone.`)) return;
-
-    setIsBulkDeleting(true);
-    try {
-      await Promise.all(Array.from(selectedIds).map((id) => api.images.delete(id)));
-      setSelectedIds(new Set());
-      await loadImages();
-    } catch (error) {
-      console.error("Failed to bulk delete images:", error);
-    } finally {
-      setIsBulkDeleting(false);
-    }
+    setConfirmAction({
+      action: async () => {
+        setIsBulkDeleting(true);
+        try {
+          await Promise.all(Array.from(selectedIds).map((id) => api.images.delete(id)));
+          setSelectedIds(new Set());
+          await loadImages();
+        } catch (error) {
+          console.error("Failed to bulk delete images:", error);
+          toast.error("Failed to delete images. Please try again.");
+        } finally {
+          setIsBulkDeleting(false);
+        }
+      },
+      title: `Delete ${count} Image${count !== 1 ? "s" : ""}`,
+      message: `Delete ${count} image${count !== 1 ? "s" : ""}? This cannot be undone.`,
+    });
   }
 
   function handleBulkExport() {
@@ -262,6 +276,16 @@ export default function ImagesPage() {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        title={confirmAction?.title ?? ""}
+        message={confirmAction?.message ?? ""}
+        variant="danger"
+        confirmLabel="Delete"
+      />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>

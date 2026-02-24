@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, parseApiError } from "@/lib/api";
 import type { AdminAlert } from "@/lib/api";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Bell,
   ChevronLeft,
@@ -69,6 +70,7 @@ export default function AdminAlertsPage() {
   const [readFilter, setReadFilter] = useState("all");
   const [markingAllRead, setMarkingAllRead] = useState(false);
   const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set());
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string; confirmLabel?: string; variant?: "danger" | "warning" | "default" } | null>(null);
 
   const pageSize = 20;
 
@@ -103,17 +105,24 @@ export default function AdminAlertsPage() {
     }
   };
 
-  const handleMarkAllRead = async () => {
-    if (!confirm("Mark all alerts as read?")) return;
-    try {
-      setMarkingAllRead(true);
-      await api.admin.alerts.markAllRead();
-      await loadAlerts();
-    } catch (err) {
-      window.alert(parseApiError(err).message);
-    } finally {
-      setMarkingAllRead(false);
-    }
+  const handleMarkAllRead = () => {
+    setConfirmAction({
+      action: async () => {
+        try {
+          setMarkingAllRead(true);
+          await api.admin.alerts.markAllRead();
+          await loadAlerts();
+        } catch (err) {
+          window.alert(parseApiError(err).message);
+        } finally {
+          setMarkingAllRead(false);
+        }
+      },
+      title: "Mark All as Read",
+      message: "Mark all alerts as read?",
+      confirmLabel: "Mark All Read",
+      variant: "default",
+    });
   };
 
   const handleToggleRead = async (alertItem: AdminAlert) => {
@@ -136,29 +145,46 @@ export default function AdminAlertsPage() {
     }
   };
 
-  const handleResolve = async (alertItem: AdminAlert) => {
-    if (!confirm("Mark this alert as resolved?")) return;
-    setUpdatingIds((prev) => new Set(prev).add(alertItem.id));
-    try {
-      const updated = await api.admin.alerts.update(alertItem.id, {
-        is_resolved: true,
-      });
-      setAlerts((prev) =>
-        prev.map((a) => (a.id === alertItem.id ? updated : a))
-      );
-    } catch (err) {
-      window.alert(parseApiError(err).message);
-    } finally {
-      setUpdatingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(alertItem.id);
-        return next;
-      });
-    }
+  const handleResolve = (alertItem: AdminAlert) => {
+    setConfirmAction({
+      action: async () => {
+        setUpdatingIds((prev) => new Set(prev).add(alertItem.id));
+        try {
+          const updated = await api.admin.alerts.update(alertItem.id, {
+            is_resolved: true,
+          });
+          setAlerts((prev) =>
+            prev.map((a) => (a.id === alertItem.id ? updated : a))
+          );
+        } catch (err) {
+          window.alert(parseApiError(err).message);
+        } finally {
+          setUpdatingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(alertItem.id);
+            return next;
+          });
+        }
+      },
+      title: "Resolve Alert",
+      message: "Mark this alert as resolved?",
+      confirmLabel: "Resolve",
+      variant: "default",
+    });
   };
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        title={confirmAction?.title ?? ""}
+        message={confirmAction?.message ?? ""}
+        variant={confirmAction?.variant ?? "default"}
+        confirmLabel={confirmAction?.confirmLabel ?? "Confirm"}
+      />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>

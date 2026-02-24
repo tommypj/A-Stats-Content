@@ -5,6 +5,7 @@ import { ProjectMember, ProjectRole } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Trash2, Crown, Shield, User as UserIcon, Eye } from "lucide-react";
 import { format } from "date-fns";
 
@@ -31,6 +32,7 @@ const roleColors = {
 
 export function ProjectMembersList({ members, myRole, onUpdateRole, onRemove }: ProjectMembersListProps) {
   const [loadingMember, setLoadingMember] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string } | null>(null);
 
   const canManageMembers = myRole === "owner" || myRole === "admin";
 
@@ -43,21 +45,33 @@ export function ProjectMembersList({ members, myRole, onUpdateRole, onRemove }: 
     }
   };
 
-  const handleRemove = async (userId: string, memberName: string) => {
-    if (!confirm(`Are you sure you want to remove ${memberName} from the project?`)) {
-      return;
-    }
-
-    setLoadingMember(userId);
-    try {
-      await onRemove(userId, memberName);
-    } finally {
-      setLoadingMember(null);
-    }
+  const handleRemove = (userId: string, memberName: string) => {
+    setConfirmAction({
+      action: async () => {
+        setLoadingMember(userId);
+        try {
+          await onRemove(userId, memberName);
+        } finally {
+          setLoadingMember(null);
+        }
+      },
+      title: "Remove Member",
+      message: `Are you sure you want to remove ${memberName} from the project?`,
+    });
   };
 
   return (
-    <Card className="p-6">
+    <>
+      <ConfirmDialog
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        title={confirmAction?.title ?? ""}
+        message={confirmAction?.message ?? ""}
+        variant="danger"
+        confirmLabel="Remove"
+      />
+      <Card className="p-6">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-text-primary">
           Project Members ({members.length})
@@ -148,5 +162,6 @@ export function ProjectMembersList({ members, myRole, onUpdateRole, onRemove }: 
         )}
       </div>
     </Card>
+    </>
   );
 }

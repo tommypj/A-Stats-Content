@@ -24,8 +24,10 @@ import {
   X,
 } from "lucide-react";
 import { api, Article } from "@/lib/api";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { clsx } from "clsx";
 import { useProject } from "@/contexts/ProjectContext";
 import { ContentOwnershipBadge } from "@/components/project/content-ownership-badge";
@@ -77,6 +79,7 @@ export default function ArticlesPage() {
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string } | null>(null);
 
   const {
     currentProject,
@@ -146,22 +149,28 @@ export default function ArticlesPage() {
       setTotalPages(response.pages ?? Math.ceil(response.total / pageSize));
     } catch (error) {
       console.error("Failed to load articles:", error);
+      toast.error("Failed to load articles. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Are you sure you want to delete this article?")) return;
-
-    try {
-      await api.articles.delete(id);
-      setArticles(articles.filter((a) => a.id !== id));
-      setTotalArticles((prev) => Math.max(0, prev - 1));
-    } catch (error) {
-      console.error("Failed to delete article:", error);
-    }
+  function handleDelete(id: string) {
     setActiveMenu(null);
+    setConfirmAction({
+      action: async () => {
+        try {
+          await api.articles.delete(id);
+          setArticles((prev) => prev.filter((a) => a.id !== id));
+          setTotalArticles((prev) => Math.max(0, prev - 1));
+        } catch (error) {
+          console.error("Failed to delete article:", error);
+          toast.error("Failed to delete article.");
+        }
+      },
+      title: "Delete Article",
+      message: "Are you sure you want to delete this article? This action cannot be undone.",
+    });
   }
 
   // --- Bulk selection helpers ---
@@ -195,20 +204,25 @@ export default function ArticlesPage() {
     setSelectedIds(new Set());
   }
 
-  async function handleBulkDelete() {
+  function handleBulkDelete() {
     const count = selectedIds.size;
-    if (!confirm(`Delete ${count} article${count !== 1 ? "s" : ""}? This cannot be undone.`)) return;
-
-    setIsBulkDeleting(true);
-    try {
-      await Promise.all(Array.from(selectedIds).map((id) => api.articles.delete(id)));
-      setSelectedIds(new Set());
-      await loadArticles();
-    } catch (error) {
-      console.error("Failed to bulk delete articles:", error);
-    } finally {
-      setIsBulkDeleting(false);
-    }
+    setConfirmAction({
+      action: async () => {
+        setIsBulkDeleting(true);
+        try {
+          await Promise.all(Array.from(selectedIds).map((id) => api.articles.delete(id)));
+          setSelectedIds(new Set());
+          await loadArticles();
+        } catch (error) {
+          console.error("Failed to bulk delete articles:", error);
+          toast.error("Failed to delete articles. Please try again.");
+        } finally {
+          setIsBulkDeleting(false);
+        }
+      },
+      title: `Delete ${count} Article${count !== 1 ? "s" : ""}`,
+      message: `Delete ${count} article${count !== 1 ? "s" : ""}? This cannot be undone.`,
+    });
   }
 
   function handleBulkExport() {
@@ -243,6 +257,16 @@ export default function ArticlesPage() {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        title={confirmAction?.title ?? ""}
+        message={confirmAction?.message ?? ""}
+        variant="danger"
+        confirmLabel="Delete"
+      />
+
       {/* Usage Limit Warning */}
       {!isPersonalWorkspace && currentProject && usage && limits && (
         <UsageLimitBanner

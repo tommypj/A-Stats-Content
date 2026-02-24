@@ -18,6 +18,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ProjectSettingsGeneral } from "@/components/project/project-settings-general";
 import { ProjectMembersList } from "@/components/project/project-members-list";
 import { ProjectInvitationsList } from "@/components/project/project-invitations-list";
@@ -64,6 +65,7 @@ export default function ProjectSettingsPage() {
   // Modal state
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string; confirmLabel?: string; variant?: "danger" | "warning" | "default" } | null>(null);
 
   useEffect(() => {
     loadProjectData();
@@ -179,18 +181,22 @@ export default function ProjectSettingsPage() {
     }
   };
 
-  const handleCancelSubscription = async () => {
-    if (!confirm("Are you sure you want to cancel your subscription? You will lose access to premium features at the end of your billing period.")) {
-      return;
-    }
-
-    try {
-      await api.projects.billing.cancel(projectId);
-      await loadProjectData();
-      alert("Subscription cancelled successfully");
-    } catch (err) {
-      alert(parseApiError(err).message);
-    }
+  const handleCancelSubscription = () => {
+    setConfirmAction({
+      action: async () => {
+        try {
+          await api.projects.billing.cancel(projectId);
+          await loadProjectData();
+          alert("Subscription cancelled successfully");
+        } catch (err) {
+          alert(parseApiError(err).message);
+        }
+      },
+      title: "Cancel Subscription",
+      message: "Are you sure you want to cancel your subscription? You will lose access to premium features at the end of your billing period.",
+      confirmLabel: "Cancel Subscription",
+      variant: "warning",
+    });
   };
 
   const handleTransferOwnership = async (newOwnerId: string) => {
@@ -213,18 +219,22 @@ export default function ProjectSettingsPage() {
     }
   };
 
-  const handleLeaveProject = async () => {
-    if (!confirm("Are you sure you want to leave this project? You will lose access immediately.")) {
-      return;
-    }
-
-    try {
-      await api.projects.leave(projectId);
-      router.push("/projects");
-      alert("You have left the project");
-    } catch (err) {
-      alert(parseApiError(err).message);
-    }
+  const handleLeaveProject = () => {
+    setConfirmAction({
+      action: async () => {
+        try {
+          await api.projects.leave(projectId);
+          router.push("/projects");
+          alert("You have left the project");
+        } catch (err) {
+          alert(parseApiError(err).message);
+        }
+      },
+      title: "Leave Project",
+      message: "Are you sure you want to leave this project? You will lose access immediately.",
+      confirmLabel: "Leave Project",
+      variant: "warning",
+    });
   };
 
   const canManageSettings = project && (project.my_role === "owner" || project.my_role === "admin");
@@ -282,6 +292,16 @@ export default function ProjectSettingsPage() {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        title={confirmAction?.title ?? ""}
+        message={confirmAction?.message ?? ""}
+        variant={confirmAction?.variant ?? "default"}
+        confirmLabel={confirmAction?.confirmLabel ?? "Confirm"}
+      />
+
       {/* Header */}
       <div>
         <Link href="/projects">
