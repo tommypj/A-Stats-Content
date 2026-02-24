@@ -3,6 +3,8 @@ Article API routes.
 """
 
 import asyncio
+import csv
+import io
 import logging
 import math
 import re
@@ -15,6 +17,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
+from fastapi.responses import StreamingResponse
 from api.middleware.rate_limit import limiter
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -707,6 +710,113 @@ Only return the JSON array, no other text."""
     except Exception as e:
         logger.error("Keyword suggestion failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to generate keyword suggestions")
+
+
+@router.get("/export")
+async def export_all_articles(
+    format: str = Query("csv", pattern="^(csv)$"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Export all articles for the current project as CSV.
+    """
+    if current_user.current_project_id:
+        query = select(Article).where(Article.project_id == current_user.current_project_id)
+    else:
+        query = select(Article).where(
+            Article.user_id == current_user.id,
+            Article.project_id.is_(None),
+        )
+    query = query.order_by(Article.created_at.desc())
+    result = await db.execute(query)
+    articles = result.scalars().all()
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["id", "title", "status", "keyword", "word_count", "created_at", "updated_at"])
+    for a in articles:
+        writer.writerow([
+            a.id,
+            a.title,
+            a.status,
+            a.keyword,
+            a.word_count or 0,
+            a.created_at.isoformat() if a.created_at else "",
+            a.updated_at.isoformat() if a.updated_at else "",
+        ])
+
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=articles.csv"},
+    )
+
+
+@router.get("/{article_id}/export")
+async def export_article(
+    article_id: str,
+    format: str = Query("markdown", pattern="^(markdown|html|csv)$"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Export a single article in the requested format (markdown, html, or csv).
+    """
+    if current_user.current_project_id:
+        query = select(Article).where(
+            Article.id == article_id,
+            Article.project_id == current_user.current_project_id,
+        )
+    else:
+        query = select(Article).where(
+            Article.id == article_id,
+            Article.user_id == current_user.id,
+        )
+    result = await db.execute(query)
+    article = result.scalar_one_or_none()
+
+    if not article:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
+
+    safe_title = re.sub(r"[^\w\-]", "_", article.title or "article")[:80]
+
+    if format == "markdown":
+        content = article.content or ""
+        return StreamingResponse(
+            iter([content]),
+            media_type="text/markdown",
+            headers={"Content-Disposition": f'attachment; filename="{safe_title}.md"'},
+        )
+
+    if format == "html":
+        content = article.content_html or ""
+        return StreamingResponse(
+            iter([content]),
+            media_type="text/html",
+            headers={"Content-Disposition": f'attachment; filename="{safe_title}.html"'},
+        )
+
+    # csv
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["id", "title", "status", "keyword", "word_count", "created_at", "updated_at"])
+    writer.writerow([
+        article.id,
+        article.title,
+        article.status,
+        article.keyword,
+        article.word_count or 0,
+        article.created_at.isoformat() if article.created_at else "",
+        article.updated_at.isoformat() if article.updated_at else "",
+    ])
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{safe_title}.csv"'},
+    )
 
 
 @router.get("/{article_id}", response_model=ArticleResponse)

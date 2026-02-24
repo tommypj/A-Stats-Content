@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -33,8 +33,13 @@ import {
   ChevronDown,
   ChevronUp,
   RotateCcw,
+  XCircle,
+  TrendingUp,
+  Download,
 } from "lucide-react";
 import { api, Article, ArticleRevision, ArticleRevisionDetail, LinkSuggestion } from "@/lib/api";
+import { calculateSEOScore, SEOScore } from "@/lib/seo-score";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -43,6 +48,103 @@ import SocialPostsModal from "@/components/social-posts-modal";
 import { clsx } from "clsx";
 import { toast } from "sonner";
 import DOMPurify from "dompurify";
+
+// ---------------------------------------------------------------------------
+// Word Count Widget — live word count, optional target + progress bar
+// ---------------------------------------------------------------------------
+
+interface WordCountWidgetProps {
+  content: string;
+  target: number | "";
+  onTargetChange: (value: number | "") => void;
+}
+
+function getWordCount(text: string): number {
+  return text.trim() === "" ? 0 : text.trim().split(/\s+/).length;
+}
+
+function getProgressColor(pct: number): string {
+  if (pct >= 100) return "bg-blue-500";
+  if (pct >= 75) return "bg-green-500";
+  if (pct >= 50) return "bg-yellow-500";
+  if (pct >= 25) return "bg-orange-500";
+  return "bg-red-500";
+}
+
+function getProgressTextColor(pct: number): string {
+  if (pct >= 100) return "text-blue-600";
+  if (pct >= 75) return "text-green-600";
+  if (pct >= 50) return "text-yellow-600";
+  if (pct >= 25) return "text-orange-600";
+  return "text-red-600";
+}
+
+function WordCountWidget({ content, target, onTargetChange }: WordCountWidgetProps) {
+  const wordCount = getWordCount(content);
+  const readingTime = Math.max(1, Math.round(wordCount / 200));
+  const hasTarget = target !== "" && target > 0;
+  const pct = hasTarget ? Math.round((wordCount / (target as number)) * 100) : 0;
+  const clampedPct = Math.min(pct, 100);
+
+  return (
+    <div className="bg-white rounded-xl border border-surface-tertiary p-4 space-y-3">
+      {/* Header row */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium text-text-primary">Word Count</p>
+        <span className="text-xs text-text-muted">{readingTime} min read</span>
+      </div>
+
+      {/* Current count */}
+      <div className="flex items-baseline gap-1.5">
+        <span className={clsx("text-2xl font-bold tabular-nums", hasTarget ? getProgressTextColor(pct) : "text-text-primary")}>
+          {wordCount.toLocaleString()}
+        </span>
+        {hasTarget && (
+          <span className="text-sm text-text-muted">
+            / {(target as number).toLocaleString()} words
+          </span>
+        )}
+        {!hasTarget && (
+          <span className="text-sm text-text-muted">words</span>
+        )}
+      </div>
+
+      {/* Progress bar */}
+      {hasTarget && (
+        <div className="space-y-1">
+          <div className="w-full h-2 bg-surface-secondary rounded-full overflow-hidden">
+            <div
+              className={clsx("h-full rounded-full transition-all duration-300", getProgressColor(pct))}
+              style={{ width: `${clampedPct}%` }}
+            />
+          </div>
+          <p className="text-xs text-text-muted tabular-nums">
+            {pct}% of target
+            {pct >= 100 && <span className="ml-1 text-blue-600 font-medium">— target reached!</span>}
+          </p>
+        </div>
+      )}
+
+      {/* Target input */}
+      <div>
+        <label className="block text-xs font-medium text-text-secondary mb-1">
+          Target word count
+        </label>
+        <input
+          type="number"
+          min={0}
+          placeholder="e.g. 1500"
+          value={target}
+          onChange={(e) => {
+            const val = e.target.value;
+            onTargetChange(val === "" ? "" : Math.max(0, parseInt(val, 10) || 0));
+          }}
+          className="w-full px-3 py-1.5 rounded-lg border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all text-sm"
+        />
+      </div>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // SERP Preview — purely visual, no API calls
@@ -164,6 +266,171 @@ function getSeoScoreColor(score: number) {
   return "text-red-600 bg-red-100";
 }
 
+// ---------------------------------------------------------------------------
+// Live SEO Score Panel — client-side, no API calls, debounced 500 ms
+// ---------------------------------------------------------------------------
+
+function getLiveScoreRingColor(score: number): string {
+  if (score >= 80) return "stroke-green-500";
+  if (score >= 50) return "stroke-yellow-500";
+  return "stroke-red-500";
+}
+
+function getLiveScoreTextColor(score: number): string {
+  if (score >= 80) return "text-green-600";
+  if (score >= 50) return "text-yellow-600";
+  return "text-red-600";
+}
+
+function getLiveScoreLabel(score: number): string {
+  if (score >= 80) return "Great";
+  if (score >= 50) return "Needs work";
+  return "Poor";
+}
+
+interface LiveSeoPanelProps {
+  seoScore: SEOScore;
+}
+
+function LiveSeoPanel({ seoScore }: LiveSeoPanelProps) {
+  const [expanded, setExpanded] = useState(true);
+
+  const { overall, checks } = seoScore;
+  const passedCount = checks.filter((c) => c.passed).length;
+  const total = checks.length;
+
+  // SVG ring — 80 px circle, r=34 gives circumference ≈ 213.6
+  const RADIUS = 34;
+  const CIRC = 2 * Math.PI * RADIUS;
+  const offset = CIRC - (overall / 100) * CIRC;
+
+  return (
+    <Card className="p-4">
+      {/* Collapsible header */}
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center justify-between text-left"
+      >
+        <div className="flex items-center gap-2">
+          <TrendingUp className="h-4 w-4 text-text-secondary" />
+          <span className="font-medium text-text-primary text-sm">Live SEO Score</span>
+          <span
+            className={clsx(
+              "text-xs font-semibold px-1.5 py-0.5 rounded-full",
+              overall >= 80
+                ? "bg-green-100 text-green-700"
+                : overall >= 50
+                ? "bg-yellow-100 text-yellow-700"
+                : "bg-red-100 text-red-700"
+            )}
+          >
+            {overall}
+          </span>
+        </div>
+        {expanded ? (
+          <ChevronUp className="h-4 w-4 text-text-muted flex-shrink-0" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-text-muted flex-shrink-0" />
+        )}
+      </button>
+
+      {expanded && (
+        <div className="mt-4 space-y-4">
+          {/* Score ring */}
+          <div className="flex items-center gap-4">
+            <div className="relative flex-shrink-0">
+              <svg width="80" height="80" viewBox="0 0 80 80">
+                {/* Track */}
+                <circle
+                  cx="40"
+                  cy="40"
+                  r={RADIUS}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  className="text-surface-secondary"
+                />
+                {/* Progress arc */}
+                <circle
+                  cx="40"
+                  cy="40"
+                  r={RADIUS}
+                  fill="none"
+                  strokeWidth="8"
+                  strokeLinecap="round"
+                  strokeDasharray={CIRC}
+                  strokeDashoffset={offset}
+                  className={clsx("transition-all duration-500", getLiveScoreRingColor(overall))}
+                  transform="rotate(-90 40 40)"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className={clsx("text-xl font-bold leading-none", getLiveScoreTextColor(overall))}>
+                  {overall}
+                </span>
+                <span className="text-xs text-text-muted leading-none mt-0.5">/ 100</span>
+              </div>
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <p className={clsx("text-sm font-semibold", getLiveScoreTextColor(overall))}>
+                {getLiveScoreLabel(overall)}
+              </p>
+              <p className="text-xs text-text-muted mt-0.5">
+                {passedCount} of {total} checks passed
+              </p>
+              {/* Mini progress bar */}
+              <div className="mt-2 h-1.5 bg-surface-secondary rounded-full overflow-hidden">
+                <div
+                  className={clsx(
+                    "h-full rounded-full transition-all duration-500",
+                    overall >= 80
+                      ? "bg-green-500"
+                      : overall >= 50
+                      ? "bg-yellow-500"
+                      : "bg-red-500"
+                  )}
+                  style={{ width: `${overall}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Checklist */}
+          <div className="space-y-2">
+            {checks.map((check, i) => (
+              <div key={i}>
+                <div className="flex items-start gap-2">
+                  {check.passed ? (
+                    <CheckCircle className="h-3.5 w-3.5 text-green-500 flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <XCircle className="h-3.5 w-3.5 text-red-400 flex-shrink-0 mt-0.5" />
+                  )}
+                  <span
+                    className={clsx(
+                      "text-xs leading-snug",
+                      check.passed ? "text-text-secondary" : "text-text-primary font-medium"
+                    )}
+                  >
+                    {check.label}
+                  </span>
+                </div>
+                {/* Tip shown only for failed checks */}
+                {!check.passed && check.tip && (
+                  <p className="ml-5 text-xs text-text-muted leading-snug mt-0.5">
+                    {check.tip}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function formatRevisionType(revisionType: string): string {
   const labels: Record<string, string> = {
     manual_edit: "Manual Edit",
@@ -202,6 +469,9 @@ export default function ArticleEditorPage() {
   const [metaDescription, setMetaDescription] = useState("");
   const [keyword, setKeyword] = useState("");
 
+  // Word count target (UI-only, not persisted)
+  const [wordCountTarget, setWordCountTarget] = useState<number | "">("");
+
   // Markdown toolbar
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lastSavedContentRef = useRef<string>("");
@@ -222,8 +492,36 @@ export default function ArticleEditorPage() {
   const [linkSuggestions, setLinkSuggestions] = useState<LinkSuggestion[]>([]);
   const [loadingLinks, setLoadingLinks] = useState(false);
 
+  // Export dropdown state
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
   // Confirmation dialog state
   const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string; confirmLabel?: string; variant?: "danger" | "warning" | "default" } | null>(null);
+
+  // Live SEO score — debounced 500 ms to avoid recalculating on every keystroke
+  const [debouncedSeoInput, setDebouncedSeoInput] = useState({ title: "", content: "", keyword: "", metaDescription: "" });
+  const seoDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (seoDebounceRef.current) clearTimeout(seoDebounceRef.current);
+    seoDebounceRef.current = setTimeout(() => {
+      setDebouncedSeoInput({ title, content, keyword, metaDescription });
+    }, 500);
+    return () => {
+      if (seoDebounceRef.current) clearTimeout(seoDebounceRef.current);
+    };
+  }, [title, content, keyword, metaDescription]);
+
+  const liveSeoScore = useMemo(
+    () =>
+      calculateSEOScore({
+        title: debouncedSeoInput.title,
+        content: debouncedSeoInput.content,
+        keyword: debouncedSeoInput.keyword,
+        meta_description: debouncedSeoInput.metaDescription,
+      }),
+    [debouncedSeoInput]
+  );
 
   useEffect(() => {
     loadArticle();
@@ -291,6 +589,25 @@ export default function ArticleEditorPage() {
       setSaving(false);
     }
   }
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts([
+    {
+      key: "s",
+      ctrl: true,
+      handler: () => {
+        if (article && !saving) handleSave();
+      },
+    },
+    {
+      key: "p",
+      ctrl: true,
+      shift: true,
+      handler: () => {
+        if (wpConnected) setShowWpModal(true);
+      },
+    },
+  ]);
 
   async function handleImprove(type: string) {
     if (!article) return;
@@ -533,6 +850,28 @@ export default function ArticleEditorPage() {
     insertMarkdown(`[${suggestion.title}](/${slug})`, "");
   }
 
+  async function handleExport(format: "markdown" | "html" | "csv") {
+    if (!article) return;
+    setShowExportMenu(false);
+    try {
+      const response = await api.articles.exportOne(article.id, format);
+      const ext = format === "markdown" ? "md" : format;
+      const safeTitle = article.title.replace(/[^\w\-]/g, "_").slice(0, 80);
+      const filename = `${safeTitle}.${ext}`;
+      const url = window.URL.createObjectURL(response.data as Blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success(`Article exported as ${format.toUpperCase()}`);
+    } catch {
+      toast.error("Failed to export article");
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -624,6 +963,41 @@ export default function ArticleEditorPage() {
           >
             Share
           </Button>
+
+          {/* Export dropdown */}
+          <div className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowExportMenu((prev) => !prev)}
+              leftIcon={<Download className="h-4 w-4" />}
+            >
+              Export
+              <ChevronDown className="h-3 w-3 ml-1" />
+            </Button>
+            {showExportMenu && (
+              <div className="absolute right-0 top-full mt-1 z-50 w-40 rounded-xl border border-surface-tertiary bg-surface shadow-lg py-1">
+                <button
+                  onClick={() => handleExport("markdown")}
+                  className="w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-surface-secondary transition-colors"
+                >
+                  Markdown (.md)
+                </button>
+                <button
+                  onClick={() => handleExport("html")}
+                  className="w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-surface-secondary transition-colors"
+                >
+                  HTML (.html)
+                </button>
+                <button
+                  onClick={() => handleExport("csv")}
+                  className="w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-surface-secondary transition-colors"
+                >
+                  CSV (.csv)
+                </button>
+              </div>
+            )}
+          </div>
 
           <div className="flex rounded-lg border border-surface-tertiary overflow-hidden">
             <button
@@ -864,6 +1238,13 @@ export default function ArticleEditorPage() {
 
         {/* SEO Sidebar */}
         <div className="space-y-4">
+          {/* Word Count Widget */}
+          <WordCountWidget
+            content={content}
+            target={wordCountTarget}
+            onTargetChange={setWordCountTarget}
+          />
+
           {/* SERP Preview */}
           <SerpPreview
             title={title}
@@ -871,6 +1252,9 @@ export default function ArticleEditorPage() {
             metaDescription={metaDescription}
             keyword={keyword}
           />
+
+          {/* Live SEO Score — updates as the user types (debounced 500 ms) */}
+          <LiveSeoPanel seoScore={liveSeoScore} />
 
           {/* SEO Score */}
           <Card className="p-4">
