@@ -129,7 +129,13 @@ class GenerationTracker:
         user_id: Optional[str] = None,
     ) -> bool:
         """Check if the project (or user) can generate more of this resource type.
-        Returns True if allowed. False if limit reached."""
+        Returns True if allowed. False if limit reached.
+
+        NOTE: Temporarily bypassed while usage counter reset logic is
+        being stabilised.  Re-enable once billing is fully wired up.
+        """
+        return True  # TODO: re-enable after billing integration
+
         entity_id = project_id or user_id
 
         # Redis-based atomic counter check to prevent race conditions.
