@@ -105,16 +105,17 @@ async def get_current_user(
             detail="User account is not active",
         )
 
-    # Reject tokens issued before the user's last security event (password change/reset).
-    # updated_at is bumped explicitly on password change and reset, so any token
-    # issued before that moment is no longer valid.
-    if payload.iat and user.updated_at:
+    # Reject tokens issued before the user's last password change/reset.
+    # password_changed_at is set *only* on explicit security events, unlike
+    # updated_at which fires on any row modification (login tracking, usage
+    # resets, etc.) via the onupdate trigger.
+    if payload.iat and user.password_changed_at:
         token_iat = payload.iat
         # Ensure both datetimes are timezone-aware for comparison
-        user_updated = user.updated_at
-        if user_updated.tzinfo is None:
-            user_updated = user_updated.replace(tzinfo=timezone.utc)
-        if user_updated > token_iat:
+        pwd_changed = user.password_changed_at
+        if pwd_changed.tzinfo is None:
+            pwd_changed = pwd_changed.replace(tzinfo=timezone.utc)
+        if pwd_changed > token_iat:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token invalidated due to security event",
@@ -373,11 +374,11 @@ async def reset_password(
             detail="Password reset token has expired",
         )
 
-    # Update password and bump updated_at so existing tokens are invalidated
+    # Update password and bump password_changed_at so existing tokens are invalidated
     user.password_hash = password_hasher.hash(request.new_password)
     user.password_reset_token = None
     user.password_reset_expires = None
-    user.updated_at = datetime.now(timezone.utc)
+    user.password_changed_at = datetime.now(timezone.utc)
     await db.commit()
 
     return {"message": "Password has been reset successfully"}
@@ -399,9 +400,9 @@ async def change_password(
             detail="Current password is incorrect",
         )
 
-    # Update password and bump updated_at so existing tokens are invalidated
+    # Update password and bump password_changed_at so existing tokens are invalidated
     current_user.password_hash = password_hasher.hash(request.new_password)
-    current_user.updated_at = datetime.now(timezone.utc)
+    current_user.password_changed_at = datetime.now(timezone.utc)
     await db.commit()
 
     return {"message": "Password has been changed successfully"}

@@ -92,6 +92,11 @@ class User(Base, TimestampMixin):
         DateTime(timezone=True), nullable=True
     )
 
+    # Security: bumped only on password change/reset to invalidate existing tokens
+    password_changed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     # Subscription
     subscription_tier: Mapped[str] = mapped_column(
         String(50),
