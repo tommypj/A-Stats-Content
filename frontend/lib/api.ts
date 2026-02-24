@@ -12,6 +12,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 // ---------------------------------------------------------------------------
 
 const apiCache = new Map<string, { data: unknown; timestamp: number }>();
+const MAX_CACHE_SIZE = 100;
 
 function getCached<T>(key: string, ttlMs: number): T | null {
   const entry = apiCache.get(key);
@@ -23,6 +24,10 @@ function getCached<T>(key: string, ttlMs: number): T | null {
 
 function setCache(key: string, data: unknown): void {
   apiCache.set(key, { data, timestamp: Date.now() });
+  if (apiCache.size > MAX_CACHE_SIZE) {
+    const firstKey = Array.from(apiCache.keys())[0];
+    apiCache.delete(firstKey);
+  }
 }
 
 export function invalidateCache(prefix?: string): void {
@@ -329,6 +334,12 @@ export const api = {
         method: "DELETE",
         url: `/outlines/${id}`,
       }),
+    bulkDelete: (ids: string[]) =>
+      apiRequest<{ deleted: number }>({
+        method: "POST",
+        url: "/outlines/bulk-delete",
+        data: { ids },
+      }),
     regenerate: (id: string) =>
       apiRequest<Outline>({
         method: "POST",
@@ -386,6 +397,15 @@ export const api = {
         url: `/articles/${id}`,
       });
       invalidateCache("/articles");
+    },
+    bulkDelete: async (ids: string[]) => {
+      const result = await apiRequest<{ deleted: number }>({
+        method: "POST",
+        url: "/articles/bulk-delete",
+        data: { ids },
+      });
+      invalidateCache("/articles");
+      return result;
     },
     improve: (id: string, improvement_type: string) =>
       apiRequest<Article>({
@@ -481,6 +501,12 @@ export const api = {
       apiRequest<void>({
         method: "DELETE",
         url: `/images/${id}`,
+      }),
+    bulkDelete: (ids: string[]) =>
+      apiRequest<{ deleted: number }>({
+        method: "POST",
+        url: "/images/bulk-delete",
+        data: { ids },
       }),
   },
 

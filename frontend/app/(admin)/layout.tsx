@@ -118,6 +118,14 @@ export default function AdminLayout({
 
   return (
     <div className="min-h-screen bg-surface-secondary">
+      {/* Skip to main content — visible on keyboard focus only */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary-600 focus:text-white focus:rounded-lg focus:outline-none"
+      >
+        Skip to main content
+      </a>
+
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
@@ -350,7 +358,7 @@ export default function AdminLayout({
         </header>
 
         {/* Page content */}
-        <main className="p-4 lg:p-8">{children}</main>
+        <main id="main-content" className="p-4 lg:p-8">{children}</main>
       </div>
     </div>
   );

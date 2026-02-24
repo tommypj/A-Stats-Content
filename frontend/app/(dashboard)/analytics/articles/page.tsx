@@ -266,7 +266,7 @@ export default function ArticlePerformancePage() {
                         </Link>
                         {article.published_at && (
                           <p className="text-xs text-text-muted mt-1">
-                            {new Date(article.published_at).toLocaleDateString()}
+                            {new Date(article.published_at).toLocaleDateString("en-US")}
                           </p>
                         )}
                       </td>

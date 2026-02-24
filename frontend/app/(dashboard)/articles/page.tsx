@@ -222,7 +222,7 @@ export default function ArticlesPage() {
       action: async () => {
         setIsBulkDeleting(true);
         try {
-          await Promise.all(Array.from(selectedIds).map((id) => api.articles.delete(id)));
+          await api.articles.bulkDelete(Array.from(selectedIds));
           setSelectedIds(new Set());
           await loadArticles();
         } catch (error) {

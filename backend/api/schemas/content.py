@@ -247,6 +247,23 @@ class ArticleImproveRequest(BaseModel):
 
 
 # ============================================================================
+# Bulk Operation Schemas
+# ============================================================================
+
+
+class BulkDeleteRequest(BaseModel):
+    """Request body for bulk-delete endpoints."""
+
+    ids: List[str] = Field(..., min_length=1, description="List of resource IDs to delete")
+
+
+class BulkDeleteResponse(BaseModel):
+    """Response returned by bulk-delete endpoints."""
+
+    deleted: int
+
+
+# ============================================================================
 # Article Revision Schemas
 # ============================================================================
 

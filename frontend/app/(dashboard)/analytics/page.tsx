@@ -266,7 +266,7 @@ export default function AnalyticsPage() {
             Track your search performance and rankings
             {lastSync && (
               <span className="ml-2 text-xs">
-                Last synced: {new Date(lastSync).toLocaleDateString()}
+                Last synced: {new Date(lastSync).toLocaleDateString("en-US")}
               </span>
             )}
           </p>

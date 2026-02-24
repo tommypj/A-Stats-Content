@@ -238,7 +238,7 @@ export default function ImagesPage() {
       action: async () => {
         setIsBulkDeleting(true);
         try {
-          await Promise.all(Array.from(selectedIds).map((id) => api.images.delete(id)));
+          await api.images.bulkDelete(Array.from(selectedIds));
           setSelectedIds(new Set());
           await loadImages();
         } catch (error) {
