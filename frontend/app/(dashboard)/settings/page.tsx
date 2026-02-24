@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api, getImageUrl } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -17,6 +17,9 @@ import {
   CheckCircle,
   AlertCircle,
   Trash2,
+  Upload,
+  Download,
+  Camera,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -29,6 +32,7 @@ interface UserProfile {
   name: string;
   language: string;
   timezone: string;
+  avatar_url?: string;
   subscription_tier: string;
   subscription_status: string;
   email_verified: boolean;
@@ -65,6 +69,8 @@ interface ProfileSectionProps {
   saved: boolean;
   error: string;
   onSave: () => void;
+  onAvatarChange: (file: File) => void;
+  avatarUploading: boolean;
 }
 
 function ProfileSection({
@@ -79,7 +85,18 @@ function ProfileSection({
   saved,
   error,
   onSave,
+  onAvatarChange,
+  avatarUploading,
 }: ProfileSectionProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const avatarUrl = profile?.avatar_url ? getImageUrl(profile.avatar_url) : null;
+  const initials = (profile?.name || profile?.email || "?")
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
   return (
     <Card className="p-6">
       <div className="flex items-center gap-3 mb-6">
@@ -88,6 +105,51 @@ function ProfileSection({
       </div>
 
       <div className="space-y-4">
+        {/* Avatar */}
+        <div className="flex items-center gap-4">
+          <div className="relative group">
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt="Avatar"
+                className="h-16 w-16 rounded-full object-cover border-2 border-surface-tertiary"
+              />
+            ) : (
+              <div className="h-16 w-16 rounded-full bg-primary-100 flex items-center justify-center border-2 border-surface-tertiary">
+                <span className="text-lg font-semibold text-primary-600">{initials}</span>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={avatarUploading}
+              className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition-colors cursor-pointer"
+              aria-label="Change avatar"
+            >
+              {avatarUploading ? (
+                <Loader2 className="h-5 w-5 text-white animate-spin opacity-0 group-hover:opacity-100 transition-opacity" />
+              ) : (
+                <Camera className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+              )}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) onAvatarChange(file);
+                e.target.value = "";
+              }}
+            />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-text-primary">Profile Photo</p>
+            <p className="text-xs text-text-muted">JPEG, PNG or WebP. Max 2 MB.</p>
+          </div>
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-text-secondary mb-1">Email</label>
           <div className="flex items-center gap-2">
@@ -482,9 +544,11 @@ function DeleteAccountDialog({
 
 interface DangerZoneSectionProps {
   onDeleteAccount: () => void;
+  onExportData: () => void;
+  exporting: boolean;
 }
 
-function DangerZoneSection({ onDeleteAccount }: DangerZoneSectionProps) {
+function DangerZoneSection({ onDeleteAccount, onExportData, exporting }: DangerZoneSectionProps) {
   return (
     <Card className="p-6 border-red-200">
       <div className="flex items-center gap-3 mb-4">
@@ -492,22 +556,44 @@ function DangerZoneSection({ onDeleteAccount }: DangerZoneSectionProps) {
         <h2 className="text-lg font-display font-semibold text-red-600">Danger Zone</h2>
       </div>
 
-      <div className="rounded-xl border border-red-200 p-4 bg-red-50 space-y-3">
-        <div>
-          <p className="font-medium text-text-primary">Delete your account</p>
-          <p className="text-sm text-text-secondary mt-1">
-            Permanently delete your account and all associated data including articles, outlines,
-            images, and project memberships. This cannot be undone.
-          </p>
+      <div className="space-y-4">
+        {/* Export data */}
+        <div className="rounded-xl border border-surface-tertiary p-4 bg-surface-secondary space-y-3">
+          <div>
+            <p className="font-medium text-text-primary">Export my data</p>
+            <p className="text-sm text-text-secondary mt-1">
+              Download a JSON file containing all your account data including articles, outlines,
+              images, knowledge sources, and social posts.
+            </p>
+          </div>
+          <Button variant="outline" onClick={onExportData} disabled={exporting}>
+            {exporting ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Download className="h-4 w-4 mr-2" />
+            )}
+            {exporting ? "Exporting..." : "Export My Data"}
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          onClick={onDeleteAccount}
-          className="text-red-600 border-red-300 hover:bg-red-100 hover:border-red-400"
-        >
-          <Trash2 className="h-4 w-4 mr-2" />
-          Delete My Account
-        </Button>
+
+        {/* Delete account */}
+        <div className="rounded-xl border border-red-200 p-4 bg-red-50 space-y-3">
+          <div>
+            <p className="font-medium text-text-primary">Delete your account</p>
+            <p className="text-sm text-text-secondary mt-1">
+              Permanently delete your account and all associated data including articles, outlines,
+              images, and project memberships. This cannot be undone.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={onDeleteAccount}
+            className="text-red-600 border-red-300 hover:bg-red-100 hover:border-red-400"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete My Account
+          </Button>
+        </div>
       </div>
     </Card>
   );
@@ -544,6 +630,12 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [passwordSaved, setPasswordSaved] = useState(false);
+
+  // Avatar upload
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
+  // Data export
+  const [exporting, setExporting] = useState(false);
 
   // Account deletion
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -628,6 +720,31 @@ export default function SettingsPage() {
     }
   };
 
+  const handleAvatarChange = async (file: File) => {
+    setAvatarUploading(true);
+    try {
+      const updated = await api.auth.uploadAvatar(file);
+      setProfile((prev) => (prev ? { ...prev, avatar_url: updated.avatar_url } : prev));
+      toast.success("Avatar updated successfully.");
+    } catch {
+      toast.error("Failed to upload avatar. Please try again.");
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const handleExportData = async () => {
+    setExporting(true);
+    try {
+      await api.auth.exportData();
+      toast.success("Data export downloaded.");
+    } catch {
+      toast.error("Failed to export data. Please try again.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -677,9 +794,15 @@ export default function SettingsPage() {
             saved={saved}
             error={error}
             onSave={handleSaveProfile}
+            onAvatarChange={handleAvatarChange}
+            avatarUploading={avatarUploading}
           />
 
-          <DangerZoneSection onDeleteAccount={() => setShowDeleteDialog(true)} />
+          <DangerZoneSection
+            onDeleteAccount={() => setShowDeleteDialog(true)}
+            onExportData={handleExportData}
+            exporting={exporting}
+          />
         </div>
       )}
 

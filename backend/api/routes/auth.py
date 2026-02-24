@@ -2,11 +2,13 @@
 Authentication API routes.
 """
 
+import json
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status, Header, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Header, Request, UploadFile, File
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,8 +16,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from infrastructure.database.connection import get_db
 from infrastructure.database.models.user import User, UserStatus
 from infrastructure.database.models.project import Project, ProjectMember
+from infrastructure.database.models.content import Article, Outline, GeneratedImage
+from infrastructure.database.models.knowledge import KnowledgeSource
+from infrastructure.database.models.social import ScheduledPost, PostTarget
 from infrastructure.database.models.analytics import GSCConnection
 from infrastructure.config.settings import settings
+from adapters.storage.image_storage import storage_adapter
 from core.security.password import password_hasher
 from core.security.tokens import TokenService
 from adapters.email.resend_adapter import email_service
@@ -598,3 +604,216 @@ async def delete_account(
     logger.info("Account deleted successfully for user_id=%s", user_id)
 
     return {"message": "Account deleted successfully"}
+
+
+# Maximum avatar file size: 2 MB
+_AVATAR_MAX_SIZE = 2 * 1024 * 1024
+_AVATAR_ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
+
+
+@router.post("/me/avatar", response_model=UserResponse)
+@limiter.limit("10/minute")
+async def upload_avatar(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """
+    Upload or replace the current user's profile avatar.
+
+    Accepts JPEG, PNG, or WebP images up to 2 MB.
+    """
+    # Validate content type
+    if file.content_type not in _AVATAR_ALLOWED_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid file type '{file.content_type}'. Allowed: JPEG, PNG, WebP.",
+        )
+
+    # Read and validate size
+    image_data = await file.read()
+    if len(image_data) > _AVATAR_MAX_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File too large. Maximum size is 2 MB.",
+        )
+
+    if len(image_data) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is empty.",
+        )
+
+    # Determine extension from content type
+    ext_map = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+    ext = ext_map.get(file.content_type, "jpg")
+    filename = f"avatar_{current_user.id}.{ext}"
+
+    # Delete old avatar if it exists
+    if current_user.avatar_url:
+        try:
+            await storage_adapter.delete_image(current_user.avatar_url)
+        except Exception:
+            logger.warning("Failed to delete old avatar for user %s", current_user.id)
+
+    # Save new avatar
+    saved_path = await storage_adapter.save_image(image_data, filename)
+    current_user.avatar_url = saved_path
+    await db.commit()
+    await db.refresh(current_user)
+
+    logger.info("Avatar uploaded for user_id=%s path=%s", current_user.id, saved_path)
+    return current_user
+
+
+@router.get("/me/export")
+@limiter.limit("1/hour")
+async def export_my_data(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Export all data associated with the current user (GDPR data portability).
+
+    Returns a JSON file containing the user's profile, articles, outlines,
+    images (metadata), knowledge sources, social posts, GSC connections,
+    and project memberships.
+    """
+    user_id = current_user.id
+
+    # Profile
+    profile_data = {
+        "id": str(current_user.id),
+        "email": current_user.email,
+        "name": current_user.name,
+        "language": current_user.language,
+        "timezone": current_user.timezone,
+        "avatar_url": current_user.avatar_url,
+        "subscription_tier": current_user.subscription_tier,
+        "subscription_status": current_user.subscription_status,
+        "email_verified": current_user.email_verified,
+        "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
+        "last_login": current_user.last_login.isoformat() if current_user.last_login else None,
+    }
+
+    # Articles
+    result = await db.execute(select(Article).where(Article.user_id == user_id))
+    articles = [
+        {
+            "id": str(a.id),
+            "title": a.title,
+            "keyword": a.keyword,
+            "status": a.status,
+            "content": a.content,
+            "meta_description": a.meta_description,
+            "word_count": a.word_count,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+        }
+        for a in result.scalars().all()
+    ]
+
+    # Outlines
+    result = await db.execute(select(Outline).where(Outline.user_id == user_id))
+    outlines = [
+        {
+            "id": str(o.id),
+            "title": o.title,
+            "keyword": o.keyword,
+            "status": o.status,
+            "sections": o.sections,
+            "created_at": o.created_at.isoformat() if o.created_at else None,
+        }
+        for o in result.scalars().all()
+    ]
+
+    # Images (metadata only)
+    result = await db.execute(select(GeneratedImage).where(GeneratedImage.user_id == user_id))
+    images = [
+        {
+            "id": str(img.id),
+            "prompt": img.prompt,
+            "alt_text": img.alt_text,
+            "style": img.style,
+            "width": img.width,
+            "height": img.height,
+            "status": img.status,
+            "created_at": img.created_at.isoformat() if img.created_at else None,
+        }
+        for img in result.scalars().all()
+    ]
+
+    # Knowledge sources
+    result = await db.execute(select(KnowledgeSource).where(KnowledgeSource.user_id == user_id))
+    knowledge = [
+        {
+            "id": str(k.id),
+            "title": k.title,
+            "filename": k.filename,
+            "file_type": k.file_type,
+            "file_size": k.file_size,
+            "status": k.status,
+            "tags": k.tags,
+            "created_at": k.created_at.isoformat() if k.created_at else None,
+        }
+        for k in result.scalars().all()
+    ]
+
+    # Social posts
+    result = await db.execute(select(ScheduledPost).where(ScheduledPost.user_id == user_id))
+    social_posts = [
+        {
+            "id": str(p.id),
+            "content": p.content,
+            "status": p.status,
+            "scheduled_at": p.scheduled_at.isoformat() if p.scheduled_at else None,
+            "published_at": p.published_at.isoformat() if p.published_at else None,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+        }
+        for p in result.scalars().all()
+    ]
+
+    # GSC connections
+    result = await db.execute(select(GSCConnection).where(GSCConnection.user_id == user_id))
+    gsc_connections = [
+        {
+            "id": str(g.id),
+            "site_url": g.site_url,
+            "created_at": g.created_at.isoformat() if g.created_at else None,
+        }
+        for g in result.scalars().all()
+    ]
+
+    # Project memberships
+    result = await db.execute(select(ProjectMember).where(ProjectMember.user_id == user_id))
+    memberships = [
+        {
+            "project_id": str(m.project_id),
+            "role": m.role,
+            "created_at": m.created_at.isoformat() if m.created_at else None,
+        }
+        for m in result.scalars().all()
+    ]
+
+    export = {
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "profile": profile_data,
+        "articles": articles,
+        "outlines": outlines,
+        "images": images,
+        "knowledge_sources": knowledge,
+        "social_posts": social_posts,
+        "gsc_connections": gsc_connections,
+        "project_memberships": memberships,
+    }
+
+    export_json = json.dumps(export, indent=2, default=str)
+
+    return StreamingResponse(
+        iter([export_json]),
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="user_data_export_{user_id}.json"',
+        },
+    )

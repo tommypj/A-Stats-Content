@@ -1257,8 +1257,10 @@ async def get_best_posting_times(
     """
     Get recommended posting times based on past performance.
 
-    NOTE: Placeholder implementation.
-    In production, analyze historical post performance to recommend times.
+    Analyses the user's published posts for the given platform, groups them
+    by hour-of-day and day-of-week, and scores each time slot using
+    engagement data from PostTarget.analytics_data (if available) or
+    raw post count as a fallback proxy.
     """
     # Validate platform
     if platform not in PLATFORM_LIMITS:
@@ -1267,19 +1269,77 @@ async def get_best_posting_times(
             detail=f"Unsupported platform: {platform}",
         )
 
-    # TODO: Analyze user's historical post performance
-    # Query published posts with analytics data
-    # Group by hour and day of week
-    # Calculate average engagement for each time slot
-    # Return top 5 time slots
+    # Query published post targets for this user + platform
+    result = await db.execute(
+        select(PostTarget, ScheduledPost)
+        .join(ScheduledPost, PostTarget.post_id == ScheduledPost.id)
+        .join(SocialAccount, PostTarget.social_account_id == SocialAccount.id)
+        .where(
+            ScheduledPost.user_id == current_user.id,
+            ScheduledPost.status == PostStatus.PUBLISHED.value,
+            SocialAccount.platform == platform,
+            PostTarget.published_at.isnot(None),
+        )
+    )
+    rows = result.all()
 
-    # Placeholder: Return generic best times
+    if not rows:
+        return BestTimesResponse(
+            platform=platform,
+            time_slots=[],
+            timezone="UTC",
+        )
+
+    # Aggregate by (hour, day_of_week)
+    # day_of_week: 0=Monday .. 6=Sunday (ISO weekday - 1)
+    slots: dict[tuple[int, int], dict] = {}  # (hour, dow) -> {score_sum, count}
+
+    for target, post in rows:
+        pub_time = target.published_at
+        hour = pub_time.hour
+        dow = pub_time.weekday()  # 0=Monday
+        key = (hour, dow)
+
+        if key not in slots:
+            slots[key] = {"score_sum": 0.0, "count": 0}
+
+        # Try to extract engagement from analytics_data
+        engagement = 0.0
+        if target.analytics_data and isinstance(target.analytics_data, dict):
+            # Sum common engagement metrics
+            for metric in ("likes", "shares", "comments", "retweets", "reactions", "clicks"):
+                engagement += float(target.analytics_data.get(metric, 0))
+
+        # If no engagement data, use 1.0 as a proxy (counts post existence)
+        if engagement == 0.0:
+            engagement = 1.0
+
+        slots[key]["score_sum"] += engagement
+        slots[key]["count"] += 1
+
+    # Build scored list — average engagement per slot
+    scored = []
+    for (hour, dow), data in slots.items():
+        avg_score = data["score_sum"] / data["count"] if data["count"] > 0 else 0
+        scored.append((hour, dow, avg_score, data["count"]))
+
+    # Sort by engagement score descending, take top 5
+    scored.sort(key=lambda x: x[2], reverse=True)
+    top_slots = scored[:5]
+
+    # Normalise scores to 0-1 range
+    max_score = top_slots[0][2] if top_slots else 1.0
+    if max_score == 0:
+        max_score = 1.0
+
     time_slots = [
-        BestTimeSlot(hour=9, day_of_week=1, engagement_score=0.85, post_count=10),
-        BestTimeSlot(hour=12, day_of_week=2, engagement_score=0.82, post_count=15),
-        BestTimeSlot(hour=15, day_of_week=3, engagement_score=0.78, post_count=12),
-        BestTimeSlot(hour=18, day_of_week=4, engagement_score=0.75, post_count=8),
-        BestTimeSlot(hour=20, day_of_week=0, engagement_score=0.72, post_count=20),
+        BestTimeSlot(
+            hour=hour,
+            day_of_week=dow,
+            engagement_score=round(score / max_score, 2),
+            post_count=count,
+        )
+        for hour, dow, score, count in top_slots
     ]
 
     return BestTimesResponse(

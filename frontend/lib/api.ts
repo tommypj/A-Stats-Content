@@ -313,6 +313,29 @@ export const api = {
         url: "/auth/account",
         data: { confirmation: "DELETE MY ACCOUNT" },
       }),
+    uploadAvatar: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const { data } = await apiClient.post<UserResponse>("/auth/me/avatar", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      invalidateCache("/auth/me");
+      return data;
+    },
+    exportData: async () => {
+      const response = await apiClient.get("/auth/me/export", {
+        responseType: "blob",
+      });
+      const blob = new Blob([response.data], { type: "application/json" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "my_data_export.json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    },
   },
 
   // Outlines
