@@ -11,7 +11,8 @@ echo "Running database migrations..."
 if alembic upgrade head; then
     echo "Migrations completed successfully."
 else
-    echo "WARNING: Migrations failed (exit code $?). Starting app anyway..."
+    echo "ERROR: Migrations failed (exit code $?). Refusing to start on stale schema."
+    exit 1
 fi
 
 echo "Starting application..."

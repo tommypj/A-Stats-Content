@@ -198,8 +198,11 @@ class S3StorageAdapter(StorageAdapter):
     """
     AWS S3 storage adapter.
 
-    Saves images to AWS S3 with public read access.
+    Saves images to AWS S3 with private access. Public URLs are served
+    via presigned URLs (default 7-day expiry) or through a CDN if configured.
     """
+
+    PRESIGNED_URL_EXPIRY = 7 * 24 * 3600  # 7 days in seconds
 
     def __init__(
         self,
@@ -290,19 +293,18 @@ class S3StorageAdapter(StorageAdapter):
             elif filename.lower().endswith('.gif'):
                 content_type = 'image/gif'
 
-            # Upload to S3
+            # Upload to S3 with private ACL (default)
             self.s3_client.put_object(
                 Bucket=self.bucket,
                 Key=s3_key,
                 Body=image_data,
                 ContentType=content_type,
-                ACL='public-read',  # Make image publicly accessible
             )
 
-            # Generate public URL
-            url = await self.get_image_url(s3_key)
+            # Return the S3 key — callers use get_image_url() to obtain
+            # a time-limited presigned URL when serving to clients.
             logger.info(f"Uploaded image to S3: {s3_key}")
-            return url
+            return s3_key
 
         except NoCredentialsError:
             logger.error("AWS credentials not found")
@@ -351,19 +353,27 @@ class S3StorageAdapter(StorageAdapter):
 
     async def get_image_url(self, path: str) -> str:
         """
-        Get public S3 URL for an image.
+        Get a presigned S3 URL for an image.
 
         Args:
             path: S3 key
 
         Returns:
-            Public S3 URL
+            Time-limited presigned URL (7-day expiry)
         """
-        if not self.bucket or not self.region:
-            raise RuntimeError("S3 bucket or region not configured")
+        if not self.s3_client or not self.bucket:
+            raise RuntimeError("S3 client or bucket not configured")
 
-        # Generate public URL
-        return f"https://{self.bucket}.s3.{self.region}.amazonaws.com/{path}"
+        # If a CDN domain is configured, use it directly (CDN handles auth)
+        cdn_domain = getattr(settings, 'cdn_domain', None)
+        if cdn_domain:
+            return f"https://{cdn_domain}/{path}"
+
+        return self.s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': self.bucket, 'Key': path},
+            ExpiresIn=self.PRESIGNED_URL_EXPIRY,
+        )
 
 
 async def download_image(url: str) -> bytes:
