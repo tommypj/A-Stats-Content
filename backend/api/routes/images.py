@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from api.middleware.rate_limit import limiter
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.schemas.content import (
@@ -18,6 +18,8 @@ from api.schemas.content import (
     ImageSetFeaturedRequest,
     ImageResponse,
     ImageListResponse,
+    BulkDeleteRequest,
+    BulkDeleteResponse,
 )
 from api.routes.auth import get_current_user
 from infrastructure.database.connection import get_db
@@ -199,6 +201,51 @@ async def list_images(
         page_size=page_size,
         pages=math.ceil(total / page_size) if total > 0 else 0,
     )
+
+
+@router.post("/bulk-delete", response_model=BulkDeleteResponse)
+async def bulk_delete_images(
+    body: BulkDeleteRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Delete multiple images in a single request.
+
+    All supplied IDs must belong to the current user's active project scope.
+    Only images that pass the ownership check are deleted; IDs that do not
+    exist or belong to a different project are silently ignored.
+    Returns the number of rows actually deleted.
+
+    Note: local file cleanup is skipped for bulk operations to keep the
+    response fast.  Orphaned local files will be cleaned up by the
+    periodic storage maintenance task.
+    """
+    if not body.ids:
+        return BulkDeleteResponse(deleted=0)
+
+    if current_user.current_project_id:
+        stmt = (
+            delete(GeneratedImage)
+            .where(
+                GeneratedImage.id.in_(body.ids),
+                GeneratedImage.project_id == current_user.current_project_id,
+            )
+        )
+    else:
+        stmt = (
+            delete(GeneratedImage)
+            .where(
+                GeneratedImage.id.in_(body.ids),
+                GeneratedImage.user_id == current_user.id,
+                GeneratedImage.project_id.is_(None),
+            )
+        )
+
+    result = await db.execute(stmt)
+    await db.commit()
+
+    return BulkDeleteResponse(deleted=result.rowcount)
 
 
 @router.get("/{image_id}", response_model=ImageResponse)

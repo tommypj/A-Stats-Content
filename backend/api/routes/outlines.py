@@ -15,7 +15,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from fastapi.responses import StreamingResponse
 from api.middleware.rate_limit import limiter
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.schemas.content import (
@@ -23,6 +23,8 @@ from api.schemas.content import (
     OutlineUpdateRequest,
     OutlineResponse,
     OutlineListResponse,
+    BulkDeleteRequest,
+    BulkDeleteResponse,
 )
 from api.routes.auth import get_current_user
 from api.utils import escape_like
@@ -374,6 +376,47 @@ async def export_outline(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{safe_title}.csv"'},
     )
+
+
+@router.post("/bulk-delete", response_model=BulkDeleteResponse)
+async def bulk_delete_outlines(
+    body: BulkDeleteRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Delete multiple outlines in a single request.
+
+    All supplied IDs must belong to the current user's active project scope.
+    Only outlines that pass the ownership check are deleted; IDs that do not
+    exist or belong to a different project are silently ignored.
+    Returns the number of rows actually deleted.
+    """
+    if not body.ids:
+        return BulkDeleteResponse(deleted=0)
+
+    if current_user.current_project_id:
+        stmt = (
+            delete(Outline)
+            .where(
+                Outline.id.in_(body.ids),
+                Outline.project_id == current_user.current_project_id,
+            )
+        )
+    else:
+        stmt = (
+            delete(Outline)
+            .where(
+                Outline.id.in_(body.ids),
+                Outline.user_id == current_user.id,
+                Outline.project_id.is_(None),
+            )
+        )
+
+    result = await db.execute(stmt)
+    await db.commit()
+
+    return BulkDeleteResponse(deleted=result.rowcount)
 
 
 @router.get("/{outline_id}", response_model=OutlineResponse)

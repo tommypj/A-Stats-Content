@@ -155,7 +155,7 @@ export default function ArticlePerformanceDetailPage() {
             <div className="mt-2 flex items-center gap-4 flex-wrap text-sm text-text-secondary">
               <span>Keyword: <span className="font-medium text-text-primary">{data.keyword}</span></span>
               {data.published_at && (
-                <span>Published: {new Date(data.published_at).toLocaleDateString()}</span>
+                <span>Published: {new Date(data.published_at).toLocaleDateString("en-US")}</span>
               )}
               {data.seo_score !== null && data.seo_score !== undefined && (
                 <span>SEO Score: <span className="font-medium text-text-primary">{data.seo_score}</span></span>

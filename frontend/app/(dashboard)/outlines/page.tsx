@@ -183,7 +183,7 @@ export default function OutlinesPage() {
       action: async () => {
         setIsBulkDeleting(true);
         try {
-          await Promise.all(Array.from(selectedIds).map((id) => api.outlines.delete(id)));
+          await api.outlines.bulkDelete(Array.from(selectedIds));
           setSelectedIds(new Set());
           await loadOutlines();
         } catch (error) {
