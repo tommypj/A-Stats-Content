@@ -30,11 +30,11 @@ export function invalidateCache(prefix?: string): void {
     apiCache.clear();
     return;
   }
-  for (const key of apiCache.keys()) {
+  Array.from(apiCache.keys()).forEach((key) => {
     if (key.startsWith(prefix)) {
       apiCache.delete(key);
     }
-  }
+  });
 }
 
 async function cachedGet<T>(url: string, ttlMs: number, params?: Record<string, unknown>): Promise<T> {
