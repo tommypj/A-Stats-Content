@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, parseApiError } from "@/lib/api";
 import type { Outline, AdminContentQueryParams } from "@/lib/api";
+import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Search, Trash2, Eye, ChevronLeft, ChevronRight, FileCheck } from "lucide-react";
 import Link from "next/link";
@@ -58,7 +59,7 @@ export default function AdminOutlinesPage() {
           await api.admin.content.deleteOutline(id);
           await loadOutlines();
         } catch (err) {
-          alert(parseApiError(err).message);
+          toast.error(parseApiError(err).message);
         } finally {
           setDeleting(false);
         }
@@ -81,7 +82,7 @@ export default function AdminOutlinesPage() {
           setSelectedIds(new Set());
           await loadOutlines();
         } catch (err) {
-          alert(parseApiError(err).message);
+          toast.error(parseApiError(err).message);
         } finally {
           setDeleting(false);
         }

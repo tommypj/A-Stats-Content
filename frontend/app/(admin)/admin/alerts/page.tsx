@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, parseApiError } from "@/lib/api";
 import type { AdminAlert } from "@/lib/api";
+import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Bell,
@@ -113,7 +114,7 @@ export default function AdminAlertsPage() {
           await api.admin.alerts.markAllRead();
           await loadAlerts();
         } catch (err) {
-          window.alert(parseApiError(err).message);
+          toast.error(parseApiError(err).message);
         } finally {
           setMarkingAllRead(false);
         }
@@ -135,7 +136,7 @@ export default function AdminAlertsPage() {
         prev.map((a) => (a.id === alertItem.id ? updated : a))
       );
     } catch (err) {
-      window.alert(parseApiError(err).message);
+      toast.error(parseApiError(err).message);
     } finally {
       setUpdatingIds((prev) => {
         const next = new Set(prev);
@@ -157,7 +158,7 @@ export default function AdminAlertsPage() {
             prev.map((a) => (a.id === alertItem.id ? updated : a))
           );
         } catch (err) {
-          window.alert(parseApiError(err).message);
+          toast.error(parseApiError(err).message);
         } finally {
           setUpdatingIds((prev) => {
             const next = new Set(prev);

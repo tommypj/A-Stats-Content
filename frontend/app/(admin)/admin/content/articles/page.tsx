@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api, parseApiError } from "@/lib/api";
+import { toast } from "sonner";
 import type { Article, AdminContentQueryParams } from "@/lib/api";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Search, Trash2, Eye, ChevronLeft, ChevronRight, FileText } from "lucide-react";
@@ -58,7 +59,7 @@ export default function AdminArticlesPage() {
           await api.admin.content.deleteArticle(id);
           await loadArticles();
         } catch (err) {
-          alert(parseApiError(err).message);
+          toast.error(parseApiError(err).message);
         } finally {
           setDeleting(false);
         }
@@ -81,7 +82,7 @@ export default function AdminArticlesPage() {
           setSelectedIds(new Set());
           await loadArticles();
         } catch (err) {
-          alert(parseApiError(err).message);
+          toast.error(parseApiError(err).message);
         } finally {
           setDeleting(false);
         }

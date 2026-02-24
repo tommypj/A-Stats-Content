@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, parseApiError } from "@/lib/api";
+import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -87,9 +88,9 @@ export default function InviteAcceptPage() {
     try {
       await api.projects.invitations.accept(token);
       router.push("/projects");
-      alert("Invitation accepted! Welcome to the project.");
+      toast.success("Invitation accepted! Welcome to the project.");
     } catch (err) {
-      alert(parseApiError(err).message);
+      toast.error(parseApiError(err).message);
     } finally {
       setIsAccepting(false);
     }

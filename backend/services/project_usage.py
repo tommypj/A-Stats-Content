@@ -10,10 +10,10 @@ from datetime import datetime, timezone
 from typing import Dict
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from infrastructure.database.models.project import Project
+from infrastructure.database.models.project import Project, ProjectMember
 from infrastructure.database.models.user import SubscriptionTier
 from api.schemas.project_billing import ProjectLimits, ProjectUsageStats
 
@@ -123,8 +123,14 @@ class ProjectUsageService:
         project = await self.get_project(project_id)
         limits = self.get_project_limits(project)
 
-        # Count active members
-        active_members_count = len([m for m in project.members if m.deleted_at is None])
+        # Count active members via SQL instead of loading all into memory
+        count_result = await self.db.execute(
+            select(func.count()).select_from(ProjectMember).where(
+                ProjectMember.project_id == str(project_id),
+                ProjectMember.deleted_at.is_(None),
+            )
+        )
+        active_members_count = count_result.scalar() or 0
 
         return ProjectUsageStats(
             articles_used=project.articles_generated_this_month,

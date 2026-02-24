@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, Project, parseApiError } from "@/lib/api";
+import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -73,7 +74,7 @@ export default function ProjectsPage() {
       router.push("/dashboard");
       router.refresh();
     } catch (err) {
-      alert(parseApiError(err).message);
+      toast.error(parseApiError(err).message);
       setSwitchingProject(null);
     }
   };

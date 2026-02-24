@@ -581,9 +581,10 @@ async def publish_to_wordpress(
                 )
 
             if response.status_code not in (200, 201):
+                logger.error("WordPress publish failed: %s - %s", response.status_code, response.text)
                 raise HTTPException(
                     status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail=f"WordPress API error: {response.status_code} - {response.text}",
+                    detail="Failed to publish to WordPress. Check your connection settings and try again.",
                 )
 
             wp_post = response.json()
@@ -730,9 +731,10 @@ async def _upload_image_to_wp(
     )
 
     if response.status_code not in (200, 201):
+        logger.error("WordPress media upload failed: %s - %s", response.status_code, response.text)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"WordPress media upload failed: {response.status_code} - {response.text}",
+            detail="Failed to upload media to WordPress. Check your connection settings and try again.",
         )
 
     wp_media = response.json()

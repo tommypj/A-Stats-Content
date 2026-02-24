@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api, AdminUserDetail, AdminAuditLog, parseApiError } from "@/lib/api";
+import { toast } from "sonner";
 import { RoleBadge } from "@/components/admin/role-badge";
 import { SubscriptionBadge } from "@/components/admin/subscription-badge";
 import { UserEditModal } from "@/components/admin/user-edit-modal";
@@ -80,7 +81,7 @@ export default function AdminUserDetailPage() {
       await fetchUser();
     } catch (err) {
       const apiError = parseApiError(err);
-      alert(`Failed to unsuspend user: ${apiError.message}`);
+      toast.error(`Failed to unsuspend user: ${apiError.message}`);
     }
   };
 
@@ -90,12 +91,12 @@ export default function AdminUserDetailPage() {
       action: async () => {
         try {
           const response = await api.admin.users.resetPassword(user.id);
-          alert(
+          toast.success(
             `Password reset successfully! Temporary password: ${response.temporary_password}`
           );
         } catch (err) {
           const apiError = parseApiError(err);
-          alert(`Failed to reset password: ${apiError.message}`);
+          toast.error(`Failed to reset password: ${apiError.message}`);
         }
       },
       title: "Reset Password",

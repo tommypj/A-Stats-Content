@@ -14,6 +14,7 @@ import {
   ProjectRole,
   parseApiError,
 } from "@/lib/api";
+import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -149,7 +150,7 @@ export default function ProjectSettingsPage() {
     try {
       const updated = await api.projects.update(projectId, data);
       setProject(updated);
-      alert("Project updated successfully!");
+      toast.success("Project updated successfully!");
     } catch (err) {
       throw new Error(parseApiError(err).message);
     }
@@ -159,7 +160,7 @@ export default function ProjectSettingsPage() {
     try {
       const updated = await api.projects.uploadLogo(projectId, file);
       setProject(updated);
-      alert("Logo uploaded successfully!");
+      toast.success("Logo uploaded successfully!");
     } catch (err) {
       throw new Error(parseApiError(err).message);
     }
@@ -169,9 +170,9 @@ export default function ProjectSettingsPage() {
     try {
       await api.projects.members.update(projectId, userId, { role });
       await loadProjectData();
-      alert("Member role updated successfully!");
+      toast.success("Member role updated successfully!");
     } catch (err) {
-      alert(parseApiError(err).message);
+      toast.error(parseApiError(err).message);
     }
   };
 
@@ -179,9 +180,9 @@ export default function ProjectSettingsPage() {
     try {
       await api.projects.members.remove(projectId, userId);
       await loadProjectData();
-      alert(`${memberName} has been removed from the project`);
+      toast.success(`${memberName} has been removed from the project`);
     } catch (err) {
-      alert(parseApiError(err).message);
+      toast.error(parseApiError(err).message);
     }
   };
 
@@ -189,7 +190,7 @@ export default function ProjectSettingsPage() {
     try {
       await api.projects.invitations.create(projectId, data);
       await loadProjectData();
-      alert(`Invitation sent to ${data.email}`);
+      toast.success(`Invitation sent to ${data.email}`);
     } catch (err) {
       throw new Error(parseApiError(err).message);
     }
@@ -199,18 +200,18 @@ export default function ProjectSettingsPage() {
     try {
       await api.projects.invitations.revoke(projectId, invitationId);
       await loadProjectData();
-      alert("Invitation revoked");
+      toast.success("Invitation revoked");
     } catch (err) {
-      alert(parseApiError(err).message);
+      toast.error(parseApiError(err).message);
     }
   };
 
   const handleResendInvitation = async (invitationId: string) => {
     try {
       await api.projects.invitations.resend(projectId, invitationId);
-      alert("Invitation resent");
+      toast.success("Invitation resent");
     } catch (err) {
-      alert(parseApiError(err).message);
+      toast.error(parseApiError(err).message);
     }
   };
 
@@ -219,7 +220,7 @@ export default function ProjectSettingsPage() {
       const response = await api.projects.billing.checkout(projectId, "starter_monthly");
       window.location.href = response.checkout_url;
     } catch (err) {
-      alert(parseApiError(err).message);
+      toast.error(parseApiError(err).message);
     }
   };
 
@@ -228,7 +229,7 @@ export default function ProjectSettingsPage() {
       const response = await api.projects.billing.portal(projectId);
       window.open(response.portal_url, "_blank");
     } catch (err) {
-      alert(parseApiError(err).message);
+      toast.error(parseApiError(err).message);
     }
   };
 
@@ -238,9 +239,9 @@ export default function ProjectSettingsPage() {
         try {
           await api.projects.billing.cancel(projectId);
           await loadProjectData();
-          alert("Subscription cancelled successfully");
+          toast.success("Subscription cancelled successfully");
         } catch (err) {
-          alert(parseApiError(err).message);
+          toast.error(parseApiError(err).message);
         }
       },
       title: "Cancel Subscription",
@@ -254,9 +255,9 @@ export default function ProjectSettingsPage() {
     try {
       await api.projects.transferOwnership(projectId, newOwnerId);
       router.push("/projects");
-      alert("Ownership transferred successfully. You are now an Admin.");
+      toast.success("Ownership transferred successfully. You are now an Admin.");
     } catch (err) {
-      alert(parseApiError(err).message);
+      toast.error(parseApiError(err).message);
     }
   };
 
@@ -264,9 +265,9 @@ export default function ProjectSettingsPage() {
     try {
       await api.projects.delete(projectId);
       router.push("/projects");
-      alert("Project deleted successfully");
+      toast.success("Project deleted successfully");
     } catch (err) {
-      alert(parseApiError(err).message);
+      toast.error(parseApiError(err).message);
     }
   };
 
@@ -276,9 +277,9 @@ export default function ProjectSettingsPage() {
         try {
           await api.projects.leave(projectId);
           router.push("/projects");
-          alert("You have left the project");
+          toast.success("You have left the project");
         } catch (err) {
-          alert(parseApiError(err).message);
+          toast.error(parseApiError(err).message);
         }
       },
       title: "Leave Project",

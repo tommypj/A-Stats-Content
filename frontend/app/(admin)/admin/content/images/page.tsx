@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, parseApiError } from "@/lib/api";
 import type { GeneratedImage, AdminContentQueryParams } from "@/lib/api";
+import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Search, Trash2, Image as ImageIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
@@ -59,7 +60,7 @@ export default function AdminImagesPage() {
           await api.admin.content.deleteImage(id);
           await loadImages();
         } catch (err) {
-          alert(parseApiError(err).message);
+          toast.error(parseApiError(err).message);
         } finally {
           setDeleting(false);
         }
@@ -82,7 +83,7 @@ export default function AdminImagesPage() {
           setSelectedIds(new Set());
           await loadImages();
         } catch (err) {
-          alert(parseApiError(err).message);
+          toast.error(parseApiError(err).message);
         } finally {
           setDeleting(false);
         }

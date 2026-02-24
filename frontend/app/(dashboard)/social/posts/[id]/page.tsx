@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api, SocialPost, SocialAnalytics, SocialPlatform } from "@/lib/api";
+import { toast } from "sonner";
 import { PostStatusBadge } from "@/components/social/post-status-badge";
 import { PostAnalyticsCard } from "@/components/social/post-analytics-card";
 import { Card } from "@/components/ui/card";
@@ -62,7 +63,7 @@ export default function PostDetailPage() {
       }
     } catch (error) {
       console.error("Failed to load post:", error);
-      alert("Failed to load post");
+      toast.error("Failed to load post");
       router.push("/social/history");
     } finally {
       setLoading(false);
@@ -93,7 +94,7 @@ export default function PostDetailPage() {
           router.push("/social/history");
         } catch (error) {
           console.error("Failed to delete post:", error);
-          alert("Failed to delete post");
+          toast.error("Failed to delete post");
         }
       },
       title: "Delete Post",
@@ -111,7 +112,7 @@ export default function PostDetailPage() {
           loadPost();
         } catch (error) {
           console.error("Failed to publish post:", error);
-          alert("Failed to publish post");
+          toast.error("Failed to publish post");
         }
       },
       title: "Publish Now",
@@ -127,7 +128,7 @@ export default function PostDetailPage() {
       loadPost();
     } catch (error) {
       console.error("Failed to retry post:", error);
-      alert("Failed to retry post");
+      toast.error("Failed to retry post");
     }
   };
 

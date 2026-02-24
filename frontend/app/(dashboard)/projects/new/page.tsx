@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, ProjectCreateRequest, parseApiError } from "@/lib/api";
+import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,12 +51,12 @@ export default function NewProjectPage() {
     e.preventDefault();
 
     if (!formData.name.trim()) {
-      alert("Please enter a project name");
+      toast.error("Please enter a project name");
       return;
     }
 
     if (!formData.slug || formData.slug.length < 3) {
-      alert("Slug must be at least 3 characters");
+      toast.error("Slug must be at least 3 characters");
       return;
     }
 
@@ -71,7 +72,7 @@ export default function NewProjectPage() {
       router.push(`/projects/${project.id}/settings`);
     } catch (err) {
       const error = parseApiError(err);
-      alert(error.message);
+      toast.error(error.message);
     } finally {
       setIsLoading(false);
     }

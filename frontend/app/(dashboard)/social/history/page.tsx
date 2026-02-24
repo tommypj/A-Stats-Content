@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { PostListItem } from "@/components/social/post-list-item";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,7 +68,7 @@ export default function SocialHistoryPage() {
           loadPosts();
         } catch (error) {
           console.error("Failed to delete post:", error);
-          alert("Failed to delete post");
+          toast.error("Failed to delete post");
         }
       },
       title: "Delete Post",
@@ -81,7 +82,7 @@ export default function SocialHistoryPage() {
       loadPosts();
     } catch (error) {
       console.error("Failed to retry post:", error);
-      alert("Failed to retry post");
+      toast.error("Failed to retry post");
     }
   };
 
@@ -98,7 +99,7 @@ export default function SocialHistoryPage() {
           loadPosts();
         } catch (error) {
           console.error("Failed to delete posts:", error);
-          alert("Failed to delete some posts");
+          toast.error("Failed to delete some posts");
         }
       },
       title: `Delete ${count} Post${count !== 1 ? "s" : ""}`,

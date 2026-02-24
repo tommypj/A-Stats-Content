@@ -56,9 +56,18 @@ router = APIRouter(prefix="/social", tags=["Social Media"])
 
 # OAuth state TTL (10 minutes)
 _OAUTH_STATE_TTL = 600
+_OAUTH_MAX_STATES = 1000  # Max in-memory entries before pruning
 
 # In-memory fallback for OAuth state (used only when Redis is unavailable)
 _oauth_states: dict[str, dict] = {}
+
+
+def _prune_expired_states() -> None:
+    """Remove expired entries from the in-memory state dict."""
+    now = time.time()
+    expired = [k for k, v in _oauth_states.items() if now - v["created_at"] > _OAUTH_STATE_TTL]
+    for k in expired:
+        del _oauth_states[k]
 
 
 async def _store_oauth_state(state: str, user_id: str) -> None:
@@ -74,7 +83,13 @@ async def _store_oauth_state(state: str, user_id: str) -> None:
         await r.setex(f"oauth_state:{state}", _OAUTH_STATE_TTL, data)
         await r.aclose()
     except Exception:
-        # Fallback: in-memory store with manual TTL tracking
+        # Prune expired entries and enforce size cap
+        _prune_expired_states()
+        if len(_oauth_states) >= _OAUTH_MAX_STATES:
+            # Drop oldest entries to make room
+            oldest = sorted(_oauth_states, key=lambda k: _oauth_states[k]["created_at"])
+            for k in oldest[:len(_oauth_states) - _OAUTH_MAX_STATES + 1]:
+                del _oauth_states[k]
         _oauth_states[state] = {"user_id": str(user_id), "created_at": time.time()}
 
 

@@ -396,6 +396,11 @@ async def download_image(url: str) -> bytes:
         async with aiohttp.ClientSession() as session:
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
                 if response.status == 200:
+                    content_type = response.headers.get("content-type", "").lower()
+                    if content_type and "image" not in content_type:
+                        raise RuntimeError(
+                            f"Downloaded content is not an image (content-type: {content_type})"
+                        )
                     image_data = await response.read()
                     logger.info(f"Downloaded image from {url} ({len(image_data)} bytes)")
                     return image_data

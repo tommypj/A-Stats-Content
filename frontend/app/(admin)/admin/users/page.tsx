@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { api, AdminUserDetail, AdminUserQueryParams } from "@/lib/api";
+import { toast } from "sonner";
 import { UserTable } from "@/components/admin/user-table";
 import { UserEditModal } from "@/components/admin/user-edit-modal";
 import { SuspendUserModal } from "@/components/admin/suspend-user-modal";
@@ -101,7 +102,7 @@ export default function AdminUsersPage() {
       await fetchUsers();
     } catch (err) {
       const apiError = parseApiError(err);
-      alert(`Failed to unsuspend user: ${apiError.message}`);
+      toast.error(`Failed to unsuspend user: ${apiError.message}`);
     }
   };
 
