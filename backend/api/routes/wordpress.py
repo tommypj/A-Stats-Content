@@ -455,11 +455,20 @@ async def publish_to_wordpress(
     """
     Publish an article to WordPress.
     """
-    # Get the article first to determine its project
+    # Require an active project — WordPress credentials are project-scoped
+    if not current_user.current_project_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active project selected. Please select a project first.",
+        )
+
+    # Fetch the article, enforcing both ownership and project membership so a
+    # user cannot publish an article that belongs to a different project.
     result = await db.execute(
         select(Article).where(
             Article.id == request.article_id,
             Article.user_id == current_user.id,
+            Article.project_id == current_user.current_project_id,
         )
     )
     article = result.scalar_one_or_none()
@@ -476,15 +485,9 @@ async def publish_to_wordpress(
             detail="Article has no content to publish",
         )
 
-    # Get WordPress credentials from the article's project
-    article_project_id = getattr(article, 'project_id', None) or current_user.current_project_id
-    if not article_project_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No WordPress connection configured",
-        )
+    # Get WordPress credentials from the current project (already verified above)
     proj_result = await db.execute(
-        select(Project).where(Project.id == article_project_id)
+        select(Project).where(Project.id == current_user.current_project_id)
     )
     article_project = proj_result.scalar_one_or_none()
     wp_creds = get_wp_credentials(article_project) if article_project else None
@@ -782,11 +785,13 @@ async def upload_media_to_wordpress(
             detail="No WordPress connection configured",
         )
 
-    # Get the image
+    # Get the image, also verifying it belongs to the current project so a user
+    # cannot upload images from a different project's context.
     result = await db.execute(
         select(GeneratedImage).where(
             GeneratedImage.id == request.image_id,
             GeneratedImage.user_id == current_user.id,
+            GeneratedImage.project_id == current_user.current_project_id,
         )
     )
     image = result.scalar_one_or_none()

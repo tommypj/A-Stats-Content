@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -139,8 +140,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Rate limiting
+# Rate limiting — wire the slowapi limiter so that:
+# 1. app.state.limiter is set (required by SlowAPIMiddleware and @limiter.limit decorators)
+# 2. SlowAPIMiddleware intercepts every request and applies the default 100/minute
+#    global limit; per-endpoint @limiter.limit decorators override this automatically
+# 3. The RateLimitExceeded exception handler returns a proper 429 response
 app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 

@@ -2,7 +2,9 @@
 Knowledge Vault API routes for document upload and RAG queries.
 """
 
+import logging
 import math
+import os
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -18,7 +20,7 @@ from fastapi import (
     Form,
     File,
 )
-from sqlalchemy import select, func, and_, desc, or_
+from sqlalchemy import select, func, and_, desc, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.schemas.knowledge import (
@@ -36,26 +38,120 @@ from api.schemas.knowledge import (
 from api.routes.auth import get_current_user
 from api.utils import escape_like
 from infrastructure.database.connection import get_db
-from infrastructure.database.models import KnowledgeSource, KnowledgeQuery, User, SourceStatus
+from infrastructure.database.models import KnowledgeSource, KnowledgeChunk, KnowledgeQuery, User, SourceStatus
+from services import knowledge_processor as kp
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
 # File upload limits and allowed types
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
-ALLOWED_FILE_TYPES = {
-    "application/pdf": "pdf",
-    "text/plain": "txt",
-    "text/markdown": "md",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
-    "text/html": "html",
-}
-ALLOWED_EXTENSIONS = {"pdf", "txt", "md", "docx", "html"}
+ALLOWED_EXTENSIONS = {"pdf", "txt", "md", "docx", "html", "csv", "json"}
 
 
 def get_file_extension(filename: str) -> str:
     """Extract file extension from filename."""
     return filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
 
+
+def _build_ownership_filter(current_user: User):
+    """Return the appropriate SQLAlchemy filter for ownership."""
+    if current_user.current_project_id:
+        return KnowledgeSource.project_id == current_user.current_project_id
+    return and_(
+        KnowledgeSource.user_id == current_user.id,
+        KnowledgeSource.project_id.is_(None),
+    )
+
+
+async def _process_document(
+    db: AsyncSession,
+    source: KnowledgeSource,
+    file_content: bytes,
+) -> None:
+    """
+    Extract text from *file_content*, split into chunks, persist chunks,
+    and update the source record with the final status.
+
+    This runs synchronously in the request handler — it is fast enough for
+    files up to 10 MB without a background worker.
+    """
+    now = datetime.now(timezone.utc)
+    source.status = SourceStatus.PROCESSING.value
+    source.processing_started_at = now
+    source.error_message = None
+    await db.commit()
+
+    try:
+        # 1. Extract text
+        text, fully_extracted = kp.extract_text(file_content, source.file_type)
+
+        if not text.strip():
+            if not fully_extracted:
+                source.status = SourceStatus.FAILED.value
+                source.error_message = (
+                    "Could not extract text from this file. "
+                    "The required library may not be installed."
+                )
+            else:
+                source.status = SourceStatus.FAILED.value
+                source.error_message = "The file appears to be empty or contains no extractable text."
+            await db.commit()
+            return
+
+        # 2. Split into chunks
+        chunks = kp.split_into_chunks(text)
+        if not chunks:
+            source.status = SourceStatus.FAILED.value
+            source.error_message = "No text chunks could be created from this document."
+            await db.commit()
+            return
+
+        # 3. Delete any existing chunks for this source (reprocess scenario)
+        await db.execute(
+            delete(KnowledgeChunk).where(KnowledgeChunk.source_id == source.id)
+        )
+
+        # 4. Persist new chunks
+        chunk_objects = []
+        for idx, chunk_text in enumerate(chunks):
+            chunk_objects.append(
+                KnowledgeChunk(
+                    id=str(uuid4()),
+                    source_id=source.id,
+                    chunk_index=idx,
+                    content=chunk_text,
+                    char_count=len(chunk_text),
+                    created_at=now,
+                )
+            )
+        db.add_all(chunk_objects)
+
+        # 5. Update source metadata
+        source.chunk_count = len(chunks)
+        source.char_count = len(text)
+        source.status = SourceStatus.COMPLETED.value
+        source.processing_completed_at = datetime.now(timezone.utc)
+
+        await db.commit()
+        logger.info(
+            "Processed knowledge source %s: %d chunks, %d chars",
+            source.id,
+            source.chunk_count,
+            source.char_count,
+        )
+
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.exception("Failed to process knowledge source %s", source.id)
+        source.status = SourceStatus.FAILED.value
+        source.error_message = f"Processing error: {str(exc)}"
+        await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Upload
+# ---------------------------------------------------------------------------
 
 @router.post("/upload", response_model=SourceUploadResponse)
 async def upload_document(
@@ -69,25 +165,26 @@ async def upload_document(
     """
     Upload a document to the knowledge vault.
 
-    Accepts PDF, TXT, MD, DOCX, and HTML files up to 10MB.
-    Files are queued for background processing and chunking.
+    Accepts PDF, TXT, MD, DOCX, HTML, CSV and JSON files up to 10 MB.
+    Text is extracted and chunked synchronously; the source is marked
+    COMPLETED (or FAILED) before the response is returned.
     """
-    # Validate file type
-    file_ext = get_file_extension(file.filename)
+    # Validate extension
+    file_ext = get_file_extension(file.filename or "")
     if file_ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}",
+            detail=f"Unsupported file type. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
         )
 
-    # Read file content to check size
+    # Read and validate size
     file_content = await file.read()
     file_size = len(file_content)
 
     if file_size > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File too large. Maximum size: {MAX_FILE_SIZE / 1024 / 1024}MB",
+            detail=f"File too large. Maximum size: {MAX_FILE_SIZE / 1024 / 1024:.0f} MB",
         )
 
     if file_size == 0:
@@ -96,20 +193,29 @@ async def upload_document(
             detail="File is empty",
         )
 
-    # TODO: Check user's storage limits (implement in future)
-    # For now, we'll allow uploads
-
     # Parse tags
     tag_list = []
     if tags:
         tag_list = [tag.strip() for tag in tags.split(",") if tag.strip()]
 
-    # Generate title if not provided
+    # Default title from filename
     if not title:
-        title = file.filename.rsplit(".", 1)[0]  # Remove extension
+        title = (file.filename or "untitled").rsplit(".", 1)[0]
 
-    # Create KnowledgeSource record
+    # Persist file to disk
     source_id = str(uuid4())
+    file_path = kp.get_file_path(source_id, file.filename or f"file.{file_ext}")
+    try:
+        with open(file_path, "wb") as fh:
+            fh.write(file_content)
+    except OSError as exc:
+        logger.error("Failed to save uploaded file: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save file to storage",
+        ) from exc
+
+    # Create DB record
     source = KnowledgeSource(
         id=source_id,
         user_id=current_user.id,
@@ -118,27 +224,20 @@ async def upload_document(
         filename=file.filename,
         file_type=file_ext,
         file_size=file_size,
-        file_url=None,  # TODO: Save to storage and set URL
+        file_url=str(file_path),
         status=SourceStatus.PENDING.value,
         description=description,
         tags=tag_list if tag_list else None,
         chunk_count=0,
         char_count=0,
     )
-
     db.add(source)
     await db.commit()
     await db.refresh(source)
 
-    # TODO: Queue background processing task
-    # For now, we'll just return the pending status
-    # In the future, this will trigger:
-    # 1. Save file to storage (S3 or local)
-    # 2. Extract text from file
-    # 3. Chunk the text
-    # 4. Generate embeddings
-    # 5. Store in ChromaDB
-    # 6. Update source status to COMPLETED
+    # Process the document immediately
+    await _process_document(db, source, file_content)
+    await db.refresh(source)
 
     return SourceUploadResponse(
         id=source.id,
@@ -147,9 +246,17 @@ async def upload_document(
         file_type=source.file_type,
         file_size=source.file_size,
         status=source.status,
-        message="Document uploaded successfully. Processing will begin shortly.",
+        message=(
+            "Document processed successfully."
+            if source.status == SourceStatus.COMPLETED.value
+            else f"Document uploaded but processing failed: {source.error_message}"
+        ),
     )
 
+
+# ---------------------------------------------------------------------------
+# List sources
+# ---------------------------------------------------------------------------
 
 @router.get("/sources", response_model=KnowledgeSourceListResponse)
 async def list_sources(
@@ -163,29 +270,13 @@ async def list_sources(
 ):
     """
     List user's knowledge sources with pagination and filtering.
-
-    Supports filtering by:
-    - status: pending, processing, completed, failed
-    - search: search in title, filename, description
-    - file_type: pdf, txt, md, docx, html
     """
-    if current_user.current_project_id:
-        query = select(KnowledgeSource).where(
-            KnowledgeSource.project_id == current_user.current_project_id
-        )
-    else:
-        query = select(KnowledgeSource).where(
-            KnowledgeSource.user_id == current_user.id,
-            KnowledgeSource.project_id.is_(None),
-        )
+    query = select(KnowledgeSource).where(_build_ownership_filter(current_user))
 
-    # Apply filters
     if status:
         query = query.where(KnowledgeSource.status == status)
-
     if file_type:
         query = query.where(KnowledgeSource.file_type == file_type)
-
     if search:
         search_pattern = f"%{escape_like(search)}%"
         query = query.where(
@@ -194,39 +285,36 @@ async def list_sources(
             | (KnowledgeSource.description.ilike(search_pattern))
         )
 
-    # Get total count
     count_query = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_query)).scalar() or 0
 
-    # Apply pagination and ordering
     query = query.order_by(desc(KnowledgeSource.created_at))
     query = query.offset((page - 1) * page_size).limit(page_size)
 
     result = await db.execute(query)
     sources = result.scalars().all()
 
-    # Convert tags from JSON to list
-    items = []
-    for source in sources:
-        source_dict = {
-            "id": source.id,
-            "title": source.title,
-            "filename": source.filename,
-            "file_type": source.file_type,
-            "file_size": source.file_size,
-            "file_url": source.file_url,
-            "status": source.status,
-            "chunk_count": source.chunk_count,
-            "char_count": source.char_count,
-            "description": source.description,
-            "tags": source.tags if source.tags else [],
-            "error_message": source.error_message,
-            "processing_started_at": source.processing_started_at,
-            "processing_completed_at": source.processing_completed_at,
-            "created_at": source.created_at,
-            "updated_at": source.updated_at,
-        }
-        items.append(KnowledgeSourceResponse(**source_dict))
+    items = [
+        KnowledgeSourceResponse(
+            id=s.id,
+            title=s.title,
+            filename=s.filename,
+            file_type=s.file_type,
+            file_size=s.file_size,
+            file_url=s.file_url,
+            status=s.status,
+            chunk_count=s.chunk_count,
+            char_count=s.char_count,
+            description=s.description,
+            tags=s.tags if s.tags else [],
+            error_message=s.error_message,
+            processing_started_at=s.processing_started_at,
+            processing_completed_at=s.processing_completed_at,
+            created_at=s.created_at,
+            updated_at=s.updated_at,
+        )
+        for s in sources
+    ]
 
     return KnowledgeSourceListResponse(
         items=items,
@@ -237,37 +325,27 @@ async def list_sources(
     )
 
 
+# ---------------------------------------------------------------------------
+# Get single source
+# ---------------------------------------------------------------------------
+
 @router.get("/sources/{source_id}", response_model=KnowledgeSourceResponse)
 async def get_source(
     source_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Get details of a specific knowledge source.
-    """
-    if current_user.current_project_id:
-        ownership_filter = KnowledgeSource.project_id == current_user.current_project_id
-    else:
-        ownership_filter = and_(
-            KnowledgeSource.user_id == current_user.id,
-            KnowledgeSource.project_id.is_(None),
-        )
+    """Get details of a specific knowledge source."""
     result = await db.execute(
         select(KnowledgeSource).where(
             KnowledgeSource.id == source_id,
-            ownership_filter,
+            _build_ownership_filter(current_user),
         )
     )
     source = result.scalar_one_or_none()
-
     if not source:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Knowledge source not found",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge source not found")
 
-    # Convert to response model
     return KnowledgeSourceResponse(
         id=source.id,
         title=source.title,
@@ -288,6 +366,10 @@ async def get_source(
     )
 
 
+# ---------------------------------------------------------------------------
+# Update source metadata
+# ---------------------------------------------------------------------------
+
 @router.put("/sources/{source_id}", response_model=KnowledgeSourceResponse)
 async def update_source(
     source_id: str,
@@ -295,33 +377,18 @@ async def update_source(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Update knowledge source metadata (title, description, tags).
-    """
-    if current_user.current_project_id:
-        ownership_filter = KnowledgeSource.project_id == current_user.current_project_id
-    else:
-        ownership_filter = and_(
-            KnowledgeSource.user_id == current_user.id,
-            KnowledgeSource.project_id.is_(None),
-        )
+    """Update knowledge source metadata (title, description, tags)."""
     result = await db.execute(
         select(KnowledgeSource).where(
             KnowledgeSource.id == source_id,
-            ownership_filter,
+            _build_ownership_filter(current_user),
         )
     )
     source = result.scalar_one_or_none()
-
     if not source:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Knowledge source not found",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge source not found")
 
-    # Update fields
-    update_data = request.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
+    for field, value in request.model_dump(exclude_unset=True).items():
         setattr(source, field, value)
 
     await db.commit()
@@ -347,6 +414,10 @@ async def update_source(
     )
 
 
+# ---------------------------------------------------------------------------
+# Delete source
+# ---------------------------------------------------------------------------
+
 @router.delete("/sources/{source_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_source(
     source_id: str,
@@ -354,44 +425,34 @@ async def delete_source(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Delete a knowledge source and its chunks from ChromaDB.
-
-    This will:
-    1. Delete the source record from PostgreSQL
-    2. Delete associated chunks from ChromaDB (TODO)
-    3. Delete the file from storage (TODO)
+    Delete a knowledge source, its on-disk file, and all associated chunks.
     """
-    if current_user.current_project_id:
-        ownership_filter = KnowledgeSource.project_id == current_user.current_project_id
-    else:
-        ownership_filter = and_(
-            KnowledgeSource.user_id == current_user.id,
-            KnowledgeSource.project_id.is_(None),
-        )
     result = await db.execute(
         select(KnowledgeSource).where(
             KnowledgeSource.id == source_id,
-            ownership_filter,
+            _build_ownership_filter(current_user),
         )
     )
     source = result.scalar_one_or_none()
-
     if not source:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Knowledge source not found",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge source not found")
 
-    # TODO: Delete chunks from ChromaDB
-    # await chroma_adapter.delete_source_chunks(source_id)
+    # Delete chunks (cascade handles this, but be explicit)
+    await db.execute(
+        delete(KnowledgeChunk).where(KnowledgeChunk.source_id == source_id)
+    )
 
-    # TODO: Delete file from storage
-    # if source.file_url:
-    #     await storage_adapter.delete_file(source.file_url)
+    # Delete on-disk file
+    if source.file_url:
+        kp.delete_file(source.file_url)
 
     await db.delete(source)
     await db.commit()
 
+
+# ---------------------------------------------------------------------------
+# Query
+# ---------------------------------------------------------------------------
 
 @router.post("/query", response_model=QueryResponse)
 async def query_knowledge(
@@ -400,40 +461,24 @@ async def query_knowledge(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Query the knowledge vault using RAG (Retrieval-Augmented Generation).
+    Query the knowledge vault using keyword-based search.
 
-    Process:
-    1. Generate embedding for the query
-    2. Search ChromaDB for similar chunks
-    3. Build context from retrieved chunks
-    4. Call Anthropic API to generate answer
-    5. Log query for analytics
-    6. Return answer with source citations
+    Splits the query into words, scores every stored chunk, and returns
+    the top matching passages together with a synthesised answer text.
     """
     start_time = time.time()
 
-    # TODO: Implement RAG query flow
-    # For now, return a placeholder response
+    ownership_filter = _build_ownership_filter(current_user)
 
-    # Build ownership filter based on project context
-    if current_user.current_project_id:
-        base_ownership_filter = KnowledgeSource.project_id == current_user.current_project_id
-    else:
-        base_ownership_filter = and_(
-            KnowledgeSource.user_id == current_user.id,
-            KnowledgeSource.project_id.is_(None),
-        )
-
-    # Validate that user has completed sources
+    # Determine which sources to search
     if request.source_ids:
-        # Check that specified sources exist and are completed
-        result = await db.execute(
+        src_result = await db.execute(
             select(KnowledgeSource).where(
                 KnowledgeSource.id.in_(request.source_ids),
-                base_ownership_filter,
+                ownership_filter,
             )
         )
-        sources = result.scalars().all()
+        sources = src_result.scalars().all()
 
         if len(sources) != len(request.source_ids):
             raise HTTPException(
@@ -441,7 +486,6 @@ async def query_knowledge(
                 detail="One or more specified sources not found",
             )
 
-        # Check if any sources are not completed
         incomplete = [s for s in sources if s.status != SourceStatus.COMPLETED.value]
         if incomplete:
             raise HTTPException(
@@ -449,14 +493,13 @@ async def query_knowledge(
                 detail=f"Some sources are not yet processed: {[s.title for s in incomplete]}",
             )
     else:
-        # Query all completed sources
-        result = await db.execute(
+        src_result = await db.execute(
             select(KnowledgeSource).where(
-                base_ownership_filter,
+                ownership_filter,
                 KnowledgeSource.status == SourceStatus.COMPLETED.value,
             )
         )
-        sources = result.scalars().all()
+        sources = src_result.scalars().all()
 
         if not sources:
             raise HTTPException(
@@ -464,37 +507,48 @@ async def query_knowledge(
                 detail="No completed knowledge sources found. Please upload and process documents first.",
             )
 
-    # TODO: Implement actual RAG flow
-    # 1. Generate query embedding using Anthropic or OpenAI
-    # 2. Search ChromaDB for top-k similar chunks
-    # 3. Build context from chunks
-    # 4. Create prompt with context and query
-    # 5. Call Anthropic API to generate answer
-    # 6. Extract source citations
+    # Fetch all chunks for the relevant sources
+    source_ids = [s.id for s in sources]
+    source_title_map = {s.id: s.title for s in sources}
 
-    # Placeholder response
-    query_time_ms = int((time.time() - start_time) * 1000)
-
-    # Create placeholder answer
-    answer = (
-        "RAG query implementation is pending. This endpoint will retrieve relevant "
-        "chunks from your knowledge sources and use Anthropic Claude to generate "
-        "a comprehensive answer based on your documents."
+    chunks_result = await db.execute(
+        select(KnowledgeChunk).where(KnowledgeChunk.source_id.in_(source_ids))
     )
+    all_chunks = chunks_result.scalars().all()
 
-    # Create placeholder sources
+    if not all_chunks:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Knowledge sources have no indexed chunks. Try reprocessing them.",
+        )
+
+    # Build search tuples: (chunk_id, source_id, source_title, chunk_index, content)
+    chunk_tuples = [
+        (c.id, c.source_id, source_title_map[c.source_id], c.chunk_index, c.content)
+        for c in all_chunks
+    ]
+
+    # Run keyword search
+    top_chunks = kp.search_chunks(chunk_tuples, request.query, top_k=request.max_results)
+    answer = kp.build_answer(request.query, top_chunks)
+
+    # Build source snippets
     source_snippets = []
     if request.include_sources:
-        for source in sources[:request.max_results]:
+        for chunk in top_chunks:
+            # Normalise score to [0, 1] range for the response
+            normalised_score = min(chunk["score"] / 10.0, 1.0)
             source_snippets.append(
                 SourceSnippet(
-                    source_id=source.id,
-                    source_title=source.title,
-                    content="[Placeholder chunk content]",
-                    relevance_score=0.95,
-                    chunk_index=0,
+                    source_id=chunk["source_id"],
+                    source_title=chunk["source_title"],
+                    content=chunk["content"][:600],
+                    relevance_score=round(normalised_score, 4),
+                    chunk_index=chunk["chunk_index"],
                 )
             )
+
+    query_time_ms = int((time.time() - start_time) * 1000)
 
     # Log the query
     query_log = KnowledgeQuery(
@@ -514,7 +568,6 @@ async def query_knowledge(
         chunks_retrieved=len(source_snippets),
         success=True,
     )
-
     db.add(query_log)
     await db.commit()
 
@@ -527,37 +580,25 @@ async def query_knowledge(
     )
 
 
+# ---------------------------------------------------------------------------
+# Stats
+# ---------------------------------------------------------------------------
+
 @router.get("/stats", response_model=KnowledgeStatsResponse)
 async def get_knowledge_stats(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Get knowledge vault statistics for the current user.
+    """Get knowledge vault statistics for the current user/project."""
+    ownership_filter = _build_ownership_filter(current_user)
 
-    Includes:
-    - Total sources, chunks, and characters
-    - Storage used in MB
-    - Query statistics
-    - Breakdown by file type
-    """
-    # Build ownership filter based on project context
-    if current_user.current_project_id:
-        stats_ownership_filter = KnowledgeSource.project_id == current_user.current_project_id
-    else:
-        stats_ownership_filter = and_(
-            KnowledgeSource.user_id == current_user.id,
-            KnowledgeSource.project_id.is_(None),
-        )
-
-    # Get source statistics
     source_stats = await db.execute(
         select(
             func.count(KnowledgeSource.id).label("total_sources"),
             func.sum(KnowledgeSource.chunk_count).label("total_chunks"),
             func.sum(KnowledgeSource.char_count).label("total_characters"),
             func.sum(KnowledgeSource.file_size).label("total_bytes"),
-        ).where(stats_ownership_filter)
+        ).where(ownership_filter)
     )
     stats = source_stats.first()
 
@@ -567,18 +608,16 @@ async def get_knowledge_stats(
     total_bytes = stats.total_bytes or 0
     storage_used_mb = round(total_bytes / (1024 * 1024), 2)
 
-    # Get sources by type
     type_stats = await db.execute(
         select(
             KnowledgeSource.file_type,
             func.count(KnowledgeSource.id).label("count"),
         )
-        .where(stats_ownership_filter)
+        .where(ownership_filter)
         .group_by(KnowledgeSource.file_type)
     )
     sources_by_type = {row.file_type: row.count for row in type_stats}
 
-    # Get query statistics
     total_queries_result = await db.execute(
         select(func.count(KnowledgeQuery.id)).where(
             KnowledgeQuery.user_id == current_user.id
@@ -586,7 +625,6 @@ async def get_knowledge_stats(
     )
     total_queries = total_queries_result.scalar() or 0
 
-    # Get recent queries (last 30 days)
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     recent_queries_result = await db.execute(
         select(func.count(KnowledgeQuery.id)).where(
@@ -598,7 +636,6 @@ async def get_knowledge_stats(
     )
     recent_queries = recent_queries_result.scalar() or 0
 
-    # Get average query time
     avg_time_result = await db.execute(
         select(func.avg(KnowledgeQuery.query_time_ms)).where(
             KnowledgeQuery.user_id == current_user.id
@@ -618,6 +655,10 @@ async def get_knowledge_stats(
     )
 
 
+# ---------------------------------------------------------------------------
+# Reprocess
+# ---------------------------------------------------------------------------
+
 @router.post("/sources/{source_id}/reprocess", response_model=ReprocessResponse)
 async def reprocess_source(
     source_id: str,
@@ -626,34 +667,20 @@ async def reprocess_source(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Reprocess a knowledge source.
+    Re-extract text and re-chunk a knowledge source.
 
-    Useful for:
-    - Retrying failed processing
-    - Forcing reprocessing with updated algorithms
+    Use *force=true* to reprocess sources that are already in COMPLETED status.
     """
-    if current_user.current_project_id:
-        reprocess_ownership_filter = KnowledgeSource.project_id == current_user.current_project_id
-    else:
-        reprocess_ownership_filter = and_(
-            KnowledgeSource.user_id == current_user.id,
-            KnowledgeSource.project_id.is_(None),
-        )
     result = await db.execute(
         select(KnowledgeSource).where(
             KnowledgeSource.id == source_id,
-            reprocess_ownership_filter,
+            _build_ownership_filter(current_user),
         )
     )
     source = result.scalar_one_or_none()
-
     if not source:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Knowledge source not found",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge source not found")
 
-    # Check if reprocessing is needed
     if source.status == SourceStatus.COMPLETED.value and not request.force:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -666,19 +693,26 @@ async def reprocess_source(
             detail="Source is currently being processed. Please wait.",
         )
 
-    # Reset source status
-    source.status = SourceStatus.PENDING.value
-    source.error_message = None
-    source.processing_started_at = None
-    source.processing_completed_at = None
+    # File must still exist on disk
+    if not source.file_url or not os.path.exists(source.file_url):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Original file is no longer available on disk. Please re-upload the document.",
+        )
 
-    await db.commit()
+    # Read the stored file and reprocess
+    with open(source.file_url, "rb") as fh:
+        file_content = fh.read()
 
-    # TODO: Queue background processing task
-    # For now, just update status
+    await _process_document(db, source, file_content)
+    await db.refresh(source)
 
     return ReprocessResponse(
         source_id=source.id,
         status=source.status,
-        message="Source queued for reprocessing",
+        message=(
+            "Source reprocessed successfully."
+            if source.status == SourceStatus.COMPLETED.value
+            else f"Reprocessing failed: {source.error_message}"
+        ),
     )
