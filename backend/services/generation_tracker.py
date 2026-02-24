@@ -223,13 +223,18 @@ class GenerationTracker:
         reset_date = user.usage_reset_date
 
         # If no reset date is set, initialise it to the first of next month
+        # and reset counters since we have no record of when they were last reset.
         if reset_date is None:
+            user.articles_generated_this_month = 0
+            user.outlines_generated_this_month = 0
+            user.images_generated_this_month = 0
             if now.month == 12:
                 user.usage_reset_date = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc)
             else:
                 user.usage_reset_date = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc)
             await self.db.flush()
-            return False
+            logger.info("Initialized usage reset date and reset counters for user %s", user.id)
+            return True
 
         # Ensure timezone-aware comparison
         if reset_date.tzinfo is None:

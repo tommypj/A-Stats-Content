@@ -17,7 +17,7 @@ except ImportError:
     REDIS_AVAILABLE = False
     redis = None
 
-from infrastructure.config import settings
+from infrastructure.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
