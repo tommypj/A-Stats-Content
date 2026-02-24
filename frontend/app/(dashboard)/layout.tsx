@@ -36,7 +36,7 @@ import {
   Keyboard,
 } from "lucide-react";
 import { clsx } from "clsx";
-import { ProjectProvider } from "@/contexts/ProjectContext";
+import { ProjectProvider, useProject } from "@/contexts/ProjectContext";
 import { ProjectSwitcher } from "@/components/project/project-switcher";
 import { api, UserResponse, GenerationNotification } from "@/lib/api";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -269,6 +269,7 @@ function NotificationBell() {
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { currentProject } = useProject();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set(["Social", "Analytics", "Projects"]));
@@ -466,11 +467,15 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                     {/* Connections */}
                     <div>
                       <p className="px-3 text-[10px] font-semibold uppercase tracking-wider text-primary-400 mb-2">
-                        Connections
+                        Project Integrations
                       </p>
                       <div className="flex gap-2 px-3">
                         <Link
-                          href="/analytics"
+                          href={
+                            currentProject
+                              ? `/projects/${currentProject.id}/settings`
+                              : "/projects"
+                          }
                           onClick={() => setUserMenuOpen(false)}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-800 border border-primary-700 text-xs font-medium text-cream-200 hover:bg-primary-700 transition-colors"
                         >
@@ -478,7 +483,11 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                           GSC
                         </Link>
                         <Link
-                          href="/settings"
+                          href={
+                            currentProject
+                              ? `/projects/${currentProject.id}/settings`
+                              : "/projects"
+                          }
                           onClick={() => setUserMenuOpen(false)}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-800 border border-primary-700 text-xs font-medium text-cream-200 hover:bg-primary-700 transition-colors"
                         >

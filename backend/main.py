@@ -21,6 +21,7 @@ from api.routes import api_router
 from api.middleware.rate_limit import limiter
 from services.social_scheduler import scheduler_service
 from services.post_queue import post_queue
+from services.task_queue import task_queue
 
 settings = get_settings()
 
@@ -87,12 +88,29 @@ async def lifespan(app: FastAPI):
     logger.info("Starting social media scheduler...")
     scheduler_task = asyncio.create_task(scheduler_service.start())
 
+    # Start periodic task-queue cleanup (runs every 30 minutes, removes tasks >1h old)
+    async def _task_queue_cleanup_loop():
+        while True:
+            await asyncio.sleep(1800)  # 30 minutes
+            removed = task_queue.cleanup_old(max_age_seconds=3600)
+            if removed:
+                logger.info("task_queue cleanup: removed %d old tasks", removed)
+
+    cleanup_task = asyncio.create_task(_task_queue_cleanup_loop(), name="tq-cleanup")
+
     logger.info("Application started successfully!")
 
     yield
 
     # Shutdown
     logger.info("Shutting down...")
+
+    # Stop task-queue cleanup loop
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
 
     # Stop scheduler
     logger.info("Stopping social media scheduler...")

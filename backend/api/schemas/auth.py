@@ -142,3 +142,9 @@ class ResendVerificationRequest(BaseModel):
     """Resend verification email request schema."""
 
     email: EmailStr
+
+
+class DeleteAccountRequest(BaseModel):
+    """Account deletion request schema."""
+
+    confirmation: str = Field(..., description="Must equal 'DELETE MY ACCOUNT' to confirm")

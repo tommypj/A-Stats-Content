@@ -110,6 +110,7 @@ function GenerateImageContent() {
 
     try {
       const selectedSize = IMAGE_SIZES.find(s => s.value === size);
+      // Endpoint returns 202 immediately with status="generating"
       const image = await api.images.generate({
         prompt: prompt.trim(),
         style,
@@ -120,10 +121,8 @@ function GenerateImageContent() {
 
       setGeneratedImage(image);
 
-      // Poll for completion if status is generating
-      if (image.status === "generating") {
-        pollImageStatus(image.id);
-      }
+      // The image is always enqueued as a background task; start polling
+      pollImageStatus(image.id);
     } catch (err) {
       setError("Failed to generate image. Please try again.");
       console.error(err);
