@@ -180,6 +180,9 @@ class GenerationTracker:
                 if not user:
                     return False
 
+                # Reset monthly counters if we've crossed into a new month
+                await self._reset_user_usage_if_needed(user)
+
                 # Get plan limits
                 from core.plans import PLANS
                 plan = PLANS.get(user.subscription_tier or "free", PLANS["free"])
@@ -210,6 +213,42 @@ class GenerationTracker:
         except Exception as e:
             logger.error("Failed to check project usage limit: %s", str(e))
             return False  # fail closed — deny generation when limits can't be verified
+
+    async def _reset_user_usage_if_needed(self, user) -> bool:
+        """Reset user-level monthly usage counters if the billing period has elapsed.
+
+        Returns True if a reset was performed.
+        """
+        now = datetime.now(timezone.utc)
+        reset_date = user.usage_reset_date
+
+        # If no reset date is set, initialise it to the first of next month
+        if reset_date is None:
+            if now.month == 12:
+                user.usage_reset_date = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc)
+            else:
+                user.usage_reset_date = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc)
+            await self.db.flush()
+            return False
+
+        # Ensure timezone-aware comparison
+        if reset_date.tzinfo is None:
+            reset_date = reset_date.replace(tzinfo=timezone.utc)
+
+        if now >= reset_date:
+            user.articles_generated_this_month = 0
+            user.outlines_generated_this_month = 0
+            user.images_generated_this_month = 0
+            # Set next reset to the first of the month after the current date
+            if now.month == 12:
+                user.usage_reset_date = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc)
+            else:
+                user.usage_reset_date = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc)
+            await self.db.flush()
+            logger.info("Reset monthly usage counters for user %s", user.id)
+            return True
+
+        return False
 
     async def _get_limit(
         self,
