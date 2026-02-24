@@ -429,6 +429,17 @@ export const api = {
       apiRequest<LinkSuggestionsResponse>({
         url: `/articles/${articleId}/link-suggestions`,
       }),
+    healthSummary: () =>
+      apiRequest<ContentHealthSummary>({
+        url: "/articles/health-summary",
+      }),
+    keywordSuggestions: (seedKeyword: string, count: number = 10) =>
+      apiRequest<KeywordSuggestionsResponse>({
+        method: "POST",
+        url: "/articles/keyword-suggestions",
+        data: { seed_keyword: seedKeyword, count },
+        timeout: AI_TIMEOUT,
+      }),
   },
 
   // Images
@@ -1213,6 +1224,36 @@ export interface ArticleListResponse {
   page: number;
   page_size: number;
   pages: number;
+}
+
+export interface ContentHealthArticle {
+  id: string;
+  title: string;
+  seo_score?: number;
+  keyword: string;
+}
+
+export interface ContentHealthSummary {
+  total_articles: number;
+  avg_seo_score: number | null;
+  excellent_count: number;
+  good_count: number;
+  needs_work_count: number;
+  no_score_count: number;
+  needs_work: ContentHealthArticle[];
+  no_score: ContentHealthArticle[];
+}
+
+export interface KeywordSuggestion {
+  keyword: string;
+  intent: "informational" | "commercial" | "transactional" | "navigational";
+  difficulty: "low" | "medium" | "high";
+  content_angle: string;
+}
+
+export interface KeywordSuggestionsResponse {
+  seed_keyword: string;
+  suggestions: KeywordSuggestion[];
 }
 
 export interface GeneratedImage {

@@ -41,6 +41,7 @@ const navigation = [
   { name: "Outlines", href: "/outlines", icon: FileText },
   { name: "Articles", href: "/articles", icon: Sparkles },
   { name: "Content Calendar", href: "/content-calendar", icon: Calendar },
+  { name: "Keyword Research", href: "/keyword-research", icon: Search },
   { name: "Images", href: "/images", icon: ImageIcon },
   {
     name: "Social",
