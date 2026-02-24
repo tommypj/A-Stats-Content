@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Plus,
   FileText,
@@ -24,6 +25,7 @@ import {
   X,
 } from "lucide-react";
 import { api, Article } from "@/lib/api";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -60,6 +62,7 @@ function getSeoScoreColor(score: number | undefined) {
 }
 
 export default function ArticlesPage() {
+  const router = useRouter();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -91,6 +94,15 @@ export default function ArticlesPage() {
     limits,
     isAtLimit,
   } = useProject();
+
+  // Ctrl+N / Cmd+N: navigate to new article
+  useKeyboardShortcuts([
+    {
+      key: "n",
+      ctrl: true,
+      handler: () => router.push("/articles/new"),
+    },
+  ]);
 
   // Debounce search keyword — reset to page 1 when keyword changes
   useEffect(() => {
@@ -225,6 +237,30 @@ export default function ArticlesPage() {
     });
   }
 
+  function triggerBlobDownload(blob: Blob, filename: string) {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }
+
+  async function handleExportAllCsv() {
+    try {
+      const response = await api.articles.exportAll("csv");
+      triggerBlobDownload(
+        response.data as Blob,
+        `articles-${new Date().toISOString().slice(0, 10)}.csv`
+      );
+      toast.success("Articles exported as CSV");
+    } catch {
+      toast.error("Failed to export articles");
+    }
+  }
+
   function handleBulkExport() {
     const selected = articles.filter((a) => selectedIds.has(a.id));
     const exportData = selected.map((a) => ({
@@ -338,6 +374,11 @@ export default function ArticlesPage() {
               </button>
             </div>
           )}
+
+          <Button variant="outline" onClick={handleExportAllCsv}>
+            <Download className="h-4 w-4 mr-2" />
+            Export All as CSV
+          </Button>
 
           <Link href="/outlines">
             <Button variant="outline">

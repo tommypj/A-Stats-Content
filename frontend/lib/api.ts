@@ -335,6 +335,16 @@ export const api = {
         url: `/outlines/${id}/regenerate`,
         timeout: AI_TIMEOUT,
       }),
+    exportAll: (format: "csv" = "csv") =>
+      apiClient.get("/outlines/export", {
+        params: { format },
+        responseType: "blob",
+      }),
+    exportOne: (id: string, format: "markdown" | "html" | "csv") =>
+      apiClient.get(`/outlines/${id}/export`, {
+        params: { format },
+        responseType: "blob",
+      }),
   },
 
   // Articles
@@ -439,6 +449,16 @@ export const api = {
         url: "/articles/keyword-suggestions",
         data: { seed_keyword: seedKeyword, count },
         timeout: AI_TIMEOUT,
+      }),
+    exportAll: (format: "csv" = "csv") =>
+      apiClient.get("/articles/export", {
+        params: { format },
+        responseType: "blob",
+      }),
+    exportOne: (id: string, format: "markdown" | "html" | "csv") =>
+      apiClient.get(`/articles/${id}/export`, {
+        params: { format },
+        responseType: "blob",
       }),
   },
 

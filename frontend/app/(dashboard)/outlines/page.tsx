@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { api, Outline } from "@/lib/api";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -61,6 +62,15 @@ export default function OutlinesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string } | null>(null);
+
+  // Ctrl+N / Cmd+N: open create outline modal
+  useKeyboardShortcuts([
+    {
+      key: "n",
+      ctrl: true,
+      handler: () => setShowCreateModal(true),
+    },
+  ]);
 
   // Debounce search input — reset page to 1 when keyword changes
   useEffect(() => {
@@ -188,6 +198,30 @@ export default function OutlinesPage() {
     });
   }
 
+  function triggerBlobDownload(blob: Blob, filename: string) {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }
+
+  async function handleExportAllCsv() {
+    try {
+      const response = await api.outlines.exportAll("csv");
+      triggerBlobDownload(
+        response.data as Blob,
+        `outlines-${new Date().toISOString().slice(0, 10)}.csv`
+      );
+      toast.success("Outlines exported as CSV");
+    } catch {
+      toast.error("Failed to export outlines");
+    }
+  }
+
   function handleBulkExport() {
     const selected = outlines.filter((o) => selectedIds.has(o.id));
     const exportData = selected.map((o) => ({
@@ -235,10 +269,16 @@ export default function OutlinesPage() {
             Create and manage your article outlines
           </p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Outline
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleExportAllCsv}>
+            <Download className="h-4 w-4 mr-2" />
+            Export All as CSV
+          </Button>
+          <Button onClick={() => setShowCreateModal(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Outline
+          </Button>
+        </div>
       </div>
 
       {/* Search & Filter Bar */}

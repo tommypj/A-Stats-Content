@@ -33,11 +33,14 @@ import {
   Bell,
   CheckCircle2,
   XCircle,
+  Keyboard,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { ProjectProvider } from "@/contexts/ProjectContext";
 import { ProjectSwitcher } from "@/components/project/project-switcher";
 import { api, UserResponse, GenerationNotification } from "@/lib/api";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { KeyboardShortcutsDialog } from "@/components/ui/keyboard-shortcuts-dialog";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -270,6 +273,19 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set(["Social", "Analytics", "Projects"]));
   const [user, setUser] = useState<UserResponse | null>(null);
+  const [showShortcutsDialog, setShowShortcutsDialog] = useState(false);
+
+  useKeyboardShortcuts([
+    {
+      key: "/",
+      ctrl: true,
+      handler: () => setShowShortcutsDialog(true),
+    },
+    {
+      key: "?",
+      handler: () => setShowShortcutsDialog(true),
+    },
+  ]);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -575,8 +591,16 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
             <div className="flex-1" />
 
-            {/* Top-right actions: notification bell + user avatar */}
+            {/* Top-right actions: keyboard shortcuts + notification bell + user avatar */}
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowShortcutsDialog(true)}
+                title="Keyboard shortcuts (Ctrl+/)"
+                aria-label="Show keyboard shortcuts"
+                className="p-2 rounded-xl text-text-muted hover:bg-surface-secondary hover:text-text-primary transition-colors"
+              >
+                <Keyboard className="h-5 w-5" />
+              </button>
               <NotificationBell />
 
               <button
@@ -594,6 +618,12 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         {/* Page content */}
         <main className="p-4 lg:p-8">{children}</main>
       </div>
+
+      {/* Global keyboard shortcuts dialog */}
+      <KeyboardShortcutsDialog
+        isOpen={showShortcutsDialog}
+        onClose={() => setShowShortcutsDialog(false)}
+      />
     </div>
   );
 }

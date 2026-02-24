@@ -2,13 +2,18 @@
 Outline API routes.
 """
 
+import csv
+import io
+import json
 import logging
 import math
+import re
 import time
 from typing import Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
+from fastapi.responses import StreamingResponse
 from api.middleware.rate_limit import limiter
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -200,6 +205,174 @@ async def list_outlines(
         page=page,
         page_size=page_size,
         pages=math.ceil(total / page_size) if total > 0 else 0,
+    )
+
+
+@router.get("/export")
+async def export_all_outlines(
+    format: str = Query("csv", pattern="^(csv)$"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Export all outlines for the current project as CSV.
+    """
+    if current_user.current_project_id:
+        query = select(Outline).where(Outline.project_id == current_user.current_project_id)
+    else:
+        query = select(Outline).where(
+            Outline.user_id == current_user.id,
+            Outline.project_id.is_(None),
+        )
+    query = query.order_by(Outline.created_at.desc())
+    result = await db.execute(query)
+    outlines = result.scalars().all()
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["id", "title", "keyword", "status", "tone", "word_count_target", "estimated_read_time", "created_at", "updated_at"])
+    for o in outlines:
+        writer.writerow([
+            o.id,
+            o.title,
+            o.keyword,
+            o.status,
+            o.tone or "",
+            o.word_count_target or 0,
+            o.estimated_read_time or 0,
+            o.created_at.isoformat() if o.created_at else "",
+            o.updated_at.isoformat() if o.updated_at else "",
+        ])
+
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=outlines.csv"},
+    )
+
+
+def _outline_to_markdown(outline) -> str:
+    """Convert an Outline ORM object to a Markdown string."""
+    lines = []
+    lines.append(f"# {outline.title}")
+    lines.append("")
+    if outline.keyword:
+        lines.append(f"**Keyword:** {outline.keyword}")
+    if outline.tone:
+        lines.append(f"**Tone:** {outline.tone}")
+    if outline.target_audience:
+        lines.append(f"**Target Audience:** {outline.target_audience}")
+    if outline.word_count_target:
+        lines.append(f"**Word Count Target:** {outline.word_count_target}")
+    lines.append("")
+
+    for section in (outline.sections or []):
+        heading = section.get("heading", "")
+        lines.append(f"## {heading}")
+        for sub in section.get("subheadings", []):
+            lines.append(f"### {sub}")
+        if section.get("notes"):
+            lines.append("")
+            lines.append(f"*Notes: {section['notes']}*")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def _outline_to_html(outline) -> str:
+    """Convert an Outline ORM object to an HTML string."""
+    parts = []
+    parts.append("<!DOCTYPE html>")
+    parts.append('<html lang="en"><head><meta charset="UTF-8"><title>')
+    parts.append(outline.title or "Outline")
+    parts.append("</title></head><body>")
+    parts.append(f"<h1>{outline.title}</h1>")
+    if outline.keyword:
+        parts.append(f"<p><strong>Keyword:</strong> {outline.keyword}</p>")
+    if outline.tone:
+        parts.append(f"<p><strong>Tone:</strong> {outline.tone}</p>")
+    if outline.target_audience:
+        parts.append(f"<p><strong>Target Audience:</strong> {outline.target_audience}</p>")
+    if outline.word_count_target:
+        parts.append(f"<p><strong>Word Count Target:</strong> {outline.word_count_target}</p>")
+
+    for section in (outline.sections or []):
+        heading = section.get("heading", "")
+        parts.append(f"<h2>{heading}</h2>")
+        for sub in section.get("subheadings", []):
+            parts.append(f"<h3>{sub}</h3>")
+        if section.get("notes"):
+            parts.append(f"<p><em>Notes: {section['notes']}</em></p>")
+
+    parts.append("</body></html>")
+    return "".join(parts)
+
+
+@router.get("/{outline_id}/export")
+async def export_outline(
+    outline_id: str,
+    format: str = Query("markdown", pattern="^(markdown|html|csv)$"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Export a single outline in the requested format (markdown, html, or csv).
+    """
+    if current_user.current_project_id:
+        query = select(Outline).where(
+            Outline.id == outline_id,
+            Outline.project_id == current_user.current_project_id,
+        )
+    else:
+        query = select(Outline).where(
+            Outline.id == outline_id,
+            Outline.user_id == current_user.id,
+        )
+    result = await db.execute(query)
+    outline = result.scalar_one_or_none()
+
+    if not outline:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Outline not found")
+
+    safe_title = re.sub(r"[^\w\-]", "_", outline.title or "outline")[:80]
+
+    if format == "markdown":
+        content = _outline_to_markdown(outline)
+        return StreamingResponse(
+            iter([content]),
+            media_type="text/markdown",
+            headers={"Content-Disposition": f'attachment; filename="{safe_title}.md"'},
+        )
+
+    if format == "html":
+        content = _outline_to_html(outline)
+        return StreamingResponse(
+            iter([content]),
+            media_type="text/html",
+            headers={"Content-Disposition": f'attachment; filename="{safe_title}.html"'},
+        )
+
+    # csv
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["id", "title", "keyword", "status", "tone", "word_count_target", "estimated_read_time", "created_at", "updated_at"])
+    writer.writerow([
+        outline.id,
+        outline.title,
+        outline.keyword,
+        outline.status,
+        outline.tone or "",
+        outline.word_count_target or 0,
+        outline.estimated_read_time or 0,
+        outline.created_at.isoformat() if outline.created_at else "",
+        outline.updated_at.isoformat() if outline.updated_at else "",
+    ])
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{safe_title}.csv"'},
     )
 
 

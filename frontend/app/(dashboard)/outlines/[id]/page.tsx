@@ -14,6 +14,7 @@ import {
   GripVertical,
   ChevronDown,
   ChevronUp,
+  Download,
 } from "lucide-react";
 import { api, Outline, OutlineSection } from "@/lib/api";
 import { toast } from "sonner";
@@ -31,6 +32,7 @@ export default function OutlineDetailPage() {
   const [regenerating, setRegenerating] = useState(false);
   const [editedSections, setEditedSections] = useState<OutlineSection[]>([]);
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set([0]));
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   useEffect(() => {
     loadOutline();
@@ -127,6 +129,28 @@ export default function OutlineDetailPage() {
     setEditedSections(newSections);
   }
 
+  async function handleExport(format: "markdown" | "html" | "csv") {
+    if (!outline) return;
+    setShowExportMenu(false);
+    try {
+      const response = await api.outlines.exportOne(outline.id, format);
+      const ext = format === "markdown" ? "md" : format;
+      const safeTitle = outline.title.replace(/[^\w\-]/g, "_").slice(0, 80);
+      const filename = `${safeTitle}.${ext}`;
+      const url = window.URL.createObjectURL(response.data as Blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success(`Outline exported as ${format.toUpperCase()}`);
+    } catch {
+      toast.error("Failed to export outline");
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -172,6 +196,40 @@ export default function OutlineDetailPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Export dropdown */}
+          <div className="relative">
+            <Button
+              variant="outline"
+              onClick={() => setShowExportMenu((prev) => !prev)}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export
+              <ChevronDown className="h-3 w-3 ml-1" />
+            </Button>
+            {showExportMenu && (
+              <div className="absolute right-0 top-full mt-1 z-50 w-40 rounded-xl border border-surface-tertiary bg-surface shadow-lg py-1">
+                <button
+                  onClick={() => handleExport("markdown")}
+                  className="w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-surface-secondary transition-colors"
+                >
+                  Markdown (.md)
+                </button>
+                <button
+                  onClick={() => handleExport("html")}
+                  className="w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-surface-secondary transition-colors"
+                >
+                  HTML (.html)
+                </button>
+                <button
+                  onClick={() => handleExport("csv")}
+                  className="w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-surface-secondary transition-colors"
+                >
+                  CSV (.csv)
+                </button>
+              </div>
+            )}
+          </div>
+
           <Button
             variant="outline"
             onClick={handleRegenerate}
