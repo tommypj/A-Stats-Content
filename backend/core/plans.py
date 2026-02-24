@@ -13,16 +13,16 @@ PLANS = {
         "price_monthly": 0,
         "price_yearly": 0,
         "features": [
-            "5 articles per month",
+            "10 articles per month",
             "10 outlines per month",
-            "2 images per month",
+            "5 images per month",
             "Basic SEO analysis",
             "Community support",
         ],
         "limits": {
-            "articles_per_month": 5,
+            "articles_per_month": 10,
             "outlines_per_month": 10,
-            "images_per_month": 2,
+            "images_per_month": 5,
         },
     },
     "starter": {

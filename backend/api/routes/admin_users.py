@@ -732,3 +732,60 @@ async def list_audit_logs(
         page_size=page_size,
         total_pages=total_pages,
     )
+
+
+@router.post("/users/{user_id}/reset-usage", response_model=UserActionResponse)
+async def reset_user_usage(
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    admin_user: User = Depends(get_current_admin_user),
+    http_request: Request = None,
+    user_agent: Optional[str] = Header(None),
+) -> UserActionResponse:
+    """
+    Reset a user's monthly generation usage counters to zero.
+
+    Admin access required.
+    """
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    old_articles = user.articles_generated_this_month
+    old_outlines = user.outlines_generated_this_month
+    old_images = user.images_generated_this_month
+
+    user.articles_generated_this_month = 0
+    user.outlines_generated_this_month = 0
+    user.images_generated_this_month = 0
+
+    await db.commit()
+    await db.refresh(user)
+
+    # Create audit log
+    await create_audit_log(
+        db=db,
+        admin_user=admin_user,
+        action=AuditAction.USER_UPDATED,
+        target_type=AuditTargetType.USER,
+        target_id=user.id,
+        description=f"Reset usage counters for {user.email}",
+        metadata={
+            "old_articles": old_articles,
+            "old_outlines": old_outlines,
+            "old_images": old_images,
+        },
+        ip_address=http_request.client.host if http_request else None,
+        user_agent=user_agent,
+    )
+
+    return UserActionResponse(
+        success=True,
+        message=f"Usage counters reset for {user.email}",
+        user=build_user_detail_response(user),
+    )
