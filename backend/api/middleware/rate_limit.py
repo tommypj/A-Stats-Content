@@ -23,11 +23,6 @@ from slowapi.util import get_remote_address
 
 from infrastructure.config.settings import settings
 
-# Create limiter instance with IP-based key function
-# Uses Redis when available, falls back to in-memory storage
-_storage_uri = settings.redis_url if settings.redis_url else "memory://"
-limiter = Limiter(key_func=get_remote_address, storage_uri=_storage_uri)
-
 # Rate limit configurations
 # Format: "count/period" where period can be: second, minute, hour, day
 RATE_LIMITS = {
@@ -38,6 +33,18 @@ RATE_LIMITS = {
     "resend_verification": "5/hour",
     "default": "100/minute",
 }
+
+# Create limiter instance with IP-based key function.
+# Uses Redis when available, falls back to in-memory storage.
+# default_limits applies the 100/minute cap globally to every route via
+# SlowAPIMiddleware; per-endpoint @limiter.limit decorators (e.g. "5/minute"
+# on /login) override this default for those specific endpoints.
+_storage_uri = settings.redis_url if settings.redis_url else "memory://"
+limiter = Limiter(
+    key_func=get_remote_address,
+    storage_uri=_storage_uri,
+    default_limits=[RATE_LIMITS["default"]],
+)
 
 
 def get_rate_limit(endpoint: str) -> str:

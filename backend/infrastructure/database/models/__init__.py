@@ -6,7 +6,7 @@ from .base import Base, TimestampMixin
 from .user import User, UserRole, UserStatus, SubscriptionTier
 from .content import Outline, Article, ArticleRevision, GeneratedImage, ContentStatus, ContentTone
 from .analytics import GSCConnection, KeywordRanking, PagePerformance, DailyAnalytics
-from .knowledge import KnowledgeSource, KnowledgeQuery, SourceStatus
+from .knowledge import KnowledgeSource, KnowledgeChunk, KnowledgeQuery, SourceStatus
 from .social import (
     SocialAccount,
     ScheduledPost,
@@ -36,6 +36,7 @@ __all__ = [
     "PagePerformance",
     "DailyAnalytics",
     "KnowledgeSource",
+    "KnowledgeChunk",
     "KnowledgeQuery",
     "SourceStatus",
     "SocialAccount",

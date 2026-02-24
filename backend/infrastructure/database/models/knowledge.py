@@ -1,5 +1,5 @@
 """
-Knowledge Vault database models: KnowledgeSource and KnowledgeQuery.
+Knowledge Vault database models: KnowledgeSource, KnowledgeChunk, and KnowledgeQuery.
 """
 
 from datetime import datetime
@@ -115,6 +115,50 @@ class KnowledgeSource(Base, TimestampMixin):
     def size_mb(self) -> float:
         """Get file size in megabytes."""
         return round(self.file_size / (1024 * 1024), 2)
+
+
+class KnowledgeChunk(Base):
+    """
+    A single text chunk extracted from a knowledge source document.
+
+    Chunks are created during document processing and are the units
+    used for keyword-based search queries.
+    """
+
+    __tablename__ = "knowledge_chunks"
+
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        primary_key=True,
+        default=lambda: str(uuid4()),
+    )
+
+    # Parent source
+    source_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("knowledge_sources.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    # Chunk data
+    chunk_index: Mapped[int] = mapped_column(nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    char_count: Mapped[int] = mapped_column(default=0, nullable=False)
+
+    # Timestamp (created_at only, no updated_at needed for immutable chunks)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+    # Indexes
+    __table_args__ = (
+        Index("ix_knowledge_chunks_source_index", "source_id", "chunk_index"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<KnowledgeChunk(id={self.id}, source_id={self.source_id}, index={self.chunk_index})>"
 
 
 class KnowledgeQuery(Base, TimestampMixin):
