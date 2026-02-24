@@ -69,18 +69,10 @@ def upgrade() -> None:
         unique=True,
     )
 
-    # Add missing columns
-    op.add_column(
-        "social_accounts",
-        sa.Column(
-            "project_id",
-            postgresql.UUID(as_uuid=False),
-            sa.ForeignKey("projects.id", ondelete="CASCADE"),
-            nullable=True,
-        ),
-    )
-    op.create_index("ix_social_accounts_project_id", "social_accounts", ["project_id"])
+    # NOTE: project_id already exists on social_accounts (added by migration 015
+    # which renamed team_id -> project_id).  Do NOT re-add it here.
 
+    # Add missing columns
     op.add_column(
         "social_accounts",
         sa.Column("account_metadata", postgresql.JSON(astext_type=sa.Text()), nullable=True),
@@ -112,17 +104,8 @@ def upgrade() -> None:
     # Drop timezone column (not in ORM model)
     op.drop_column("scheduled_posts", "timezone")
 
-    # Add project_id foreign key column
-    op.add_column(
-        "scheduled_posts",
-        sa.Column(
-            "project_id",
-            postgresql.UUID(as_uuid=False),
-            sa.ForeignKey("projects.id", ondelete="CASCADE"),
-            nullable=True,
-        ),
-    )
-    op.create_index("ix_scheduled_posts_project_id", "scheduled_posts", ["project_id"])
+    # NOTE: project_id already exists on scheduled_posts (added by migration 015
+    # which renamed team_id -> project_id).  Do NOT re-add it here.
 
     # Add publishing metadata columns
     op.add_column(
@@ -257,8 +240,8 @@ def downgrade() -> None:
     op.drop_column("scheduled_posts", "publish_attempted_at")
     op.drop_column("scheduled_posts", "published_at")
     op.drop_column("scheduled_posts", "link_url")
-    op.drop_index("ix_scheduled_posts_project_id", "scheduled_posts")
-    op.drop_column("scheduled_posts", "project_id")
+
+    # NOTE: project_id is NOT dropped here — migration 015 owns that column.
 
     op.add_column(
         "scheduled_posts",
@@ -282,8 +265,8 @@ def downgrade() -> None:
     op.drop_column("social_accounts", "verification_error")
     op.drop_column("social_accounts", "last_verified_at")
     op.drop_column("social_accounts", "account_metadata")
-    op.drop_index("ix_social_accounts_project_id", "social_accounts")
-    op.drop_column("social_accounts", "project_id")
+
+    # NOTE: project_id is NOT dropped here — migration 015 owns that column.
 
     op.drop_index("ix_social_accounts_platform_user", "social_accounts")
     op.create_unique_constraint(
