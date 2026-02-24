@@ -18,10 +18,28 @@ Rate Limits:
 - Default: 100 requests per minute
 """
 
+from starlette.requests import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from infrastructure.config.settings import settings
+
+
+def _get_real_ip(request: Request) -> str:
+    """Extract real client IP from proxy headers, falling back to remote address.
+
+    Railway (and most reverse proxies) set X-Forwarded-For.  Without this,
+    all requests appear to come from the proxy's internal IP, which means
+    every user shares a single rate-limit bucket.
+    """
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        # X-Forwarded-For can be a comma-separated list; first entry is the client
+        return forwarded.split(",")[0].strip()
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+    return get_remote_address(request)
 
 # Rate limit configurations
 # Format: "count/period" where period can be: second, minute, hour, day
@@ -41,7 +59,7 @@ RATE_LIMITS = {
 # on /login) override this default for those specific endpoints.
 _storage_uri = settings.redis_url if settings.redis_url else "memory://"
 limiter = Limiter(
-    key_func=get_remote_address,
+    key_func=_get_real_ip,
     storage_uri=_storage_uri,
     default_limits=[RATE_LIMITS["default"]],
 )
