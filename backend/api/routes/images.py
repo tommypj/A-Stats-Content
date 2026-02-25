@@ -9,9 +9,11 @@ import time
 from typing import Optional
 from uuid import uuid4
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from api.middleware.rate_limit import limiter
 from sqlalchemy import select, func, delete
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.schemas.content import (
@@ -123,7 +125,7 @@ async def _run_image_generation(
                 )
                 image.local_path = local_path
                 await db.commit()
-            except Exception as dl_err:
+            except (httpx.HTTPError, OSError, ValueError) as dl_err:
                 logger.warning(
                     "Failed to cache image locally for %s: %s", image_id, dl_err
                 )
@@ -144,9 +146,9 @@ async def _run_image_generation(
                     if failed_image:
                         failed_image.status = "failed"
                         await err_db.commit()
-            except Exception:
+            except (OSError, SQLAlchemyError) as mark_err:
                 logger.error(
-                    "Failed to mark image %s as failed", image_id, exc_info=True
+                    "Failed to mark image %s as failed: %s", image_id, mark_err, exc_info=True
                 )
 
             # Log failure in a separate session
@@ -161,7 +163,7 @@ async def _run_image_generation(
                             duration_ms=duration_ms,
                         )
                         await tracker_db.commit()
-                except Exception:
+                except (OSError, SQLAlchemyError) as log_err:
                     logger.error(
                         "Failed to log image generation failure for %s", image_id, exc_info=True
                     )
@@ -421,8 +423,8 @@ async def delete_image(
     if image.local_path:
         try:
             await storage_adapter.delete_image(image.local_path)
-        except Exception:
-            pass
+        except OSError:
+            logger.warning("Failed to delete local image file: %s", image.local_path)
 
     # Delete from database
     await db.delete(image)

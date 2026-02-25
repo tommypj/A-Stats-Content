@@ -82,8 +82,8 @@ async def _store_oauth_state(state: str, user_id: str) -> None:
         r = aioredis.from_url(settings.redis_url)
         await r.setex(f"oauth_state:{state}", _OAUTH_STATE_TTL, data)
         await r.aclose()
-    except Exception:
-        # Prune expired entries and enforce size cap
+    except (ImportError, OSError, ConnectionError, TypeError, ValueError):
+        # Redis unavailable or misconfigured — prune expired entries and enforce size cap
         _prune_expired_states()
         if len(_oauth_states) >= _OAUTH_MAX_STATES:
             # Drop oldest entries to make room
@@ -106,9 +106,10 @@ async def _verify_oauth_state(state: str) -> Optional[str]:
         await r.aclose()
         if raw is None:
             return None
-        return json.loads(raw)["user_id"]
-    except Exception:
-        # Fallback: in-memory pop with expiry check
+        parsed = json.loads(raw)
+        return parsed.get("user_id")
+    except (ImportError, OSError, ConnectionError, TypeError, ValueError, json.JSONDecodeError, KeyError):
+        # Redis unavailable or misconfigured — fallback to in-memory pop with expiry check
         entry = _oauth_states.pop(state, None)
         if not entry:
             return None
@@ -278,7 +279,8 @@ async def oauth_callback(
     if platform == "facebook":
         try:
             tokens, profile = await _facebook_exchange_and_profile(code)
-        except Exception as e:
+        except (httpx.HTTPError, ValueError, KeyError) as e:
+            logger.warning("Facebook OAuth exchange failed: %s", e)
             return RedirectResponse(
                 url=f"{frontend_callback}?error=token_exchange_failed&platform={platform}"
             )
@@ -288,7 +290,8 @@ async def oauth_callback(
         )
 
     # Encrypt tokens
-    access_token_encrypted = encrypt_credential(tokens["access_token"], settings.secret_key)
+    access_token_encrypted = encrypt_credential(tokens.get("access_token", ""), settings.secret_key)
+    platform_user_id = profile.get("id", "")
 
     # Check if account already exists for this user + platform + platform_user_id
     result = await db.execute(
@@ -296,7 +299,7 @@ async def oauth_callback(
             and_(
                 SocialAccount.user_id == user.id,
                 SocialAccount.platform == platform,
-                SocialAccount.platform_user_id == profile["id"],
+                SocialAccount.platform_user_id == platform_user_id,
             )
         )
     )
@@ -315,7 +318,7 @@ async def oauth_callback(
         new_account = SocialAccount(
             user_id=user.id,
             platform=platform,
-            platform_user_id=profile["id"],
+            platform_user_id=platform_user_id,
             platform_username=profile.get("username"),
             platform_display_name=profile.get("display_name"),
             profile_image_url=profile.get("profile_image"),
@@ -351,10 +354,17 @@ async def _facebook_exchange_and_profile(code: str) -> tuple[dict, dict]:
             },
         )
         if token_resp.status_code != 200:
-            raise Exception(f"Token exchange failed: {token_resp.text}")
+            logger.warning("Facebook token exchange failed: %s", token_resp.text)
+            raise httpx.HTTPStatusError(
+                "Token exchange failed",
+                request=token_resp.request,
+                response=token_resp,
+            )
 
         token_data = token_resp.json()
-        short_token = token_data["access_token"]
+        short_token = token_data.get("access_token")
+        if not short_token:
+            raise ValueError("Facebook token response missing 'access_token'")
 
         # Step 2: Exchange for long-lived token (60 days)
         long_token_resp = await client.get(
@@ -368,7 +378,7 @@ async def _facebook_exchange_and_profile(code: str) -> tuple[dict, dict]:
         )
         if long_token_resp.status_code == 200:
             long_data = long_token_resp.json()
-            access_token = long_data["access_token"]
+            access_token = long_data.get("access_token", short_token)
             expires_in = long_data.get("expires_in", 5184000)  # Default 60 days
         else:
             # Fall back to short-lived token
@@ -389,12 +399,15 @@ async def _facebook_exchange_and_profile(code: str) -> tuple[dict, dict]:
                 # Use the first page — its token never expires as long as
                 # the user remains an admin and the app has permissions
                 page = pages[0]
-                page_token = page["access_token"]
+                page_token = page.get("access_token")
+                page_id = page.get("id")
+                if not page_token or not page_id:
+                    raise ValueError("Facebook page response missing 'access_token' or 'id'")
                 profile = {
-                    "id": page["id"],
+                    "id": page_id,
                     "username": page.get("name", ""),
                     "display_name": page.get("name", ""),
-                    "profile_image": f"https://graph.facebook.com/v21.0/{page['id']}/picture?type=small",
+                    "profile_image": f"https://graph.facebook.com/v21.0/{page_id}/picture?type=small",
                 }
                 tokens = {
                     "access_token": page_token,
@@ -411,9 +424,17 @@ async def _facebook_exchange_and_profile(code: str) -> tuple[dict, dict]:
             },
         )
         if me_resp.status_code != 200:
-            raise Exception(f"Profile fetch failed: {me_resp.text}")
+            logger.warning("Facebook profile fetch failed: %s", me_resp.text)
+            raise httpx.HTTPStatusError(
+                "Profile fetch failed",
+                request=me_resp.request,
+                response=me_resp,
+            )
 
         me_data = me_resp.json()
+        me_id = me_data.get("id")
+        if not me_id:
+            raise ValueError("Facebook profile response missing 'id'")
         picture_url = me_data.get("picture", {}).get("data", {}).get("url")
 
         expires_at = datetime.now(timezone.utc).timestamp() + expires_in
@@ -422,7 +443,7 @@ async def _facebook_exchange_and_profile(code: str) -> tuple[dict, dict]:
             "expires_at": datetime.fromtimestamp(expires_at, tz=timezone.utc),
         }
         profile = {
-            "id": me_data["id"],
+            "id": me_id,
             "username": me_data.get("name", ""),
             "display_name": me_data.get("name", ""),
             "profile_image": picture_url,

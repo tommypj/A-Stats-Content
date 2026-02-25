@@ -656,7 +656,7 @@ async def upload_avatar(
     if current_user.avatar_url:
         try:
             await storage_adapter.delete_image(current_user.avatar_url)
-        except Exception:
+        except OSError:
             logger.warning("Failed to delete old avatar for user %s", current_user.id)
 
     # Save new avatar
