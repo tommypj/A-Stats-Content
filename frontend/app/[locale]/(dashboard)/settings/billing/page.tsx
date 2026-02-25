@@ -62,7 +62,7 @@ export default function BillingSettingsPage() {
     try {
       setActionLoading(true);
       const response = await api.billing.checkout(planId, "monthly");
-      window.open(response.checkout_url, "_blank");
+      window.open(response.checkout_url, "_blank", "noopener,noreferrer");
 
       // Poll for subscription changes after checkout
       if (pollRef.current) clearInterval(pollRef.current);
@@ -97,7 +97,7 @@ export default function BillingSettingsPage() {
     try {
       setActionLoading(true);
       const response = await api.billing.portal();
-      window.open(response.portal_url, "_blank");
+      window.open(response.portal_url, "_blank", "noopener,noreferrer");
     } catch (error) {
       const apiError = parseApiError(error);
       toast.error(apiError.message);

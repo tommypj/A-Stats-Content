@@ -50,7 +50,7 @@ export default function PricingPage() {
     try {
       setCheckoutLoading(planId);
       const response = await api.billing.checkout(planId, billingCycle);
-      window.open(response.checkout_url, "_blank");
+      window.open(response.checkout_url, "_blank", "noopener,noreferrer");
     } catch (error) {
       const apiError = parseApiError(error);
       toast.error(apiError.message);

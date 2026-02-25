@@ -95,7 +95,7 @@ export function SiteSelector({
           <Button
             variant="outline"
             className="mt-4"
-            onClick={() => window.open("https://search.google.com/search-console", "_blank")}
+            onClick={() => window.open("https://search.google.com/search-console", "_blank", "noopener,noreferrer")}
           >
             Open Google Search Console
           </Button>
