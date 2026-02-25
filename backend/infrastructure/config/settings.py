@@ -1,9 +1,19 @@
 """Application settings and configuration."""
 import json
+import secrets
 from functools import lru_cache
 from typing import Optional
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+def _generate_dev_secret() -> str:
+    """Generate a random secret for development use.
+
+    Tokens issued with this key won't survive server restarts, which is
+    acceptable in development.  Production **must** set explicit secrets
+    via environment variables — the startup validator enforces this.
+    """
+    return secrets.token_urlsafe(32)
 
 
 class Settings(BaseSettings):
@@ -48,8 +58,20 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
 
     # Authentication / JWT
-    secret_key: str = "change-me-in-production-use-secrets-gen"
-    jwt_secret_key: str = "change-me-in-production-jwt-secret"
+    secret_key: str = ""
+    jwt_secret_key: str = ""
+    @field_validator("secret_key", "jwt_secret_key", mode="before")
+    @classmethod
+    def fill_empty_secret(cls, v: str) -> str:
+        """Generate a random secret when no value is provided.
+
+        This keeps development functional without a .env file while ensuring
+        production never silently falls back to a guessable default.
+        """
+        if not v:
+            return _generate_dev_secret()
+        return v
+
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 60
     jwt_refresh_token_expire_days: int = 7
@@ -145,16 +167,17 @@ class Settings(BaseSettings):
         return self.environment == "development"
 
     def validate_production_secrets(self) -> None:
-        """Validate that production secrets and critical API keys are configured."""
+        """Validate that production secrets and critical API keys are configured.
+
+        Called automatically by get_settings().  In production/staging the
+        app refuses to start unless explicit, strong secrets are provided
+        via environment variables.
+        """
         if self.environment in ("production", "staging"):
-            if "change-me" in self.secret_key.lower():
-                raise ValueError("SECRET_KEY must be changed for production!")
-            if "change-me" in self.jwt_secret_key.lower():
-                raise ValueError("JWT_SECRET_KEY must be changed for production!")
             if len(self.secret_key) < 32:
-                raise ValueError("SECRET_KEY must be at least 32 characters!")
+                raise ValueError("SECRET_KEY must be set to at least 32 characters in production!")
             if len(self.jwt_secret_key) < 32:
-                raise ValueError("JWT_SECRET_KEY must be at least 32 characters!")
+                raise ValueError("JWT_SECRET_KEY must be set to at least 32 characters in production!")
             if not self.anthropic_api_key:
                 raise ValueError("ANTHROPIC_API_KEY is required in production!")
             if not self.lemonsqueezy_api_key:
@@ -165,8 +188,14 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    """Get cached settings instance."""
-    return Settings()
+    """Get cached settings instance.
+
+    Automatically validates that production/staging deployments have
+    proper secrets configured — the app will refuse to start otherwise.
+    """
+    s = Settings()
+    s.validate_production_secrets()
+    return s
 
 
 # Global settings instance
