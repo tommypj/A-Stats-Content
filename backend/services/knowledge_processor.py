@@ -48,7 +48,7 @@ def delete_file(file_path: str) -> None:
         if path.exists():
             path.unlink()
             logger.info("Deleted knowledge file: %s", file_path)
-    except Exception as exc:  # pylint: disable=broad-except
+    except OSError as exc:
         logger.warning("Failed to delete knowledge file %s: %s", file_path, exc)
 
 
@@ -88,7 +88,8 @@ def _extract_pdf(content: bytes) -> Tuple[str, bool]:
     except ImportError:
         logger.warning("pypdf not available – PDF stored without text extraction")
         return "", False
-    except Exception as exc:  # pylint: disable=broad-except
+    except (ValueError, KeyError, OSError, EOFError) as exc:
+        # pypdf raises various exceptions on corrupt/malformed PDFs
         logger.warning("PDF extraction failed: %s", exc)
         return "", False
 
@@ -109,7 +110,7 @@ def _extract_csv(content: bytes) -> str:
         for row in rows[1:]:
             lines.append("\t".join(row))
         return "\n".join(lines)
-    except Exception as exc:  # pylint: disable=broad-except
+    except (csv.Error, UnicodeDecodeError, ValueError) as exc:
         logger.warning("CSV extraction failed: %s", exc)
         return content.decode("utf-8", errors="replace")
 
@@ -119,7 +120,7 @@ def _extract_json(content: bytes) -> str:
     try:
         data = json.loads(content)
         return json.dumps(data, indent=2, ensure_ascii=False)
-    except Exception:  # pylint: disable=broad-except
+    except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
         return content.decode("utf-8", errors="replace")
 
 
@@ -137,7 +138,8 @@ def _extract_html(content: bytes) -> str:
         # Fall back to simple regex strip
         text = content.decode("utf-8", errors="replace")
         return re.sub(r"<[^>]+>", " ", text)
-    except Exception as exc:  # pylint: disable=broad-except
+    except (ValueError, TypeError, UnicodeDecodeError) as exc:
+        # BeautifulSoup can raise these on severely malformed HTML
         logger.warning("HTML extraction failed: %s", exc)
         return content.decode("utf-8", errors="replace")
 
@@ -146,6 +148,7 @@ def _extract_docx(content: bytes) -> str:
     """Extract text from a DOCX file using python-docx."""
     try:
         import docx  # type: ignore
+        from zipfile import BadZipFile
 
         doc = docx.Document(io.BytesIO(content))
         paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
@@ -153,7 +156,8 @@ def _extract_docx(content: bytes) -> str:
     except ImportError:
         logger.warning("python-docx not available – DOCX stored without text extraction")
         return ""
-    except Exception as exc:  # pylint: disable=broad-except
+    except (BadZipFile, ValueError, KeyError, OSError) as exc:
+        # DOCX is a ZIP archive; corrupt files trigger BadZipFile or KeyError
         logger.warning("DOCX extraction failed: %s", exc)
         return ""
 
@@ -183,7 +187,7 @@ def extract_text(content: bytes, file_type: str) -> Tuple[str, bool]:
     # Unknown type — attempt UTF-8 decode
     try:
         return content.decode("utf-8", errors="replace"), True
-    except Exception:  # pylint: disable=broad-except
+    except (UnicodeDecodeError, ValueError):
         return "", False
 
 
