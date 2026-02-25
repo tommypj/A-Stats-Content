@@ -21,13 +21,11 @@ const Dialog = forwardRef<HTMLDivElement, DialogProps>(
 
     // Lock body scroll when dialog is open
     useEffect(() => {
-      if (isOpen) {
-        document.body.style.overflow = "hidden";
-      } else {
-        document.body.style.overflow = "unset";
-      }
+      if (!isOpen) return;
+      const previous = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
       return () => {
-        document.body.style.overflow = "unset";
+        document.body.style.overflow = previous;
       };
     }, [isOpen]);
 

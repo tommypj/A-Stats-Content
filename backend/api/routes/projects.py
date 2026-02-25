@@ -68,8 +68,9 @@ async def ensure_unique_slug(db: AsyncSession, slug: str, project_id: Optional[s
     """Ensure slug is unique by appending number if necessary."""
     original_slug = slug
     counter = 1
+    max_attempts = 100
 
-    while True:
+    while counter <= max_attempts:
         stmt = select(Project).where(Project.slug == slug)
         if project_id:
             stmt = stmt.where(Project.id != project_id)
@@ -82,6 +83,10 @@ async def ensure_unique_slug(db: AsyncSession, slug: str, project_id: Optional[s
 
         slug = f"{original_slug}-{counter}"
         counter += 1
+
+    # Fallback: append a random suffix to guarantee uniqueness
+    import uuid
+    return f"{original_slug}-{uuid.uuid4().hex[:8]}"
 
 
 # =============================================================================

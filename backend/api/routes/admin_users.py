@@ -177,7 +177,7 @@ async def list_users(
     if filters:
         count_query = count_query.where(and_(*filters))
     total_result = await db.execute(count_query)
-    total = total_result.scalar_one()
+    total = total_result.scalar() or 0
 
     # Apply sorting
     sort_column = getattr(User, sort_by)
@@ -686,7 +686,7 @@ async def list_audit_logs(
     if filters:
         count_query = count_query.where(and_(*filters))
     total_result = await db.execute(count_query)
-    total = total_result.scalar_one()
+    total = total_result.scalar() or 0
 
     # Apply sorting
     if sort_order == "desc":

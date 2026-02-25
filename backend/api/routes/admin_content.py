@@ -138,7 +138,7 @@ async def list_all_articles(
         )
 
     result = await db.execute(count_query)
-    total = result.scalar_one()
+    total = result.scalar() or 0
 
     # Apply pagination
     offset = (page - 1) * page_size
@@ -328,7 +328,7 @@ async def list_all_outlines(
         count_query = count_query.where(Outline.title.ilike(search_pattern))
 
     result = await db.execute(count_query)
-    total = result.scalar_one()
+    total = result.scalar() or 0
 
     # Apply pagination
     offset = (page - 1) * page_size
@@ -463,7 +463,7 @@ async def list_all_images(
         count_query = count_query.where(GeneratedImage.created_at <= end_date)
 
     result = await db.execute(count_query)
-    total = result.scalar_one()
+    total = result.scalar() or 0
 
     # Apply pagination
     offset = (page - 1) * page_size
@@ -619,7 +619,7 @@ async def list_all_social_posts(
         count_query = count_query.where(ScheduledPost.status == status)
 
     result = await db.execute(count_query)
-    total = result.scalar_one()
+    total = result.scalar() or 0
 
     # Apply pagination
     offset = (page - 1) * page_size

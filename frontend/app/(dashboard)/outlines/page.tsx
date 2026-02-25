@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Plus,
@@ -92,13 +92,7 @@ export default function OutlinesPage() {
     setSelectedIds(new Set());
   }, [page, debouncedKeyword, statusFilter]);
 
-  // Load outlines whenever page, debouncedKeyword, or statusFilter changes
-  useEffect(() => {
-    loadOutlines();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedKeyword, statusFilter]);
-
-  async function loadOutlines() {
+  const loadOutlines = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.outlines.list({
@@ -115,7 +109,12 @@ export default function OutlinesPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [page, pageSize, debouncedKeyword, statusFilter]);
+
+  // Load outlines whenever page, debouncedKeyword, or statusFilter changes
+  useEffect(() => {
+    loadOutlines();
+  }, [loadOutlines]);
 
   function handleDelete(id: string) {
     setActiveMenu(null);

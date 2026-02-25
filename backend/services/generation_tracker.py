@@ -83,9 +83,17 @@ class GenerationTracker:
                 )
                 user = user_result.scalar_one_or_none()
                 if user:
-                    usage_field = f"{log.resource_type}s_generated_this_month"
-                    current = getattr(user, usage_field, 0) or 0
-                    setattr(user, usage_field, current + 1)
+                    ALLOWED_USAGE_FIELDS = {
+                        "article": "articles_generated_this_month",
+                        "outline": "outlines_generated_this_month",
+                        "image": "images_generated_this_month",
+                    }
+                    usage_field = ALLOWED_USAGE_FIELDS.get(log.resource_type)
+                    if usage_field:
+                        current = getattr(user, usage_field, 0) or 0
+                        setattr(user, usage_field, current + 1)
+                    else:
+                        logger.warning("Unknown resource_type '%s' for usage increment", log.resource_type)
                 else:
                     logger.warning("User %s not found for usage increment", log.user_id)
             except Exception as e:
@@ -177,7 +185,15 @@ class GenerationTracker:
                     return True  # unlimited
 
                 # Get current month's usage count for this user
-                usage_field = f"{resource_type}s_generated_this_month"
+                ALLOWED_USAGE_FIELDS = {
+                    "article": "articles_generated_this_month",
+                    "outline": "outlines_generated_this_month",
+                    "image": "images_generated_this_month",
+                }
+                usage_field = ALLOWED_USAGE_FIELDS.get(resource_type)
+                if not usage_field:
+                    logger.warning("Unknown resource_type '%s' for limit check", resource_type)
+                    return True  # Fail open for unknown types
                 current_usage = getattr(user, usage_field, 0) or 0
 
                 return current_usage < limit

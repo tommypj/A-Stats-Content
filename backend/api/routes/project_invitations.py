@@ -122,7 +122,7 @@ async def list_project_invitations(
         count_query = count_query.where(ProjectInvitation.status == status_filter)
 
     result = await db.execute(count_query)
-    total = result.scalar_one()
+    total = result.scalar() or 0
 
     # Apply pagination
     offset = (page - 1) * page_size

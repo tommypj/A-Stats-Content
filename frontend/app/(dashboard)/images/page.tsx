@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -47,6 +47,16 @@ export default function ImagesPage() {
   const [wpUploading, setWpUploading] = useState<string | null>(null);
   const [wpUploaded, setWpUploaded] = useState<Set<string>>(new Set());
   const [wpError, setWpError] = useState("");
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wpErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+      if (wpErrorTimerRef.current) clearTimeout(wpErrorTimerRef.current);
+    };
+  }, []);
 
   // Pagination state
   const [page, setPage] = useState(1);
@@ -162,7 +172,8 @@ export default function ImagesPage() {
     try {
       await navigator.clipboard.writeText(url);
       setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 2000);
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+      copiedTimerRef.current = setTimeout(() => setCopiedId(null), 2000);
     } catch {
       toast.error("Failed to copy URL");
     }
@@ -200,7 +211,8 @@ export default function ImagesPage() {
       setWpUploaded((prev) => new Set(prev).add(image.id));
     } catch (err) {
       setWpError(parseApiError(err).message);
-      setTimeout(() => setWpError(""), 5000);
+      if (wpErrorTimerRef.current) clearTimeout(wpErrorTimerRef.current);
+      wpErrorTimerRef.current = setTimeout(() => setWpError(""), 5000);
     } finally {
       setWpUploading(null);
     }
