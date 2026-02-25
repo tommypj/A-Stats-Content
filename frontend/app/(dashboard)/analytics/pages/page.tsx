@@ -365,9 +365,9 @@ export default function PagesPage() {
                     </td>
                   </tr>
                 ) : (
-                  displayedPages.map((pageData, index) => (
+                  displayedPages.map((pageData) => (
                     <tr
-                      key={index}
+                      key={pageData.page_url}
                       className="border-b border-surface-tertiary hover:bg-surface-secondary transition-colors"
                     >
                       <td className="p-4 text-sm text-text-primary font-medium max-w-2xl">

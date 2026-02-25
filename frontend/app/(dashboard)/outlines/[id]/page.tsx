@@ -265,7 +265,7 @@ export default function OutlineDetailPage() {
       {/* Sections Editor */}
       <div className="space-y-4">
         {editedSections.map((section, index) => (
-          <Card key={index} className="overflow-hidden">
+          <Card key={section.heading || index} className="overflow-hidden">
             <div
               className="flex items-center gap-3 p-4 cursor-pointer hover:bg-surface-secondary/50"
               onClick={() => toggleSection(index)}

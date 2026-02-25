@@ -240,9 +240,9 @@ export default function PricingPage() {
                           images/month
                         </span>
                       </li>
-                      {plan.features.map((feature, idx) => (
+                      {plan.features.map((feature) => (
                         <li
-                          key={idx}
+                          key={feature}
                           className="flex items-start gap-2 text-sm text-text-secondary"
                         >
                           <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />

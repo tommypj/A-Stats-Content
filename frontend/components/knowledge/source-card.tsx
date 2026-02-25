@@ -84,9 +84,9 @@ export function SourceCard({ source, onClick }: SourceCardProps) {
             {/* Tags */}
             {source.tags.length > 0 && (
               <div className="flex flex-wrap gap-1 mb-2">
-                {source.tags.slice(0, 3).map((tag, index) => (
+                {source.tags.slice(0, 3).map((tag) => (
                   <span
-                    key={index}
+                    key={tag}
                     className="text-xs px-2 py-0.5 bg-surface-secondary rounded-full text-text-secondary"
                   >
                     {tag}

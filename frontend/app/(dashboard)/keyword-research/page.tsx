@@ -165,9 +165,9 @@ export default function KeywordResearchPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {result.suggestions.map((item, index) => (
+            {result.suggestions.map((item) => (
               <div
-                key={index}
+                key={item.keyword}
                 className="card p-5 flex flex-col gap-3 hover:shadow-md transition-shadow"
               >
                 {/* Keyword */}

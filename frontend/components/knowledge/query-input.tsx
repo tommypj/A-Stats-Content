@@ -66,9 +66,9 @@ export function QueryInput({
             Try these examples:
           </p>
           <div className="flex flex-wrap gap-2">
-            {EXAMPLE_QUERIES.map((example, index) => (
+            {EXAMPLE_QUERIES.map((example) => (
               <button
-                key={index}
+                key={example}
                 onClick={() => handleExampleClick(example)}
                 className="text-xs px-3 py-1.5 bg-surface-secondary hover:bg-surface-tertiary text-text-secondary hover:text-text-primary rounded-lg transition-colors"
               >

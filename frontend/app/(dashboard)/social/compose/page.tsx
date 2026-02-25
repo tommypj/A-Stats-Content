@@ -302,7 +302,7 @@ export default function ComposePage() {
               {mediaUrls.length > 0 && (
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   {mediaUrls.map((url, index) => (
-                    <div key={index} className="relative group">
+                    <div key={url} className="relative group">
                       <img
                         src={url}
                         alt={`Media ${index + 1}`}

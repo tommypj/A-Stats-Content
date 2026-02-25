@@ -400,8 +400,8 @@ function LiveSeoPanel({ seoScore }: LiveSeoPanelProps) {
 
           {/* Checklist */}
           <div className="space-y-2">
-            {checks.map((check, i) => (
-              <div key={i}>
+            {checks.map((check) => (
+              <div key={check.label}>
                 <div className="flex items-start gap-2">
                   {check.passed ? (
                     <CheckCircle className="h-3.5 w-3.5 text-green-500 flex-shrink-0 mt-0.5" />
@@ -1375,8 +1375,8 @@ export default function ArticleEditorPage() {
             <Card className="p-4">
               <h3 className="font-medium text-text-primary mb-3">Suggestions</h3>
               <ul className="space-y-2">
-                {seo.suggestions.map((suggestion, index) => (
-                  <li key={index} className="flex items-start gap-2 text-sm text-text-secondary">
+                {seo.suggestions.map((suggestion) => (
+                  <li key={suggestion} className="flex items-start gap-2 text-sm text-text-secondary">
                     <AlertCircle className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
                     {suggestion}
                   </li>

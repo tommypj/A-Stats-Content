@@ -400,8 +400,8 @@ export default function ContentOpportunitiesPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {suggestions.map((suggestion, index) => (
-              <Card key={index} className="hover:shadow-lg transition-shadow">
+            {suggestions.map((suggestion) => (
+              <Card key={suggestion.target_keyword} className="hover:shadow-lg transition-shadow">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-base leading-snug">{suggestion.suggested_title}</CardTitle>

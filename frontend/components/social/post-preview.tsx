@@ -70,8 +70,8 @@ export function PostPreview({
       {mediaUrls.length > 0 && (
         <div className="px-4 pb-3">
           <div className={`grid gap-2 ${mediaUrls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-            {mediaUrls.slice(0, 4).map((url, idx) => (
-              <div key={idx} className="aspect-video bg-surface-tertiary rounded-xl overflow-hidden">
+            {mediaUrls.slice(0, 4).map((url) => (
+              <div key={url} className="aspect-video bg-surface-tertiary rounded-xl overflow-hidden">
                 <img src={url} alt="" className="w-full h-full object-cover" />
               </div>
             ))}

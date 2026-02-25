@@ -261,7 +261,7 @@ export default function PostDetailPage() {
                 <div className="grid grid-cols-2 gap-4">
                   {post.media_urls.map((url, index) => (
                     <img
-                      key={index}
+                      key={url}
                       src={url}
                       alt={`Media ${index + 1}`}
                       className="w-full h-48 object-cover rounded-lg border border-surface-tertiary"

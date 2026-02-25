@@ -271,8 +271,8 @@ export default function SourceDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
-                  {source.tags.map((tag, index) => (
-                    <Badge key={index} variant="secondary">
+                  {source.tags.map((tag) => (
+                    <Badge key={tag} variant="secondary">
                       {tag}
                     </Badge>
                   ))}

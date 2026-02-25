@@ -174,7 +174,7 @@ export function AIGenerationProgress({
 
           return (
             <div
-              key={index}
+              key={phase.label}
               className={clsx(
                 "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-500",
                 isCurrent && "bg-primary-50 border border-primary-200",

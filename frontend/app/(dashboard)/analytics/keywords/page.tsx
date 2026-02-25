@@ -359,9 +359,9 @@ export default function KeywordsPage() {
                     </td>
                   </tr>
                 ) : (
-                  displayedKeywords.map((keyword, index) => (
+                  displayedKeywords.map((keyword) => (
                     <tr
-                      key={index}
+                      key={keyword.keyword}
                       className="border-b border-surface-tertiary hover:bg-surface-secondary transition-colors"
                     >
                       <td className="p-4 text-sm text-text-primary font-medium max-w-md">

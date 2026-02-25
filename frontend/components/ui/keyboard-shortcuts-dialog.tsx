@@ -139,9 +139,9 @@ export function KeyboardShortcutsDialog({ isOpen, onClose }: KeyboardShortcutsDi
                   {section.title}
                 </p>
                 <div className="space-y-1">
-                  {section.shortcuts.map((row, idx) => (
+                  {section.shortcuts.map((row) => (
                     <div
-                      key={idx}
+                      key={row.description}
                       className="flex items-center justify-between py-1.5"
                     >
                       <span className="text-sm text-text-secondary">{row.description}</span>

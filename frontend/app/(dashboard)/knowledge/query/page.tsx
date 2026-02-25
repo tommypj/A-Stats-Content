@@ -215,7 +215,7 @@ function QueryPageContent() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {response.sources.map((snippet, index) => (
-                  <SourceSnippet key={index} snippet={snippet} index={index} />
+                  <SourceSnippet key={snippet.source_id} snippet={snippet} index={index} />
                 ))}
               </CardContent>
             </Card>
@@ -247,9 +247,9 @@ function QueryPageContent() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {queryHistory.map((item, index) => (
+              {queryHistory.map((item) => (
                 <button
-                  key={index}
+                  key={item.timestamp}
                   onClick={() => handleQuery(item.query)}
                   className="w-full text-left p-3 rounded-lg hover:bg-surface-secondary transition-colors group"
                 >

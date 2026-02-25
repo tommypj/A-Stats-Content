@@ -124,8 +124,8 @@ export default function HelpPage() {
           Frequently Asked Questions
         </h2>
         <div className="space-y-3">
-          {faqs.map((faq, index) => (
-            <Card key={index} className="p-5">
+          {faqs.map((faq) => (
+            <Card key={faq.question} className="p-5">
               <div className="flex items-start gap-3">
                 <HelpCircle className="h-5 w-5 text-primary-500 mt-0.5 shrink-0" />
                 <div>
