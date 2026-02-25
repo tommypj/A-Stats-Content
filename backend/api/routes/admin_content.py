@@ -21,6 +21,7 @@ from infrastructure.database.models.social import ScheduledPost, PostTarget
 from infrastructure.database.models.admin import AdminAuditLog, AuditAction, AuditTargetType
 from api.deps_admin import get_current_admin_user
 from api.utils import escape_like
+from adapters.storage.image_storage import storage_adapter
 from api.schemas.admin_content import (
     AdminArticleListResponse,
     AdminArticleListItem,
@@ -530,11 +531,12 @@ async def delete_image(
     image_user_id = image.user_id
     image_url = image.url
 
-    # TODO: Remove from storage (S3/local filesystem)
-    # This requires the storage adapter to be implemented
-    # from adapters.storage.image_storage import image_storage
-    # if image.local_path:
-    #     await image_storage.delete_file(image.local_path)
+    # Remove from local storage if cached
+    if image.local_path:
+        try:
+            await storage_adapter.delete_image(image.local_path)
+        except OSError:
+            logger.warning("Failed to delete local image file: %s", image.local_path)
 
     # Delete image from database
     await db.execute(delete(GeneratedImage).where(GeneratedImage.id == image_id))

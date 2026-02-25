@@ -607,6 +607,8 @@ export default function ArticlesPage() {
                     )}
                     <button
                       onClick={() => setActiveMenu(activeMenu === article.id ? null : article.id)}
+                      aria-expanded={activeMenu === article.id}
+                      aria-label="Article actions"
                       className="p-1.5 rounded-lg hover:bg-surface-secondary"
                       disabled={isViewer}
                     >

@@ -200,6 +200,7 @@ function NotificationBell() {
       <button
         onClick={handleOpen}
         aria-label="Notifications"
+        aria-expanded={open}
         className="relative flex items-center justify-center h-9 w-9 rounded-xl hover:bg-surface-secondary transition-colors"
       >
         <Bell className="h-5 w-5 text-text-secondary" />
@@ -396,6 +397,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                         }
                         setExpandedMenus(newExpanded);
                       }}
+                      aria-expanded={isExpanded}
                       className={clsx(
                         "flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
                         hasActiveChild
@@ -578,6 +580,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             {/* User card - always visible at bottom */}
             <button
               onClick={() => setUserMenuOpen(!userMenuOpen)}
+              aria-expanded={userMenuOpen}
               className="w-full flex items-center gap-3 p-4 hover:bg-primary-900 transition-colors"
             >
               <div className="h-9 w-9 rounded-full bg-primary-700 flex items-center justify-center shrink-0">
@@ -608,6 +611,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           <div className="flex h-full items-center justify-between px-4 lg:px-8">
             <button
               onClick={() => setSidebarOpen(true)}
+              aria-expanded={sidebarOpen}
+              aria-label="Open sidebar"
               className="lg:hidden p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-surface-secondary"
             >
               <Menu className="h-5 w-5 text-text-secondary" />

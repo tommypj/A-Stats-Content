@@ -18,7 +18,7 @@ from infrastructure.database.models.content import Article, Outline, GeneratedIm
 from infrastructure.database.models.social import SocialAccount, ScheduledPost
 from infrastructure.database.models.knowledge import KnowledgeSource
 from infrastructure.database.models.analytics import GSCConnection
-from infrastructure.database.models.project import ProjectMember
+from infrastructure.database.models.project import ProjectMember, ProjectMemberRole
 
 
 # Type alias for content models
@@ -219,18 +219,24 @@ async def verify_content_edit(
     if content.user_id == user.id and content.project_id is None:
         return  # User owns this personal content
 
-    # Project content check
+    # Project content check — viewers cannot edit
     if content.project_id:
-        is_member = await verify_project_membership(db, user, content.project_id)
-        if is_member:
-            # TODO: Add role-based permission check once ProjectMember model exists
-            # For now, all project members can edit (MEMBER+ role)
-            # Example:
-            # if member.role in (ProjectRole.MEMBER, ProjectRole.ADMIN, ProjectRole.OWNER):
-            #     return
-            # else:
-            #     raise HTTPException(403, "You don't have permission to edit project content")
-            return  # User is a project member with edit access
+        stmt = select(ProjectMember).where(
+            and_(
+                ProjectMember.project_id == content.project_id,
+                ProjectMember.user_id == user.id,
+                ProjectMember.deleted_at.is_(None),
+            )
+        )
+        result = await db.execute(stmt)
+        member = result.scalar_one_or_none()
+        if member and member.role != ProjectMemberRole.VIEWER.value:
+            return  # OWNER, ADMIN, or EDITOR can edit
+        if member and member.role == ProjectMemberRole.VIEWER.value:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Viewers cannot edit project content",
+            )
 
     # If we reach here, user doesn't have edit access
     raise HTTPException(

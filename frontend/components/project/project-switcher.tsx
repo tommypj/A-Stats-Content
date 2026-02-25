@@ -29,6 +29,8 @@ export function ProjectSwitcher() {
       <button
         onClick={() => setIsOpen(!isOpen)}
         disabled={isLoading}
+        aria-expanded={isOpen}
+        aria-label="Switch project"
         className={clsx(
           "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
           "hover:bg-surface-secondary",
