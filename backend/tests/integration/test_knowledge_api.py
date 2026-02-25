@@ -13,6 +13,7 @@ Tests cover all endpoints:
 import pytest
 from io import BytesIO
 from uuid import uuid4
+from unittest.mock import patch
 
 # Skip if routes not implemented yet
 pytest.importorskip("api.routes.knowledge", reason="Knowledge routes not yet implemented")
@@ -25,23 +26,25 @@ class TestUploadEndpoint:
     async def test_upload_pdf_success(self, async_client, auth_headers, sample_pdf):
         """Test successful PDF upload.
 
-        The route returns 200 (not 202) and the response uses 'id' (not 'source_id').
-        Status value is the raw DB status string (e.g. 'pending').
+        The route returns 200 and processes the document synchronously.
+        Mock text extraction since pypdf may not be in the test environment.
         """
         files = {
             'file': ('test_document.pdf', sample_pdf, 'application/pdf')
         }
 
-        response = await async_client.post(
-            "/api/v1/knowledge/upload",
-            files=files,
-            headers=auth_headers
-        )
+        with patch("api.routes.knowledge.kp.extract_text", return_value=("Sample extracted text from PDF.", True)), \
+             patch("api.routes.knowledge.kp.split_into_chunks", return_value=["Sample extracted text from PDF."]):
+            response = await async_client.post(
+                "/api/v1/knowledge/upload",
+                files=files,
+                headers=auth_headers
+            )
 
         assert response.status_code == 200
         data = response.json()
         assert 'id' in data
-        assert data['status'] == 'pending'
+        assert data['status'] == 'completed'
         assert data['filename'] == 'test_document.pdf'
 
     @pytest.mark.asyncio

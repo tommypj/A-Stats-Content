@@ -167,10 +167,10 @@ class TestS3StorageAdapter:
         assert call_args[1]['Bucket'] == 'test-bucket'
         assert call_args[1]['Body'] == sample_image_data
         assert call_args[1]['ContentType'] == 'image/png'
-        assert call_args[1]['ACL'] == 'public-read'
+        # ACL is no longer set — images are private, served via presigned URLs
+        assert 'ACL' not in call_args[1]
 
-        # Verify URL format
-        assert url.startswith('https://test-bucket.s3.us-east-1.amazonaws.com/')
+        # save_image now returns the S3 key (not the full URL)
         assert 'images/' in url
 
     @pytest.mark.asyncio
@@ -267,12 +267,20 @@ class TestS3StorageAdapter:
 
     @pytest.mark.asyncio
     async def test_get_image_url_format(self, adapter):
-        """Test S3 URL generation."""
+        """Test S3 presigned URL generation."""
         s3_key = "images/2026/02/test_12345.png"
+        # Mock generate_presigned_url to return a known URL
+        adapter.s3_client.generate_presigned_url = Mock(
+            return_value=f"https://test-bucket.s3.us-east-1.amazonaws.com/{s3_key}?X-Amz-Signature=abc"
+        )
         url = await adapter.get_image_url(s3_key)
 
-        expected = f"https://test-bucket.s3.us-east-1.amazonaws.com/{s3_key}"
-        assert url == expected
+        adapter.s3_client.generate_presigned_url.assert_called_once_with(
+            'get_object',
+            Params={'Bucket': 'test-bucket', 'Key': s3_key},
+            ExpiresIn=604800,
+        )
+        assert s3_key in url
 
 
 class TestDownloadImage:
@@ -286,6 +294,7 @@ class TestDownloadImage:
 
         mock_response = AsyncMock()
         mock_response.status = 200
+        mock_response.headers = {"content-type": "image/png"}
         mock_response.read = AsyncMock(return_value=test_data)
         mock_response.__aenter__ = AsyncMock(return_value=mock_response)
         mock_response.__aexit__ = AsyncMock(return_value=None)

@@ -103,32 +103,36 @@ class TestRateLimitingEmailVerification:
         """Test that verify email endpoint is rate limited (5 requests per hour)."""
         # Make 5 verification attempts (will fail but should not be rate limited)
         for i in range(5):
-            response = await async_client.post("/api/v1/auth/verify-email", params={
-                "token": f"invalid_token_{i}"
-            })
+            response = await async_client.post(
+                "/api/v1/auth/verify-email",
+                json={"token": f"invalid_token_{i}"},
+            )
             # Should get 400 for invalid token, not 429
             assert response.status_code == 400
 
         # 6th attempt should be rate limited
-        response = await async_client.post("/api/v1/auth/verify-email", params={
-            "token": "invalid_token_6"
-        })
+        response = await async_client.post(
+            "/api/v1/auth/verify-email",
+            json={"token": "invalid_token_6"},
+        )
         assert response.status_code == 429
 
     async def test_resend_verification_rate_limit_exceeded(self, async_client: AsyncClient):
         """Test that resend verification endpoint is rate limited (5 requests per hour)."""
         # Make 5 resend verification requests
         for i in range(5):
-            response = await async_client.post("/api/v1/auth/resend-verification", params={
-                "email": f"user{i}@example.com"
-            })
+            response = await async_client.post(
+                "/api/v1/auth/resend-verification",
+                json={"email": f"user{i}@example.com"},
+            )
             # All should return 202 (even for non-existent emails to prevent enumeration)
             assert response.status_code == 202
 
         # 6th attempt should be rate limited
-        response = await async_client.post("/api/v1/auth/resend-verification", params={
-            "email": "user6@example.com"
-        })
+        response = await async_client.post(
+            "/api/v1/auth/resend-verification",
+            json={"email": "user6@example.com"},
+        )
         assert response.status_code == 429
 
 

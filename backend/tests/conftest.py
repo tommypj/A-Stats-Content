@@ -423,7 +423,7 @@ async def processed_source(db_session: AsyncSession, test_user: User):
 
     Used for testing query operations that require indexed content.
     """
-    from infrastructure.database.models.knowledge import KnowledgeSource, SourceStatus
+    from infrastructure.database.models.knowledge import KnowledgeSource, KnowledgeChunk, SourceStatus
 
     source = KnowledgeSource(
         id=str(uuid4()),
@@ -434,9 +434,31 @@ async def processed_source(db_session: AsyncSession, test_user: User):
         file_size=5120,
         file_url="uploads/therapy_guide.pdf",
         status=SourceStatus.COMPLETED.value,
-        chunk_count=25,
+        chunk_count=5,
     )
     db_session.add(source)
+    await db_session.flush()
+
+    # Add actual chunks so query endpoint doesn't return 400
+    now = datetime.utcnow()
+    chunk_texts = [
+        "Cognitive behavioral therapy (CBT) is a structured form of psychotherapy.",
+        "Mindfulness meditation involves focusing attention on the present moment.",
+        "Exposure therapy gradually exposes patients to feared situations.",
+        "Relaxation techniques include deep breathing and progressive muscle relaxation.",
+        "Behavioral activation involves scheduling positive and rewarding activities.",
+    ]
+    for i, text in enumerate(chunk_texts):
+        chunk = KnowledgeChunk(
+            id=str(uuid4()),
+            source_id=source.id,
+            chunk_index=i,
+            content=text,
+            char_count=len(text),
+            created_at=now,
+        )
+        db_session.add(chunk)
+
     await db_session.commit()
     await db_session.refresh(source)
     return source
@@ -541,11 +563,11 @@ async def test_sources(db_session: AsyncSession, test_user: User):
 @pytest.fixture
 async def processed_sources(db_session: AsyncSession, test_user: User):
     """
-    Create multiple completed KnowledgeSource records.
+    Create multiple completed KnowledgeSource records with chunks.
 
     Used for testing multi-source queries and filtering.
     """
-    from infrastructure.database.models.knowledge import KnowledgeSource, SourceStatus
+    from infrastructure.database.models.knowledge import KnowledgeSource, KnowledgeChunk, SourceStatus
 
     filenames = [
         "cbt_techniques.pdf",
@@ -563,13 +585,29 @@ async def processed_sources(db_session: AsyncSession, test_user: User):
             file_size=2048,
             file_url=f"uploads/{filename}",
             status=SourceStatus.COMPLETED.value,
-            chunk_count=15,
+            chunk_count=3,
         )
         for filename in filenames
     ]
 
     for source in sources:
         db_session.add(source)
+
+    await db_session.flush()
+
+    # Add chunks for each source
+    now = datetime.utcnow()
+    for source in sources:
+        for i in range(3):
+            chunk = KnowledgeChunk(
+                id=str(uuid4()),
+                source_id=source.id,
+                chunk_index=i,
+                content=f"Sample content about {source.title} techniques, chunk {i}.",
+                char_count=60,
+                created_at=now,
+            )
+            db_session.add(chunk)
 
     await db_session.commit()
 
@@ -1038,6 +1076,40 @@ async def team_invitation(db_session: AsyncSession, team: dict, test_user: User)
         "token": invitation.token,
         "status": invitation.status,
     }
+
+
+# Aliases: test files use "project" naming; conftest uses "team" naming
+@pytest.fixture
+async def project(team: dict) -> dict:
+    return team
+
+@pytest.fixture
+async def project_admin(team_admin: dict) -> dict:
+    return team_admin
+
+@pytest.fixture
+def project_admin_auth(team_admin_auth: dict) -> dict:
+    return team_admin_auth
+
+@pytest.fixture
+async def project_member(team_member: dict) -> dict:
+    return team_member
+
+@pytest.fixture
+def project_member_auth(team_member_auth: dict) -> dict:
+    return team_member_auth
+
+@pytest.fixture
+async def project_viewer(team_viewer: dict) -> dict:
+    return team_viewer
+
+@pytest.fixture
+def project_viewer_auth(team_viewer_auth: dict) -> dict:
+    return team_viewer_auth
+
+@pytest.fixture
+async def project_invitation(team_invitation: dict) -> dict:
+    return team_invitation
 
 
 # ============================================================================

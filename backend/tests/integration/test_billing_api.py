@@ -344,10 +344,21 @@ class TestCancelEndpoint:
         access_token = token_service.create_access_token(user_id=user.id)
         headers = {"Authorization": f"Bearer {access_token}"}
 
-        response = await async_client.post(
-            "/api/v1/billing/cancel",
-            headers=headers,
-        )
+        # Mock the LemonSqueezy API call so the test doesn't make a real request
+        mock_ls_response = AsyncMock()
+        mock_ls_response.status_code = 200
+
+        with patch("api.routes.billing.httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.delete = AsyncMock(return_value=mock_ls_response)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client_cls.return_value = mock_client
+
+            response = await async_client.post(
+                "/api/v1/billing/cancel",
+                headers=headers,
+            )
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()

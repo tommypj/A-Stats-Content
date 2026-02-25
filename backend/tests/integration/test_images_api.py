@@ -63,17 +63,17 @@ class TestImageGenerateEndpoint:
                 headers=auth_headers,
             )
 
-        assert response.status_code == status.HTTP_201_CREATED
+        # Image generation is async — endpoint returns 202 with "generating" status.
+        # The actual AI call and storage happen in a background task.
+        assert response.status_code == status.HTTP_202_ACCEPTED
         data = response.json()
 
         assert data["prompt"] == "A beautiful sunset"
         assert data["style"] == "photographic"
         assert data["width"] == 1024
         assert data["height"] == 1024
-        assert data["status"] == "completed"
-        assert data["url"] == "https://replicate.delivery/test-image.png"
-        assert data["local_path"] == "images/2026/02/test_image.jpg"
-        assert "AI-generated image" in data["alt_text"]
+        assert data["status"] == "generating"
+        assert data["id"] is not None
 
     @pytest.mark.asyncio
     async def test_generate_image_with_article_id(
@@ -127,9 +127,10 @@ class TestImageGenerateEndpoint:
                 headers=auth_headers,
             )
 
-        assert response.status_code == status.HTTP_201_CREATED
+        assert response.status_code == status.HTTP_202_ACCEPTED
         data = response.json()
         assert data["article_id"] == article.id
+        assert data["status"] == "generating"
 
     @pytest.mark.asyncio
     async def test_generate_image_invalid_article_id(
@@ -208,8 +209,11 @@ class TestImageGenerateEndpoint:
                 headers=auth_headers,
             )
 
-        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-        assert "Failed to generate image" in response.json()["detail"]
+        # Service failure happens in the background task, not during the request.
+        # The endpoint always returns 202 with "generating" status.
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        data = response.json()
+        assert data["status"] == "generating"
 
 
 class TestListImagesEndpoint:

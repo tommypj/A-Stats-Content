@@ -165,11 +165,11 @@ class TestGenerateArticle:
 
         assert response.status_code == 201
         data = response.json()
-        assert data["status"] == ContentStatus.COMPLETED.value
+        # Article generation is async — the endpoint returns immediately
+        # with status "generating"; content is populated by the background task.
+        assert data["status"] == ContentStatus.GENERATING.value
         assert data["outline_id"] == outline.id
-        assert data["content"] is not None
-        assert data["word_count"] > 0
-        assert "seo_score" in data
+        assert data["id"] is not None
 
     async def test_generate_article_outline_not_found(
         self,
@@ -250,9 +250,9 @@ class TestGenerateArticle:
 
         assert response.status_code == 201
         data = response.json()
-        assert data["status"] == ContentStatus.FAILED.value
-        # generation_error is stored in the DB model but not exposed in
-        # ArticleResponse schema; verify only that status is FAILED.
+        # AI failure happens in the background task, not during the request.
+        # The endpoint always returns "generating" immediately.
+        assert data["status"] == ContentStatus.GENERATING.value
 
 
 class TestListArticles:

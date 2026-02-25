@@ -366,7 +366,9 @@ class TestEmailVerification:
         token_service = TokenService(secret_key=settings.jwt_secret_key)
         token = token_service.create_email_verification_token(user.id, user.email)
 
-        response = await async_client.post(f"/api/v1/auth/verify-email?token={token}")
+        response = await async_client.post(
+            "/api/v1/auth/verify-email", json={"token": token}
+        )
         assert response.status_code == 200
         assert "verified successfully" in response.json()["message"].lower()
 
@@ -377,7 +379,9 @@ class TestEmailVerification:
 
     async def test_verify_email_invalid_token(self, async_client: AsyncClient):
         """Test email verification with invalid token."""
-        response = await async_client.post("/api/v1/auth/verify-email?token=invalid-token")
+        response = await async_client.post(
+            "/api/v1/auth/verify-email", json={"token": "invalid-token"}
+        )
         assert response.status_code == 400
         assert "invalid" in response.json()["detail"].lower()
 
@@ -402,7 +406,7 @@ class TestEmailVerification:
         await db_session.commit()
 
         response = await async_client.post(
-            f"/api/v1/auth/resend-verification?email={user.email}"
+            "/api/v1/auth/resend-verification", json={"email": user.email}
         )
         assert response.status_code == 202
 
