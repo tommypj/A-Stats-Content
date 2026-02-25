@@ -221,15 +221,21 @@ class SocialSchedulerService:
                 # Update stored credentials
                 await self._update_account_tokens(account, credentials, db)
 
-            # Publish the post
+            # Publish the post — Facebook requires page_id and page_token from account metadata
+            extra_kwargs = {}
+            if account.platform in ("facebook", "instagram"):
+                metadata = account.account_metadata or {}
+                extra_kwargs["page_id"] = metadata.get("page_id")
+                extra_kwargs["page_token"] = metadata.get("page_token")
+
             result: PostResult
             if post.media_urls:
                 # Post with media
                 media_list = post.media_urls if isinstance(post.media_urls, list) else []
-                result = await adapter.post_with_media(credentials, post.content, media_list)
+                result = await adapter.post_with_media(credentials, post.content, media_list, **extra_kwargs)
             else:
                 # Text-only post
-                result = await adapter.post_text(credentials, post.content)
+                result = await adapter.post_text(credentials, post.content, **extra_kwargs)
 
             # Update target
             if result.success:

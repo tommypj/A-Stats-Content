@@ -67,13 +67,29 @@ class GenerationTracker:
         log.duration_ms = duration_ms
         log.cost_credits = 1
 
-        # Increment project usage counter if project exists
+        # Increment usage counters
         if log.project_id:
             try:
                 usage_service = ProjectUsageService(self.db)
                 await usage_service.increment_usage(log.project_id, log.resource_type + "s")
             except Exception as e:
                 logger.warning("Failed to increment usage for project %s: %s", log.project_id, e)
+        else:
+            # Increment user-level counters for personal workspace
+            try:
+                from infrastructure.database.models.user import User
+                user_result = await self.db.execute(
+                    select(User).where(User.id == log.user_id)
+                )
+                user = user_result.scalar_one_or_none()
+                if user:
+                    usage_field = f"{log.resource_type}s_generated_this_month"
+                    current = getattr(user, usage_field, 0) or 0
+                    setattr(user, usage_field, current + 1)
+                else:
+                    logger.warning("User %s not found for usage increment", log.user_id)
+            except Exception as e:
+                logger.warning("Failed to increment user usage for %s: %s", log.user_id, e)
 
         await self.db.flush()
 

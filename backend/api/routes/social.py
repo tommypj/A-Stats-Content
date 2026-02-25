@@ -1272,7 +1272,7 @@ async def get_best_posting_times(
     # Query published post targets for this user + platform
     result = await db.execute(
         select(PostTarget, ScheduledPost)
-        .join(ScheduledPost, PostTarget.post_id == ScheduledPost.id)
+        .join(ScheduledPost, PostTarget.scheduled_post_id == ScheduledPost.id)
         .join(SocialAccount, PostTarget.social_account_id == SocialAccount.id)
         .where(
             ScheduledPost.user_id == current_user.id,

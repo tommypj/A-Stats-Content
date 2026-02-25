@@ -392,14 +392,17 @@ async def _run_article_generation(
             article.status = ContentStatus.COMPLETED.value
 
             # Run SEO analysis
-            seo_result = analyze_seo(
-                generated.content,
-                outline_keyword,
-                outline_title,
-                generated.meta_description,
-            )
-            article.seo_score = seo_result["score"]
-            article.seo_analysis = seo_result
+            try:
+                seo_result = analyze_seo(
+                    generated.content,
+                    outline_keyword,
+                    outline_title,
+                    generated.meta_description,
+                )
+                article.seo_score = seo_result["score"]
+                article.seo_analysis = seo_result
+            except Exception as seo_err:
+                logger.warning("SEO analysis failed for article %s: %s", article_id, seo_err)
 
             # Generate image prompt (with 30s timeout)
             try:
@@ -422,11 +425,12 @@ async def _run_article_generation(
 
             # Log successful generation and increment usage
             duration_ms = int((time.time() - start_time) * 1000)
-            await tracker.log_success(
-                log_id=gen_log.id,
-                ai_model=settings.anthropic_model,
-                duration_ms=duration_ms,
-            )
+            if gen_log is not None:
+                await tracker.log_success(
+                    log_id=gen_log.id,
+                    ai_model=settings.anthropic_model,
+                    duration_ms=duration_ms,
+                )
             await db.commit()
             logger.info("Article %s generated successfully", article_id)
 
@@ -475,13 +479,20 @@ async def generate_article(
     Generate an article from an outline using AI.
     Returns immediately with status 'generating'; the frontend polls for completion.
     """
-    # Get the outline
-    result = await db.execute(
-        select(Outline).where(
+    # Get the outline — scoped to project or personal workspace
+    project_id = getattr(current_user, 'current_project_id', None)
+    if project_id:
+        outline_query = select(Outline).where(
+            Outline.id == body.outline_id,
+            Outline.project_id == project_id,
+        )
+    else:
+        outline_query = select(Outline).where(
             Outline.id == body.outline_id,
             Outline.user_id == current_user.id,
+            Outline.project_id.is_(None),
         )
-    )
+    result = await db.execute(outline_query)
     outline = result.scalar_one_or_none()
 
     if not outline:
@@ -497,7 +508,6 @@ async def generate_article(
         )
 
     # Check usage limit
-    project_id = getattr(current_user, 'current_project_id', None)
     tracker = GenerationTracker(db)
     if not await tracker.check_limit(project_id, "article", user_id=current_user.id):
         raise HTTPException(
@@ -516,6 +526,7 @@ async def generate_article(
     article = Article(
         id=article_id,
         user_id=current_user.id,
+        project_id=project_id,
         outline_id=outline.id,
         title=outline.title,
         slug=slug,

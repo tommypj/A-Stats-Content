@@ -351,6 +351,7 @@ export const api = {
         method: "POST",
         url: "/outlines",
         data,
+        timeout: AI_TIMEOUT,
       }),
     update: (id: string, data: UpdateOutlineInput) =>
       apiRequest<Outline>({

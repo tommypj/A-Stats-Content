@@ -238,6 +238,7 @@ async def generate_image(
     image = GeneratedImage(
         id=image_id,
         user_id=current_user.id,
+        project_id=project_id,
         article_id=body.article_id,
         prompt=body.prompt,
         style=body.style,
