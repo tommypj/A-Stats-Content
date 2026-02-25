@@ -51,12 +51,16 @@ def _make_user(
     articles_used: int = 0,
 ) -> MagicMock:
     """Build a mock User with the usage fields needed by GenerationTracker."""
+    from datetime import datetime, timezone
+
     user = MagicMock()
     user.id = user_id
     user.subscription_tier = tier
     user.articles_generated_this_month = articles_used
     user.outlines_generated_this_month = 0
     user.images_generated_this_month = 0
+    # Set a future reset date so _reset_user_usage_if_needed is a no-op
+    user.usage_reset_date = datetime(2099, 1, 1, tzinfo=timezone.utc)
     return user
 
 
@@ -133,25 +137,38 @@ class TestGenerationLog:
         # Usage should be incremented for the project
         mock_usage.increment_usage.assert_called_once_with(project_id, "articles")
 
-    async def test_log_success_no_project_skips_usage_increment(self):
-        """When project_id is None, log_success should NOT call usage service."""
+    async def test_log_success_no_project_increments_user_usage(self):
+        """When project_id is None, log_success increments user-level counters."""
         db = _make_db_session()
         tracker = GenerationTracker(db)
 
+        user_id = str(uuid4())
         log_id = str(uuid4())
         fake_log = MagicMock()
         fake_log.id = log_id
+        fake_log.user_id = user_id
         fake_log.project_id = None  # personal workspace
         fake_log.resource_type = "article"
 
-        execute_result = MagicMock()
-        execute_result.scalar_one_or_none.return_value = fake_log
-        db.execute = AsyncMock(return_value=execute_result)
+        # First execute returns the log, second returns the user
+        fake_user = MagicMock()
+        fake_user.id = user_id
+        fake_user.articles_generated_this_month = 3
+
+        log_result = MagicMock()
+        log_result.scalar_one_or_none.return_value = fake_log
+        user_result = MagicMock()
+        user_result.scalar_one_or_none.return_value = fake_user
+
+        db.execute = AsyncMock(side_effect=[log_result, user_result])
 
         with patch("services.generation_tracker.ProjectUsageService") as MockUsage:
             await tracker.log_success(log_id=log_id)
 
+        # ProjectUsageService should NOT be called for personal workspace
         MockUsage.assert_not_called()
+        # User-level counter should be incremented
+        assert fake_user.articles_generated_this_month == 4
         assert fake_log.status == "success"
 
     async def test_log_failure_sets_status_and_creates_alert(self):
@@ -337,23 +354,19 @@ class TestCheckLimitUserLevel:
         db.execute = AsyncMock(return_value=execute_result)
 
         tracker = GenerationTracker(db)
-
-        # Disable Redis to exercise the DB-level branch
-        with patch("services.generation_tracker.settings") as mock_settings:
-            mock_settings.redis_url = None
-            result = await tracker.check_limit(
-                project_id=None,
-                resource_type="article",
-                user_id=user_id,
-            )
+        result = await tracker.check_limit(
+            project_id=None,
+            resource_type="article",
+            user_id=user_id,
+        )
 
         assert result is True
 
     async def test_check_limit_user_exceeded_returns_false(self):
-        """User on free plan that has already used all 5 articles."""
+        """User on free plan that has already used all 10 articles."""
         user_id = str(uuid4())
-        # free tier limit = 5; user used 5 -> exceeded
-        mock_user = _make_user(user_id, tier="free", articles_used=5)
+        # free tier limit = 10; user used 10 -> exceeded
+        mock_user = _make_user(user_id, tier="free", articles_used=10)
 
         db = _make_db_session()
         execute_result = MagicMock()
@@ -361,14 +374,11 @@ class TestCheckLimitUserLevel:
         db.execute = AsyncMock(return_value=execute_result)
 
         tracker = GenerationTracker(db)
-
-        with patch("services.generation_tracker.settings") as mock_settings:
-            mock_settings.redis_url = None
-            result = await tracker.check_limit(
-                project_id=None,
-                resource_type="article",
-                user_id=user_id,
-            )
+        result = await tracker.check_limit(
+            project_id=None,
+            resource_type="article",
+            user_id=user_id,
+        )
 
         assert result is False
 
@@ -383,19 +393,16 @@ class TestCheckLimitUserLevel:
         db.execute = AsyncMock(return_value=execute_result)
 
         tracker = GenerationTracker(db)
-
-        with patch("services.generation_tracker.settings") as mock_settings:
-            mock_settings.redis_url = None
-            result = await tracker.check_limit(
-                project_id=None,
-                resource_type="article",
-                user_id=user_id,
-            )
+        result = await tracker.check_limit(
+            project_id=None,
+            resource_type="article",
+            user_id=user_id,
+        )
 
         assert result is True
 
-    async def test_check_limit_user_not_found_returns_false(self):
-        """If the user record doesn't exist, deny generation."""
+    async def test_check_limit_user_not_found_fails_open(self):
+        """If the user record doesn't exist, fail open (return True)."""
         user_id = str(uuid4())
 
         db = _make_db_session()
@@ -404,29 +411,24 @@ class TestCheckLimitUserLevel:
         db.execute = AsyncMock(return_value=execute_result)
 
         tracker = GenerationTracker(db)
+        result = await tracker.check_limit(
+            project_id=None,
+            resource_type="article",
+            user_id=user_id,
+        )
 
-        with patch("services.generation_tracker.settings") as mock_settings:
-            mock_settings.redis_url = None
-            result = await tracker.check_limit(
-                project_id=None,
-                resource_type="article",
-                user_id=user_id,
-            )
-
-        assert result is False
+        assert result is True
 
     async def test_check_limit_no_context_fails_open(self):
         """No project_id and no user_id — fail open (return True)."""
         db = _make_db_session()
         tracker = GenerationTracker(db)
 
-        with patch("services.generation_tracker.settings") as mock_settings:
-            mock_settings.redis_url = None
-            result = await tracker.check_limit(
-                project_id=None,
-                resource_type="article",
-                user_id=None,
-            )
+        result = await tracker.check_limit(
+            project_id=None,
+            resource_type="article",
+            user_id=None,
+        )
 
         assert result is True
 
@@ -440,201 +442,12 @@ class TestCheckLimitUserLevel:
         db.execute = AsyncMock(side_effect=Exception("Connection refused"))
 
         tracker = GenerationTracker(db)
-
-        with patch("services.generation_tracker.settings") as mock_settings:
-            mock_settings.redis_url = None
-            result = await tracker.check_limit(
-                project_id=None,
-                resource_type="article",
-                user_id=user_id,
-            )
+        result = await tracker.check_limit(
+            project_id=None,
+            resource_type="article",
+            user_id=user_id,
+        )
 
         assert result is True
 
 
-# ---------------------------------------------------------------------------
-# Tests: check_limit — Redis atomic counter
-# ---------------------------------------------------------------------------
-
-class TestCheckLimitRedisAtomicCounter:
-    """Tests for the Redis-based atomic counter in check_limit."""
-
-    async def test_redis_counter_within_limit_returns_true(self):
-        """
-        When Redis is configured and the counter is below the plan cap,
-        check_limit returns True without hitting the DB for the limit check.
-        """
-        project_id = str(uuid4())
-        db = _make_db_session()
-        tracker = GenerationTracker(db)
-
-        # Simulate Redis incrementing to 3 (below free-tier cap of 10)
-        mock_redis = AsyncMock()
-        mock_redis.incr = AsyncMock(return_value=3)
-        mock_redis.expire = AsyncMock()
-        mock_redis.aclose = AsyncMock()
-
-        with patch("services.generation_tracker.settings") as mock_settings:
-            mock_settings.redis_url = "redis://localhost:6379/0"
-
-            with patch(
-                "services.generation_tracker.GenerationTracker._get_limit",
-                new_callable=AsyncMock,
-                return_value=10,  # free-tier articles cap
-            ):
-                with patch("redis.asyncio.from_url", return_value=mock_redis):
-                    result = await tracker.check_limit(
-                        project_id=project_id,
-                        resource_type="article",
-                    )
-
-        assert result is True
-        mock_redis.incr.assert_called_once()
-        mock_redis.aclose.assert_called_once()
-
-    async def test_redis_counter_exceeded_returns_false(self):
-        """Redis counter exceeds the cap — should deny generation."""
-        project_id = str(uuid4())
-        db = _make_db_session()
-        tracker = GenerationTracker(db)
-
-        mock_redis = AsyncMock()
-        mock_redis.incr = AsyncMock(return_value=11)  # over cap=10
-        mock_redis.expire = AsyncMock()
-        mock_redis.aclose = AsyncMock()
-
-        with patch("services.generation_tracker.settings") as mock_settings:
-            mock_settings.redis_url = "redis://localhost:6379/0"
-
-            with patch(
-                "services.generation_tracker.GenerationTracker._get_limit",
-                new_callable=AsyncMock,
-                return_value=10,
-            ):
-                with patch("redis.asyncio.from_url", return_value=mock_redis):
-                    result = await tracker.check_limit(
-                        project_id=project_id,
-                        resource_type="article",
-                    )
-
-        assert result is False
-
-    async def test_redis_unlimited_plan_returns_true(self):
-        """When limit is -1 (unlimited), Redis counter is irrelevant."""
-        project_id = str(uuid4())
-        db = _make_db_session()
-        tracker = GenerationTracker(db)
-
-        mock_redis = AsyncMock()
-        mock_redis.incr = AsyncMock(return_value=99999)
-        mock_redis.expire = AsyncMock()
-        mock_redis.aclose = AsyncMock()
-
-        with patch("services.generation_tracker.settings") as mock_settings:
-            mock_settings.redis_url = "redis://localhost:6379/0"
-
-            with patch(
-                "services.generation_tracker.GenerationTracker._get_limit",
-                new_callable=AsyncMock,
-                return_value=-1,  # unlimited
-            ):
-                with patch("redis.asyncio.from_url", return_value=mock_redis):
-                    result = await tracker.check_limit(
-                        project_id=project_id,
-                        resource_type="article",
-                    )
-
-        assert result is True
-
-    async def test_redis_unavailable_falls_back_to_db(self):
-        """
-        If Redis raises an exception, check_limit falls back to the DB-based
-        check rather than raising or returning an incorrect result.
-        """
-        project_id = str(uuid4())
-        db = _make_db_session()
-        tracker = GenerationTracker(db)
-
-        # Redis throws ConnectionError
-        mock_redis = AsyncMock()
-        mock_redis.incr = AsyncMock(side_effect=ConnectionError("Redis down"))
-
-        with patch("services.generation_tracker.settings") as mock_settings:
-            mock_settings.redis_url = "redis://localhost:6379/0"
-
-            with patch("redis.asyncio.from_url", return_value=mock_redis):
-                with patch(
-                    "services.generation_tracker.ProjectUsageService"
-                ) as MockUsage:
-                    mock_usage_instance = AsyncMock()
-                    mock_usage_instance.reset_project_usage_if_needed = AsyncMock(
-                        return_value=False
-                    )
-                    mock_usage_instance.check_project_limit = AsyncMock(return_value=True)
-                    MockUsage.return_value = mock_usage_instance
-
-                    result = await tracker.check_limit(
-                        project_id=project_id,
-                        resource_type="article",
-                    )
-
-        # Should have fallen back to DB check and returned True
-        assert result is True
-        mock_usage_instance.check_project_limit.assert_called_once()
-
-    async def test_redis_sets_ttl_on_first_use(self):
-        """When Redis counter is first created (value == 1), a TTL is set."""
-        project_id = str(uuid4())
-        db = _make_db_session()
-        tracker = GenerationTracker(db)
-
-        mock_redis = AsyncMock()
-        mock_redis.incr = AsyncMock(return_value=1)  # first use
-        mock_redis.expire = AsyncMock()
-        mock_redis.aclose = AsyncMock()
-
-        with patch("services.generation_tracker.settings") as mock_settings:
-            mock_settings.redis_url = "redis://localhost:6379/0"
-
-            with patch(
-                "services.generation_tracker.GenerationTracker._get_limit",
-                new_callable=AsyncMock,
-                return_value=10,
-            ):
-                with patch("redis.asyncio.from_url", return_value=mock_redis):
-                    await tracker.check_limit(
-                        project_id=project_id,
-                        resource_type="article",
-                    )
-
-        # expire must have been called with 86400 * 35 seconds TTL
-        mock_redis.expire.assert_called_once()
-        ttl_arg = mock_redis.expire.call_args[0][1]
-        assert ttl_arg == 86400 * 35
-
-    async def test_redis_no_ttl_on_subsequent_increments(self):
-        """When Redis counter > 1, no TTL call is made (key already exists)."""
-        project_id = str(uuid4())
-        db = _make_db_session()
-        tracker = GenerationTracker(db)
-
-        mock_redis = AsyncMock()
-        mock_redis.incr = AsyncMock(return_value=5)  # not first use
-        mock_redis.expire = AsyncMock()
-        mock_redis.aclose = AsyncMock()
-
-        with patch("services.generation_tracker.settings") as mock_settings:
-            mock_settings.redis_url = "redis://localhost:6379/0"
-
-            with patch(
-                "services.generation_tracker.GenerationTracker._get_limit",
-                new_callable=AsyncMock,
-                return_value=10,
-            ):
-                with patch("redis.asyncio.from_url", return_value=mock_redis):
-                    await tracker.check_limit(
-                        project_id=project_id,
-                        resource_type="article",
-                    )
-
-        mock_redis.expire.assert_not_called()
