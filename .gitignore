@@ -1,5 +1,9 @@
 # A-Stats Engine .gitignore
 
+# Claude agent logs (operational context, not source code)
+.claude/AGENT_LOG.md
+.claude/DEV_LOG.md
+
 # Windows reserved names
 nul
 con
