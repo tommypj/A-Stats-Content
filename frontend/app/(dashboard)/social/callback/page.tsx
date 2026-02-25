@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useCallback, useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,11 +13,7 @@ function CallbackContent() {
   const [error, setError] = useState<string | null>(null);
   const [platform, setPlatform] = useState<string>("social");
 
-  useEffect(() => {
-    handleCallback();
-  }, []);
-
-  const handleCallback = async () => {
+  const handleCallback = useCallback(async () => {
     try {
       const success = searchParams.get("success");
       const errorParam = searchParams.get("error");
@@ -56,7 +52,11 @@ function CallbackContent() {
       setError(err instanceof Error ? err.message : "Failed to connect account");
       setStatus("error");
     }
-  };
+  }, [searchParams, router]);
+
+  useEffect(() => {
+    handleCallback();
+  }, [handleCallback]);
 
   if (status === "loading") {
     return (

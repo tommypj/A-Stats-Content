@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -23,11 +23,7 @@ function AnalyticsCallbackContent() {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    handleCallback();
-  }, []);
-
-  async function handleCallback() {
+  const handleCallback = useCallback(async () => {
     const code = searchParams.get("code");
     const state = searchParams.get("state");
 
@@ -52,7 +48,11 @@ function AnalyticsCallbackContent() {
       setErrorMessage(apiError.message);
       toast.error(apiError.message || "Failed to connect Google Search Console");
     }
-  }
+  }, [searchParams, router]);
+
+  useEffect(() => {
+    handleCallback();
+  }, [handleCallback]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">

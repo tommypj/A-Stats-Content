@@ -29,6 +29,7 @@ async def get_generation_status(
     entries.
     """
     from infrastructure.database.models import Article, Outline, GeneratedImage
+    from infrastructure.database.models.content import ContentStatus
 
     five_min_ago = datetime.now(timezone.utc) - timedelta(minutes=5)
 
@@ -42,7 +43,7 @@ async def get_generation_status(
         )
         .where(
             Article.user_id == current_user.id,
-            Article.status.in_(["completed", "failed"]),
+            Article.status.in_([ContentStatus.COMPLETED.value, ContentStatus.FAILED.value]),
             Article.updated_at >= five_min_ago,
         )
         .order_by(Article.updated_at.desc())
@@ -59,7 +60,7 @@ async def get_generation_status(
         )
         .where(
             Outline.user_id == current_user.id,
-            Outline.status.in_(["completed", "failed"]),
+            Outline.status.in_([ContentStatus.COMPLETED.value, ContentStatus.FAILED.value]),
             Outline.updated_at >= five_min_ago,
         )
         .order_by(Outline.updated_at.desc())
@@ -76,7 +77,7 @@ async def get_generation_status(
         )
         .where(
             GeneratedImage.user_id == current_user.id,
-            GeneratedImage.status.in_(["completed", "failed"]),
+            GeneratedImage.status.in_([ContentStatus.COMPLETED.value, ContentStatus.FAILED.value]),
             GeneratedImage.updated_at >= five_min_ago,
         )
         .order_by(GeneratedImage.updated_at.desc())

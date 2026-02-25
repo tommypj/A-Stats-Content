@@ -439,7 +439,7 @@ async def handle_webhook(
             )
     else:
         logger.error("Webhook rejected: LEMONSQUEEZY_WEBHOOK_SECRET not configured")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Webhook verification not configured")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Webhook verification not configured")
 
     # Parse webhook payload
     try:

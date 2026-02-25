@@ -629,7 +629,7 @@ async def get_content_health(
         )
 
     # Only include completed/published articles (not drafts/generating)
-    base = base.where(Article.status.in_(["completed", "published"]))
+    base = base.where(Article.status.in_([ContentStatus.COMPLETED.value, ContentStatus.PUBLISHED.value]))
 
     result = await db.execute(base)
     articles = result.scalars().all()
@@ -1534,7 +1534,7 @@ async def get_link_suggestions(
         .options(defer(Article.content), defer(Article.content_html))
         .where(
             Article.id != article_id,
-            Article.status.in_(["completed", "published"]),
+            Article.status.in_([ContentStatus.COMPLETED.value, ContentStatus.PUBLISHED.value]),
         )
     )
 
