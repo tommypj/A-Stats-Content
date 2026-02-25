@@ -628,6 +628,15 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const passwordSavedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      if (passwordSavedTimerRef.current) clearTimeout(passwordSavedTimerRef.current);
+    };
+  }, []);
 
   // Profile fields
   const [name, setName] = useState("");
@@ -706,7 +715,7 @@ export default function SettingsPage() {
       setOriginalLanguage(language);
       setOriginalTimezone(timezone);
       setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+      savedTimerRef.current = setTimeout(() => setSaved(false), 3000);
     } catch {
       setError("Failed to save profile");
     } finally {
@@ -733,7 +742,7 @@ export default function SettingsPage() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      setTimeout(() => setPasswordSaved(false), 3000);
+      passwordSavedTimerRef.current = setTimeout(() => setPasswordSaved(false), 3000);
     } catch (err) {
       const apiError = parseApiError(err);
       setPasswordError(apiError.message || "Current password is incorrect");

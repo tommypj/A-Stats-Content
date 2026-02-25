@@ -227,7 +227,7 @@ export default function ProjectSettingsPage() {
   const handleManageBilling = async () => {
     try {
       const response = await api.projects.billing.portal(projectId);
-      window.open(response.portal_url, "_blank");
+      window.open(response.portal_url, "_blank", "noopener,noreferrer");
     } catch (err) {
       toast.error(parseApiError(err).message);
     }
@@ -367,7 +367,7 @@ export default function ProjectSettingsPage() {
     setGscConnecting(true);
     try {
       const { auth_url } = await api.analytics.getAuthUrl();
-      window.open(auth_url, "_blank");
+      window.open(auth_url, "_blank", "noopener,noreferrer");
     } catch (err) {
       setGscError(parseApiError(err).message);
     } finally {

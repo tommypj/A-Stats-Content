@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, BrandVoiceSettings, parseApiError } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -66,6 +66,13 @@ export default function BrandVoicePage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [noProject, setNoProject] = useState(false);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    };
+  }, []);
 
   // Form state
   const [tone, setTone] = useState("");
@@ -117,7 +124,7 @@ export default function BrandVoicePage() {
 
       await api.projects.updateBrandVoice(payload);
       setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+      savedTimerRef.current = setTimeout(() => setSaved(false), 3000);
     } catch (err) {
       const parsed = parseApiError(err);
       if (parsed.message?.includes("No project selected")) {

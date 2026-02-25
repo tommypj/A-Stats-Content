@@ -2,7 +2,7 @@
 Admin user management API routes.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Annotated, Optional
 from math import ceil
 
@@ -589,7 +589,7 @@ async def force_password_reset(
     # Generate reset token
     reset_token = token_service.create_password_reset_token(user.id)
     user.password_reset_token = reset_token
-    user.password_reset_expires = datetime.now(timezone.utc)
+    user.password_reset_expires = datetime.now(timezone.utc) + timedelta(hours=1)
 
     await db.commit()
     await db.refresh(user)

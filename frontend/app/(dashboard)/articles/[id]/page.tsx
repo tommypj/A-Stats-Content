@@ -477,6 +477,7 @@ export default function ArticleEditorPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lastSavedContentRef = useRef<string>("");
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoSaveStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   // Version history panel state
@@ -738,16 +739,19 @@ export default function ArticleEditorPage() {
         lastSavedSnapshotRef.current = currentSnapshot;
         lastSavedContentRef.current = content;
         setAutoSaveStatus("saved");
-        setTimeout(() => setAutoSaveStatus("idle"), 2000);
+        autoSaveStatusTimerRef.current = setTimeout(() => setAutoSaveStatus("idle"), 2000);
       } catch {
         setAutoSaveStatus("error");
-        setTimeout(() => setAutoSaveStatus("idle"), 3000);
+        autoSaveStatusTimerRef.current = setTimeout(() => setAutoSaveStatus("idle"), 3000);
       }
     }, 3000);
 
     return () => {
       if (autoSaveTimerRef.current) {
         clearTimeout(autoSaveTimerRef.current);
+      }
+      if (autoSaveStatusTimerRef.current) {
+        clearTimeout(autoSaveStatusTimerRef.current);
       }
     };
   }, [content, article, title, metaDescription, keyword]);
