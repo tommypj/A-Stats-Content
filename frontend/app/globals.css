@@ -96,6 +96,133 @@
     }
   }
 
+  /* Scroll reveal animations */
+  .scroll-reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+  }
+
+  .scroll-reveal.revealed {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .scroll-reveal-left {
+    opacity: 0;
+    transform: translateX(-32px);
+    transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+  }
+
+  .scroll-reveal-left.revealed {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .scroll-reveal-right {
+    opacity: 0;
+    transform: translateX(32px);
+    transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+  }
+
+  .scroll-reveal-right.revealed {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  /* Stagger children animations */
+  .scroll-reveal.revealed .stagger-child {
+    opacity: 0;
+    animation: staggerIn 0.5s ease-out forwards;
+  }
+
+  .scroll-reveal.revealed .stagger-child:nth-child(1) { animation-delay: 0.05s; }
+  .scroll-reveal.revealed .stagger-child:nth-child(2) { animation-delay: 0.1s; }
+  .scroll-reveal.revealed .stagger-child:nth-child(3) { animation-delay: 0.15s; }
+  .scroll-reveal.revealed .stagger-child:nth-child(4) { animation-delay: 0.2s; }
+  .scroll-reveal.revealed .stagger-child:nth-child(5) { animation-delay: 0.25s; }
+  .scroll-reveal.revealed .stagger-child:nth-child(6) { animation-delay: 0.3s; }
+
+  @keyframes staggerIn {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Hero fade-in */
+  @keyframes heroFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .hero-animate {
+    animation: heroFadeIn 0.8s ease-out forwards;
+  }
+
+  .hero-animate-delay-1 {
+    opacity: 0;
+    animation: heroFadeIn 0.8s ease-out 0.15s forwards;
+  }
+
+  .hero-animate-delay-2 {
+    opacity: 0;
+    animation: heroFadeIn 0.8s ease-out 0.3s forwards;
+  }
+
+  .hero-animate-delay-3 {
+    opacity: 0;
+    animation: heroFadeIn 0.8s ease-out 0.45s forwards;
+  }
+
+  /* FAQ accordion */
+  .faq-item summary {
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .faq-item summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .faq-item summary::marker {
+    display: none;
+    content: "";
+  }
+
+  .faq-item[open] .faq-icon {
+    transform: rotate(45deg);
+  }
+
+  .faq-icon {
+    transition: transform 0.2s ease-out;
+  }
+
+  .faq-item[open] .faq-answer {
+    animation: faqOpen 0.3s ease-out;
+  }
+
+  @keyframes faqOpen {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
