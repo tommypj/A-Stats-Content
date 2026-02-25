@@ -20,6 +20,7 @@ import { api, Outline, OutlineSection } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export default function OutlineDetailPage() {
   const params = useParams();
@@ -33,6 +34,7 @@ export default function OutlineDetailPage() {
   const [editedSections, setEditedSections] = useState<OutlineSection[]>([]);
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set([0]));
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
 
   useEffect(() => {
     loadOutline();
@@ -172,6 +174,16 @@ export default function OutlineDetailPage() {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog
+        isOpen={showRegenerateConfirm}
+        onClose={() => setShowRegenerateConfirm(false)}
+        onConfirm={() => { setShowRegenerateConfirm(false); handleRegenerate(); }}
+        title="Regenerate Outline"
+        message="This will overwrite all current sections with a freshly generated outline. Any unsaved edits will be lost. Are you sure?"
+        variant="warning"
+        confirmLabel="Regenerate"
+      />
+
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-4">
@@ -232,7 +244,7 @@ export default function OutlineDetailPage() {
 
           <Button
             variant="outline"
-            onClick={handleRegenerate}
+            onClick={() => setShowRegenerateConfirm(true)}
             disabled={regenerating}
           >
             {regenerating ? (

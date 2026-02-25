@@ -12,6 +12,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { api, parseApiError } from "@/lib/api";
 
 const resetPasswordSchema = z
   .object({
@@ -62,29 +63,15 @@ export default function ResetPasswordPage() {
 
     setIsLoading(true);
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/password/reset`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            token,
-            new_password: data.password,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || "Failed to reset password");
-      }
-
+      await api.auth.resetPassword(token, data.password);
       setIsSuccess(true);
     } catch (error) {
-      if (error instanceof Error && error.message.includes("expired")) {
+      const apiError = parseApiError(error);
+      const message = apiError.message || "";
+      if (message.toLowerCase().includes("expired") || message.toLowerCase().includes("invalid token")) {
         setIsInvalid(true);
       } else {
-        toast.error(error instanceof Error ? error.message : tErrors("serverError"));
+        toast.error(message || tErrors("serverError"));
       }
     } finally {
       setIsLoading(false);

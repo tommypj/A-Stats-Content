@@ -90,7 +90,7 @@ export default function AnalyticsPage() {
       setSiteUrl(selectedSiteUrl);
       toast.success("Site selected! Syncing data...");
       // Auto-sync after selecting site
-      handleSync();
+      await handleSync();
     } catch (error) {
       const apiError = parseApiError(error);
       toast.error(apiError.message || "Failed to select site");
@@ -101,6 +101,7 @@ export default function AnalyticsPage() {
 
   async function loadAnalytics() {
     try {
+      setIsLoading(true);
       const [summaryData, dailyResponse] = await Promise.all([
         api.analytics.summary(),
         api.analytics.daily({ page: 1, page_size: dateRange }),
@@ -110,6 +111,8 @@ export default function AnalyticsPage() {
     } catch (error) {
       const apiError = parseApiError(error);
       toast.error(apiError.message || "Failed to load analytics data");
+    } finally {
+      setIsLoading(false);
     }
   }
 

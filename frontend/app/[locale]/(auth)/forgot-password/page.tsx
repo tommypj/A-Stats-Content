@@ -40,23 +40,13 @@ export default function ForgotPasswordPage() {
   const onSubmit = async (data: ForgotPasswordFormData) => {
     setIsLoading(true);
     try {
-      // Call API - it always returns success to prevent email enumeration
-      await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/password/reset-request`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: data.email }),
-        }
-      );
-
-      setSentEmail(data.email);
-      setEmailSent(true);
-    } catch (error) {
-      // Still show success to prevent email enumeration
-      setSentEmail(data.email);
-      setEmailSent(true);
+      await api.auth.forgotPassword(data.email);
+    } catch {
+      // Ignore errors to prevent email enumeration
     } finally {
+      // Always show success to prevent email enumeration
+      setSentEmail(data.email);
+      setEmailSent(true);
       setIsLoading(false);
     }
   };

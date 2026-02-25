@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, parseApiError, PlanInfo, SubscriptionStatus } from "@/lib/api";
+import { useAuthStore } from "@/stores/auth";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,110 +13,54 @@ import {
   Crown,
   Zap,
   Building2,
+  AlertTriangle,
 } from "lucide-react";
 
-interface PricingPlan {
-  name: string;
-  description: string;
-  monthlyPrice: string;
-  yearlyPrice: string;
-  icon: typeof Crown;
-  features: string[];
-  tier: string;
-  popular?: boolean;
-}
-
-const plans: PricingPlan[] = [
-  {
-    name: "Free",
-    description: "Get started with AI content",
-    monthlyPrice: "$0",
-    yearlyPrice: "$0",
-    icon: Zap,
-    tier: "free",
-    features: [
-      "10 articles/month",
-      "20 outlines/month",
-      "5 images/month",
-      "Basic SEO optimization",
-      "1 project member",
-    ],
-  },
-  {
-    name: "Starter",
-    description: "For growing content creators",
-    monthlyPrice: "$19",
-    yearlyPrice: "$190",
-    icon: Crown,
-    tier: "starter",
-    popular: true,
-    features: [
-      "50 articles/month",
-      "100 outlines/month",
-      "25 images/month",
-      "Advanced SEO tools",
-      "Social media scheduling",
-      "3 project members",
-      "Knowledge Vault (100MB)",
-    ],
-  },
-  {
-    name: "Professional",
-    description: "For agencies and teams",
-    monthlyPrice: "$49",
-    yearlyPrice: "$490",
-    icon: Crown,
-    tier: "professional",
-    features: [
-      "200 articles/month",
-      "Unlimited outlines",
-      "100 images/month",
-      "Full analytics suite",
-      "Social media automation",
-      "10 project members",
-      "Knowledge Vault (1GB)",
-      "Priority support",
-    ],
-  },
-  {
-    name: "Enterprise",
-    description: "Custom solutions at scale",
-    monthlyPrice: "$149",
-    yearlyPrice: "$1,490",
-    icon: Building2,
-    tier: "enterprise",
-    features: [
-      "Unlimited articles",
-      "Unlimited outlines",
-      "Unlimited images",
-      "Custom AI training",
-      "Unlimited project members",
-      "Knowledge Vault (10GB)",
-      "Dedicated support",
-      "SLA guarantee",
-    ],
-  },
-];
+const tierIcons: Record<string, typeof Crown> = {
+  free: Zap,
+  starter: Crown,
+  professional: Crown,
+  enterprise: Building2,
+};
 
 export default function BillingPage() {
+  const { user } = useAuthStore();
+  const [plans, setPlans] = useState<PlanInfo[]>([]);
   const [currentTier, setCurrentTier] = useState("free");
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">("monthly");
   const [loading, setLoading] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
+  const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
 
   useEffect(() => {
-    loadSubscription();
+    loadBillingData();
   }, []);
 
-  const loadSubscription = async () => {
+  async function loadBillingData() {
     try {
-      const profile = await api.auth.me();
-      setCurrentTier(profile.subscription_tier || "free");
-    } catch {
-      // Default to free
+      setLoading(true);
+      const [pricingRes, profileRes, subRes] = await Promise.all([
+        api.billing.pricing().catch(() => null),
+        api.auth.me().catch(() => null),
+        api.billing.subscription().catch(() => null),
+      ]);
+
+      if (pricingRes?.plans) {
+        setPlans(pricingRes.plans);
+      }
+      if (profileRes) {
+        setCurrentTier(profileRes.subscription_tier || "free");
+      }
+      if (subRes) {
+        setSubscription(subRes);
+      }
+    } catch (error) {
+      const apiError = parseApiError(error);
+      toast.error(apiError.message || "Failed to load billing data");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   const handleUpgrade = async (tier: string) => {
     try {
@@ -125,6 +70,20 @@ export default function BillingPage() {
       }
     } catch {
       toast.error("Failed to start checkout. Please try again.");
+    }
+  };
+
+  const handleCancel = async () => {
+    try {
+      setCancelling(true);
+      const result = await api.billing.cancel();
+      toast.success(result.message || "Subscription cancelled");
+      await loadBillingData();
+    } catch (error) {
+      const apiError = parseApiError(error);
+      toast.error(apiError.message || "Failed to cancel subscription");
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -142,6 +101,33 @@ export default function BillingPage() {
         <h1 className="text-2xl font-display font-bold text-text-primary">Billing & Plans</h1>
         <p className="mt-1 text-text-secondary">Choose the right plan for your content needs.</p>
       </div>
+
+      {/* Current subscription info */}
+      {currentTier !== "free" && subscription && (
+        <Card className="p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-text-secondary">Current Plan</p>
+              <p className="text-lg font-semibold text-text-primary capitalize">{currentTier}</p>
+              {subscription.subscription_expires && (
+                <p className="text-xs text-text-muted mt-1">
+                  Renews {new Date(subscription.subscription_expires).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCancel}
+              disabled={cancelling}
+              isLoading={cancelling}
+              leftIcon={<AlertTriangle className="h-4 w-4" />}
+            >
+              Cancel Subscription
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Billing Toggle */}
       <div className="flex items-center justify-center gap-3">
@@ -170,27 +156,26 @@ export default function BillingPage() {
       {/* Plans Grid */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {plans.map((plan) => {
-          const isCurrent = currentTier === plan.tier;
+          const isCurrent = currentTier === plan.id;
+          const PlanIcon = tierIcons[plan.id] || Zap;
+          const isPopular = plan.id === "starter";
           return (
             <Card
-              key={plan.name}
-              className={`p-6 relative ${
-                plan.popular ? "ring-2 ring-primary-500" : ""
-              }`}
+              key={plan.id}
+              className={`p-6 relative ${isPopular ? "ring-2 ring-primary-500" : ""}`}
             >
-              {plan.popular && (
+              {isPopular && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary-500 text-white text-xs px-3 py-1 rounded-full font-medium">
                   Most Popular
                 </div>
               )}
               <div className="h-10 w-10 rounded-xl bg-primary-50 flex items-center justify-center mb-4">
-                <plan.icon className="h-5 w-5 text-primary-500" />
+                <PlanIcon className="h-5 w-5 text-primary-500" />
               </div>
               <h3 className="text-lg font-display font-bold text-text-primary">{plan.name}</h3>
-              <p className="text-sm text-text-secondary mt-1">{plan.description}</p>
               <div className="mt-4 mb-6">
                 <span className="text-3xl font-bold text-text-primary">
-                  {billingPeriod === "monthly" ? plan.monthlyPrice : plan.yearlyPrice}
+                  ${billingPeriod === "monthly" ? plan.price_monthly : plan.price_yearly}
                 </span>
                 <span className="text-text-muted text-sm">
                   /{billingPeriod === "monthly" ? "mo" : "yr"}
@@ -211,10 +196,10 @@ export default function BillingPage() {
               ) : (
                 <Button
                   className="w-full"
-                  variant={plan.popular ? "primary" : "outline"}
-                  onClick={() => handleUpgrade(plan.tier)}
+                  variant={isPopular ? "primary" : "outline"}
+                  onClick={() => handleUpgrade(plan.id)}
                 >
-                  {plan.tier === "free" ? "Downgrade" : "Upgrade"}
+                  {plan.id === "free" ? "Downgrade" : "Upgrade"}
                 </Button>
               )}
             </Card>

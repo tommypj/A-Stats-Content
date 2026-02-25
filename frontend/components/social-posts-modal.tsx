@@ -66,6 +66,8 @@ export default function SocialPostsModal({
       setSocialPosts(data);
     } catch (error) {
       console.error("Failed to load social posts:", error);
+      const apiError = parseApiError(error);
+      toast.error(apiError.message || "Failed to load social posts");
     } finally {
       setLoading(false);
     }

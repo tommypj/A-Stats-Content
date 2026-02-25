@@ -249,9 +249,9 @@ export default function DashboardPage() {
       const [userRes, articlesRes, outlinesRes, imagesRes, pricingRes, healthRes] =
         await Promise.all([
           api.auth.me(),
-          api.articles.list({ page: 1, page_size: 5 }),
-          api.outlines.list({ page: 1, page_size: 5 }),
-          api.images.list({ page: 1, page_size: 1 }),
+          api.articles.list({ page: 1, page_size: 5 }).catch(() => ({ items: [], total: 0 })),
+          api.outlines.list({ page: 1, page_size: 5 }).catch(() => ({ items: [], total: 0 })),
+          api.images.list({ page: 1, page_size: 1 }).catch(() => ({ items: [], total: 0 })),
           api.billing.pricing().catch(() => null),
           api.articles.healthSummary().catch(() => null),
         ]);

@@ -1202,10 +1202,25 @@ export default function ArticleEditorPage() {
                 />
               </div>
             ) : (
-              <div
-                className="prose prose-lg max-w-none min-h-[500px] px-4 py-3"
-                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(article.content_html || "") }}
-              />
+              <div className="prose prose-lg max-w-none min-h-[500px] px-4 py-3">
+                {content ? (
+                  <div dangerouslySetInnerHTML={{
+                    __html: DOMPurify.sanitize(
+                      content
+                        .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+                        .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+                        .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                        .replace(/\n\n/g, '</p><p>')
+                        .replace(/^(?!<[h|p|u|o|l|d])/gm, '<p>')
+                        .replace(/(?<![>])$/gm, '</p>')
+                    )
+                  }} />
+                ) : (
+                  <p className="text-text-muted">No content to preview</p>
+                )}
+              </div>
             )}
           </Card>
 

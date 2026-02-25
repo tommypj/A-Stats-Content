@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Database,
   FileText,
@@ -22,6 +23,7 @@ import { QueryInput } from "@/components/knowledge/query-input";
 import { UploadModal } from "@/components/knowledge/upload-modal";
 
 export default function KnowledgePage() {
+  const router = useRouter();
   const [stats, setStats] = useState<KnowledgeStats | null>(null);
   const [recentSources, setRecentSources] = useState<KnowledgeSource[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,8 +51,7 @@ export default function KnowledgePage() {
   }
 
   const handleQuickQuery = (query: string) => {
-    // Redirect to query page with pre-filled query
-    window.location.href = `/knowledge/query?q=${encodeURIComponent(query)}`;
+    router.push(`/knowledge/query?q=${encodeURIComponent(query)}`);
   };
 
   const formatNumber = (num: number) => {
@@ -198,7 +199,7 @@ export default function KnowledgePage() {
                   <SourceCard
                     key={source.id}
                     source={source}
-                    onClick={() => (window.location.href = `/knowledge/sources/${source.id}`)}
+                    onClick={() => router.push(`/knowledge/sources/${source.id}`)}
                   />
                 ))
               )}
