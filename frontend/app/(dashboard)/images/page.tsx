@@ -87,6 +87,16 @@ export default function ImagesPage() {
     loadImages();
   }, [page, pageSize]);
 
+  // Close image modal on Escape key
+  useEffect(() => {
+    if (!selectedImage) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedImage(null);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedImage]);
+
   useEffect(() => {
     checkWpConnection();
   }, []);
@@ -99,7 +109,6 @@ export default function ImagesPage() {
       setTotalCount(response.total);
       setTotalPages(Math.ceil(response.total / pageSize));
     } catch (error) {
-      console.error("Failed to load images:", error);
       toast.error("Failed to load images. Please try again.");
     } finally {
       setLoading(false);
@@ -141,7 +150,6 @@ export default function ImagesPage() {
           setImages((prev) => prev.filter((img) => img.id !== id));
           setTotalCount((prev) => prev - 1);
         } catch (error) {
-          console.error("Failed to delete image:", error);
           toast.error("Failed to delete image.");
         }
       },
@@ -242,7 +250,6 @@ export default function ImagesPage() {
           setSelectedIds(new Set());
           await loadImages();
         } catch (error) {
-          console.error("Failed to bulk delete images:", error);
           toast.error("Failed to delete images. Please try again.");
         } finally {
           setIsBulkDeleting(false);

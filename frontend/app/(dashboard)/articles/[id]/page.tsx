@@ -523,6 +523,16 @@ export default function ArticleEditorPage() {
     [debouncedSeoInput]
   );
 
+  // Escape key exits preview mode
+  useEffect(() => {
+    if (viewMode !== "preview") return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setViewMode("edit");
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [viewMode]);
+
   useEffect(() => {
     loadArticle();
     checkWordPressConnection();
@@ -549,7 +559,6 @@ export default function ArticleEditorPage() {
         }
       }
     } catch (error) {
-      console.error("Failed to load article:", error);
       toast.error("Failed to load article. Please try again.");
     } finally {
       setLoading(false);
@@ -562,7 +571,6 @@ export default function ArticleEditorPage() {
       const status = await api.wordpress.status();
       setWpConnected(status.is_connected);
     } catch (error) {
-      console.error("Failed to check WordPress connection:", error);
       toast.error("Failed to check WordPress connection.");
       setWpConnected(false);
     } finally {
@@ -583,7 +591,6 @@ export default function ArticleEditorPage() {
       });
       setArticle(updated);
     } catch (error) {
-      console.error("Failed to save article:", error);
       toast.error("Failed to save changes.");
     } finally {
       setSaving(false);
@@ -618,7 +625,6 @@ export default function ArticleEditorPage() {
       setArticle(updated);
       setContent(updated.content || "");
     } catch (error) {
-      console.error("Failed to improve article:", error);
       toast.error("AI improvement failed. Please try again.");
     } finally {
       setImproving(false);
@@ -632,7 +638,6 @@ export default function ArticleEditorPage() {
       const updated = await api.articles.analyzeSeo(article.id);
       setArticle(updated);
     } catch (error) {
-      console.error("Failed to analyze SEO:", error);
       toast.error("SEO analysis failed. Please try again.");
     }
   }
@@ -645,7 +650,6 @@ export default function ArticleEditorPage() {
           await api.articles.delete(article.id);
           router.push("/articles");
         } catch (error) {
-          console.error("Failed to delete article:", error);
           toast.error("Failed to delete article");
         }
       },
@@ -776,7 +780,6 @@ export default function ArticleEditorPage() {
       setRevisions(data.items);
       setRevisionsTotal(data.total);
     } catch (error) {
-      console.error("Failed to load revisions:", error);
       toast.error("Failed to load version history");
     } finally {
       setLoadingRevisions(false);
@@ -795,7 +798,6 @@ export default function ArticleEditorPage() {
       const detail = await api.articles.getRevision(article.id, revisionId);
       setPreviewRevision(detail);
     } catch (error) {
-      console.error("Failed to load revision detail:", error);
       toast.error("Failed to load revision content");
     } finally {
       setLoadingPreview(false);
@@ -819,7 +821,6 @@ export default function ArticleEditorPage() {
           await loadRevisions();
           toast.success("Article restored to selected version");
         } catch (error) {
-          console.error("Failed to restore revision:", error);
           toast.error("Failed to restore revision");
         } finally {
           setRestoringRevisionId(null);
@@ -842,7 +843,6 @@ export default function ArticleEditorPage() {
         const data = await api.articles.linkSuggestions(articleId);
         setLinkSuggestions(data.suggestions);
       } catch (error) {
-        console.error("Failed to load link suggestions:", error);
         toast.error("Failed to load link suggestions");
       } finally {
         setLoadingLinks(false);

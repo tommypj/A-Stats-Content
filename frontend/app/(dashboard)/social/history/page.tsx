@@ -67,7 +67,6 @@ export default function SocialHistoryPage() {
           await api.social.deletePost(id);
           loadPosts();
         } catch (error) {
-          console.error("Failed to delete post:", error);
           toast.error("Failed to delete post");
         }
       },
@@ -81,7 +80,6 @@ export default function SocialHistoryPage() {
       await api.social.retryFailed(id);
       loadPosts();
     } catch (error) {
-      console.error("Failed to retry post:", error);
       toast.error("Failed to retry post");
     }
   };
@@ -98,7 +96,6 @@ export default function SocialHistoryPage() {
           setSelectedPosts(new Set());
           loadPosts();
         } catch (error) {
-          console.error("Failed to delete posts:", error);
           toast.error("Failed to delete some posts");
         }
       },

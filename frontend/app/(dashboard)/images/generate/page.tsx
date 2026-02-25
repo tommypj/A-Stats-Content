@@ -133,7 +133,6 @@ function GenerateImageContent() {
       pollImageStatus(image.id);
     } catch (err) {
       setError("Failed to generate image. Please try again.");
-      console.error(err);
     } finally {
       setLoading(false);
     }

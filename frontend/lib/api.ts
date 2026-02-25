@@ -1,4 +1,5 @@
 import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from "axios";
+import { toast } from "sonner";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -202,6 +203,36 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+/**
+ * Response interceptor: show retry toast on network errors and 5xx responses.
+ * Runs after the 401/refresh interceptor above.
+ */
+apiClient.interceptors.response.use(undefined, (error: AxiosError) => {
+  const status = error.response?.status;
+  const isNetworkError = !error.response && error.code !== "ERR_CANCELED";
+  const isServerError = status !== undefined && status >= 500;
+
+  if ((isNetworkError || isServerError) && error.config && typeof window !== "undefined") {
+    const cfg = error.config as AxiosRequestConfig & { _retry?: boolean };
+    const message = isNetworkError
+      ? "Network error — check your connection"
+      : `Server error (${status})`;
+
+    toast.error(message, {
+      action: {
+        label: "Retry",
+        onClick: () => {
+          apiClient(cfg).catch(() => {
+            // retry failed — the interceptor will fire again
+          });
+        },
+      },
+    });
+  }
+
+  return Promise.reject(error);
+});
 
 /**
  * API Error type

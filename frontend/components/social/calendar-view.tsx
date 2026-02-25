@@ -62,6 +62,7 @@ export function CalendarView({
   filterPlatform = "all",
 }: CalendarViewProps) {
   const [draggedPost, setDraggedPost] = useState<string | null>(null);
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
 
   // Filter posts by platform
   const filteredPosts = posts.filter((post) =>
@@ -145,7 +146,7 @@ export function CalendarView({
               </button>
             </div>
             <div className="space-y-1">
-              {dayPosts.slice(0, 3).map((post) => (
+              {(expandedDays.has(dateKey) ? dayPosts : dayPosts.slice(0, 3)).map((post) => (
                 <div
                   key={post.id}
                   draggable={post.status === "pending" && !!onReschedule}
@@ -183,9 +184,25 @@ export function CalendarView({
                 </div>
               ))}
               {dayPosts.length > 3 && (
-                <div className="text-xs text-text-secondary text-center py-1">
-                  +{dayPosts.length - 3} more
-                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setExpandedDays((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(dateKey)) {
+                        next.delete(dateKey);
+                      } else {
+                        next.add(dateKey);
+                      }
+                      return next;
+                    });
+                  }}
+                  className="text-xs text-primary-600 hover:text-primary-700 text-center py-1 w-full hover:bg-surface-secondary rounded transition-colors"
+                >
+                  {expandedDays.has(dateKey)
+                    ? "Show less"
+                    : `+${dayPosts.length - 3} more`}
+                </button>
               )}
             </div>
           </div>

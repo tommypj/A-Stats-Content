@@ -15,6 +15,9 @@ import {
   CheckCircle,
   Upload,
 } from "lucide-react";
+import { toast } from "sonner";
+
+const DRAFT_KEY = "social_compose_draft";
 
 export default function ComposePage() {
   const router = useRouter();
@@ -37,6 +40,39 @@ export default function ComposePage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  // Restore draft from localStorage on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const draft = JSON.parse(raw);
+        if (draft.content) setContent(draft.content);
+        if (draft.scheduledAt) setScheduledAt(draft.scheduledAt);
+        if (draft.timezone) setTimezone(draft.timezone);
+        // selectedAccountIds restored after accounts load
+        toast.info("Draft restored");
+      }
+    } catch {
+      // ignore corrupt draft
+    }
+  }, []);
+
+  // Auto-save draft to localStorage (debounced 500ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!content && selectedAccountIds.length === 0) return;
+      try {
+        localStorage.setItem(
+          DRAFT_KEY,
+          JSON.stringify({ content, selectedAccountIds, scheduledAt, timezone })
+        );
+      } catch {
+        // storage full — ignore
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [content, selectedAccountIds, scheduledAt, timezone]);
+
   useEffect(() => {
     loadAccounts();
   }, []);
@@ -45,12 +81,27 @@ export default function ComposePage() {
     try {
       setLoading(true);
       const res = await api.social.accounts();
-      setAccounts(res.accounts.filter((a) => a.is_connected));
+      const connected = res.accounts.filter((a) => a.is_connected);
+      setAccounts(connected);
 
-      // Auto-select all connected accounts
-      setSelectedAccountIds(
-        res.accounts.filter((a) => a.is_connected).map((a) => a.id)
-      );
+      // Restore draft account selection, or auto-select all connected
+      const connectedIds = connected.map((a) => a.id);
+      try {
+        const raw = localStorage.getItem(DRAFT_KEY);
+        if (raw) {
+          const draft = JSON.parse(raw);
+          if (Array.isArray(draft.selectedAccountIds)) {
+            const valid = draft.selectedAccountIds.filter((id: string) => connectedIds.includes(id));
+            if (valid.length > 0) {
+              setSelectedAccountIds(valid);
+              return;
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+      setSelectedAccountIds(connectedIds);
     } catch (err) {
       setError(parseApiError(err).message);
     } finally {
@@ -90,6 +141,7 @@ export default function ComposePage() {
         account_ids: selectedAccountIds,
       });
 
+      localStorage.removeItem(DRAFT_KEY);
       setSuccess(true);
       setTimeout(() => {
         router.push("/social");

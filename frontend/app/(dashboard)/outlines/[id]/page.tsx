@@ -47,7 +47,6 @@ export default function OutlineDetailPage() {
       setOutline(data);
       setEditedSections(data.sections || []);
     } catch (error) {
-      console.error("Failed to load outline:", error);
       toast.error("Failed to load outline. Please try again.");
     } finally {
       setLoading(false);
@@ -64,7 +63,6 @@ export default function OutlineDetailPage() {
       });
       setOutline(updated);
     } catch (error) {
-      console.error("Failed to save outline:", error);
       toast.error("Failed to save changes.");
     } finally {
       setSaving(false);
@@ -80,7 +78,6 @@ export default function OutlineDetailPage() {
       setOutline(updated);
       setEditedSections(updated.sections || []);
     } catch (error) {
-      console.error("Failed to regenerate outline:", error);
       toast.error("Failed to regenerate outline. Please try again.");
     } finally {
       setRegenerating(false);

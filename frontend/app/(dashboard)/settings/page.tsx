@@ -71,6 +71,7 @@ interface ProfileSectionProps {
   onSave: () => void;
   onAvatarChange: (file: File) => void;
   avatarUploading: boolean;
+  isDirty: boolean;
 }
 
 function ProfileSection({
@@ -87,6 +88,7 @@ function ProfileSection({
   onSave,
   onAvatarChange,
   avatarUploading,
+  isDirty,
 }: ProfileSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const avatarUrl = profile?.avatar_url ? getImageUrl(profile.avatar_url) : null;
@@ -225,6 +227,11 @@ function ProfileSection({
           {saved && (
             <span className="flex items-center gap-1 text-sm text-green-600">
               <CheckCircle className="h-4 w-4" /> Saved
+            </span>
+          )}
+          {isDirty && !saved && (
+            <span className="flex items-center gap-1 text-sm text-amber-600">
+              <AlertCircle className="h-4 w-4" /> Unsaved changes
             </span>
           )}
         </div>
@@ -624,6 +631,14 @@ export default function SettingsPage() {
   const [language, setLanguage] = useState("en");
   const [timezone, setTimezone] = useState("UTC");
 
+  // Original profile values (for dirty tracking)
+  const [originalName, setOriginalName] = useState("");
+  const [originalLanguage, setOriginalLanguage] = useState("en");
+  const [originalTimezone, setOriginalTimezone] = useState("UTC");
+
+  const isDirty =
+    name !== originalName || language !== originalLanguage || timezone !== originalTimezone;
+
   // Password change
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -640,6 +655,16 @@ export default function SettingsPage() {
   // Account deletion
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Warn before leaving with unsaved changes
+  useEffect(() => {
+    if (!isDirty) return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty]);
 
   // Sync hash when tab changes
   const handleTabChange = (tab: TabId) => {
@@ -658,6 +683,9 @@ export default function SettingsPage() {
       setName(data.name);
       setLanguage(data.language || "en");
       setTimezone(data.timezone || "UTC");
+      setOriginalName(data.name);
+      setOriginalLanguage(data.language || "en");
+      setOriginalTimezone(data.timezone || "UTC");
     } catch {
       setError("Failed to load profile");
     } finally {
@@ -671,6 +699,9 @@ export default function SettingsPage() {
     setError("");
     try {
       await api.auth.updateProfile({ name, language, timezone });
+      setOriginalName(name);
+      setOriginalLanguage(language);
+      setOriginalTimezone(timezone);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch {
@@ -797,6 +828,7 @@ export default function SettingsPage() {
             onSave={handleSaveProfile}
             onAvatarChange={handleAvatarChange}
             avatarUploading={avatarUploading}
+            isDirty={isDirty}
           />
 
           <DangerZoneSection

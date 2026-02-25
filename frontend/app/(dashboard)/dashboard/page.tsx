@@ -285,7 +285,6 @@ export default function DashboardPage() {
         }
       }
     } catch (error) {
-      console.error("Failed to load dashboard data:", error);
       toast.error("Failed to load dashboard data. Please try again.");
     } finally {
       setLoading(false);

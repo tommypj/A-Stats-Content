@@ -111,7 +111,6 @@ export default function OutlinesPage() {
       setTotalItems(response.total);
       setTotalPages(response.pages);
     } catch (error) {
-      console.error("Failed to load outlines:", error);
       toast.error("Failed to load outlines. Please try again.");
     } finally {
       setLoading(false);
@@ -127,7 +126,6 @@ export default function OutlinesPage() {
           setOutlines((prev) => prev.filter((o) => o.id !== id));
           setTotalItems((prev) => Math.max(0, prev - 1));
         } catch (error) {
-          console.error("Failed to delete outline:", error);
           toast.error("Failed to delete outline.");
         }
       },
@@ -141,7 +139,6 @@ export default function OutlinesPage() {
       const updated = await api.outlines.regenerate(id);
       setOutlines(outlines.map((o) => (o.id === id ? updated : o)));
     } catch (error) {
-      console.error("Failed to regenerate outline:", error);
       toast.error("Failed to regenerate outline. Please try again.");
     }
     setActiveMenu(null);
@@ -188,7 +185,6 @@ export default function OutlinesPage() {
           setSelectedIds(new Set());
           await loadOutlines();
         } catch (error) {
-          console.error("Failed to bulk delete outlines:", error);
           toast.error("Failed to delete outlines. Please try again.");
         } finally {
           setIsBulkDeleting(false);
@@ -564,7 +560,6 @@ function CreateOutlineModal({
       onCreate(outline);
     } catch (err) {
       setError("Failed to create outline. Please try again.");
-      console.error(err);
     } finally {
       setLoading(false);
     }

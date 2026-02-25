@@ -67,7 +67,6 @@ function NewArticleContent() {
       setTone(data.tone);
       setTargetAudience(data.target_audience || "");
     } catch (error) {
-      console.error("Failed to load outline:", error);
       setError("Failed to load outline");
     } finally {
       setLoading(false);
@@ -119,7 +118,6 @@ function NewArticleContent() {
             setGenerating(false);
           }
         } catch (pollErr) {
-          console.error("Polling error:", pollErr);
           if (pollRef.current) clearInterval(pollRef.current);
           pollRef.current = null;
           setError("Lost connection while generating. Check your articles list.");
@@ -128,7 +126,6 @@ function NewArticleContent() {
       }, 3000);
     } catch (err) {
       setError("Failed to start article generation. Please try again.");
-      console.error(err);
       setGenerating(false);
     }
   }
@@ -153,7 +150,6 @@ function NewArticleContent() {
       router.push(`/articles/${article.id}`);
     } catch (err) {
       setError("Failed to create article. Please try again.");
-      console.error(err);
     } finally {
       setGenerating(false);
     }

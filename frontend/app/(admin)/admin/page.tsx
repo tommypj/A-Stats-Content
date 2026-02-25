@@ -50,7 +50,6 @@ export default function AdminDashboardPage() {
       const data = await api.admin.dashboard();
       setStats(data);
     } catch (err) {
-      console.error("Failed to load dashboard stats:", err);
       setError("Failed to load dashboard statistics");
     } finally {
       setLoading(false);

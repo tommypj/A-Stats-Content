@@ -279,7 +279,6 @@ export default function ContentCalendarPage() {
       setArticles(artRes.items);
       setOutlines(outRes.items);
     } catch (err) {
-      console.error("Failed to load calendar data:", err);
       setError("Failed to load content. Please try again.");
     } finally {
       setLoading(false);

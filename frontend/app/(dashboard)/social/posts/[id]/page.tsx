@@ -62,7 +62,6 @@ export default function PostDetailPage() {
         loadAnalytics();
       }
     } catch (error) {
-      console.error("Failed to load post:", error);
       toast.error("Failed to load post");
       router.push("/social/history");
     } finally {
@@ -93,7 +92,6 @@ export default function PostDetailPage() {
           await api.social.deletePost(postId);
           router.push("/social/history");
         } catch (error) {
-          console.error("Failed to delete post:", error);
           toast.error("Failed to delete post");
         }
       },
@@ -111,7 +109,6 @@ export default function PostDetailPage() {
           await api.social.publishNow(postId);
           loadPost();
         } catch (error) {
-          console.error("Failed to publish post:", error);
           toast.error("Failed to publish post");
         }
       },
@@ -127,7 +124,6 @@ export default function PostDetailPage() {
       await api.social.retryFailed(postId, targetIds);
       loadPost();
     } catch (error) {
-      console.error("Failed to retry post:", error);
       toast.error("Failed to retry post");
     }
   };

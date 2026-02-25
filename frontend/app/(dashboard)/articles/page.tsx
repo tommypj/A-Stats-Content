@@ -161,7 +161,6 @@ export default function ArticlesPage() {
       setTotalArticles(response.total);
       setTotalPages(response.pages ?? Math.ceil(response.total / pageSize));
     } catch (error) {
-      console.error("Failed to load articles:", error);
       toast.error("Failed to load articles. Please try again.");
     } finally {
       setLoading(false);
@@ -177,7 +176,6 @@ export default function ArticlesPage() {
           setArticles((prev) => prev.filter((a) => a.id !== id));
           setTotalArticles((prev) => Math.max(0, prev - 1));
         } catch (error) {
-          console.error("Failed to delete article:", error);
           toast.error("Failed to delete article.");
         }
       },
@@ -227,7 +225,6 @@ export default function ArticlesPage() {
           setSelectedIds(new Set());
           await loadArticles();
         } catch (error) {
-          console.error("Failed to bulk delete articles:", error);
           toast.error("Failed to delete articles. Please try again.");
         } finally {
           setIsBulkDeleting(false);
