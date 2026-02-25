@@ -7,11 +7,11 @@ platforms, and tracks results.
 """
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import List, Optional
 import logging
 
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -23,10 +23,9 @@ from infrastructure.database.models.social import (
     PostTarget,
     SocialAccount,
     PostStatus,
-    PostTargetStatus,
 )
 from core.security.encryption import decrypt_credential
-from infrastructure.config import settings
+from infrastructure.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -117,8 +116,9 @@ class SocialSchedulerService:
         try:
             logger.info(f"Processing post {post.id} scheduled for {post.scheduled_at}")
 
-            # Update post status to POSTING
-            post.status = PostStatus.POSTING.value
+            # Update post status to PUBLISHING
+            post.status = PostStatus.PUBLISHING.value
+            post.publish_attempted_at = datetime.now(timezone.utc)
             await db.flush()
 
             # Track results
@@ -127,8 +127,8 @@ class SocialSchedulerService:
 
             # Publish to each target account
             for target in post.targets:
-                if target.status != PostTargetStatus.PENDING.value:
-                    continue  # Skip already processed targets
+                if target.is_published:
+                    continue  # Skip already published targets
 
                 try:
                     result = await self.publish_to_platform(post, target, target.social_account, db)
@@ -144,22 +144,24 @@ class SocialSchedulerService:
                         f"({target.social_account.platform_username}): {e}",
                         exc_info=True,
                     )
-                    target.status = PostTargetStatus.FAILED.value
-                    target.error_message = str(e)
+                    target.publish_error = str(e)
                     failed_count += 1
 
             # Update overall post status based on results
             if success_count > 0 and failed_count == 0:
-                post.status = PostStatus.POSTED.value
+                post.status = PostStatus.PUBLISHED.value
+                post.published_at = datetime.now(timezone.utc)
                 logger.info(f"Post {post.id} published successfully to all platforms")
             elif success_count > 0 and failed_count > 0:
-                post.status = PostStatus.POSTED.value  # Partially successful
+                post.status = PostStatus.PUBLISHED.value  # Partially successful
+                post.published_at = datetime.now(timezone.utc)
                 logger.warning(
                     f"Post {post.id} partially published: "
                     f"{success_count} succeeded, {failed_count} failed"
                 )
             else:
                 post.status = PostStatus.FAILED.value
+                post.publish_error = f"All {failed_count} targets failed"
                 logger.error(f"Post {post.id} failed to publish to all platforms")
 
         except Exception as e:
@@ -191,7 +193,7 @@ class SocialSchedulerService:
                 f"({account.platform_username})"
             )
 
-            # Decrypt credentials
+            # Decrypt credentials — map DB column names to SocialCredentials fields
             credentials = SocialCredentials(
                 platform=SocialPlatform(account.platform),
                 access_token=decrypt_credential(
@@ -202,10 +204,10 @@ class SocialSchedulerService:
                     if account.refresh_token_encrypted
                     else None
                 ),
-                token_expiry=account.token_expiry,
-                account_id=account.account_id,
+                token_expiry=account.token_expires_at,
+                account_id=account.platform_user_id,
                 account_name=account.platform_username,
-                account_username=account.account_username,
+                account_username=account.platform_display_name,
                 profile_image_url=account.profile_image_url,
             )
 
@@ -229,23 +231,19 @@ class SocialSchedulerService:
                 # Text-only post
                 result = await adapter.post_text(credentials, post.content)
 
-            # Update target status
+            # Update target
             if result.success:
-                target.status = PostTargetStatus.POSTED.value
+                target.is_published = True
                 target.platform_post_id = result.post_id
                 target.platform_post_url = result.post_url
-                target.error_message = None
-                target.posted_at = datetime.now(timezone.utc)
-
-                # Update account last_used
-                account.last_used = datetime.now(timezone.utc)
+                target.publish_error = None
+                target.published_at = datetime.now(timezone.utc)
 
                 logger.info(
                     f"Successfully published to {account.platform}: {result.post_url}"
                 )
             else:
-                target.status = PostTargetStatus.FAILED.value
-                target.error_message = result.error_message
+                target.publish_error = result.error_message
                 logger.warning(
                     f"Failed to publish to {account.platform}: {result.error_message}"
                 )
@@ -254,14 +252,12 @@ class SocialSchedulerService:
 
         except SocialRateLimitError as e:
             logger.warning(f"Rate limit hit for {account.platform}: {e}")
-            target.status = PostTargetStatus.PENDING.value  # Keep pending to retry later
-            target.error_message = f"Rate limit exceeded: {str(e)}"
+            target.publish_error = f"Rate limit exceeded: {str(e)}"
             return PostResult(success=False, error_message=str(e))
 
         except Exception as e:
             logger.error(f"Failed to publish to {account.platform}: {e}", exc_info=True)
-            target.status = PostTargetStatus.FAILED.value
-            target.error_message = str(e)
+            target.publish_error = str(e)
             return PostResult(success=False, error_message=str(e))
 
     async def publish_post_immediately(self, post_id: str, db: AsyncSession) -> dict:
@@ -291,7 +287,7 @@ class SocialSchedulerService:
             if not post:
                 return {"success": False, "error": "Post not found"}
 
-            if post.status == PostStatus.POSTED.value:
+            if post.status == PostStatus.PUBLISHED.value:
                 return {"success": False, "error": "Post already published"}
 
             if post.status == PostStatus.CANCELLED.value:
@@ -302,13 +298,9 @@ class SocialSchedulerService:
             await db.commit()
 
             # Count results
-            success_count = sum(
-                1
-                for t in post.targets
-                if t.status == PostTargetStatus.POSTED.value
-            )
+            success_count = sum(1 for t in post.targets if t.is_published)
             failed_count = sum(
-                1 for t in post.targets if t.status == PostTargetStatus.FAILED.value
+                1 for t in post.targets if not t.is_published and t.publish_error
             )
 
             return {
@@ -320,9 +312,9 @@ class SocialSchedulerService:
                     {
                         "account": t.social_account.platform_username,
                         "platform": t.social_account.platform,
-                        "status": t.status,
+                        "status": "published" if t.is_published else "failed" if t.publish_error else "pending",
                         "post_url": t.platform_post_url,
-                        "error": t.error_message,
+                        "error": t.publish_error,
                     }
                     for t in post.targets
                 ],
@@ -349,7 +341,7 @@ class SocialSchedulerService:
             stmt = (
                 select(PostTarget)
                 .options(
-                    selectinload(PostTarget.post),
+                    selectinload(PostTarget.scheduled_post),
                     selectinload(PostTarget.social_account),
                 )
                 .where(PostTarget.id == target_id)
@@ -361,16 +353,15 @@ class SocialSchedulerService:
             if not target:
                 return PostResult(success=False, error_message="Target not found")
 
-            if target.status == PostTargetStatus.POSTED.value:
+            if target.is_published:
                 return PostResult(success=False, error_message="Target already posted")
 
-            # Reset target status
-            target.status = PostTargetStatus.PENDING.value
-            target.error_message = None
+            # Clear previous error for retry
+            target.publish_error = None
 
             # Attempt to publish
             result = await self.publish_to_platform(
-                target.post, target, target.social_account, db
+                target.scheduled_post, target, target.social_account, db
             )
 
             await db.commit()
@@ -406,8 +397,7 @@ class SocialSchedulerService:
                 credentials.refresh_token, settings.secret_key
             )
 
-        account.token_expiry = credentials.token_expiry
-        account.last_used = datetime.now(timezone.utc)
+        account.token_expires_at = credentials.token_expiry
 
         await db.flush()
         logger.info(f"Updated tokens for {account.platform} account")

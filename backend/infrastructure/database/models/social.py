@@ -257,6 +257,11 @@ class PostTarget(Base, TimestampMixin):
     )
 
     # Relationships
+    scheduled_post: Mapped["ScheduledPost"] = relationship(
+        "ScheduledPost",
+        lazy="noload",
+        overlaps="targets",
+    )
     social_account: Mapped["SocialAccount"] = relationship(
         "SocialAccount",
         lazy="noload",

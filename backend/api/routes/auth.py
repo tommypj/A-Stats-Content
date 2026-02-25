@@ -498,7 +498,8 @@ async def logout(
     Note: JWT tokens are stateless, so individual token blacklisting requires
     Redis or a similar store (not implemented here). The client must discard
     the token on logout. Password change and password reset do invalidate all
-    previously issued tokens via the updated_at timestamp check in get_current_user().
+    previously issued tokens via the password_changed_at timestamp check in
+    get_current_user().
     """
     return {"message": "Logged out successfully"}
 
