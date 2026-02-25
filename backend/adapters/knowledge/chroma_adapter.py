@@ -186,14 +186,18 @@ class ChromaAdapter:
 
             # Parse results
             query_results = []
-            if results and results["ids"] and results["ids"][0]:
-                for i, doc_id in enumerate(results["ids"][0]):
+            if results and results.get("ids") and results["ids"][0]:
+                ids = results["ids"][0]
+                documents = results.get("documents", [[]])[0] if results.get("documents") else []
+                metadatas = results.get("metadatas", [[]])[0] if results.get("metadatas") else []
+                distances = results.get("distances", [[]])[0] if results.get("distances") else []
+                for i, doc_id in enumerate(ids):
                     query_results.append(
                         QueryResult(
                             document_id=doc_id,
-                            content=results["documents"][0][i],
-                            metadata=results["metadatas"][0][i],
-                            score=1.0 - results["distances"][0][i],  # Convert distance to similarity
+                            content=documents[i] if i < len(documents) else "",
+                            metadata=metadatas[i] if i < len(metadatas) else {},
+                            score=1.0 - distances[i] if i < len(distances) else 0.0,
                         )
                     )
 

@@ -525,8 +525,11 @@ class LinkedInAdapter(BaseSocialAdapter):
                     raise SocialAPIError(f"Media upload registration failed: {error_msg}")
 
                 register_result = response.json()
-                upload_url = register_result["value"]["uploadMechanism"]["com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"]["uploadUrl"]
-                asset_id = register_result["value"]["asset"]
+                try:
+                    upload_url = register_result["value"]["uploadMechanism"]["com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"]["uploadUrl"]
+                    asset_id = register_result["value"]["asset"]
+                except (KeyError, TypeError) as e:
+                    raise SocialAPIError(f"Unexpected LinkedIn upload registration response structure: {e}")
 
                 # Step 2: Upload binary data
                 logger.info("Uploading media binary to LinkedIn")

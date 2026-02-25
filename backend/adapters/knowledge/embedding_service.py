@@ -93,7 +93,12 @@ class EmbeddingService:
                 response.raise_for_status()
                 data = response.json()
 
-                embedding = data["data"][0]["embedding"]
+                items = data.get("data") or []
+                if not items:
+                    raise EmbeddingError("OpenAI API returned no embedding data")
+                embedding = items[0].get("embedding")
+                if embedding is None:
+                    raise EmbeddingError("OpenAI API returned no embedding vector")
                 logger.debug(f"Generated embedding for text of length {len(text)}")
                 return embedding
 

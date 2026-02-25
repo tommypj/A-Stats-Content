@@ -257,7 +257,10 @@ class TwitterAdapter(BaseSocialAdapter):
             if response.status_code != 200:
                 raise SocialAPIError("Failed to fetch user profile")
 
-            return response.json()["data"]
+            data = response.json().get("data")
+            if not data:
+                raise SocialAPIError("Twitter API returned no user data")
+            return data
 
     async def refresh_token(self, credentials: SocialCredentials) -> SocialCredentials:
         """

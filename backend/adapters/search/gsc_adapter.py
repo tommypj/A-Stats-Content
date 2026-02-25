@@ -440,8 +440,11 @@ class GSCAdapter:
         # Transform the response to a more user-friendly format
         keywords = []
         for row in rows:
+            keys = row.get("keys") or []
+            if not keys:
+                continue
             keywords.append({
-                "query": row["keys"][0],  # First dimension is 'query'
+                "query": keys[0],  # First dimension is 'query'
                 "clicks": row["clicks"],
                 "impressions": row["impressions"],
                 "ctr": row["ctr"],
@@ -494,8 +497,11 @@ class GSCAdapter:
         # Transform the response
         pages = []
         for row in rows:
+            keys = row.get("keys") or []
+            if not keys:
+                continue
             pages.append({
-                "page": row["keys"][0],  # First dimension is 'page'
+                "page": keys[0],  # First dimension is 'page'
                 "clicks": row["clicks"],
                 "impressions": row["impressions"],
                 "ctr": row["ctr"],
@@ -548,8 +554,11 @@ class GSCAdapter:
         # Transform the response
         daily_stats = []
         for row in rows:
+            keys = row.get("keys") or []
+            if not keys:
+                continue
             daily_stats.append({
-                "date": row["keys"][0],  # First dimension is 'date'
+                "date": keys[0],  # First dimension is 'date'
                 "clicks": row["clicks"],
                 "impressions": row["impressions"],
                 "ctr": row["ctr"],
@@ -597,8 +606,11 @@ class GSCAdapter:
         # Transform the response
         devices = []
         for row in rows:
+            keys = row.get("keys") or []
+            if not keys:
+                continue
             devices.append({
-                "device": row["keys"][0],  # First dimension is 'device'
+                "device": keys[0],  # First dimension is 'device'
                 "clicks": row["clicks"],
                 "impressions": row["impressions"],
                 "ctr": row["ctr"],
@@ -645,8 +657,11 @@ class GSCAdapter:
         # Transform the response
         countries = []
         for row in rows:
+            keys = row.get("keys") or []
+            if not keys:
+                continue
             countries.append({
-                "country": row["keys"][0],  # First dimension is 'country'
+                "country": keys[0],  # First dimension is 'country'
                 "clicks": row["clicks"],
                 "impressions": row["impressions"],
                 "ctr": row["ctr"],
