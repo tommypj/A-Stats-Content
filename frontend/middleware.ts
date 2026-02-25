@@ -16,6 +16,6 @@ export const config = {
   // Only match locale-aware routes (marketing & auth pages).
   // Exclude dashboard app routes which don't use i18n.
   matcher: [
-    "/((?!api|_next|_vercel|.*\\..*|dashboard|outlines|articles|images|social|analytics|knowledge|projects|settings|help|admin).*)",
+    "/((?!api|_next|_vercel|.*\\..*|dashboard|outlines|articles|images|social|analytics|knowledge|projects|settings|help|admin|content-calendar|keyword-research|invite).*)",
   ],
 };
