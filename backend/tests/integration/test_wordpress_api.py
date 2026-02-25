@@ -496,6 +496,14 @@ class TestPublishToWordPress:
         )
         db_session.add(project)
 
+        member = ProjectMember(
+            id=str(uuid4()),
+            project_id=project.id,
+            user_id=test_user.id,
+            role=ProjectMemberRole.OWNER.value,
+        )
+        db_session.add(member)
+
         test_user.current_project_id = project.id
 
         article = Article(

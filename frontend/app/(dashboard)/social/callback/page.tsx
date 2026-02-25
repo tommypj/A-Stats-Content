@@ -91,7 +91,7 @@ function CallbackContent() {
             <Button variant="outline" onClick={() => router.push("/social/accounts")}>
               Go to Accounts
             </Button>
-            <Button onClick={() => window.location.reload()}>Try Again</Button>
+            <Button onClick={() => router.push("/social/accounts")}>Try Again</Button>
           </div>
         </Card>
       </div>

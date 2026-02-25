@@ -5,6 +5,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
 
 interface DeleteProjectModalProps {
   isOpen: boolean;
@@ -26,7 +27,7 @@ export function DeleteProjectModal({
 
   const handleDelete = async () => {
     if (!isConfirmed) {
-      alert("Please type the project name to confirm deletion");
+      toast.error("Please type the project name to confirm deletion");
       return;
     }
 

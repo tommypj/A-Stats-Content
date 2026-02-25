@@ -10,7 +10,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status, Header, Request, UploadFile, File
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from infrastructure.database.connection import get_db
@@ -121,6 +121,23 @@ async def get_current_user(
                 detail="Token invalidated due to security event",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+
+    # Validate project membership if user has a current_project_id set.
+    # A user could have been removed from the project after switching to it;
+    # reset to personal workspace if membership no longer exists.
+    if user.current_project_id:
+        membership = await db.execute(
+            select(ProjectMember.id).where(
+                and_(
+                    ProjectMember.project_id == user.current_project_id,
+                    ProjectMember.user_id == user.id,
+                    ProjectMember.deleted_at.is_(None),
+                )
+            )
+        )
+        if not membership.scalar_one_or_none():
+            user.current_project_id = None
+            await db.commit()
 
     return user
 

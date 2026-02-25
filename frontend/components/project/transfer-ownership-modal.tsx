@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ProjectMember } from "@/lib/api";
 import { Crown, AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
 
 interface TransferOwnershipModalProps {
   isOpen: boolean;
@@ -31,7 +32,7 @@ export function TransferOwnershipModal({
 
   const handleTransfer = () => {
     if (!selectedMember) {
-      alert("Please select a member to transfer ownership to");
+      toast.error("Please select a member to transfer ownership to");
       return;
     }
 

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ProjectRole, ProjectInvitationCreateRequest } from "@/lib/api";
 import { Mail, Shield, User as UserIcon, Eye } from "lucide-react";
+import { toast } from "sonner";
 
 interface InviteMemberFormProps {
   onInvite: (data: ProjectInvitationCreateRequest) => Promise<void>;
@@ -26,7 +27,7 @@ export function InviteMemberForm({ onInvite }: InviteMemberFormProps) {
     e.preventDefault();
 
     if (!email.trim()) {
-      alert("Please enter an email address");
+      toast.error("Please enter an email address");
       return;
     }
 

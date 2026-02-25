@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Upload, Loader2, Image as ImageIcon } from "lucide-react";
+import { toast } from "sonner";
 import { Project, ProjectUpdateRequest } from "@/lib/api";
 import Image from "next/image";
 
@@ -38,13 +39,13 @@ export function ProjectSettingsGeneral({ project, onUpdate, onUploadLogo }: Proj
 
     // Validate file type
     if (!file.type.startsWith("image/")) {
-      alert("Please upload an image file");
+      toast.error("Please upload an image file");
       return;
     }
 
     // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
-      alert("File size must be less than 2MB");
+      toast.error("File size must be less than 2MB");
       return;
     }
 

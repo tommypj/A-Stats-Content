@@ -97,7 +97,8 @@ def get_wp_credentials(project: Project) -> Optional[dict]:
                 settings.secret_key,
             ),
         }
-    except Exception:
+    except (ValueError, KeyError, TypeError) as e:
+        logger.warning("Failed to decrypt WordPress credentials: %s", e)
         return None
 
 
