@@ -33,15 +33,18 @@ export default function AdminAnalyticsPage() {
         end_date: dateRange.end_date,
       };
 
-      const [users, content, revenue] = await Promise.all([
+      const [usersResult, contentResult, revenueResult] = await Promise.allSettled([
         api.admin.analytics.users(params),
         api.admin.analytics.content(params),
         api.admin.analytics.revenue(params),
       ]);
 
-      setUserAnalytics(users);
-      setContentAnalytics(content);
-      setRevenueAnalytics(revenue);
+      if (usersResult.status === "fulfilled") setUserAnalytics(usersResult.value);
+      if (contentResult.status === "fulfilled") setContentAnalytics(contentResult.value);
+      if (revenueResult.status === "fulfilled") setRevenueAnalytics(revenueResult.value);
+
+      const failures = [usersResult, contentResult, revenueResult].filter(r => r.status === "rejected");
+      if (failures.length === 3) throw failures[0].reason;
     } catch (err) {
       setError(parseApiError(err).message);
     } finally {

@@ -94,7 +94,7 @@ export default function AdminLayout({
         setIsAdmin(true);
         setLoading(false);
       } catch (error) {
-        console.error("Failed to check admin role:", error);
+        // Admin role check failed — redirect to login silently
         router.push("/login");
       }
     };

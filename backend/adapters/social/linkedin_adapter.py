@@ -174,9 +174,9 @@ class LinkedInAdapter(BaseSocialAdapter):
             elements = (user_profile.get("profilePicture", {})
                         .get("displayImage~", {})
                         .get("elements") or [])
-            if elements:
+            if elements and isinstance(elements[0], dict):
                 identifiers = elements[0].get("identifiers") or []
-                if identifiers:
+                if identifiers and isinstance(identifiers[0], dict):
                     profile_image_url = identifiers[0].get("identifier")
 
             credentials = SocialCredentials(

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -22,6 +22,13 @@ function AnalyticsCallbackContent() {
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+    };
+  }, []);
 
   const handleCallback = useCallback(async () => {
     const code = searchParams.get("code");
@@ -39,7 +46,7 @@ function AnalyticsCallbackContent() {
       setStatus("success");
       toast.success("Google Search Console connected successfully!");
 
-      setTimeout(() => {
+      redirectTimerRef.current = setTimeout(() => {
         router.push("/analytics");
       }, 2000);
     } catch (error) {

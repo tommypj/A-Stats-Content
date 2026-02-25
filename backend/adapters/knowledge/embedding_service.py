@@ -143,7 +143,10 @@ class EmbeddingService:
                 response.raise_for_status()
                 data = response.json()
 
-                embeddings = [item["embedding"] for item in data["data"]]
+                items = data.get("data") or []
+                embeddings = [item["embedding"] for item in items if "embedding" in item]
+                if not embeddings:
+                    raise EmbeddingError("OpenAI API returned no embedding vectors")
                 logger.info(
                     f"Generated {len(embeddings)} embeddings using model {self.model}"
                 )

@@ -301,7 +301,7 @@ class LemonSqueezyAdapter:
             try:
                 error_data = e.response.json()
                 errors = error_data.get("errors", [])
-                if errors:
+                if errors and isinstance(errors[0], dict):
                     error_detail = errors[0].get("detail", str(e))
             except Exception:
                 error_detail = str(e)

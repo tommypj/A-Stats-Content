@@ -214,14 +214,18 @@ class TwitterAdapter(BaseSocialAdapter):
             # Get user profile
             user_profile = await self._get_user_profile(token_data["access_token"])
 
+            account_id = user_profile.get("id")
+            if not account_id:
+                raise SocialAPIError("Twitter API response missing user ID")
+
             credentials = SocialCredentials(
                 platform=SocialPlatform.TWITTER,
                 access_token=token_data["access_token"],
                 refresh_token=token_data.get("refresh_token"),
                 token_expiry=None,  # Twitter doesn't provide expiry in response
-                account_id=user_profile["id"],
-                account_name=user_profile["name"],
-                account_username=user_profile["username"],
+                account_id=account_id,
+                account_name=user_profile.get("name", ""),
+                account_username=user_profile.get("username", ""),
                 profile_image_url=user_profile.get("profile_image_url"),
             )
 
