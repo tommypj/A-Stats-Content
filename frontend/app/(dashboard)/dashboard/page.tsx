@@ -296,9 +296,9 @@ export default function DashboardPage() {
   const outlinesUsed = user?.outlines_generated_this_month ?? 0;
   const imagesUsed = user?.images_generated_this_month ?? 0;
 
-  const articlesLimit = planLimits?.limits.articles_per_month ?? 5;
-  const outlinesLimit = planLimits?.limits.outlines_per_month ?? 10;
-  const imagesLimit = planLimits?.limits.images_per_month ?? 2;
+  const articlesLimit = planLimits?.limits.articles_per_month ?? 10;
+  const outlinesLimit = planLimits?.limits.outlines_per_month ?? 20;
+  const imagesLimit = planLimits?.limits.images_per_month ?? 5;
 
   function formatLimit(used: number, limit: number) {
     return `${used} / ${limit === -1 ? "∞" : limit}`;

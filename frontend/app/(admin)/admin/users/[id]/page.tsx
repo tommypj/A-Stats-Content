@@ -91,9 +91,7 @@ export default function AdminUserDetailPage() {
       action: async () => {
         try {
           const response = await api.admin.users.resetPassword(user.id);
-          toast.success(
-            `Password reset successfully! Temporary password: ${response.temporary_password}`
-          );
+          toast.success(response.message || "Password reset successfully!");
         } catch (err) {
           const apiError = parseApiError(err);
           toast.error(`Failed to reset password: ${apiError.message}`);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -30,9 +30,15 @@ export default function BillingSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fetchData();
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+    };
   }, []);
 
   const fetchData = async () => {
@@ -59,12 +65,14 @@ export default function BillingSettingsPage() {
       window.open(response.checkout_url, "_blank");
 
       // Poll for subscription changes after checkout
-      const pollInterval = setInterval(async () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = setInterval(async () => {
         try {
           const subData = await api.billing.subscription();
           if (subData.subscription_tier !== subscription?.subscription_tier) {
             setSubscription(subData);
-            clearInterval(pollInterval);
+            if (pollRef.current) clearInterval(pollRef.current);
+            pollRef.current = null;
             toast.success("Subscription updated successfully!");
           }
         } catch (error) {
@@ -73,7 +81,10 @@ export default function BillingSettingsPage() {
       }, 3000);
 
       // Stop polling after 5 minutes
-      setTimeout(() => clearInterval(pollInterval), 300000);
+      pollTimeoutRef.current = setTimeout(() => {
+        if (pollRef.current) clearInterval(pollRef.current);
+        pollRef.current = null;
+      }, 300000);
     } catch (error) {
       const apiError = parseApiError(error);
       toast.error(apiError.message);

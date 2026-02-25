@@ -35,18 +35,23 @@ export default function SocialDashboard() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const [accountsRes, postsRes] = await Promise.all([
+      const [accountsRes, upcomingRes, recentRes] = await Promise.all([
         api.social.accounts(),
-        api.social.posts({ page: 1, page_size: 5, status: "pending" }),
+        api.social.posts({ page: 1, page_size: 5 }),
+        api.social.posts({ page: 1, page_size: 20, status: "posted" }),
       ]);
 
       setAccounts(accountsRes.accounts);
-      setUpcomingPosts(postsRes.items);
+      // Show upcoming (non-posted) posts
+      const upcoming = upcomingRes.items.filter(
+        (p) => p.status !== "posted" && p.status !== "failed" && p.status !== "cancelled"
+      );
+      setUpcomingPosts(upcoming);
 
-      // Calculate stats
-      const scheduled = postsRes.items.filter((p) => p.status === "pending").length;
-      const postedThisWeek = postsRes.items.filter(
-        (p) => p.status === "posted" && isThisWeek(p.published_at || "")
+      // Calculate stats from separate queries
+      const scheduled = upcoming.length;
+      const postedThisWeek = recentRes.items.filter(
+        (p) => isThisWeek(p.published_at || p.updated_at || "")
       ).length;
 
       setStats({
@@ -276,7 +281,7 @@ export default function SocialDashboard() {
               <div
                 key={post.id}
                 className="p-4 border border-surface-tertiary rounded-xl hover:bg-surface-secondary transition-colors cursor-pointer"
-                onClick={() => router.push(`/social/posts/${post.id}`)}
+                onClick={() => router.push(`/social/calendar`)}
               >
                 <div className="flex items-start gap-4">
                   <div className="flex-1">
@@ -328,7 +333,7 @@ export default function SocialDashboard() {
         <Button
           variant="outline"
           className="h-auto py-6 flex flex-col gap-2"
-          onClick={() => router.push("/social/posts")}
+          onClick={() => router.push("/social/history")}
         >
           <TrendingUp className="h-6 w-6" />
           <span>Post History</span>

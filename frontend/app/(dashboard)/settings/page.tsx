@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { api, getImageUrl } from "@/lib/api";
+import { api, getImageUrl, parseApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -700,8 +700,9 @@ export default function SettingsPage() {
       setNewPassword("");
       setConfirmPassword("");
       setTimeout(() => setPasswordSaved(false), 3000);
-    } catch {
-      setPasswordError("Current password is incorrect");
+    } catch (err) {
+      const apiError = parseApiError(err);
+      setPasswordError(apiError.message || "Current password is incorrect");
     }
   };
 

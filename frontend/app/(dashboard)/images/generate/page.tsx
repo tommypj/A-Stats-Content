@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -63,6 +63,14 @@ function GenerateImageContent() {
   const [error, setError] = useState("");
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [promptSource, setPromptSource] = useState<"manual" | "article">("manual");
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     loadArticles();
@@ -131,25 +139,29 @@ function GenerateImageContent() {
     }
   }
 
-  async function pollImageStatus(imageId: string) {
+  function pollImageStatus(imageId: string) {
     const maxAttempts = 90; // 90 attempts with 2s interval = 3 minutes max
     let attempts = 0;
 
-    const interval = setInterval(async () => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
       try {
         attempts++;
         const image = await api.images.get(imageId);
 
         if (image.status === "completed") {
           setGeneratedImage(image);
-          clearInterval(interval);
+          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = null;
         } else if (image.status === "failed" || attempts >= maxAttempts) {
           setError("Image generation failed or timed out");
-          clearInterval(interval);
+          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = null;
         }
       } catch (err) {
         console.error("Failed to poll image status:", err);
-        clearInterval(interval);
+        if (pollRef.current) clearInterval(pollRef.current);
+        pollRef.current = null;
       }
     }, 2000);
   }

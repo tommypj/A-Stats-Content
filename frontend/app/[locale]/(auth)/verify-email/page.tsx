@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { api, parseApiError } from "@/lib/api";
 
 export default function VerifyEmailPage() {
   const t = useTranslations("auth.verifyEmail");
@@ -26,22 +27,12 @@ export default function VerifyEmailPage() {
 
     const verifyEmail = async () => {
       try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/verify-email?token=${token}`,
-          { method: "POST" }
-        );
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.detail || "Verification failed");
-        }
-
+        await api.auth.verifyEmail(token);
         setStatus("success");
       } catch (error) {
         setStatus("error");
-        setErrorMessage(
-          error instanceof Error ? error.message : "Verification failed"
-        );
+        const apiError = parseApiError(error);
+        setErrorMessage(apiError.message || "Verification failed");
       }
     };
 

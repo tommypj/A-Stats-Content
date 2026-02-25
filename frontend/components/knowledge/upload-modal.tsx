@@ -116,9 +116,9 @@ export function UploadModal({ isOpen, onClose, onSuccess }: UploadModalProps) {
         setUploadProgress((prev) => Math.min(prev + 10, 90));
       }, 200);
 
-      await api.knowledge.upload(file, title, description, tags);
+      await api.knowledge.upload(file, title, description, tags)
+        .finally(() => clearInterval(progressInterval));
 
-      clearInterval(progressInterval);
       setUploadProgress(100);
 
       toast.success("File uploaded successfully!");
@@ -127,6 +127,7 @@ export function UploadModal({ isOpen, onClose, onSuccess }: UploadModalProps) {
         onSuccess?.();
       }, 500);
     } catch (error) {
+      setUploadProgress(0);
       const apiError = parseApiError(error);
       toast.error(apiError.message || "Failed to upload file");
       setError(apiError.message);

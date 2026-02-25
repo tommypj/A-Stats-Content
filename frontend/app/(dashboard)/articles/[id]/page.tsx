@@ -476,7 +476,7 @@ export default function ArticleEditorPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lastSavedContentRef = useRef<string>("");
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   // Version history panel state
   const [showVersionHistory, setShowVersionHistory] = useState(false);
@@ -704,17 +704,20 @@ export default function ArticleEditorPage() {
     });
   }, [content]);
 
-  // Auto-save: debounce 3 s after last keystroke
+  // Auto-save: debounce 3 s after last keystroke (tracks all editable fields)
+  const lastSavedSnapshotRef = useRef("");
   useEffect(() => {
     if (!article) return;
-    if (content === lastSavedContentRef.current) return;
+    const snapshot = JSON.stringify({ content, title, metaDescription, keyword });
+    if (snapshot === lastSavedSnapshotRef.current) return;
 
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current);
     }
 
     autoSaveTimerRef.current = setTimeout(async () => {
-      if (content === lastSavedContentRef.current) return;
+      const currentSnapshot = JSON.stringify({ content, title, metaDescription, keyword });
+      if (currentSnapshot === lastSavedSnapshotRef.current) return;
       setAutoSaveStatus("saving");
       try {
         await api.articles.update(article.id, {
@@ -723,11 +726,13 @@ export default function ArticleEditorPage() {
           meta_description: metaDescription,
           keyword,
         });
+        lastSavedSnapshotRef.current = currentSnapshot;
         lastSavedContentRef.current = content;
         setAutoSaveStatus("saved");
         setTimeout(() => setAutoSaveStatus("idle"), 2000);
       } catch {
-        setAutoSaveStatus("idle");
+        setAutoSaveStatus("error");
+        setTimeout(() => setAutoSaveStatus("idle"), 3000);
       }
     }, 3000);
 
@@ -1180,6 +1185,9 @@ export default function ArticleEditorPage() {
                         <CheckCircle className="h-3 w-3 text-green-500" />
                         <span className="text-green-600">Saved</span>
                       </>
+                    )}
+                    {autoSaveStatus === "error" && (
+                      <span className="text-red-500">Save failed</span>
                     )}
                   </div>
                 </div>

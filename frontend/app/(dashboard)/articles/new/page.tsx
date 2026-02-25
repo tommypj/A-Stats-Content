@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -44,6 +44,14 @@ function NewArticleContent() {
   const [voice, setVoice] = useState("second_person");
   const [listUsage, setListUsage] = useState("balanced");
   const [customInstructions, setCustomInstructions] = useState("");
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (outlineId) {
@@ -88,28 +96,32 @@ function NewArticleContent() {
       const maxAttempts = 120; // 120 * 3s = 6 minutes max
       let attempts = 0;
 
-      const poll = setInterval(async () => {
+      pollRef.current = setInterval(async () => {
         try {
           attempts++;
           const updated = await api.articles.get(article.id);
 
           if (updated.status === "completed" || updated.status === "published") {
-            clearInterval(poll);
+            if (pollRef.current) clearInterval(pollRef.current);
+            pollRef.current = null;
             router.push(`/articles/${updated.id}`);
           } else if (updated.status === "failed") {
-            clearInterval(poll);
+            if (pollRef.current) clearInterval(pollRef.current);
+            pollRef.current = null;
             setError(
               "Article generation failed. Please try again."
             );
             setGenerating(false);
           } else if (attempts >= maxAttempts) {
-            clearInterval(poll);
+            if (pollRef.current) clearInterval(pollRef.current);
+            pollRef.current = null;
             setError("Generation is taking too long. Check your articles list for the result.");
             setGenerating(false);
           }
         } catch (pollErr) {
           console.error("Polling error:", pollErr);
-          clearInterval(poll);
+          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = null;
           setError("Lost connection while generating. Check your articles list.");
           setGenerating(false);
         }

@@ -24,7 +24,7 @@ export function UsageLimitWarning({
   showUpgrade = true,
   className,
 }: UsageLimitWarningProps) {
-  const percentage = (used / limit) * 100;
+  const percentage = limit > 0 ? (used / limit) * 100 : (used > 0 ? 100 : 0);
   const isWarning = percentage >= 80 && percentage < 100;
   const isAtLimit = percentage >= 100;
 
@@ -114,7 +114,7 @@ export function UsageLimitWarning({
           {showUpgrade && (
             <div className="flex items-center gap-3">
               <Link
-                href={isProject ? `/projects/${isProject}/billing` : "/settings/billing"}
+                href="/settings/billing"
               >
                 <Button
                   size="sm"
@@ -164,7 +164,7 @@ export function UsageLimitBanner({
   isProject = false,
   projectName,
 }: UsageLimitBannerProps) {
-  const percentage = (used / limit) * 100;
+  const percentage = limit > 0 ? (used / limit) * 100 : (used > 0 ? 100 : 0);
 
   // Don't show anything if usage is below 90% for banner
   if (percentage < 90) {
@@ -218,7 +218,7 @@ export function UsageLimitBanner({
           </div>
         </div>
         <Link
-          href={isProject ? `/projects/${isProject}/billing` : "/settings/billing"}
+          href="/settings/billing"
         >
           <Button
             size="sm"

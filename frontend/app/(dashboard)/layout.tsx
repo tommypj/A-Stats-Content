@@ -167,10 +167,13 @@ function NotificationBell() {
     }
   }, []);
 
-  // Initial fetch + 30-second polling interval
+  // Initial fetch + 30-second polling interval (pauses when tab is hidden)
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30_000);
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      fetchNotifications();
+    }, 30_000);
     return () => clearInterval(interval);
   }, [fetchNotifications]);
 
@@ -294,16 +297,18 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         const data = await api.auth.me();
         setUser(data);
       } catch {
-        // Token refresh interceptor handles 401→redirect automatically.
-        // Only set user to null to show loading state.
+        // Failed to load user — token is likely invalid/expired.
+        // Redirect to login.
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("refresh_token");
+        router.push("/login");
       }
     };
     loadUser();
-  }, []);
+  }, [router]);
 
-  const handleSignOut = () => {
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("refresh_token");
+  const handleSignOut = async () => {
+    await api.auth.logout();
     router.push("/login");
   };
 
@@ -351,9 +356,11 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                 <p className="text-xs text-primary-400">Relational SEO</p>
               </div>
             </Link>
-            <div className="h-8 w-8 rounded-lg bg-amber-600/20 border border-amber-600/40 flex items-center justify-center">
-              <Shield className="h-4 w-4 text-amber-500" />
-            </div>
+            {isAdmin && (
+              <div className="h-8 w-8 rounded-lg bg-amber-600/20 border border-amber-600/40 flex items-center justify-center">
+                <Shield className="h-4 w-4 text-amber-500" />
+              </div>
+            )}
             <button
               onClick={() => setSidebarOpen(false)}
               className="lg:hidden p-1 rounded-lg hover:bg-primary-800"
@@ -585,9 +592,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                 </p>
               </div>
               {userMenuOpen ? (
-                <ChevronDown className="h-4 w-4 text-primary-400 shrink-0" />
-              ) : (
                 <ChevronUp className="h-4 w-4 text-primary-400 shrink-0" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-primary-400 shrink-0" />
               )}
             </button>
           </div>

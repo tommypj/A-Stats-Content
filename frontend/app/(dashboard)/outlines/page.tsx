@@ -28,12 +28,13 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AIGenerationProgress } from "@/components/ui/ai-generation-progress";
 import { clsx } from "clsx";
 
-const statusConfig = {
+const statusConfig: Record<string, { label: string; color: string; icon: typeof FileText }> = {
   draft: { label: "Draft", color: "bg-gray-100 text-gray-700", icon: FileText },
   generating: { label: "Generating", color: "bg-yellow-100 text-yellow-700", icon: Loader2 },
   completed: { label: "Completed", color: "bg-green-100 text-green-700", icon: CheckCircle2 },
   failed: { label: "Failed", color: "bg-red-100 text-red-700", icon: XCircle },
 };
+const defaultStatus = { label: "Unknown", color: "bg-gray-100 text-gray-500", icon: FileText };
 
 const STATUS_OPTIONS = [
   { value: "", label: "All Statuses" },
@@ -384,7 +385,7 @@ export default function OutlinesPage() {
 
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {outlines.map((outline) => {
-              const status = statusConfig[outline.status];
+              const status = statusConfig[outline.status] || defaultStatus;
               const StatusIcon = status.icon;
               const isChecked = selectedIds.has(outline.id);
 

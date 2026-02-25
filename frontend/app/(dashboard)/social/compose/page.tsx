@@ -25,7 +25,13 @@ export default function ComposePage() {
   const [scheduledAt, setScheduledAt] = useState(
     new Date(Date.now() + 3600000).toISOString() // Default to 1 hour from now
   );
-  const [timezone, setTimezone] = useState("America/New_York");
+  const [timezone, setTimezone] = useState(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch {
+      return "America/New_York";
+    }
+  });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,9 +77,12 @@ export default function ComposePage() {
     try {
       setSubmitting(true);
 
+      // Filter out blob: URLs — only send actual remote URLs to the backend
+      const remoteMediaUrls = mediaUrls.filter((url) => !url.startsWith("blob:"));
+
       await api.social.createPost({
         content,
-        media_urls: mediaUrls.length > 0 ? mediaUrls : undefined,
+        media_urls: remoteMediaUrls.length > 0 ? remoteMediaUrls : undefined,
         scheduled_at: scheduledAt,
         platforms: accounts
           .filter((a) => selectedAccountIds.includes(a.id))
@@ -94,10 +103,15 @@ export default function ComposePage() {
 
   const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files) return;
+    if (!files || files.length === 0) return;
 
-    // In a real app, you'd upload these to your storage service
-    // For now, we'll just create object URLs
+    if (mediaUrls.length + files.length > 4) {
+      setError("Maximum 4 media files allowed");
+      return;
+    }
+
+    // Create object URLs for preview display
+    // Note: blob URLs are for local preview only and are filtered out before API submission
     const urls = Array.from(files).map((file) => URL.createObjectURL(file));
     setMediaUrls([...mediaUrls, ...urls]);
   };

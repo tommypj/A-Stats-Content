@@ -271,6 +271,11 @@ export const api = {
         data: { refresh_token: refreshToken },
       }),
     logout: async (): Promise<void> => {
+      try {
+        await apiRequest<void>({ method: "POST", url: "/auth/logout" });
+      } catch {
+        // Best-effort server-side logout; clear local state regardless
+      }
       localStorage.removeItem("auth_token");
       localStorage.removeItem("refresh_token");
     },
@@ -589,8 +594,9 @@ export const api = {
       }),
     handleCallback: (code: string, state: string) =>
       apiRequest<void>({
+        method: "POST",
         url: "/analytics/gsc/callback",
-        params: { code, state },
+        data: { code, state },
       }),
     status: () =>
       apiRequest<GSCStatus>({
@@ -678,7 +684,7 @@ export const api = {
         url: "/billing/portal",
       }),
     cancel: () =>
-      apiRequest<void>({
+      apiRequest<{ success: boolean; message: string }>({
         method: "POST",
         url: "/billing/cancel",
       }),
@@ -760,19 +766,19 @@ export const api = {
     publishNow: (id: string) =>
       apiRequest<SocialPost>({
         method: "POST",
-        url: `/social/posts/${id}/publish`,
+        url: `/social/posts/${id}/publish-now`,
       }),
     reschedule: (id: string, newDate: string) =>
       apiRequest<SocialPost>({
-        method: "POST",
-        url: `/social/posts/${id}/reschedule`,
+        method: "PUT",
+        url: `/social/posts/${id}`,
         data: { scheduled_at: newDate },
       }),
     retryFailed: (id: string, targetIds?: string[]) =>
       apiRequest<SocialPost>({
-        method: "POST",
-        url: `/social/posts/${id}/retry`,
-        data: { target_ids: targetIds },
+        method: "PUT",
+        url: `/social/posts/${id}`,
+        data: { status: "pending", target_ids: targetIds },
       }),
     accounts: () =>
       apiRequest<SocialAccountListResponse>({
@@ -802,7 +808,7 @@ export const api = {
   admin: {
     dashboard: () =>
       apiRequest<AdminDashboardStats>({
-        url: "/admin/dashboard",
+        url: "/admin/analytics/dashboard",
       }),
     users: {
       list: (params?: AdminUserQueryParams) =>
@@ -836,17 +842,26 @@ export const api = {
           method: "DELETE",
           url: `/admin/users/${id}`,
         }),
-      resetPassword: (id: string) =>
-        apiRequest<{ temporary_password: string }>({
+      resetPassword: (id: string, sendEmail: boolean = true) =>
+        apiRequest<{ success: boolean; message: string }>({
           method: "POST",
           url: `/admin/users/${id}/reset-password`,
+          data: { send_email: sendEmail },
         }),
-      bulkSuspend: (userIds: string[], reason: string) =>
-        apiRequest<{ suspended: number }>({
-          method: "POST",
-          url: "/admin/users/bulk-suspend",
-          data: { user_ids: userIds, reason },
-        }),
+      // bulkSuspend: backend endpoint not yet implemented
+      // Use individual suspend calls instead
+      bulkSuspend: async (userIds: string[], reason: string) => {
+        const results = await Promise.all(
+          userIds.map((id) =>
+            apiRequest<AdminUserDetail>({
+              method: "POST",
+              url: `/admin/users/${id}/suspend`,
+              data: { reason },
+            }).then(() => 1).catch(() => 0)
+          )
+        );
+        return { suspended: results.reduce((a, b) => a + b, 0) };
+      },
     },
     analytics: {
       users: (params?: AdminAnalyticsParams) =>
@@ -1061,12 +1076,12 @@ export const api = {
         }),
       getByToken: (token: string) =>
         apiRequest<ProjectInvitation>({
-          url: `/invitations/${token}`,
+          url: `/projects/invitations/${token}`,
         }),
       accept: (token: string) =>
         apiRequest<void>({
           method: "POST",
-          url: `/invitations/${token}/accept`,
+          url: `/projects/invitations/${token}/accept`,
         }),
     },
 

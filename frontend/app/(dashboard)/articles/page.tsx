@@ -35,13 +35,14 @@ import { useProject } from "@/contexts/ProjectContext";
 import { ContentOwnershipBadge } from "@/components/project/content-ownership-badge";
 import { UsageLimitBanner } from "@/components/project/usage-limit-warning";
 
-const statusConfig = {
+const statusConfig: Record<string, { label: string; color: string; icon: typeof FileText }> = {
   draft: { label: "Draft", color: "bg-gray-100 text-gray-700", icon: FileText },
   generating: { label: "Generating", color: "bg-yellow-100 text-yellow-700", icon: Loader2 },
   completed: { label: "Completed", color: "bg-green-100 text-green-700", icon: CheckCircle2 },
   published: { label: "Published", color: "bg-blue-100 text-blue-700", icon: ExternalLink },
   failed: { label: "Failed", color: "bg-red-100 text-red-700", icon: XCircle },
 };
+const defaultStatus = { label: "Unknown", color: "bg-gray-100 text-gray-500", icon: FileText };
 
 const STATUS_OPTIONS = [
   { value: "", label: "All Statuses" },
@@ -515,7 +516,7 @@ export default function ArticlesPage() {
           )}
 
           {articles.map((article) => {
-            const status = statusConfig[article.status];
+            const status = statusConfig[article.status] || defaultStatus;
             const StatusIcon = status.icon;
             const isProjectContent = !!article.project_id;
             const canModify = canEdit;

@@ -62,7 +62,7 @@ export default function LoginPage() {
           email: user.email,
           name: user.name,
           role: user.role as "user" | "admin",
-          subscription_tier: "free",
+          subscription_tier: (user.subscription_tier as "free" | "starter" | "professional" | "enterprise") || "free",
         },
         response.access_token,
         response.refresh_token
