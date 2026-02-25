@@ -194,22 +194,32 @@ class SocialSchedulerService:
             )
 
             # Decrypt credentials — map DB column names to SocialCredentials fields
-            credentials = SocialCredentials(
-                platform=SocialPlatform(account.platform),
-                access_token=decrypt_credential(
-                    account.access_token_encrypted, settings.secret_key
-                ),
-                refresh_token=(
-                    decrypt_credential(account.refresh_token_encrypted, settings.secret_key)
-                    if account.refresh_token_encrypted
-                    else None
-                ),
-                token_expiry=account.token_expires_at,
-                account_id=account.platform_user_id,
-                account_name=account.platform_username,
-                account_username=account.platform_display_name,
-                profile_image_url=account.profile_image_url,
-            )
+            try:
+                credentials = SocialCredentials(
+                    platform=SocialPlatform(account.platform),
+                    access_token=decrypt_credential(
+                        account.access_token_encrypted, settings.secret_key
+                    ),
+                    refresh_token=(
+                        decrypt_credential(account.refresh_token_encrypted, settings.secret_key)
+                        if account.refresh_token_encrypted
+                        else None
+                    ),
+                    token_expiry=account.token_expires_at,
+                    account_id=account.platform_user_id,
+                    account_name=account.platform_username,
+                    account_username=account.platform_display_name,
+                    profile_image_url=account.profile_image_url,
+                )
+            except Exception as decrypt_err:
+                logger.error(
+                    f"Failed to decrypt credentials for {account.platform} "
+                    f"({account.platform_username}): {decrypt_err}"
+                )
+                return PostResult(
+                    success=False,
+                    error_message=f"Credential decryption failed — reconnect your {account.platform} account",
+                )
 
             # Get platform adapter
             adapter = get_social_adapter(SocialPlatform(account.platform))
@@ -217,9 +227,17 @@ class SocialSchedulerService:
             # Check if token needs refresh
             if credentials.token_expiry and credentials.token_expiry < datetime.now(timezone.utc):
                 logger.info(f"Refreshing expired token for {account.platform}")
-                credentials = await adapter.refresh_token(credentials)
-                # Update stored credentials
-                await self._update_account_tokens(account, credentials, db)
+                try:
+                    credentials = await adapter.refresh_token(credentials)
+                    await self._update_account_tokens(account, credentials, db)
+                except Exception as refresh_err:
+                    logger.warning(
+                        f"Token refresh failed for {account.platform}: {refresh_err}"
+                    )
+                    return PostResult(
+                        success=False,
+                        error_message=f"Token expired — please reconnect your {account.platform} account",
+                    )
 
             # Publish the post — Facebook requires page_id and page_token from account metadata
             extra_kwargs = {}

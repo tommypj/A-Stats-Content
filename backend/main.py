@@ -45,9 +45,9 @@ async def lifespan(app: FastAPI):
 
     settings.validate_production_secrets()
 
-    # Recover articles and outlines stuck in "generating" status from previous shutdown
+    # Recover articles, outlines, and images stuck in "generating" status from previous shutdown
     from infrastructure.database.connection import async_session_maker
-    from infrastructure.database.models.content import Article, Outline, ContentStatus
+    from infrastructure.database.models.content import Article, Outline, GeneratedImage, ContentStatus
     from sqlalchemy import update
 
     async with async_session_maker() as recovery_db:
@@ -67,6 +67,11 @@ async def lifespan(app: FastAPI):
                 generation_error="Server restarted during generation",
             )
         )
+        stale_images = await recovery_db.execute(
+            update(GeneratedImage)
+            .where(GeneratedImage.status == "generating")
+            .values(status="failed")
+        )
         await recovery_db.commit()
         if stale_articles.rowcount > 0:
             logger.warning(
@@ -75,6 +80,10 @@ async def lifespan(app: FastAPI):
         if stale_outlines.rowcount > 0:
             logger.warning(
                 "Recovered %d outlines stuck in generating status", stale_outlines.rowcount
+            )
+        if stale_images.rowcount > 0:
+            logger.warning(
+                "Recovered %d images stuck in generating status", stale_images.rowcount
             )
 
     if settings.is_development:

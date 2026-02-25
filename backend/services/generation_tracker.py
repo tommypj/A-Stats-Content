@@ -193,7 +193,7 @@ class GenerationTracker:
             return await usage_service.check_project_limit(project_id, resource_type + "s")
         except Exception as e:
             logger.error("Failed to check project usage limit: %s", str(e))
-            return True  # Fail open
+            return False  # Fail closed — projects have explicit billing
 
     async def _reset_user_usage_if_needed(self, user) -> bool:
         """Reset user-level monthly usage counters if the billing period has elapsed.

@@ -132,7 +132,7 @@ function GenerateImageContent() {
   }
 
   async function pollImageStatus(imageId: string) {
-    const maxAttempts = 30; // 30 attempts with 2s interval = 1 minute max
+    const maxAttempts = 90; // 90 attempts with 2s interval = 3 minutes max
     let attempts = 0;
 
     const interval = setInterval(async () => {
