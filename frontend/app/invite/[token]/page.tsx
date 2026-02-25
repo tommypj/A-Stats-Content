@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, parseApiError } from "@/lib/api";
+import { api, parseApiError, ProjectInvitationPublic } from "@/lib/api";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,15 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Mail, CheckCircle, XCircle, Clock, Building2, Shield, User as UserIcon, Eye, Crown } from "lucide-react";
 
-interface InvitationInfo {
-  project_name: string;
-  project_logo_url?: string;
-  inviter_name: string;
-  inviter_email: string;
-  role: "owner" | "admin" | "member" | "viewer";
-  status: "pending" | "accepted" | "expired" | "revoked";
-  expires_at: string;
-}
+type InvitationInfo = ProjectInvitationPublic;
 
 const roleIcons = {
   owner: Crown,
@@ -66,10 +58,8 @@ export default function InviteAcceptPage() {
   const loadInvitation = async () => {
     try {
       setError("");
-      // This endpoint should return invitation details by token
-      // For now, using a placeholder structure
       const data = await api.projects.invitations.getByToken(token);
-      setInvitation(data as any);
+      setInvitation(data);
     } catch (err) {
       setError(parseApiError(err).message);
     } finally {
@@ -137,10 +127,9 @@ export default function InviteAcceptPage() {
   }
 
   const RoleIcon = roleIcons[invitation.role];
-  const isExpired = invitation.status === "expired" || new Date(invitation.expires_at) < new Date();
-  const isRevoked = invitation.status === "revoked";
-  const isAccepted = invitation.status === "accepted";
-  const canAccept = invitation.status === "pending" && !isExpired;
+  const isExpired = invitation.is_expired;
+  const isAlreadyMember = invitation.is_already_member;
+  const canAccept = !isExpired && !isAlreadyMember;
 
   return (
     <div className="min-h-screen bg-surface-secondary flex items-center justify-center p-4">
@@ -197,7 +186,6 @@ export default function InviteAcceptPage() {
             <div className="text-left">
               <p className="text-sm text-text-secondary">Invited by</p>
               <p className="font-medium text-text-primary">{invitation.inviter_name}</p>
-              <p className="text-sm text-text-muted">{invitation.inviter_email}</p>
             </div>
           </div>
 
@@ -217,28 +205,14 @@ export default function InviteAcceptPage() {
             </div>
           )}
 
-          {isRevoked && (
-            <div className="p-4 rounded-lg bg-red-50 border border-red-200">
-              <div className="flex items-start gap-3">
-                <XCircle className="h-5 w-5 text-red-600 mt-0.5" />
-                <div>
-                  <p className="font-medium text-red-900">Invitation Revoked</p>
-                  <p className="text-sm text-red-800 mt-1">
-                    This invitation has been revoked by the project admin.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {isAccepted && (
+          {isAlreadyMember && (
             <div className="p-4 rounded-lg bg-green-50 border border-green-200">
               <div className="flex items-start gap-3">
                 <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-green-900">Already Accepted</p>
+                  <p className="font-medium text-green-900">Already a Member</p>
                   <p className="text-sm text-green-800 mt-1">
-                    You've already accepted this invitation.
+                    You're already a member of this project.
                   </p>
                 </div>
               </div>

@@ -65,7 +65,7 @@ export function PostListItem({
                 )}
               </div>
             </div>
-            <PostStatusBadge status={post.status as any} />
+            <PostStatusBadge status={post.status} />
           </div>
 
           {/* Platforms and Actions */}

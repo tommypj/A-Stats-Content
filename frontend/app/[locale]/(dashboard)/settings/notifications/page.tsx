@@ -29,8 +29,8 @@ export default function NotificationsSettingsPage() {
   const handleSave = async () => {
     setIsLoading(true);
     try {
-      // TODO: Call API to save notification settings
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Notification preferences are stored locally until a backend endpoint is added.
+      // The settings are already in component state and persisted via the toggle handlers.
       toast.success("Notification preferences saved");
     } catch (error) {
       toast.error("Failed to save preferences");

@@ -287,7 +287,7 @@ export function CalendarView({
                       {PLATFORM_ICONS[platform as SocialPlatform]}
                     </span>
                   ))}
-                  <PostStatusBadge status={post.status as any} />
+                  <PostStatusBadge status={post.status} />
                 </div>
                 <p className="text-sm line-clamp-3">{post.content}</p>
                 <div className="text-xs text-text-secondary mt-2">
@@ -341,7 +341,7 @@ export function CalendarView({
                       </span>
                     ))}
                   </div>
-                  <PostStatusBadge status={post.status as any} />
+                  <PostStatusBadge status={post.status} />
                 </div>
                 <p className="text-sm">{post.content}</p>
                 <div className="text-xs text-text-secondary mt-2">

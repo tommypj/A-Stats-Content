@@ -1106,7 +1106,7 @@ export const api = {
           url: `/projects/${projectId}/invitations/${invitationId}/resend`,
         }),
       getByToken: (token: string) =>
-        apiRequest<ProjectInvitation>({
+        apiRequest<ProjectInvitationPublic>({
           url: `/projects/invitations/${token}`,
         }),
       accept: (token: string) =>
@@ -2189,6 +2189,17 @@ export interface ProjectInvitation {
   invited_by: string;
   invited_by_name: string;
   created_at: string;
+}
+
+export interface ProjectInvitationPublic {
+  project_name: string;
+  project_slug: string;
+  project_logo_url?: string;
+  inviter_name: string;
+  role: ProjectRole;
+  expires_at: string;
+  is_expired: boolean;
+  is_already_member: boolean;
 }
 
 export interface ProjectCreateRequest {

@@ -8,6 +8,7 @@ import { z } from "zod";
 import { Camera } from "lucide-react";
 import { toast } from "sonner";
 
+import { api, parseApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/stores/auth";
@@ -39,8 +40,7 @@ export default function ProfileSettingsPage() {
   const onSubmit = async (data: ProfileFormData) => {
     setIsLoading(true);
     try {
-      // TODO: Call API to update profile
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await api.auth.updateProfile({ name: data.name });
 
       if (user) {
         setUser({ ...user, name: data.name });
@@ -48,7 +48,7 @@ export default function ProfileSettingsPage() {
 
       toast.success("Profile updated successfully");
     } catch (error) {
-      toast.error("Failed to update profile");
+      toast.error(parseApiError(error).message || "Failed to update profile");
     } finally {
       setIsLoading(false);
     }
