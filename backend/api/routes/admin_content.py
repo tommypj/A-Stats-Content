@@ -66,16 +66,20 @@ async def log_audit(
     details: Optional[dict] = None,
 ) -> None:
     """Log an admin action to the audit log."""
-    audit_log = AdminAuditLog(
-        admin_user_id=admin_user.id,
-        action=action.value,
-        target_type=target_type.value,
-        target_id=target_id,
-        target_user_id=target_user_id,
-        details=details,
-    )
-    db.add(audit_log)
-    await db.commit()
+    try:
+        audit_log = AdminAuditLog(
+            admin_user_id=admin_user.id,
+            action=action.value,
+            target_type=target_type.value,
+            target_id=target_id,
+            target_user_id=target_user_id,
+            details=details,
+        )
+        db.add(audit_log)
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        logger.error("Failed to log audit action %s: %s", action.value, e)
 
 
 # --- Article Endpoints ---
@@ -115,7 +119,10 @@ async def list_all_articles(
             )
         )
 
-    # Apply sorting
+    # Apply sorting (whitelist allowed columns)
+    ALLOWED_SORT_FIELDS = {"created_at", "updated_at", "seo_score", "word_count", "title", "status"}
+    if sort_by not in ALLOWED_SORT_FIELDS:
+        sort_by = "created_at"
     sort_column = getattr(Article, sort_by, Article.created_at)
     if sort_order == "desc":
         query = query.order_by(desc(sort_column))
@@ -207,7 +214,7 @@ async def get_article_detail(
 
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Article author not found",
         )
 

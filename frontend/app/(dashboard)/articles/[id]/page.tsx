@@ -534,12 +534,7 @@ export default function ArticleEditorPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [viewMode]);
 
-  useEffect(() => {
-    loadArticle();
-    checkWordPressConnection();
-  }, [articleId]);
-
-  async function loadArticle() {
+  const loadArticle = useCallback(async () => {
     try {
       setLoading(true);
       const data = await api.articles.get(articleId);
@@ -564,9 +559,9 @@ export default function ArticleEditorPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [articleId]);
 
-  async function checkWordPressConnection() {
+  const checkWordPressConnection = useCallback(async () => {
     try {
       setCheckingWpConnection(true);
       const status = await api.wordpress.status();
@@ -577,7 +572,12 @@ export default function ArticleEditorPage() {
     } finally {
       setCheckingWpConnection(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    loadArticle();
+    checkWordPressConnection();
+  }, [loadArticle, checkWordPressConnection]);
 
   async function handleSave() {
     if (!article) return;

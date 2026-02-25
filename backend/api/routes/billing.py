@@ -53,7 +53,7 @@ def get_variant_id(plan: str, billing_cycle: str) -> str:
 
     if not variant_id:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Variant not configured for {plan} {billing_cycle}",
         )
 
@@ -159,7 +159,7 @@ async def create_checkout(
     # Check LemonSqueezy configuration
     if not settings.lemonsqueezy_api_key or not settings.lemonsqueezy_store_id:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Payment system not configured",
         )
 
@@ -201,7 +201,7 @@ async def get_customer_portal(
 
     if not settings.lemonsqueezy_store_id:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Payment system not configured",
         )
 

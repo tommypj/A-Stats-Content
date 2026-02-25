@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -53,17 +53,23 @@ export default function SourceDetailPage() {
   const [isReprocessing, setIsReprocessing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
+  const statusRef = useRef(source?.status);
+  statusRef.current = source?.status;
+
   useEffect(() => {
     loadSource();
-    // Poll for status updates if processing
+  }, [sourceId]);
+
+  // Poll for status updates if processing
+  useEffect(() => {
     const interval = setInterval(() => {
-      if (source?.status === "processing" || source?.status === "pending") {
+      if (statusRef.current === "processing" || statusRef.current === "pending") {
         loadSource(true);
       }
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [sourceId, source?.status]);
+  }, [sourceId]);
 
   async function loadSource(silent = false) {
     try {

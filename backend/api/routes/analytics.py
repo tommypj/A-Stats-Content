@@ -209,7 +209,7 @@ async def gsc_oauth_callback(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to connect GSC: {str(e)}",
+            detail="Failed to connect GSC",
         )
 
 
@@ -328,7 +328,7 @@ async def get_gsc_sites(
         logger.error(f"GSC list_sites failed: {type(e).__name__}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch GSC sites: {str(e)}",
+            detail="Failed to fetch GSC sites",
         )
 
 
@@ -525,7 +525,7 @@ async def sync_gsc_data(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to sync GSC data: {str(e)}",
+            detail="Failed to sync GSC data",
         )
 
 
@@ -1380,7 +1380,7 @@ async def suggest_content(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate suggestions: {str(e)}",
+            detail="Failed to generate suggestions",
         )
 
     suggestions = [

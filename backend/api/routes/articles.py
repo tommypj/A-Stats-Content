@@ -735,7 +735,7 @@ Only return the JSON array, no other text."""
         raise
     except Exception as e:
         logger.error("Keyword suggestion failed: %s", e)
-        raise HTTPException(status_code=500, detail="Failed to generate keyword suggestions")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to generate keyword suggestions")
 
 
 @router.get("/export")
