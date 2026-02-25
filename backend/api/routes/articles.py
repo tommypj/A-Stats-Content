@@ -713,8 +713,15 @@ Only return the JSON array, no other text."""
 
         text = response.content[0].text
         # Extract JSON from response (handle markdown code blocks)
-        if "```" in text:
-            text = text.split("```")[1]
+        parts = text.split("```")
+        if len(parts) >= 3:
+            # Standard ```json...``` block — extract the middle part
+            text = parts[1]
+            if text.startswith("json"):
+                text = text[4:]
+        elif len(parts) == 2:
+            # Single opening ``` with no closing — take the rest
+            text = parts[1]
             if text.startswith("json"):
                 text = text[4:]
 

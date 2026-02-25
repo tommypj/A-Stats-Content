@@ -78,7 +78,7 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    token = authorization.split(" ")[1]
+    token = authorization.split(" ", 1)[1] if " " in authorization else ""
     payload = token_service.verify_access_token(token)
 
     if not payload:

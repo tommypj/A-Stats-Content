@@ -169,6 +169,16 @@ class LinkedInAdapter(BaseSocialAdapter):
             # Get user profile
             user_profile = await self._get_user_profile(token_data["access_token"])
 
+            # Safely extract profile image URL from deeply nested LinkedIn response
+            profile_image_url = None
+            elements = (user_profile.get("profilePicture", {})
+                        .get("displayImage~", {})
+                        .get("elements") or [])
+            if elements:
+                identifiers = elements[0].get("identifiers") or []
+                if identifiers:
+                    profile_image_url = identifiers[0].get("identifier")
+
             credentials = SocialCredentials(
                 platform=SocialPlatform.LINKEDIN,
                 access_token=token_data["access_token"],
@@ -177,7 +187,7 @@ class LinkedInAdapter(BaseSocialAdapter):
                 account_id=user_profile["id"],
                 account_name=f"{user_profile.get('localizedFirstName', '')} {user_profile.get('localizedLastName', '')}".strip(),
                 account_username=None,
-                profile_image_url=user_profile.get("profilePicture", {}).get("displayImage~", {}).get("elements", [{}])[0].get("identifiers", [{}])[0].get("identifier"),
+                profile_image_url=profile_image_url,
             )
 
             logger.info(f"LinkedIn authentication successful: {credentials.account_name}")

@@ -14,6 +14,7 @@ import {
   ImageIcon,
   CheckCircle2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { api, getImageUrl, GeneratedImage, Article } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -174,8 +175,8 @@ function GenerateImageContent() {
       await navigator.clipboard.writeText(getImageUrl(generatedImage.url));
       setCopiedUrl(true);
       setTimeout(() => setCopiedUrl(false), 2000);
-    } catch (error) {
-      console.error("Failed to copy URL:", error);
+    } catch {
+      toast.error("Failed to copy URL");
     }
   }
 

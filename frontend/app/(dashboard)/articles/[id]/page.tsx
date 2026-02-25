@@ -661,9 +661,13 @@ export default function ArticleEditorPage() {
     });
   }
 
-  function copyToClipboard(text: string) {
-    navigator.clipboard.writeText(text);
-    toast.success("Copied to clipboard!");
+  async function copyToClipboard(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Copied to clipboard!");
+    } catch {
+      toast.error("Failed to copy to clipboard");
+    }
   }
 
   // Markdown toolbar helpers
