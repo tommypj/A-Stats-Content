@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Upload, Search, Filter, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,6 +22,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function SourcesPage() {
+  const router = useRouter();
   const [sources, setSources] = useState<KnowledgeSource[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -176,7 +178,7 @@ export default function SourcesPage() {
               <SourceCard
                 key={source.id}
                 source={source}
-                onClick={() => (window.location.href = `/knowledge/sources/${source.id}`)}
+                onClick={() => router.push(`/knowledge/sources/${source.id}`)}
               />
             ))}
           </div>

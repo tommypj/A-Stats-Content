@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
 import { api, getImageUrl, parseApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -355,9 +356,11 @@ function BillingSection({ profile }: BillingSectionProps) {
             Status: {profile?.subscription_status || "Active"}
           </p>
         </div>
-        <Button variant="outline" onClick={() => (window.location.href = "/settings/billing")}>
-          Manage Plan
-        </Button>
+        <Link href="/settings/billing">
+          <Button variant="outline">
+            Manage Plan
+          </Button>
+        </Link>
       </div>
 
       <div className="mt-4 grid sm:grid-cols-3 gap-4">

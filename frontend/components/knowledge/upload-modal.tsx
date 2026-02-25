@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Upload, FileText, X, CheckCircle, AlertCircle } from "lucide-react";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,16 @@ export function UploadModal({ isOpen, onClose, onSuccess }: UploadModalProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState("");
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Clean up interval on unmount
+  useEffect(() => {
+    return () => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+    };
+  }, []);
 
   const resetForm = () => {
     setFile(null);
@@ -112,12 +122,17 @@ export function UploadModal({ isOpen, onClose, onSuccess }: UploadModalProps) {
       setUploadProgress(0);
 
       // Simulate upload progress (since FormData doesn't provide real progress)
-      const progressInterval = setInterval(() => {
+      progressIntervalRef.current = setInterval(() => {
         setUploadProgress((prev) => Math.min(prev + 10, 90));
       }, 200);
 
       await api.knowledge.upload(file, title, description, tags)
-        .finally(() => clearInterval(progressInterval));
+        .finally(() => {
+          if (progressIntervalRef.current) {
+            clearInterval(progressIntervalRef.current);
+            progressIntervalRef.current = null;
+          }
+        });
 
       setUploadProgress(100);
 

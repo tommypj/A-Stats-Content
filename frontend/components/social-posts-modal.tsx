@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   X,
   Loader2,
@@ -50,6 +50,16 @@ export default function SocialPostsModal({
   const [saving, setSaving] = useState(false);
   const [editedTexts, setEditedTexts] = useState<Record<string, string>>({});
   const [copiedPlatform, setCopiedPlatform] = useState<string | null>(null);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -126,7 +136,8 @@ export default function SocialPostsModal({
       await navigator.clipboard.writeText(text);
       setCopiedPlatform(platform);
       toast.success("Copied to clipboard!");
-      setTimeout(() => setCopiedPlatform(null), 2000);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = setTimeout(() => setCopiedPlatform(null), 2000);
     } catch {
       toast.error("Failed to copy");
     }

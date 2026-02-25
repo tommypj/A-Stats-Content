@@ -37,6 +37,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/billing", tags=["billing"])
 
 
+def _parse_iso_datetime(value: str) -> datetime:
+    """Parse ISO 8601 datetime string, handling Z suffix and invalid formats."""
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (ValueError, AttributeError) as e:
+        logger.warning("Failed to parse datetime '%s': %s", value, e)
+        return datetime.now(timezone.utc)
+
+
 def get_variant_id(plan: str, billing_cycle: str) -> str:
     """Get LemonSqueezy variant ID for a plan and billing cycle."""
     variant_key = f"lemonsqueezy_variant_{plan}_{billing_cycle}"
@@ -239,8 +248,8 @@ async def cancel_subscription(
                 response.text,
             )
             raise HTTPException(
-                500,
-                "Failed to cancel subscription. Please try again or contact support.",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to cancel subscription. Please try again or contact support.",
             )
 
     return SubscriptionCancelResponse(
@@ -314,7 +323,7 @@ async def handle_project_subscription_webhook(
             project.lemonsqueezy_subscription_id = str(subscription_id) if subscription_id else None
 
             if renews_at:
-                project.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
+                project.subscription_expires = _parse_iso_datetime(renews_at)
 
             logger.info(f"Project subscription created: project_id={project_id}, tier={tier}")
 
@@ -323,7 +332,7 @@ async def handle_project_subscription_webhook(
             project.subscription_tier = tier
 
             if renews_at:
-                project.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
+                project.subscription_expires = _parse_iso_datetime(renews_at)
 
             if subscription_status in ["cancelled", "paused", "expired"]:
                 logger.info(f"Project subscription {subscription_status}: project_id={project_id}, expires={renews_at}")
@@ -333,7 +342,7 @@ async def handle_project_subscription_webhook(
         elif event_name == WebhookEventType.SUBSCRIPTION_CANCELLED.value:
             # Project subscription cancelled - keep tier until expiration
             if renews_at:
-                project.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
+                project.subscription_expires = _parse_iso_datetime(renews_at)
 
             logger.info(f"Project subscription cancelled: project_id={project_id}, expires={renews_at}")
 
@@ -348,7 +357,7 @@ async def handle_project_subscription_webhook(
         elif event_name == WebhookEventType.SUBSCRIPTION_PAYMENT_SUCCESS.value:
             # Payment successful - update renewal date
             if renews_at:
-                project.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
+                project.subscription_expires = _parse_iso_datetime(renews_at)
 
             logger.info(f"Project payment successful: project_id={project_id}, renews={renews_at}")
 
@@ -361,7 +370,7 @@ async def handle_project_subscription_webhook(
             project.subscription_tier = tier
 
             if renews_at:
-                project.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
+                project.subscription_expires = _parse_iso_datetime(renews_at)
 
             logger.info(f"Project subscription resumed: project_id={project_id}")
 
@@ -374,7 +383,7 @@ async def handle_project_subscription_webhook(
             project.subscription_tier = tier
 
             if renews_at:
-                project.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
+                project.subscription_expires = _parse_iso_datetime(renews_at)
 
             logger.info(f"Project subscription unpaused: project_id={project_id}")
 
@@ -390,7 +399,7 @@ async def handle_project_subscription_webhook(
     except Exception as e:
         logger.error("Webhook processing failed for project %s: %s", project_id, str(e), exc_info=True)
         await db.rollback()
-        raise HTTPException(status_code=500, detail="Webhook processing failed")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Webhook processing failed")
 
 
 @router.post("/webhook")
@@ -430,7 +439,7 @@ async def handle_webhook(
             )
     else:
         logger.error("Webhook rejected: LEMONSQUEEZY_WEBHOOK_SECRET not configured")
-        raise HTTPException(status_code=500, detail="Webhook verification not configured")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Webhook verification not configured")
 
     # Parse webhook payload
     try:
@@ -443,9 +452,13 @@ async def handle_webhook(
     # Extract event info
     meta = payload.get("meta", {})
     event_name = meta.get("event_name")
-    custom_data = meta.get("custom_data", {})
+    custom_data = meta.get("custom_data", {}) or {}
     user_id = custom_data.get("user_id")
     project_id = custom_data.get("project_id")  # Project subscription support
+
+    if not event_name:
+        logger.error("Webhook payload missing event_name in meta")
+        return {"status": "error", "message": "Missing event_name"}
 
     data = payload.get("data", {})
     attributes = data.get("attributes", {})
@@ -517,7 +530,7 @@ async def handle_webhook(
             user.lemonsqueezy_subscription_id = str(subscription_id) if subscription_id else None
 
             if renews_at:
-                user.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
+                user.subscription_expires = _parse_iso_datetime(renews_at)
 
             logger.info(f"Subscription created for user {user_id}: tier={tier}")
 
@@ -526,7 +539,7 @@ async def handle_webhook(
             user.subscription_tier = tier
 
             if renews_at:
-                user.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
+                user.subscription_expires = _parse_iso_datetime(renews_at)
 
             # If subscription is cancelled or paused, don't downgrade immediately
             # Let it expire naturally
@@ -538,7 +551,7 @@ async def handle_webhook(
         elif event_name == WebhookEventType.SUBSCRIPTION_CANCELLED.value:
             # Subscription cancelled - keep tier until expiration
             if renews_at:
-                user.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
+                user.subscription_expires = _parse_iso_datetime(renews_at)
 
             logger.info(f"Subscription cancelled for user {user_id}, will expire at {renews_at}")
 
@@ -553,7 +566,7 @@ async def handle_webhook(
         elif event_name == WebhookEventType.SUBSCRIPTION_PAYMENT_SUCCESS.value:
             # Payment successful - update renewal date
             if renews_at:
-                user.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
+                user.subscription_expires = _parse_iso_datetime(renews_at)
 
             logger.info(f"Payment successful for user {user_id}, renews at {renews_at}")
 
@@ -566,7 +579,7 @@ async def handle_webhook(
             user.subscription_tier = tier
 
             if renews_at:
-                user.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
+                user.subscription_expires = _parse_iso_datetime(renews_at)
 
             logger.info(f"Subscription resumed for user {user_id}")
 
@@ -579,7 +592,7 @@ async def handle_webhook(
             user.subscription_tier = tier
 
             if renews_at:
-                user.subscription_expires = datetime.fromisoformat(renews_at.replace("Z", "+00:00"))
+                user.subscription_expires = _parse_iso_datetime(renews_at)
 
             logger.info(f"Subscription unpaused for user {user_id}")
 
@@ -595,4 +608,4 @@ async def handle_webhook(
     except Exception as e:
         logger.error("Webhook processing failed: %s", str(e), exc_info=True)
         await db.rollback()
-        raise HTTPException(status_code=500, detail="Webhook processing failed")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Webhook processing failed")
