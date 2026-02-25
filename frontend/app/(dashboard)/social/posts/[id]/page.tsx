@@ -75,7 +75,7 @@ export default function PostDetailPage() {
       const data = await api.social.analytics(postId);
       setAnalytics([data]);
     } catch (error) {
-      console.error("Failed to load analytics:", error);
+      toast.error("Failed to load post analytics");
     } finally {
       setAnalyticsLoading(false);
     }

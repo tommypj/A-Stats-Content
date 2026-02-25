@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { api, SocialAccount, SocialPost } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -60,7 +61,7 @@ export default function SocialDashboard() {
         totalEngagement: 0, // Would need analytics endpoint
       });
     } catch (error) {
-      console.error("Failed to load dashboard:", error);
+      toast.error("Failed to load dashboard data");
     } finally {
       setLoading(false);
     }

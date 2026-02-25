@@ -99,7 +99,7 @@ function GenerateImageContent() {
       const response = await api.articles.list({ page_size: 100 });
       setArticles(response.items.filter(a => a.status === "completed" || a.status === "published"));
     } catch (err) {
-      console.error("Failed to load articles:", err);
+      toast.error("Failed to load articles");
     } finally {
       setLoadingArticles(false);
     }
@@ -161,7 +161,7 @@ function GenerateImageContent() {
           pollRef.current = null;
         }
       } catch (err) {
-        console.error("Failed to poll image status:", err);
+        setError("Failed to check generation status");
         if (pollRef.current) clearInterval(pollRef.current);
         pollRef.current = null;
       }

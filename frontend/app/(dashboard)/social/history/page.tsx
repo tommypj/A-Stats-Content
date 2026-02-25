@@ -46,7 +46,7 @@ export default function SocialHistoryPage() {
       setTotal(response.total);
       setTotalPages(response.pages);
     } catch (error) {
-      console.error("Failed to load posts:", error);
+      toast.error("Failed to load post history");
     } finally {
       setLoading(false);
     }

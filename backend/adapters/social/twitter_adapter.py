@@ -558,7 +558,8 @@ class TwitterAdapter(BaseSocialAdapter):
                 )
 
                 if response.status_code != 200:
-                    error_msg = response.json().get("errors", [{}])[0].get("message", "Upload failed")
+                    errors = response.json().get("errors") or []
+                    error_msg = errors[0].get("message", "Upload failed") if errors else "Upload failed"
                     raise SocialAPIError(f"Media upload failed: {error_msg}")
 
                 result = response.json()

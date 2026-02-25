@@ -65,7 +65,7 @@ export default function AdminUserDetailPage() {
       });
       setAuditLogs(response.logs);
     } catch (err) {
-      console.error("Failed to fetch audit logs:", err);
+      toast.error("Failed to load audit logs");
     }
   };
 

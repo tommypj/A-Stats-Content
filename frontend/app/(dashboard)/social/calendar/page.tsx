@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { CalendarView } from "@/components/social/calendar-view";
 import { DateNavigation } from "@/components/social/date-navigation";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { api, SocialPost, SocialPlatform } from "@/lib/api";
 import { Calendar, Filter, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -54,7 +55,7 @@ export default function SocialCalendarPage() {
 
       setPosts(response.items);
     } catch (error) {
-      console.error("Failed to load posts:", error);
+      toast.error("Failed to load posts");
     } finally {
       setLoading(false);
     }
@@ -75,7 +76,7 @@ export default function SocialCalendarPage() {
       // Reload posts
       loadPosts();
     } catch (error) {
-      console.error("Failed to reschedule post:", error);
+      toast.error("Failed to reschedule post");
     }
   };
 

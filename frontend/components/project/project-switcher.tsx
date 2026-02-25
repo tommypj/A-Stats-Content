@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useProject } from "@/contexts/ProjectContext";
 import { Check, ChevronDown, Plus, User, FolderOpen } from "lucide-react";
+import { toast } from "sonner";
 import { clsx } from "clsx";
 import type { Project } from "@/lib/api";
 
@@ -16,7 +17,7 @@ export function ProjectSwitcher() {
       await switchProject(projectId);
       setIsOpen(false);
     } catch (error) {
-      console.error("Failed to switch project:", error);
+      toast.error("Failed to switch project");
     }
   };
 

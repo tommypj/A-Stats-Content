@@ -334,10 +334,13 @@ class S3StorageAdapter(StorageAdapter):
             # Extract S3 key from URL if necessary
             s3_key = path
             if path.startswith('http'):
-                # Extract key from URL
+                # Extract key from URL like https://bucket.s3.amazonaws.com/key/path
                 parts = path.split(f"{self.bucket}.s3")
                 if len(parts) > 1:
-                    s3_key = parts[1].split('/', 2)[-1]
+                    # Remove leading domain portion (e.g. ".amazonaws.com/") to get the key
+                    remainder = parts[1]
+                    slash_parts = remainder.split('/', 2)
+                    s3_key = slash_parts[2] if len(slash_parts) > 2 else slash_parts[-1]
 
             # Delete from S3
             self.s3_client.delete_object(Bucket=self.bucket, Key=s3_key)
