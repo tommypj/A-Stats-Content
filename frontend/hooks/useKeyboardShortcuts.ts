@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 export interface KeyboardShortcut {
   /** The key to match (case-insensitive). E.g. "s", "n", "p", "/", "?". */
@@ -27,6 +27,9 @@ const INHERENTLY_SHIFTED_KEYS = new Set(["?", "!", "@", "#", "$", "%", "^", "&",
  * inside the article textarea.
  */
 export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[]): void {
+  const shortcutsRef = useRef(shortcuts);
+  shortcutsRef.current = shortcuts;
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       const target = event.target as HTMLElement;
@@ -35,7 +38,7 @@ export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[]): void {
         target instanceof HTMLTextAreaElement ||
         target.isContentEditable;
 
-      for (const shortcut of shortcuts) {
+      for (const shortcut of shortcutsRef.current) {
         // Key match (case-insensitive)
         if (event.key.toLowerCase() !== shortcut.key.toLowerCase()) continue;
 
@@ -59,5 +62,5 @@ export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[]): void {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [shortcuts]);
+  }, []);
 }

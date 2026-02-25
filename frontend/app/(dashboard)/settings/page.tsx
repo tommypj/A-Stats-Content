@@ -114,7 +114,7 @@ function ProfileSection({
             {avatarUrl ? (
               <img
                 src={avatarUrl}
-                alt="Avatar"
+                alt={`${profile?.name || "User"}'s profile photo`}
                 className="h-16 w-16 rounded-full object-cover border-2 border-surface-tertiary"
               />
             ) : (
