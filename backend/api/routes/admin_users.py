@@ -165,6 +165,9 @@ async def list_users(
 
     if status:
         filters.append(User.status == status)
+    else:
+        # Exclude deleted users by default; pass status=deleted explicitly to see them
+        filters.append(User.status != UserStatus.DELETED.value)
 
     if email_verified is not None:
         filters.append(User.email_verified == email_verified)
@@ -656,6 +659,12 @@ async def list_audit_logs(
 
     Admin access required.
     """
+    if date_from and date_to and date_from > date_to:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="date_from must be before date_to",
+        )
+
     # Build query with eager loading of admin_user relationship
     from sqlalchemy.orm import selectinload
     query = select(AdminAuditLog).options(selectinload(AdminAuditLog.admin_user))

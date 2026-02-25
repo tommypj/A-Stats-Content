@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Toaster } from "sonner";
@@ -59,6 +59,14 @@ export default function AdminLayout({
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [alertCount, setAlertCount] = useState(0);
+  const [adminName, setAdminName] = useState("Admin User");
+  const [adminRole, setAdminRole] = useState("Admin");
+
+  const handleSignOut = useCallback(() => {
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("refresh_token");
+    router.push("/login");
+  }, [router]);
 
   useEffect(() => {
     const fetchAlertCount = async () => {
@@ -91,11 +99,12 @@ export default function AdminLayout({
           return;
         }
 
+        setAdminName(user.name || "Admin User");
+        setAdminRole(user.role === "super_admin" ? "Super Admin" : "Admin");
         setIsAdmin(true);
         setLoading(false);
-      } catch (error) {
-        // Admin role check failed — redirect to login silently
-        router.push("/login");
+      } catch {
+        handleSignOut();
       }
     };
 
@@ -295,9 +304,9 @@ export default function AdminLayout({
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-cream-100 truncate">
-                  Admin User
+                  {adminName}
                 </p>
-                <p className="text-xs text-primary-400 truncate">Super Admin</p>
+                <p className="text-xs text-primary-400 truncate">{adminRole}</p>
               </div>
             </div>
           </div>
@@ -346,7 +355,10 @@ export default function AdminLayout({
                         <Settings className="h-4 w-4" />
                         Settings
                       </Link>
-                      <button className="flex w-full items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50">
+                      <button
+                        onClick={handleSignOut}
+                        className="flex w-full items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50"
+                      >
                         <LogOut className="h-4 w-4" />
                         Sign Out
                       </button>

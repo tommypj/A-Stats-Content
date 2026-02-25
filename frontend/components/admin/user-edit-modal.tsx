@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api, AdminUserDetail, AdminUpdateUserInput, parseApiError } from "@/lib/api";
+import { toast } from "sonner";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
@@ -45,6 +46,7 @@ export function UserEditModal({ user, onClose, onSuccess }: UserEditModalProps) 
     } catch (err) {
       const apiError = parseApiError(err);
       setError(apiError.message);
+      toast.error(apiError.message || "Failed to update user");
     } finally {
       setLoading(false);
     }

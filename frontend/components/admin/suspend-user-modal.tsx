@@ -93,7 +93,8 @@ export function SuspendUserModal({
               placeholder="Enter a detailed reason for suspending this account..."
               rows={4}
               required
-              className="w-full rounded-xl border border-surface-tertiary bg-surface px-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+              disabled={loading}
+              className="w-full rounded-xl border border-surface-tertiary bg-surface px-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 disabled:opacity-50"
             />
           </div>
 
