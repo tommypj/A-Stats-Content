@@ -65,10 +65,12 @@ function GenerateImageContent() {
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [promptSource, setPromptSource] = useState<"manual" | "article">("manual");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isMountedRef = useRef(true);
 
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
+      isMountedRef.current = false;
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, []);
@@ -147,9 +149,15 @@ function GenerateImageContent() {
 
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
+      if (!isMountedRef.current) {
+        if (pollRef.current) clearInterval(pollRef.current);
+        pollRef.current = null;
+        return;
+      }
       try {
         attempts++;
         const image = await api.images.get(imageId);
+        if (!isMountedRef.current) return;
 
         if (image.status === "completed") {
           setGeneratedImage(image);
@@ -161,6 +169,7 @@ function GenerateImageContent() {
           pollRef.current = null;
         }
       } catch (err) {
+        if (!isMountedRef.current) return;
         setError("Failed to check generation status");
         if (pollRef.current) clearInterval(pollRef.current);
         pollRef.current = null;

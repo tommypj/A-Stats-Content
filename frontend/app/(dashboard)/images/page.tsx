@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -93,9 +93,23 @@ export default function ImagesPage() {
     setSelectedIds(new Set());
   }, [page]);
 
+  const loadImages = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await api.images.list({ page, page_size: pageSize });
+      setImages(response.items);
+      setTotalCount(response.total);
+      setTotalPages(Math.ceil(response.total / pageSize));
+    } catch (error) {
+      toast.error("Failed to load images. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [page, pageSize]);
+
   useEffect(() => {
     loadImages();
-  }, [page, pageSize]);
+  }, [loadImages]);
 
   // Close image modal on Escape key
   useEffect(() => {
@@ -111,22 +125,8 @@ export default function ImagesPage() {
     checkWpConnection();
   }, []);
 
-  async function loadImages() {
-    try {
-      setLoading(true);
-      const response = await api.images.list({ page, page_size: pageSize });
-      setImages(response.items);
-      setTotalCount(response.total);
-      setTotalPages(Math.ceil(response.total / pageSize));
-    } catch (error) {
-      toast.error("Failed to load images. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   // Client-side filtering applied after load
-  const filteredImages = images.filter((img) => {
+  const filteredImages = useMemo(() => images.filter((img) => {
     const matchesSearch =
       debouncedSearch === "" ||
       img.prompt.toLowerCase().includes(debouncedSearch.toLowerCase());
@@ -134,12 +134,12 @@ export default function ImagesPage() {
       styleFilter === "" ||
       (img.style ?? "").toLowerCase() === styleFilter.toLowerCase();
     return matchesSearch && matchesStyle;
-  });
+  }), [images, debouncedSearch, styleFilter]);
 
   // Collect unique styles from the current page for the dropdown
-  const availableStyles = Array.from(
+  const availableStyles = useMemo(() => Array.from(
     new Set(images.map((img) => img.style).filter((s): s is string => Boolean(s)))
-  ).sort();
+  ).sort(), [images]);
 
   // When filters are active the visible count is the filtered set; otherwise use server total
   const isFiltering = debouncedSearch !== "" || styleFilter !== "";

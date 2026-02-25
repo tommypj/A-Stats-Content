@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -124,11 +124,7 @@ export default function ArticlesPage() {
     setSelectedIds(new Set());
   }, [page, debouncedKeyword, statusFilter, contentFilter]);
 
-  useEffect(() => {
-    loadArticles();
-  }, [currentProject, contentFilter, page, debouncedKeyword, statusFilter]);
-
-  async function loadArticles() {
+  const loadArticles = useCallback(async () => {
     try {
       setLoading(true);
       const params: { page: number; page_size: number; status?: string; keyword?: string; project_id?: string } = {
@@ -165,7 +161,11 @@ export default function ArticlesPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [currentProject, isPersonalWorkspace, contentFilter, page, pageSize, debouncedKeyword, statusFilter]);
+
+  useEffect(() => {
+    loadArticles();
+  }, [loadArticles]);
 
   function handleDelete(id: string) {
     setActiveMenu(null);

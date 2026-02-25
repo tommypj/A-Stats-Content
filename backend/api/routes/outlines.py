@@ -61,7 +61,7 @@ async def create_outline(
             select(Project).where(Project.id == project_id, Project.deleted_at.is_(None))
         )
         proj = proj_result.scalar_one_or_none()
-        if proj and proj.brand_voice:
+        if proj and isinstance(proj.brand_voice, dict):
             brand_voice = proj.brand_voice
 
     # Apply brand voice defaults when the caller did not supply explicit values

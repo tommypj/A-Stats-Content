@@ -5,6 +5,7 @@ Knowledge Vault API routes for document upload and RAG queries.
 import logging
 import math
 import os
+from pathlib import Path
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -48,6 +49,16 @@ router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 # File upload limits and allowed types
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 ALLOWED_EXTENSIONS = {"pdf", "txt", "md", "docx", "html", "csv", "json"}
+ALLOWED_CONTENT_TYPES = {
+    "application/pdf",
+    "text/plain",
+    "text/markdown",
+    "text/csv",
+    "text/html",
+    "application/json",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/octet-stream",  # fallback for unknown MIME types
+}
 
 
 def get_file_extension(filename: str) -> str:
@@ -175,6 +186,13 @@ async def upload_document(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unsupported file type. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+        )
+
+    # Validate MIME type
+    if file.content_type and file.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported content type: {file.content_type}",
         )
 
     # Read and validate size
@@ -698,6 +716,16 @@ async def reprocess_source(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Original file is no longer available on disk. Please re-upload the document.",
+        )
+
+    # Validate file path is within expected storage directory
+    from services.knowledge_processor import KNOWLEDGE_STORAGE_DIR
+    resolved = Path(source.file_url).resolve()
+    if not resolved.is_relative_to(KNOWLEDGE_STORAGE_DIR.resolve()):
+        logger.error("File path outside storage directory: %s", source.file_url)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid file path",
         )
 
     # Read the stored file and reprocess

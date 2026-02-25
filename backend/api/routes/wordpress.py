@@ -47,18 +47,18 @@ def _validate_wp_url(url: str) -> str:
     parsed = urlparse(url)
     hostname = parsed.hostname
     if not hostname:
-        raise HTTPException(400, "Invalid WordPress URL")
+        raise HTTPException(status_code=400, detail="Invalid WordPress URL")
 
     # Block private/internal hostnames
     blocked = ["localhost", "127.0.0.1", "0.0.0.0", "::1"]
     if hostname in blocked:
-        raise HTTPException(400, "WordPress URL cannot point to localhost")
+        raise HTTPException(status_code=400, detail="WordPress URL cannot point to localhost")
 
     # Check for private IP ranges
     try:
         ip = ipaddress.ip_address(hostname)
         if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
-            raise HTTPException(400, "WordPress URL cannot point to a private network")
+            raise HTTPException(status_code=400, detail="WordPress URL cannot point to a private network")
     except ValueError:
         pass  # hostname is not an IP, that's fine
 
