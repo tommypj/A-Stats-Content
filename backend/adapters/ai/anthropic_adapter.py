@@ -378,6 +378,8 @@ META_DESCRIPTION: [A compelling 150-160 character meta description]"""
                 )
             break
 
+        if not message.content:
+            raise AIGenerationError("AI returned empty response")
         response_text = message.content[0].text
 
         # Extract meta description

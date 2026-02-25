@@ -218,7 +218,8 @@ async def upload_document(
 
     # Default title from filename
     if not title:
-        title = (file.filename or "untitled").rsplit(".", 1)[0]
+        raw_name = file.filename or "untitled"
+        title = raw_name.rsplit(".", 1)[0] if "." in raw_name else raw_name
 
     # Persist file to disk
     source_id = str(uuid4())

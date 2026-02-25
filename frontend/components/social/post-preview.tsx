@@ -72,7 +72,7 @@ export function PostPreview({
           <div className={`grid gap-2 ${mediaUrls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
             {mediaUrls.slice(0, 4).map((url) => (
               <div key={url} className="aspect-video bg-surface-tertiary rounded-xl overflow-hidden">
-                <img src={url} alt="" className="w-full h-full object-cover" />
+                <img src={url} alt="Post media" className="w-full h-full object-cover" />
               </div>
             ))}
           </div>
@@ -129,7 +129,7 @@ export function PostPreview({
       {/* Media */}
       {mediaUrls.length > 0 && (
         <div className="mt-3">
-          <img src={mediaUrls[0]} alt="" className="w-full object-cover max-h-96" />
+          <img src={mediaUrls[0]} alt="Post media" className="w-full object-cover max-h-96" />
         </div>
       )}
 
@@ -180,7 +180,7 @@ export function PostPreview({
       {/* Media */}
       {mediaUrls.length > 0 && (
         <div>
-          <img src={mediaUrls[0]} alt="" className="w-full object-cover max-h-96" />
+          <img src={mediaUrls[0]} alt="Post media" className="w-full object-cover max-h-96" />
         </div>
       )}
 
@@ -221,7 +221,7 @@ export function PostPreview({
       {/* Media */}
       {mediaUrls.length > 0 ? (
         <div className="aspect-square bg-surface-tertiary">
-          <img src={mediaUrls[0]} alt="" className="w-full h-full object-cover" />
+          <img src={mediaUrls[0]} alt="Post media" className="w-full h-full object-cover" />
         </div>
       ) : (
         <div className="aspect-square bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">

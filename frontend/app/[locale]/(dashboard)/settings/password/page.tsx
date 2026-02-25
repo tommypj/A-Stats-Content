@@ -10,6 +10,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { api } from "@/lib/api";
 
 const passwordSchema = z
   .object({
@@ -48,25 +49,7 @@ export default function PasswordSettingsPage() {
   const onSubmit = async (data: PasswordFormData) => {
     setIsLoading(true);
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/password/change`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-          },
-          body: JSON.stringify({
-            current_password: data.currentPassword,
-            new_password: data.newPassword,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || "Failed to change password");
-      }
+      await api.auth.changePassword(data.currentPassword, data.newPassword);
 
       toast.success("Password changed successfully");
       reset();

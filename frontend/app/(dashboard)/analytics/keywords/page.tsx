@@ -59,7 +59,7 @@ export default function KeywordsPage() {
       const status = await api.analytics.status();
       setIsConnected(status.connected);
     } catch (error) {
-      console.error("Failed to check analytics status:", error);
+      toast.error("Failed to check analytics status");
     } finally {
       setIsLoading(false);
     }

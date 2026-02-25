@@ -180,7 +180,10 @@ async def list_users(
     total = total_result.scalar() or 0
 
     # Apply sorting
-    sort_column = getattr(User, sort_by)
+    ALLOWED_SORT_FIELDS = {"created_at", "updated_at", "email", "name", "role", "subscription_tier"}
+    if sort_by not in ALLOWED_SORT_FIELDS:
+        sort_by = "created_at"
+    sort_column = getattr(User, sort_by, User.created_at)
     if sort_order == "desc":
         query = query.order_by(desc(sort_column))
     else:

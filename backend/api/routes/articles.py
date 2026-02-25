@@ -711,6 +711,8 @@ Only return the JSON array, no other text."""
             messages=[{"role": "user", "content": prompt}],
         )
 
+        if not response.content:
+            raise HTTPException(status_code=502, detail="AI returned empty response — please try again")
         text = response.content[0].text
         # Extract JSON from response (handle markdown code blocks)
         parts = text.split("```")
