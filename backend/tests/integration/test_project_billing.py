@@ -15,7 +15,7 @@ All tests use async fixtures and httpx AsyncClient.
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 # Skip tests if projects module not implemented yet
@@ -192,7 +192,7 @@ class TestProjectWebhookProcessing:
                     "product_name": "Professional Plan",
                     "variant_id": 1,
                     "status": "active",
-                    "renews_at": (datetime.utcnow() + timedelta(days=30)).isoformat()
+                    "renews_at": (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
                 }
             }
         }
@@ -223,7 +223,7 @@ class TestProjectWebhookProcessing:
             "data": {
                 "attributes": {
                     "status": "cancelled",
-                    "ends_at": (datetime.utcnow() + timedelta(days=30)).isoformat()
+                    "ends_at": (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
                 }
             }
         }

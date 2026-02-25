@@ -11,7 +11,7 @@ Tests admin user management endpoints:
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from fastapi import status
@@ -677,7 +677,7 @@ class TestDeleteUserEndpoint:
             pytest.skip("Admin routes not available")
 
         # Soft delete the user first
-        test_user.deleted_at = datetime.utcnow()
+        test_user.deleted_at = datetime.now(timezone.utc)
         test_user.status = UserStatus.DELETED.value
         await db_session.commit()
 

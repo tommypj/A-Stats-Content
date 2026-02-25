@@ -2,6 +2,7 @@
 Social media scheduling API routes.
 """
 
+import asyncio
 import json
 import secrets
 import time
@@ -60,10 +61,14 @@ _OAUTH_MAX_STATES = 1000  # Max in-memory entries before pruning
 
 # In-memory fallback for OAuth state (used only when Redis is unavailable)
 _oauth_states: dict[str, dict] = {}
+_oauth_states_lock = asyncio.Lock()
 
 
 def _prune_expired_states() -> None:
-    """Remove expired entries from the in-memory state dict."""
+    """Remove expired entries from the in-memory state dict.
+
+    Must be called while holding ``_oauth_states_lock``.
+    """
     now = time.time()
     expired = [k for k, v in _oauth_states.items() if now - v["created_at"] > _OAUTH_STATE_TTL]
     for k in expired:
@@ -84,13 +89,14 @@ async def _store_oauth_state(state: str, user_id: str) -> None:
         await r.aclose()
     except (ImportError, OSError, ConnectionError, TypeError, ValueError):
         # Redis unavailable or misconfigured — prune expired entries and enforce size cap
-        _prune_expired_states()
-        if len(_oauth_states) >= _OAUTH_MAX_STATES:
-            # Drop oldest entries to make room
-            oldest = sorted(_oauth_states, key=lambda k: _oauth_states[k]["created_at"])
-            for k in oldest[:len(_oauth_states) - _OAUTH_MAX_STATES + 1]:
-                del _oauth_states[k]
-        _oauth_states[state] = {"user_id": str(user_id), "created_at": time.time()}
+        async with _oauth_states_lock:
+            _prune_expired_states()
+            if len(_oauth_states) >= _OAUTH_MAX_STATES:
+                # Drop oldest entries to make room
+                oldest = sorted(_oauth_states, key=lambda k: _oauth_states[k]["created_at"])
+                for k in oldest[:len(_oauth_states) - _OAUTH_MAX_STATES + 1]:
+                    del _oauth_states[k]
+            _oauth_states[state] = {"user_id": str(user_id), "created_at": time.time()}
 
 
 async def _verify_oauth_state(state: str) -> Optional[str]:
@@ -110,7 +116,8 @@ async def _verify_oauth_state(state: str) -> Optional[str]:
         return parsed.get("user_id")
     except (ImportError, OSError, ConnectionError, TypeError, ValueError, json.JSONDecodeError, KeyError):
         # Redis unavailable or misconfigured — fallback to in-memory pop with expiry check
-        entry = _oauth_states.pop(state, None)
+        async with _oauth_states_lock:
+            entry = _oauth_states.pop(state, None)
         if not entry:
             return None
         if time.time() - entry["created_at"] > _OAUTH_STATE_TTL:

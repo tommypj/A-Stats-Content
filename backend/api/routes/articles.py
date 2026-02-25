@@ -718,7 +718,11 @@ Only return the JSON array, no other text."""
             if text.startswith("json"):
                 text = text[4:]
 
-        suggestions = json.loads(text.strip())
+        try:
+            suggestions = json.loads(text.strip())
+        except (json.JSONDecodeError, ValueError):
+            logger.warning("AI returned invalid JSON for keyword suggestions: %s", text[:200])
+            raise HTTPException(status_code=502, detail="AI returned invalid response — please try again")
         return {"seed_keyword": body.seed_keyword, "suggestions": suggestions}
     except HTTPException:
         raise

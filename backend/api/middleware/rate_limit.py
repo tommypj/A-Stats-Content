@@ -18,11 +18,28 @@ Rate Limits:
 - Default: 100 requests per minute
 """
 
+import ipaddress
+import re
+
 from starlette.requests import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from infrastructure.config.settings import settings
+
+# Simple pattern to quickly reject obviously invalid IPs before parsing
+_IP_LIKE = re.compile(r"^[\d.:a-fA-F]+$")
+
+
+def _is_valid_ip(value: str) -> bool:
+    """Return True if *value* looks like a valid IPv4 or IPv6 address."""
+    if not _IP_LIKE.match(value):
+        return False
+    try:
+        ipaddress.ip_address(value)
+        return True
+    except ValueError:
+        return False
 
 
 def _get_real_ip(request: Request) -> str:
@@ -31,14 +48,21 @@ def _get_real_ip(request: Request) -> str:
     Railway (and most reverse proxies) set X-Forwarded-For.  Without this,
     all requests appear to come from the proxy's internal IP, which means
     every user shares a single rate-limit bucket.
+
+    The extracted IP is validated to prevent header injection attacks where
+    an attacker injects crafted values to bypass rate limiting.
     """
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
         # X-Forwarded-For can be a comma-separated list; first entry is the client
-        return forwarded.split(",")[0].strip()
+        candidate = forwarded.split(",")[0].strip()
+        if _is_valid_ip(candidate):
+            return candidate
     real_ip = request.headers.get("x-real-ip")
     if real_ip:
-        return real_ip.strip()
+        candidate = real_ip.strip()
+        if _is_valid_ip(candidate):
+            return candidate
     return get_remote_address(request)
 
 # Rate limit configurations

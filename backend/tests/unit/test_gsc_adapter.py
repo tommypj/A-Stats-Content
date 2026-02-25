@@ -3,7 +3,7 @@ Tests for Google Search Console OAuth adapter.
 """
 
 import pytest
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from unittest.mock import Mock, patch, MagicMock
 from urllib.parse import urlparse, parse_qs
 
@@ -22,7 +22,7 @@ class TestGSCCredentials:
 
     def test_credentials_initialization(self):
         """Test GSCCredentials initialization."""
-        token_expiry = datetime.utcnow() + timedelta(hours=1)
+        token_expiry = datetime.now(timezone.utc) + timedelta(hours=1)
         creds = GSCCredentials(
             access_token="test_access_token",
             refresh_token="test_refresh_token",
@@ -85,7 +85,7 @@ class TestGSCAdapter:
         return GSCCredentials(
             access_token="test_access_token",
             refresh_token="test_refresh_token",
-            token_expiry=datetime.utcnow() + timedelta(hours=1),
+            token_expiry=datetime.now(timezone.utc) + timedelta(hours=1),
             site_url="https://example.com",
         )
 
@@ -95,7 +95,7 @@ class TestGSCAdapter:
         return GSCCredentials(
             access_token="expired_access_token",
             refresh_token="test_refresh_token",
-            token_expiry=datetime.utcnow() - timedelta(hours=1),
+            token_expiry=datetime.now(timezone.utc) - timedelta(hours=1),
             site_url="https://example.com",
         )
 
@@ -232,7 +232,7 @@ class TestGSCAdapter:
         credentials = GSCCredentials(
             access_token="test_token",
             refresh_token="",  # No refresh token
-            token_expiry=datetime.utcnow() + timedelta(hours=1),
+            token_expiry=datetime.now(timezone.utc) + timedelta(hours=1),
             site_url="https://example.com",
         )
 

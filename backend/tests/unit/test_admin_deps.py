@@ -9,7 +9,7 @@ Tests admin authentication dependencies:
 """
 
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 from unittest.mock import Mock, AsyncMock
 
@@ -139,7 +139,7 @@ class TestGetCurrentAdminUser:
         if not ADMIN_DEPS_AVAILABLE:
             pytest.skip("Admin dependencies not available")
 
-        admin_user.deleted_at = datetime.utcnow()
+        admin_user.deleted_at = datetime.now(timezone.utc)
 
         with pytest.raises(HTTPException) as exc_info:
             await get_current_admin_user(current_user=admin_user)

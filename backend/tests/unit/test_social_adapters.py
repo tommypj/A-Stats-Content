@@ -13,7 +13,7 @@ Tests the social media API integrations including:
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch, AsyncMock
 from typing import Dict, Any
 
@@ -197,7 +197,7 @@ class TestTwitterAdapter:
             mock_response = AsyncMock()
             mock_response.status_code = 429
             mock_response.headers = {
-                "x-rate-limit-reset": str(int(datetime.utcnow().timestamp()) + 900)
+                "x-rate-limit-reset": str(int(datetime.now(timezone.utc).timestamp()) + 900)
             }
             mock_response.json.return_value = {
                 "title": "Too Many Requests",

@@ -13,7 +13,7 @@ Tests cover:
 import pytest
 from unittest.mock import Mock, AsyncMock, patch
 from uuid import uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Skip if service not implemented yet
 pytest.importorskip("core.knowledge.knowledge_service", reason="Knowledge service not yet implemented")
@@ -442,7 +442,7 @@ class TestKnowledgeServiceStats:
         mock_source.filename = "therapy_guide.pdf"
         mock_source.status = ProcessingStatus.COMPLETED
         mock_source.chunks_count = 25
-        mock_source.created_at = datetime.utcnow()
+        mock_source.created_at = datetime.now(timezone.utc)
         mock_dependencies['db_session'].get = AsyncMock(return_value=mock_source)
 
         detail = await service.get_source_detail(user_id=user_id, source_id=source_id)

@@ -5,6 +5,7 @@ Provides interface for storing and querying document embeddings using ChromaDB H
 """
 
 import logging
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import List, Optional, Dict, Any
@@ -331,16 +332,20 @@ class ChromaAdapter:
 
 # Lazy singleton - only instantiated when actually needed
 _chroma_adapter: ChromaAdapter | None = None
+_chroma_lock = threading.Lock()
 
 
 def get_chroma_adapter() -> ChromaAdapter:
     """Get or create the ChromaAdapter singleton.
 
-    Uses lazy initialization to avoid connection errors at import time.
+    Uses lazy initialization with a lock to avoid connection errors at
+    import time and prevent duplicate instances under concurrent access.
     """
     global _chroma_adapter
     if _chroma_adapter is None:
-        _chroma_adapter = ChromaAdapter()
+        with _chroma_lock:
+            if _chroma_adapter is None:
+                _chroma_adapter = ChromaAdapter()
     return _chroma_adapter
 
 

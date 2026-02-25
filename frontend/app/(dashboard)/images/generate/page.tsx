@@ -107,6 +107,8 @@ function GenerateImageContent() {
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
 
+    if (loading) return;
+
     if (!prompt.trim()) {
       setError("Please enter a prompt");
       return;

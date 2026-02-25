@@ -384,11 +384,11 @@ async def example_token_refresh():
     adapter = create_gsc_adapter()
 
     # Simulate expired credentials
-    from datetime import datetime
+    from datetime import datetime, timezone
     credentials = GSCCredentials(
         access_token="expired_token",
         refresh_token="valid_refresh_token",
-        token_expiry=datetime.utcnow() - timedelta(hours=1),  # Expired
+        token_expiry=datetime.now(timezone.utc) - timedelta(hours=1),  # Expired
         site_url="https://example.com",
     )
 

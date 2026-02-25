@@ -11,7 +11,7 @@ backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator
 from uuid import uuid4
 
@@ -180,7 +180,7 @@ async def subscribed_user(db_session: AsyncSession) -> User:
         lemonsqueezy_customer_id="12345",
         lemonsqueezy_subscription_id="67890",
         lemonsqueezy_variant_id="1",
-        subscription_expires=datetime.utcnow() + timedelta(days=30),
+        subscription_expires=datetime.now(timezone.utc) + timedelta(days=30),
         status="active",
         email_verified=True,
     )
@@ -440,7 +440,7 @@ async def processed_source(db_session: AsyncSession, test_user: User):
     await db_session.flush()
 
     # Add actual chunks so query endpoint doesn't return 400
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     chunk_texts = [
         "Cognitive behavioral therapy (CBT) is a structured form of psychotherapy.",
         "Mindfulness meditation involves focusing attention on the present moment.",
@@ -596,7 +596,7 @@ async def processed_sources(db_session: AsyncSession, test_user: User):
     await db_session.flush()
 
     # Add chunks for each source
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     for source in sources:
         for i in range(3):
             chunk = KnowledgeChunk(
@@ -1061,7 +1061,7 @@ async def team_invitation(db_session: AsyncSession, team: dict, test_user: User)
         role=ProjectRole.EDITOR.value,
         token=secrets.token_urlsafe(32),
         invited_by=test_user.id,
-        expires_at=datetime.utcnow() + timedelta(days=7),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
         status="pending",
     )
     db_session.add(invitation)
@@ -1141,7 +1141,7 @@ async def connected_twitter_account(db_session: AsyncSession, test_user: User):
         platform_user_id="123456",
         access_token_encrypted=_encrypt_token("test_twitter_token"),
         refresh_token_encrypted=_encrypt_token("test_twitter_refresh"),
-        token_expires_at=datetime.utcnow() + timedelta(hours=2),
+        token_expires_at=datetime.now(timezone.utc) + timedelta(hours=2),
         is_active=True,
     )
     db_session.add(account)
@@ -1166,7 +1166,7 @@ async def connected_linkedin_account(db_session: AsyncSession, test_user: User):
         platform_username="Test User",
         platform_user_id="urn:li:person:123456",
         access_token_encrypted=_encrypt_token("test_linkedin_token"),
-        token_expires_at=datetime.utcnow() + timedelta(days=60),
+        token_expires_at=datetime.now(timezone.utc) + timedelta(days=60),
         is_active=True,
     )
     db_session.add(account)
@@ -1191,7 +1191,7 @@ async def connected_facebook_account(db_session: AsyncSession, test_user: User):
         platform_username="Test Page",
         platform_user_id="123456789",
         access_token_encrypted=_encrypt_token("test_facebook_token"),
-        token_expires_at=datetime.utcnow() + timedelta(days=60),
+        token_expires_at=datetime.now(timezone.utc) + timedelta(days=60),
         is_active=True,
         account_metadata={"page_id": "123456789"},
     )
@@ -1233,7 +1233,7 @@ async def pending_post(
         id=str(uuid4()),
         user_id=test_user.id,
         content="Test pending post",
-        scheduled_at=datetime.utcnow() + timedelta(hours=2),
+        scheduled_at=datetime.now(timezone.utc) + timedelta(hours=2),
         status=PostStatus.SCHEDULED,
     )
     db_session.add(post)
@@ -1269,9 +1269,9 @@ async def posted_post(
         id=str(uuid4()),
         user_id=test_user.id,
         content="Test published post",
-        scheduled_at=datetime.utcnow() - timedelta(hours=1),
+        scheduled_at=datetime.now(timezone.utc) - timedelta(hours=1),
         status=PostStatus.PUBLISHED,
-        published_at=datetime.utcnow() - timedelta(hours=1),
+        published_at=datetime.now(timezone.utc) - timedelta(hours=1),
     )
     db_session.add(post)
     await db_session.flush()
@@ -1282,7 +1282,7 @@ async def posted_post(
         social_account_id=connected_twitter_account.id,
         is_published=True,
         platform_post_id="1234567890",
-        published_at=datetime.utcnow() - timedelta(hours=1),
+        published_at=datetime.now(timezone.utc) - timedelta(hours=1),
     )
     db_session.add(target)
 
@@ -1308,7 +1308,7 @@ async def failed_post(
         id=str(uuid4()),
         user_id=test_user.id,
         content="Test failed post",
-        scheduled_at=datetime.utcnow() - timedelta(minutes=30),
+        scheduled_at=datetime.now(timezone.utc) - timedelta(minutes=30),
         status=PostStatus.FAILED,
         publish_error="API Error: Rate limit exceeded",
     )
@@ -1353,9 +1353,9 @@ async def multiple_scheduled_posts(
     ]
 
     for i, post_status in enumerate(statuses):
-        scheduled_at = datetime.utcnow() + timedelta(hours=(i + 1))
+        scheduled_at = datetime.now(timezone.utc) + timedelta(hours=(i + 1))
         if post_status == PostStatus.PUBLISHED:
-            scheduled_at = datetime.utcnow() - timedelta(hours=1)
+            scheduled_at = datetime.now(timezone.utc) - timedelta(hours=1)
 
         post = ScheduledPost(
             id=str(uuid4()),
@@ -1363,7 +1363,7 @@ async def multiple_scheduled_posts(
             content=f"Test post {i + 1}",
             scheduled_at=scheduled_at,
             status=post_status,
-            published_at=datetime.utcnow() - timedelta(hours=1) if post_status == PostStatus.PUBLISHED else None,
+            published_at=datetime.now(timezone.utc) - timedelta(hours=1) if post_status == PostStatus.PUBLISHED else None,
         )
         db_session.add(post)
         await db_session.flush()
@@ -1376,7 +1376,7 @@ async def multiple_scheduled_posts(
                 social_account_id=account.id,
                 is_published=is_published,
                 platform_post_id=f"post_{i}_{account.platform}" if is_published else None,
-                published_at=datetime.utcnow() - timedelta(hours=1) if is_published else None,
+                published_at=datetime.now(timezone.utc) - timedelta(hours=1) if is_published else None,
             )
             db_session.add(target)
 

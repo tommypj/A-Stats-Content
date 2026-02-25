@@ -9,7 +9,7 @@ import hashlib
 import hmac
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 from urllib.parse import urlencode
 
@@ -120,7 +120,7 @@ class LemonSqueezySubscription:
             status=attributes.get("status", ""),
             current_period_end=datetime.fromisoformat(
                 attributes.get("renews_at", "").replace("Z", "+00:00")
-            ) if attributes.get("renews_at") else datetime.utcnow(),
+            ) if attributes.get("renews_at") else datetime.now(timezone.utc),
             renews_at=datetime.fromisoformat(
                 attributes.get("renews_at", "").replace("Z", "+00:00")
             ) if attributes.get("renews_at") else None,

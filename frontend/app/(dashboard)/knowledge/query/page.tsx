@@ -42,9 +42,13 @@ function QueryPageContent() {
     }
 
     // Load query history from localStorage
-    const savedHistory = localStorage.getItem("knowledge_query_history");
-    if (savedHistory) {
-      setQueryHistory(JSON.parse(savedHistory));
+    try {
+      const savedHistory = localStorage.getItem("knowledge_query_history");
+      if (savedHistory) {
+        setQueryHistory(JSON.parse(savedHistory));
+      }
+    } catch {
+      // Ignore corrupt localStorage data
     }
   }, []);
 
