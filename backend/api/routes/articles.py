@@ -356,6 +356,7 @@ async def _run_article_generation(
             )
 
             # Grammar proofreading pass
+            is_proofread = False
             try:
                 proofread_content = await asyncio.wait_for(
                     content_ai_service.proofread_grammar(
@@ -371,6 +372,7 @@ async def _run_article_generation(
                     meta_description=generated.meta_description,
                     word_count=len(proofread_content.split()),
                 )
+                is_proofread = True
                 logger.info("Grammar proofread completed for article %s", article_id)
             except asyncio.TimeoutError:
                 logger.warning(
@@ -399,10 +401,12 @@ async def _run_article_generation(
                     outline_title,
                     generated.meta_description,
                 )
+                seo_result["is_proofread"] = is_proofread
                 article.seo_score = seo_result["score"]
                 article.seo_analysis = seo_result
             except Exception as seo_err:
                 logger.warning("SEO analysis failed for article %s: %s", article_id, seo_err)
+                article.seo_analysis = {"is_proofread": is_proofread}
 
             # Generate image prompt (with 30s timeout)
             try:
@@ -421,9 +425,7 @@ async def _run_article_generation(
                     article_id, img_err,
                 )
 
-            await db.commit()
-
-            # Log successful generation and increment usage
+            # Log successful generation and increment usage (single commit)
             duration_ms = int((time.time() - start_time) * 1000)
             if gen_log is not None:
                 await tracker.log_success(
@@ -1065,14 +1067,17 @@ async def improve_article(
         article.read_time = calculate_read_time(improved_content)
 
         # Re-run SEO analysis
-        seo_result = analyze_seo(
-            improved_content,
-            article.keyword,
-            article.title,
-            article.meta_description or "",
-        )
-        article.seo_score = seo_result["score"]
-        article.seo_analysis = seo_result
+        try:
+            seo_result = analyze_seo(
+                improved_content,
+                article.keyword,
+                article.title,
+                article.meta_description or "",
+            )
+            article.seo_score = seo_result["score"]
+            article.seo_analysis = seo_result
+        except Exception as seo_err:
+            logger.warning("SEO re-analysis failed for article %s: %s", article_id, seo_err)
 
     except Exception as e:
         raise HTTPException(

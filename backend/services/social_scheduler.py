@@ -153,7 +153,7 @@ class SocialSchedulerService:
                 post.published_at = datetime.now(timezone.utc)
                 logger.info(f"Post {post.id} published successfully to all platforms")
             elif success_count > 0 and failed_count > 0:
-                post.status = PostStatus.PUBLISHED.value  # Partially successful
+                post.status = PostStatus.PARTIALLY_PUBLISHED.value
                 post.published_at = datetime.now(timezone.utc)
                 logger.warning(
                     f"Post {post.id} partially published: "
@@ -275,8 +275,29 @@ class SocialSchedulerService:
             return result
 
         except SocialRateLimitError as e:
-            logger.warning(f"Rate limit hit for {account.platform}: {e}")
-            target.publish_error = f"Rate limit exceeded: {str(e)}"
+            # Retry once after a short backoff
+            retry_delay = getattr(e, "retry_after", 30) or 30
+            retry_delay = min(retry_delay, 120)  # Cap at 2 minutes
+            logger.warning(
+                f"Rate limit hit for {account.platform}, retrying in {retry_delay}s: {e}"
+            )
+            await asyncio.sleep(retry_delay)
+            try:
+                if post.media_urls:
+                    media_list = post.media_urls if isinstance(post.media_urls, list) else []
+                    result = await adapter.post_with_media(credentials, post.content, media_list, **extra_kwargs)
+                else:
+                    result = await adapter.post_text(credentials, post.content, **extra_kwargs)
+                if result.success:
+                    target.is_published = True
+                    target.platform_post_id = result.post_id
+                    target.platform_post_url = result.post_url
+                    target.publish_error = None
+                    target.published_at = datetime.now(timezone.utc)
+                    return result
+            except Exception:
+                pass  # Fall through to failure below
+            target.publish_error = f"Rate limit exceeded after retry: {str(e)}"
             return PostResult(success=False, error_message=str(e))
 
         except Exception as e:
@@ -311,7 +332,7 @@ class SocialSchedulerService:
             if not post:
                 return {"success": False, "error": "Post not found"}
 
-            if post.status == PostStatus.PUBLISHED.value:
+            if post.status in (PostStatus.PUBLISHED.value, PostStatus.PARTIALLY_PUBLISHED.value):
                 return {"success": False, "error": "Post already published"}
 
             if post.status == PostStatus.CANCELLED.value:
