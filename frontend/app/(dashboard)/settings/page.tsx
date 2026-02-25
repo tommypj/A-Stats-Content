@@ -13,6 +13,7 @@ import {
   User,
   Lock,
   CreditCard,
+  Plug,
   Save,
   Loader2,
   CheckCircle,
@@ -50,6 +51,7 @@ const TABS = [
   { id: "profile", label: "Profile", icon: User },
   { id: "password", label: "Password", icon: Lock },
   { id: "billing", label: "Billing", icon: CreditCard },
+  { id: "integrations", label: "Integrations", icon: Plug },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -680,6 +682,10 @@ export default function SettingsPage() {
 
   // Sync hash when tab changes
   const handleTabChange = (tab: TabId) => {
+    if (tab === "integrations") {
+      router.push("/settings/integrations");
+      return;
+    }
     setActiveTab(tab);
     window.location.hash = tab;
   };
