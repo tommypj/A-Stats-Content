@@ -48,6 +48,7 @@ import SocialPostsModal from "@/components/social-posts-modal";
 import { clsx } from "clsx";
 import { toast } from "sonner";
 import DOMPurify from "dompurify";
+import { marked } from "marked";
 
 // ---------------------------------------------------------------------------
 // Word Count Widget — live word count, optional target + progress bar
@@ -1206,15 +1207,7 @@ export default function ArticleEditorPage() {
                 {content ? (
                   <div dangerouslySetInnerHTML={{
                     __html: DOMPurify.sanitize(
-                      content
-                        .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-                        .replace(/^## (.*$)/gm, '<h2>$1</h2>')
-                        .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                        .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                        .replace(/\n\n/g, '</p><p>')
-                        .replace(/^(?!<[h|p|u|o|l|d])/gm, '<p>')
-                        .replace(/(?<![>])$/gm, '</p>')
+                      marked.parse(content, { async: false }) as string
                     )
                   }} />
                 ) : (

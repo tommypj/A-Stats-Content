@@ -131,7 +131,7 @@ export default function ArticlesPage() {
   async function loadArticles() {
     try {
       setLoading(true);
-      const params: any = {
+      const params: { page: number; page_size: number; status?: string; keyword?: string; project_id?: string } = {
         page,
         page_size: pageSize,
       };

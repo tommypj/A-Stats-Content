@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { api, SocialAccount, parseApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,14 @@ export default function ComposePage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const blobUrlsRef = useRef<string[]>([]);
+
+  // Revoke all blob URLs on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      blobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, []);
 
   // Restore draft from localStorage on mount
   useEffect(() => {
@@ -165,10 +173,15 @@ export default function ComposePage() {
     // Create object URLs for preview display
     // Note: blob URLs are for local preview only and are filtered out before API submission
     const urls = Array.from(files).map((file) => URL.createObjectURL(file));
+    blobUrlsRef.current.push(...urls);
     setMediaUrls([...mediaUrls, ...urls]);
   };
 
   const handleRemoveMedia = (index: number) => {
+    const removed = mediaUrls[index];
+    if (removed?.startsWith("blob:")) {
+      URL.revokeObjectURL(removed);
+    }
     setMediaUrls(mediaUrls.filter((_, i) => i !== index));
   };
 
