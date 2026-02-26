@@ -19,6 +19,7 @@ from .project import Project, ProjectMember, ProjectInvitation, ProjectMemberRol
 from .generation import GenerationLog, AdminAlert
 from .aeo import AEOScore, AEOCitation
 from .bulk import ContentTemplate, BulkJob, BulkJobItem
+from .revenue import ConversionGoal, ContentConversion, RevenueReport
 
 __all__ = [
     "Base",
@@ -62,4 +63,7 @@ __all__ = [
     "ContentTemplate",
     "BulkJob",
     "BulkJobItem",
+    "ConversionGoal",
+    "ContentConversion",
+    "RevenueReport",
 ]

@@ -10,6 +10,7 @@ import {
   RefreshCw,
   ArrowRight,
   Activity,
+  DollarSign,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -379,6 +380,25 @@ export default function AnalyticsPage() {
             <CardContent>
               <p className="text-sm text-text-secondary">
                 Monitor declining content and recover rankings
+              </p>
+            </CardContent>
+          </Link>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+          <Link href="/analytics/revenue">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-text-muted" />
+                  Revenue Attribution
+                </span>
+                <ArrowRight className="h-5 w-5 text-text-muted" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-text-secondary">
+                Track content ROI and conversion attribution
               </p>
             </CardContent>
           </Link>

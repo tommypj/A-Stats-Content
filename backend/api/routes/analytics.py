@@ -45,6 +45,16 @@ from api.schemas.analytics import (
     RunDecayDetectionResponse,
     AEOOverviewResponse,
     AEOArticleSummary,
+    ConversionGoalResponse,
+    ConversionGoalListResponse,
+    CreateConversionGoalRequest,
+    UpdateConversionGoalRequest,
+    RevenueOverviewResponse,
+    RevenueByArticleListResponse,
+    RevenueByKeywordListResponse,
+    ImportConversionsRequest,
+    ImportConversionsResponse,
+    RevenueReportResponse,
 )
 from api.routes.auth import get_current_user
 from api.utils import escape_like
@@ -57,6 +67,7 @@ from infrastructure.database.models.analytics import (
     DailyAnalytics,
     ContentDecayAlert,
 )
+from infrastructure.database.models.revenue import ConversionGoal, ContentConversion, RevenueReport
 from infrastructure.database.models.content import Article
 from infrastructure.config.settings import settings
 
@@ -1691,3 +1702,176 @@ async def get_aeo_overview(
             AEOArticleSummary(**a) for a in data["bottom_articles"]
         ],
     )
+
+
+# ============================================================================
+# Revenue Attribution Endpoints
+# ============================================================================
+
+
+@router.get("/revenue/overview", response_model=RevenueOverviewResponse)
+async def get_revenue_overview_endpoint(
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get revenue attribution overview for the current user."""
+    from services.revenue_attribution import get_revenue_overview
+
+    data = await get_revenue_overview(db, current_user.id, start_date, end_date)
+    return RevenueOverviewResponse(**data)
+
+
+@router.get("/revenue/by-article", response_model=RevenueByArticleListResponse)
+async def get_revenue_by_article_endpoint(
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get revenue attribution broken down by article."""
+    from services.revenue_attribution import get_revenue_by_article
+
+    data = await get_revenue_by_article(db, current_user.id, start_date, end_date, page, page_size)
+    return RevenueByArticleListResponse(**data)
+
+
+@router.get("/revenue/by-keyword", response_model=RevenueByKeywordListResponse)
+async def get_revenue_by_keyword_endpoint(
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get revenue attribution broken down by keyword."""
+    from services.revenue_attribution import get_revenue_by_keyword
+
+    data = await get_revenue_by_keyword(db, current_user.id, start_date, end_date, page, page_size)
+    return RevenueByKeywordListResponse(**data)
+
+
+@router.post("/revenue/goals", response_model=ConversionGoalResponse)
+async def create_conversion_goal(
+    body: CreateConversionGoalRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a new conversion goal."""
+    goal = ConversionGoal(
+        user_id=current_user.id,
+        project_id=current_user.current_project_id,
+        name=body.name,
+        goal_type=body.goal_type,
+        goal_config=body.goal_config,
+    )
+    db.add(goal)
+    await db.commit()
+    await db.refresh(goal)
+    return ConversionGoalResponse.model_validate(goal)
+
+
+@router.get("/revenue/goals", response_model=ConversionGoalListResponse)
+async def list_conversion_goals(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all conversion goals for the current user."""
+    result = await db.execute(
+        select(ConversionGoal).where(
+            ConversionGoal.user_id == current_user.id
+        ).order_by(desc(ConversionGoal.created_at))
+    )
+    goals = result.scalars().all()
+    return ConversionGoalListResponse(
+        items=[ConversionGoalResponse.model_validate(g) for g in goals],
+        total=len(goals),
+    )
+
+
+@router.put("/revenue/goals/{goal_id}", response_model=ConversionGoalResponse)
+async def update_conversion_goal(
+    goal_id: str,
+    body: UpdateConversionGoalRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update an existing conversion goal."""
+    result = await db.execute(
+        select(ConversionGoal).where(
+            and_(
+                ConversionGoal.id == goal_id,
+                ConversionGoal.user_id == current_user.id,
+            )
+        )
+    )
+    goal = result.scalar_one_or_none()
+    if not goal:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found")
+
+    if body.name is not None:
+        goal.name = body.name
+    if body.goal_type is not None:
+        goal.goal_type = body.goal_type
+    if body.goal_config is not None:
+        goal.goal_config = body.goal_config
+    if body.is_active is not None:
+        goal.is_active = body.is_active
+
+    await db.commit()
+    await db.refresh(goal)
+    return ConversionGoalResponse.model_validate(goal)
+
+
+@router.delete("/revenue/goals/{goal_id}")
+async def delete_conversion_goal(
+    goal_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a conversion goal."""
+    result = await db.execute(
+        select(ConversionGoal).where(
+            and_(
+                ConversionGoal.id == goal_id,
+                ConversionGoal.user_id == current_user.id,
+            )
+        )
+    )
+    goal = result.scalar_one_or_none()
+    if not goal:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found")
+
+    await db.delete(goal)
+    await db.commit()
+    return {"message": "Goal deleted"}
+
+
+@router.post("/revenue/import", response_model=ImportConversionsResponse)
+async def import_conversions_endpoint(
+    body: ImportConversionsRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Import conversion records for a given goal."""
+    from services.revenue_attribution import import_conversions
+
+    data = await import_conversions(db, current_user.id, body.goal_id, body.conversions)
+    return ImportConversionsResponse(**data)
+
+
+@router.post("/revenue/report", response_model=RevenueReportResponse)
+async def generate_revenue_report_endpoint(
+    report_type: str = Query("monthly"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate a pre-computed revenue attribution report."""
+    from services.revenue_attribution import generate_revenue_report
+
+    data = await generate_revenue_report(db, current_user.id, report_type)
+    return RevenueReportResponse(**data)

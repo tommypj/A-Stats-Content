@@ -752,6 +752,55 @@ export const api = {
       apiRequest<AEOOverviewResponse>({
         url: "/analytics/aeo/overview",
       }),
+    // Revenue
+    revenueOverview: (params?: { start_date?: string; end_date?: string }) =>
+      apiRequest<RevenueOverview>({
+        url: "/analytics/revenue/overview",
+        params,
+      }),
+    revenueByArticle: (params?: { start_date?: string; end_date?: string; page?: number; page_size?: number }) =>
+      apiRequest<RevenueByArticleListResponse>({
+        url: "/analytics/revenue/by-article",
+        params,
+      }),
+    revenueByKeyword: (params?: { start_date?: string; end_date?: string; page?: number; page_size?: number }) =>
+      apiRequest<RevenueByKeywordListResponse>({
+        url: "/analytics/revenue/by-keyword",
+        params,
+      }),
+    revenueGoals: () =>
+      apiRequest<ConversionGoalListResponse>({
+        url: "/analytics/revenue/goals",
+      }),
+    createRevenueGoal: (data: { name: string; goal_type: string; goal_config?: Record<string, unknown> }) =>
+      apiRequest<ConversionGoal>({
+        method: "POST",
+        url: "/analytics/revenue/goals",
+        data,
+      }),
+    updateRevenueGoal: (goalId: string, data: { name?: string; goal_type?: string; goal_config?: Record<string, unknown>; is_active?: boolean }) =>
+      apiRequest<ConversionGoal>({
+        method: "PUT",
+        url: `/analytics/revenue/goals/${goalId}`,
+        data,
+      }),
+    deleteRevenueGoal: (goalId: string) =>
+      apiRequest<{ message: string }>({
+        method: "DELETE",
+        url: `/analytics/revenue/goals/${goalId}`,
+      }),
+    importConversions: (data: { goal_id: string; conversions: Array<{ page_url: string; date: string; visits: number; conversions: number; revenue: number }> }) =>
+      apiRequest<ImportConversionsResponse>({
+        method: "POST",
+        url: "/analytics/revenue/import",
+        data,
+      }),
+    generateRevenueReport: (reportType: string = "monthly") =>
+      apiRequest<RevenueReport>({
+        method: "POST",
+        url: "/analytics/revenue/report",
+        params: { report_type: reportType },
+      }),
   },
 
   // Bulk Content
@@ -1947,6 +1996,92 @@ export interface AEOSuggestionsResponse {
     category?: string;
     estimated_impact?: "high" | "medium" | "low";
   }>;
+}
+
+// Revenue Attribution types
+export interface ConversionGoal {
+  id: string;
+  user_id: string;
+  project_id: string | null;
+  name: string;
+  goal_type: string;
+  goal_config: Record<string, unknown> | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface ConversionGoalListResponse {
+  items: ConversionGoal[];
+  total: number;
+}
+
+export interface RevenueOverview {
+  total_organic_visits: number;
+  total_conversions: number;
+  total_revenue: number;
+  conversion_rate: number;
+  active_goals: number;
+  top_articles: Array<{ article_id: string; title: string; revenue: number; visits: number }>;
+  top_keywords: Array<{ keyword: string; revenue: number; visits: number }>;
+  visits_trend: TrendData | null;
+  conversions_trend: TrendData | null;
+  revenue_trend: TrendData | null;
+  start_date: string;
+  end_date: string;
+}
+
+export interface RevenueByArticleItem {
+  article_id: string;
+  title: string;
+  keyword: string;
+  published_url: string | null;
+  visits: number;
+  conversions: number;
+  revenue: number;
+  conversion_rate: number;
+}
+
+export interface RevenueByArticleListResponse {
+  items: RevenueByArticleItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export interface RevenueByKeywordItem {
+  keyword: string;
+  visits: number;
+  conversions: number;
+  revenue: number;
+  conversion_rate: number;
+}
+
+export interface RevenueByKeywordListResponse {
+  items: RevenueByKeywordItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export interface ImportConversionsResponse {
+  imported_count: number;
+  matched_articles: number;
+  message: string;
+}
+
+export interface RevenueReport {
+  id: string;
+  report_type: string;
+  period_start: string;
+  period_end: string;
+  total_organic_visits: number;
+  total_conversions: number;
+  total_revenue: number;
+  top_articles: unknown[] | null;
+  top_keywords: unknown[] | null;
+  generated_at: string;
 }
 
 // Bulk Content types

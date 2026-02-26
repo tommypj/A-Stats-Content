@@ -463,3 +463,157 @@ class AEOSuggestionsResponse(BaseModel):
     """AI-generated AEO improvement suggestions."""
 
     suggestions: list[dict] = Field(default_factory=list)
+
+
+# ============================================================================
+# Revenue Attribution Schemas
+# ============================================================================
+
+
+class ConversionGoalResponse(BaseModel):
+    """Conversion goal configuration."""
+
+    id: str
+    user_id: str
+    project_id: Optional[str] = None
+    name: str
+    goal_type: str = Field(..., description="page_visit, form_submit, purchase, or custom")
+    goal_config: Optional[dict] = None
+    is_active: bool = True
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ConversionGoalListResponse(BaseModel):
+    """List of conversion goals."""
+
+    items: list[ConversionGoalResponse]
+    total: int
+
+
+class CreateConversionGoalRequest(BaseModel):
+    """Request to create a conversion goal."""
+
+    name: str = Field(..., min_length=1, max_length=200)
+    goal_type: str = Field(..., description="page_visit, form_submit, purchase, or custom")
+    goal_config: Optional[dict] = None
+
+
+class UpdateConversionGoalRequest(BaseModel):
+    """Request to update a conversion goal."""
+
+    name: Optional[str] = Field(None, min_length=1, max_length=200)
+    goal_type: Optional[str] = None
+    goal_config: Optional[dict] = None
+    is_active: Optional[bool] = None
+
+
+class ContentConversionResponse(BaseModel):
+    """Single content conversion record."""
+
+    id: str
+    article_id: Optional[str] = None
+    goal_id: str
+    page_url: Optional[str] = None
+    keyword: Optional[str] = None
+    date: date_type
+    visits: int = 0
+    conversions: int = 0
+    conversion_rate: float = 0.0
+    revenue: float = 0.0
+    attribution_model: str = "last_touch"
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RevenueOverviewResponse(BaseModel):
+    """Revenue attribution dashboard overview."""
+
+    total_organic_visits: int = 0
+    total_conversions: int = 0
+    total_revenue: float = 0.0
+    conversion_rate: float = 0.0
+    active_goals: int = 0
+    top_articles: list[dict] = Field(default_factory=list)
+    top_keywords: list[dict] = Field(default_factory=list)
+    visits_trend: Optional[TrendData] = None
+    conversions_trend: Optional[TrendData] = None
+    revenue_trend: Optional[TrendData] = None
+    start_date: date_type
+    end_date: date_type
+
+
+class RevenueByArticleItem(BaseModel):
+    """Revenue data for a single article."""
+
+    article_id: str
+    title: str
+    keyword: str
+    published_url: Optional[str] = None
+    visits: int = 0
+    conversions: int = 0
+    revenue: float = 0.0
+    conversion_rate: float = 0.0
+
+
+class RevenueByArticleListResponse(BaseModel):
+    """Paginated list of articles with revenue data."""
+
+    items: list[RevenueByArticleItem]
+    total: int
+    page: int
+    page_size: int
+    pages: int
+
+
+class RevenueByKeywordItem(BaseModel):
+    """Revenue data for a single keyword."""
+
+    keyword: str
+    visits: int = 0
+    conversions: int = 0
+    revenue: float = 0.0
+    conversion_rate: float = 0.0
+
+
+class RevenueByKeywordListResponse(BaseModel):
+    """Paginated list of keywords with revenue data."""
+
+    items: list[RevenueByKeywordItem]
+    total: int
+    page: int
+    page_size: int
+    pages: int
+
+
+class ImportConversionsRequest(BaseModel):
+    """Request to import conversion data."""
+
+    goal_id: str = Field(..., description="Conversion goal ID")
+    conversions: list[dict] = Field(..., min_length=1, max_length=1000, description="List of conversion records")
+
+
+class ImportConversionsResponse(BaseModel):
+    """Response from importing conversion data."""
+
+    imported_count: int = 0
+    matched_articles: int = 0
+    message: str = "Import completed"
+
+
+class RevenueReportResponse(BaseModel):
+    """Generated revenue report."""
+
+    id: str
+    report_type: str
+    period_start: date_type
+    period_end: date_type
+    total_organic_visits: int = 0
+    total_conversions: int = 0
+    total_revenue: float = 0.0
+    top_articles: Optional[list] = None
+    top_keywords: Optional[list] = None
+    generated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

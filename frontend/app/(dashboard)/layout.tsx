@@ -36,6 +36,7 @@ import {
   XCircle,
   Keyboard,
   Layers,
+  DollarSign,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { ProjectProvider, useProject } from "@/contexts/ProjectContext";
@@ -74,6 +75,7 @@ const navigation = [
       { name: "Content Opportunities", href: "/analytics/opportunities", icon: Lightbulb },
       { name: "Content Health", href: "/analytics/content-health", icon: Activity },
       { name: "AEO Scores", href: "/analytics/aeo", icon: Zap },
+      { name: "Revenue", href: "/analytics/revenue", icon: DollarSign },
     ],
   },
   { name: "Knowledge", href: "/knowledge", icon: BookOpen },
