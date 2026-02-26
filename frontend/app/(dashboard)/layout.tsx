@@ -35,6 +35,7 @@ import {
   CheckCircle2,
   XCircle,
   Keyboard,
+  Layers,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { ProjectProvider, useProject } from "@/contexts/ProjectContext";
@@ -50,6 +51,7 @@ const navigation = [
   { name: "Content Calendar", href: "/content-calendar", icon: Calendar },
   { name: "Keyword Research", href: "/keyword-research", icon: Search },
   { name: "Images", href: "/images", icon: ImageIcon },
+  { name: "Bulk Content", href: "/bulk", icon: Layers },
   {
     name: "Social",
     icon: Share2,

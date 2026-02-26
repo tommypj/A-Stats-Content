@@ -18,6 +18,7 @@ from .admin import AdminAuditLog, AuditAction, AuditTargetType
 from .project import Project, ProjectMember, ProjectInvitation, ProjectMemberRole, InvitationStatus
 from .generation import GenerationLog, AdminAlert
 from .aeo import AEOScore, AEOCitation
+from .bulk import ContentTemplate, BulkJob, BulkJobItem
 
 __all__ = [
     "Base",
@@ -58,4 +59,7 @@ __all__ = [
     "AdminAlert",
     "AEOScore",
     "AEOCitation",
+    "ContentTemplate",
+    "BulkJob",
+    "BulkJobItem",
 ]

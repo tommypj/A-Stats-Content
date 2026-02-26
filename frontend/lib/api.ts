@@ -754,6 +754,58 @@ export const api = {
       }),
   },
 
+  // Bulk Content
+  bulk: {
+    // Templates
+    templates: () =>
+      apiRequest<TemplateListResponse>({
+        url: "/bulk/templates",
+      }),
+    createTemplate: (data: { name: string; description?: string; template_config: TemplateConfig }) =>
+      apiRequest<ContentTemplate>({
+        method: "POST",
+        url: "/bulk/templates",
+        data,
+      }),
+    updateTemplate: (id: string, data: { name?: string; description?: string; template_config?: TemplateConfig }) =>
+      apiRequest<ContentTemplate>({
+        method: "PUT",
+        url: `/bulk/templates/${id}`,
+        data,
+      }),
+    deleteTemplate: (id: string) =>
+      apiRequest<{ message: string }>({
+        method: "DELETE",
+        url: `/bulk/templates/${id}`,
+      }),
+    // Jobs
+    jobs: (params?: { page?: number; page_size?: number; status?: string }) =>
+      apiRequest<BulkJobListResponse>({
+        url: "/bulk/jobs",
+        params,
+      }),
+    getJob: (jobId: string) =>
+      apiRequest<BulkJobDetail>({
+        url: `/bulk/jobs/${jobId}`,
+      }),
+    createOutlineJob: (data: { keywords: BulkKeywordInput[]; template_id?: string }) =>
+      apiRequest<BulkJob>({
+        method: "POST",
+        url: "/bulk/jobs/outlines",
+        data,
+      }),
+    cancelJob: (jobId: string) =>
+      apiRequest<{ message: string }>({
+        method: "POST",
+        url: `/bulk/jobs/${jobId}/cancel`,
+      }),
+    retryFailed: (jobId: string) =>
+      apiRequest<{ message: string }>({
+        method: "POST",
+        url: `/bulk/jobs/${jobId}/retry-failed`,
+      }),
+  },
+
   // Billing / LemonSqueezy
   billing: {
     pricing: () => cachedGet<PricingResponse>("/billing/pricing", 300_000),
@@ -1895,6 +1947,76 @@ export interface AEOSuggestionsResponse {
     category?: string;
     estimated_impact?: "high" | "medium" | "low";
   }>;
+}
+
+// Bulk Content types
+export interface BulkKeywordInput {
+  keyword: string;
+  title?: string;
+  target_audience?: string;
+}
+
+export interface TemplateConfig {
+  tone: string;
+  writing_style: string;
+  word_count_target: number;
+  target_audience: string;
+  custom_instructions: string;
+  include_faq: boolean;
+  include_conclusion: boolean;
+  language: string;
+}
+
+export interface ContentTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  template_config: TemplateConfig;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TemplateListResponse {
+  items: ContentTemplate[];
+  total: number;
+}
+
+export interface BulkJobItem {
+  id: string;
+  keyword?: string;
+  title?: string;
+  status: "pending" | "processing" | "completed" | "failed" | "cancelled";
+  resource_type?: string;
+  resource_id?: string;
+  error_message?: string;
+  processing_started_at?: string;
+  processing_completed_at?: string;
+}
+
+export interface BulkJob {
+  id: string;
+  job_type: string;
+  status: "pending" | "processing" | "completed" | "partially_failed" | "failed" | "cancelled";
+  total_items: number;
+  completed_items: number;
+  failed_items: number;
+  template_id?: string;
+  started_at?: string;
+  completed_at?: string;
+  error_summary?: string;
+  created_at: string;
+}
+
+export interface BulkJobDetail extends BulkJob {
+  items: BulkJobItem[];
+}
+
+export interface BulkJobListResponse {
+  items: BulkJob[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
 }
 
 // Billing / LemonSqueezy types
