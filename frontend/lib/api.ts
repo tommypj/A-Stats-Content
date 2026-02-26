@@ -1319,6 +1319,112 @@ export const api = {
         url: `/notifications/tasks/${taskId}/status`,
       }),
   },
+
+  // Agency / White-Label
+  agency: {
+    // Profile
+    getProfile: () =>
+      apiRequest<AgencyProfile>({
+        url: "/agency/profile",
+      }),
+    createProfile: (data: { agency_name: string; logo_url?: string; brand_colors?: Record<string, string>; contact_email?: string; footer_text?: string }) =>
+      apiRequest<AgencyProfile>({
+        method: "POST",
+        url: "/agency/profile",
+        data,
+      }),
+    updateProfile: (data: { agency_name?: string; logo_url?: string; brand_colors?: Record<string, string>; contact_email?: string; footer_text?: string }) =>
+      apiRequest<AgencyProfile>({
+        method: "PUT",
+        url: "/agency/profile",
+        data,
+      }),
+    deleteProfile: () =>
+      apiRequest<{ message: string }>({
+        method: "DELETE",
+        url: "/agency/profile",
+      }),
+    // Clients
+    clients: () =>
+      apiRequest<{ items: ClientWorkspace[]; total: number }>({
+        url: "/agency/clients",
+      }),
+    createClient: (data: { project_id: string; client_name: string; client_email?: string; client_logo_url?: string; allowed_features?: Record<string, boolean> }) =>
+      apiRequest<ClientWorkspace>({
+        method: "POST",
+        url: "/agency/clients",
+        data,
+      }),
+    getClient: (id: string) =>
+      apiRequest<ClientWorkspace>({
+        url: `/agency/clients/${id}`,
+      }),
+    updateClient: (id: string, data: { client_name?: string; client_email?: string; client_logo_url?: string; is_portal_enabled?: boolean; allowed_features?: Record<string, boolean> }) =>
+      apiRequest<ClientWorkspace>({
+        method: "PUT",
+        url: `/agency/clients/${id}`,
+        data,
+      }),
+    deleteClient: (id: string) =>
+      apiRequest<{ message: string }>({
+        method: "DELETE",
+        url: `/agency/clients/${id}`,
+      }),
+    enablePortal: (id: string) =>
+      apiRequest<ClientWorkspace>({
+        method: "POST",
+        url: `/agency/clients/${id}/enable-portal`,
+      }),
+    disablePortal: (id: string) =>
+      apiRequest<ClientWorkspace>({
+        method: "POST",
+        url: `/agency/clients/${id}/disable-portal`,
+      }),
+    // Templates
+    reportTemplates: () =>
+      apiRequest<{ items: AgencyReportTemplate[]; total: number }>({
+        url: "/agency/templates",
+      }),
+    createReportTemplate: (data: { name: string; template_config: Record<string, unknown> }) =>
+      apiRequest<AgencyReportTemplate>({
+        method: "POST",
+        url: "/agency/templates",
+        data,
+      }),
+    updateReportTemplate: (id: string, data: { name?: string; template_config?: Record<string, unknown> }) =>
+      apiRequest<AgencyReportTemplate>({
+        method: "PUT",
+        url: `/agency/templates/${id}`,
+        data,
+      }),
+    deleteReportTemplate: (id: string) =>
+      apiRequest<{ message: string }>({
+        method: "DELETE",
+        url: `/agency/templates/${id}`,
+      }),
+    // Reports
+    generateReport: (data: { client_workspace_id: string; report_template_id?: string; report_type?: string; period_start: string; period_end: string }) =>
+      apiRequest<GeneratedReport>({
+        method: "POST",
+        url: "/agency/reports/generate",
+        data,
+        timeout: 60000,
+      }),
+    reports: (params?: { page?: number; page_size?: number }) =>
+      apiRequest<{ items: GeneratedReport[]; total: number; page: number; page_size: number; pages: number }>({
+        url: "/agency/reports",
+        params,
+      }),
+    getReport: (id: string) =>
+      apiRequest<GeneratedReport>({
+        url: `/agency/reports/${id}`,
+      }),
+    // Portal (public)
+    portal: (token: string) =>
+      apiRequest<PortalData>({
+        url: `/agency/portal/${token}`,
+      }),
+  },
 };
 
 // Type definitions
@@ -2337,6 +2443,67 @@ export interface SocialAnalytics {
   engagement_rate: number;
   click_through_rate?: number;
   fetched_at: string;
+}
+
+// Agency / White-Label types
+export interface AgencyProfile {
+  id: string;
+  user_id: string;
+  agency_name: string;
+  logo_url: string | null;
+  brand_colors: Record<string, string> | null;
+  custom_domain: string | null;
+  contact_email: string | null;
+  footer_text: string | null;
+  max_clients: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface ClientWorkspace {
+  id: string;
+  agency_id: string;
+  project_id: string;
+  client_name: string;
+  client_email: string | null;
+  client_logo_url: string | null;
+  is_portal_enabled: boolean;
+  portal_access_token: string | null;
+  allowed_features: Record<string, boolean> | null;
+  created_at: string;
+}
+
+export interface AgencyReportTemplate {
+  id: string;
+  agency_id: string;
+  name: string;
+  template_config: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface GeneratedReport {
+  id: string;
+  agency_id: string;
+  client_workspace_id: string;
+  report_template_id: string | null;
+  report_type: string;
+  period_start: string;
+  period_end: string;
+  report_data: Record<string, unknown> | null;
+  pdf_url: string | null;
+  generated_at: string;
+}
+
+export interface PortalData {
+  client_name: string;
+  client_logo_url: string | null;
+  agency_name: string;
+  agency_logo_url: string | null;
+  brand_colors: Record<string, string> | null;
+  contact_email: string | null;
+  footer_text: string | null;
+  allowed_features: Record<string, boolean> | null;
+  analytics_summary: Record<string, unknown> | null;
 }
 
 // Admin types

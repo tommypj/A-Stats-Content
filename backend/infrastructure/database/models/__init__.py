@@ -20,6 +20,7 @@ from .generation import GenerationLog, AdminAlert
 from .aeo import AEOScore, AEOCitation
 from .bulk import ContentTemplate, BulkJob, BulkJobItem
 from .revenue import ConversionGoal, ContentConversion, RevenueReport
+from .agency import AgencyProfile, ClientWorkspace, ReportTemplate, GeneratedReport
 
 __all__ = [
     "Base",
@@ -66,4 +67,8 @@ __all__ = [
     "ConversionGoal",
     "ContentConversion",
     "RevenueReport",
+    "AgencyProfile",
+    "ClientWorkspace",
+    "ReportTemplate",
+    "GeneratedReport",
 ]

@@ -21,6 +21,7 @@ from .project_invitations import router as project_invitations_router
 from .projects import router as projects_router
 from .notifications import router as notifications_router
 from .bulk import router as bulk_router
+from .agency import router as agency_router
 
 # Create main API router
 api_router = APIRouter()
@@ -46,6 +47,7 @@ api_router.include_router(project_invitations_router)
 api_router.include_router(projects_router)
 api_router.include_router(notifications_router)
 api_router.include_router(bulk_router)
+api_router.include_router(agency_router)
 
 # Future routes will be added here:
 # api_router.include_router(content_router, prefix="/content", tags=["Content"])

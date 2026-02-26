@@ -37,6 +37,7 @@ import {
   Keyboard,
   Layers,
   DollarSign,
+  Building2,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { ProjectProvider, useProject } from "@/contexts/ProjectContext";
@@ -85,6 +86,16 @@ const navigation = [
     submenu: [
       { name: "All Projects", href: "/projects", icon: FolderOpen },
       { name: "Brand Voice", href: "/projects/brand-voice", icon: MessageSquare },
+    ],
+  },
+  {
+    name: "Agency",
+    icon: Building2,
+    submenu: [
+      { name: "Dashboard", href: "/agency", icon: LayoutDashboard },
+      { name: "Clients", href: "/agency", icon: Users },
+      { name: "Reports", href: "/agency/reports", icon: FileText },
+      { name: "Branding", href: "/agency/branding", icon: Globe },
     ],
   },
 ];
