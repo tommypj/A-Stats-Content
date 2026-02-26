@@ -206,25 +206,32 @@ async def initiate_connection(
     state = secrets.token_urlsafe(32)
     await _store_oauth_state(state, str(current_user.id))
 
-    if platform == "facebook":
+    if platform in ("facebook", "instagram"):
         if not settings.facebook_app_id or not settings.facebook_app_secret:
             raise HTTPException(
                 status_code=status.HTTP_501_NOT_IMPLEMENTED,
-                detail="Facebook integration is not configured. Please set FACEBOOK_APP_ID and FACEBOOK_APP_SECRET.",
+                detail="Facebook/Instagram integration is not configured. Please set FACEBOOK_APP_ID and FACEBOOK_APP_SECRET.",
             )
+
+        # Instagram business accounts need additional scopes to access the
+        # linked IG account via the Facebook Graph API.
+        if platform == "instagram":
+            scope = "instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement"
+        else:
+            scope = "public_profile,pages_show_list,pages_manage_posts"
 
         params = urlencode({
             "client_id": settings.facebook_app_id,
             "redirect_uri": settings.facebook_redirect_uri,
             "state": state,
-            "scope": "public_profile,pages_show_list,pages_manage_posts",
+            "scope": scope,
             "response_type": "code",
         })
         authorization_url = f"https://www.facebook.com/v21.0/dialog/oauth?{params}"
     else:
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail=f"OAuth for {platform} is not yet implemented. Currently supported: facebook.",
+            detail=f"OAuth for {platform} is not yet implemented. Currently supported: facebook, instagram.",
         )
 
     return ConnectAccountResponse(
@@ -283,11 +290,13 @@ async def oauth_callback(
             url=f"{frontend_callback}?error=user_not_found&platform={platform}"
         )
 
-    if platform == "facebook":
+    if platform in ("facebook", "instagram"):
+        # Instagram business accounts authenticate through the Facebook Graph API,
+        # so the token exchange flow is identical for both platforms.
         try:
             tokens, profile = await _facebook_exchange_and_profile(code)
         except (httpx.HTTPError, ValueError, KeyError) as e:
-            logger.warning("Facebook OAuth exchange failed: %s", e)
+            logger.warning("Facebook/Instagram OAuth exchange failed: %s", e)
             return RedirectResponse(
                 url=f"{frontend_callback}?error=token_exchange_failed&platform={platform}"
             )

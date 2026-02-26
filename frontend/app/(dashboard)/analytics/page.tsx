@@ -11,10 +11,20 @@ import {
   ArrowRight,
   Activity,
   DollarSign,
+  Monitor,
+  Globe,
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { api, parseApiError, AnalyticsSummary, DailyAnalyticsData, GSCSite } from "@/lib/api";
+import {
+  api,
+  parseApiError,
+  AnalyticsSummary,
+  DailyAnalyticsData,
+  GSCSite,
+  DeviceBreakdownItem,
+  CountryBreakdownItem,
+} from "@/lib/api";
 import { StatCard } from "@/components/analytics/stat-card";
 import { PerformanceChart } from "@/components/analytics/performance-chart";
 import { DateRangePicker } from "@/components/analytics/date-range-picker";
@@ -33,6 +43,11 @@ export default function AnalyticsPage() {
   const [dailyData, setDailyData] = useState<DailyAnalyticsData[]>([]);
   const [lastSync, setLastSync] = useState<string | null>(null);
 
+  // Device / Country breakdown state
+  const [deviceData, setDeviceData] = useState<DeviceBreakdownItem[]>([]);
+  const [countryData, setCountryData] = useState<CountryBreakdownItem[]>([]);
+  const [isLoadingBreakdown, setIsLoadingBreakdown] = useState(false);
+
   // Site selection state
   const [sites, setSites] = useState<GSCSite[]>([]);
   const [isLoadingSites, setIsLoadingSites] = useState(false);
@@ -46,6 +61,7 @@ export default function AnalyticsPage() {
   useEffect(() => {
     if (isConnected && siteUrl) {
       loadAnalytics();
+      loadBreakdowns();
     }
   }, [isConnected, siteUrl, dateRange]);
 
@@ -115,6 +131,23 @@ export default function AnalyticsPage() {
       toast.error(apiError.message || "Failed to load analytics data");
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function loadBreakdowns() {
+    try {
+      setIsLoadingBreakdown(true);
+      const [deviceRes, countryRes] = await Promise.all([
+        api.analytics.deviceBreakdown(dateRange),
+        api.analytics.countryBreakdown(dateRange, 10),
+      ]);
+      setDeviceData(deviceRes.items);
+      setCountryData(countryRes.items);
+    } catch (error) {
+      // Breakdowns are supplementary — log but don't toast
+      console.error("Failed to load breakdowns:", error);
+    } finally {
+      setIsLoadingBreakdown(false);
     }
   }
 
@@ -404,6 +437,100 @@ export default function AnalyticsPage() {
           </Link>
         </Card>
       </div>
+
+      {/* Device Breakdown */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Monitor className="h-5 w-5 text-text-muted" />
+            Device Breakdown
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoadingBreakdown ? (
+            <div className="flex items-center justify-center py-10">
+              <RefreshCw className="h-5 w-5 animate-spin text-primary-500" />
+              <span className="ml-2 text-sm text-text-secondary">Loading device data...</span>
+            </div>
+          ) : deviceData.length === 0 ? (
+            <p className="text-sm text-text-secondary text-center py-8">
+              No device breakdown data available for the selected period.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-surface-tertiary text-left">
+                    <th className="pb-3 pr-4 font-medium text-text-secondary">Device</th>
+                    <th className="pb-3 pr-4 font-medium text-text-secondary text-right">Clicks</th>
+                    <th className="pb-3 pr-4 font-medium text-text-secondary text-right">Impressions</th>
+                    <th className="pb-3 pr-4 font-medium text-text-secondary text-right">CTR</th>
+                    <th className="pb-3 font-medium text-text-secondary text-right">Position</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {deviceData.map((row) => (
+                    <tr key={row.device} className="border-b border-surface-tertiary last:border-0">
+                      <td className="py-3 pr-4 capitalize font-medium text-text-primary">{row.device}</td>
+                      <td className="py-3 pr-4 text-right text-text-secondary">{formatNumber(row.clicks)}</td>
+                      <td className="py-3 pr-4 text-right text-text-secondary">{formatNumber(row.impressions)}</td>
+                      <td className="py-3 pr-4 text-right text-text-secondary">{formatPercentage(row.ctr)}</td>
+                      <td className="py-3 text-right text-text-secondary">{formatPosition(row.position)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Country Breakdown */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Globe className="h-5 w-5 text-text-muted" />
+            Top Countries
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoadingBreakdown ? (
+            <div className="flex items-center justify-center py-10">
+              <RefreshCw className="h-5 w-5 animate-spin text-primary-500" />
+              <span className="ml-2 text-sm text-text-secondary">Loading country data...</span>
+            </div>
+          ) : countryData.length === 0 ? (
+            <p className="text-sm text-text-secondary text-center py-8">
+              No country breakdown data available for the selected period.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-surface-tertiary text-left">
+                    <th className="pb-3 pr-4 font-medium text-text-secondary">Country</th>
+                    <th className="pb-3 pr-4 font-medium text-text-secondary text-right">Clicks</th>
+                    <th className="pb-3 pr-4 font-medium text-text-secondary text-right">Impressions</th>
+                    <th className="pb-3 pr-4 font-medium text-text-secondary text-right">CTR</th>
+                    <th className="pb-3 font-medium text-text-secondary text-right">Position</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {countryData.map((row) => (
+                    <tr key={row.country} className="border-b border-surface-tertiary last:border-0">
+                      <td className="py-3 pr-4 font-medium text-text-primary uppercase">{row.country}</td>
+                      <td className="py-3 pr-4 text-right text-text-secondary">{formatNumber(row.clicks)}</td>
+                      <td className="py-3 pr-4 text-right text-text-secondary">{formatNumber(row.impressions)}</td>
+                      <td className="py-3 pr-4 text-right text-text-secondary">{formatPercentage(row.ctr)}</td>
+                      <td className="py-3 text-right text-text-secondary">{formatPosition(row.position)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

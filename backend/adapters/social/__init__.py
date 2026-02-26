@@ -1,8 +1,8 @@
 """
 Social media platform adapters.
 
-Provides unified interface for posting to Twitter, LinkedIn, and Facebook
-using OAuth 2.0 authentication and platform-specific APIs.
+Provides unified interface for posting to Twitter, LinkedIn, Facebook,
+and Instagram using OAuth 2.0 authentication and platform-specific APIs.
 """
 
 from .base import (
@@ -20,6 +20,7 @@ from .base import (
 from .twitter_adapter import TwitterAdapter
 from .linkedin_adapter import LinkedInAdapter
 from .facebook_adapter import FacebookAdapter
+from .instagram_adapter import InstagramAdapter
 
 
 def get_social_adapter(
@@ -31,7 +32,7 @@ def get_social_adapter(
     Factory function to get platform-specific social media adapter.
 
     Args:
-        platform: Social media platform (twitter, linkedin, facebook)
+        platform: Social media platform (twitter, linkedin, facebook, instagram)
         mock_mode: Enable mock mode for development/testing
         **kwargs: Additional adapter-specific arguments
 
@@ -55,12 +56,15 @@ def get_social_adapter(
 
         >>> # Get Facebook adapter in mock mode
         >>> facebook = get_social_adapter(SocialPlatform.FACEBOOK, mock_mode=True)
+
+        >>> # Get Instagram adapter in mock mode
+        >>> instagram = get_social_adapter(SocialPlatform.INSTAGRAM, mock_mode=True)
     """
     adapters = {
         SocialPlatform.TWITTER: TwitterAdapter,
         SocialPlatform.LINKEDIN: LinkedInAdapter,
         SocialPlatform.FACEBOOK: FacebookAdapter,
-        SocialPlatform.INSTAGRAM: FacebookAdapter,  # Instagram uses Facebook API
+        SocialPlatform.INSTAGRAM: InstagramAdapter,
     }
 
     adapter_class = adapters.get(platform)
@@ -77,6 +81,7 @@ def get_social_adapter(
 twitter_adapter = TwitterAdapter()
 linkedin_adapter = LinkedInAdapter()
 facebook_adapter = FacebookAdapter()
+instagram_adapter = InstagramAdapter()
 
 
 __all__ = [
@@ -96,10 +101,12 @@ __all__ = [
     "TwitterAdapter",
     "LinkedInAdapter",
     "FacebookAdapter",
+    "InstagramAdapter",
     # Factory
     "get_social_adapter",
     # Convenience instances
     "twitter_adapter",
     "linkedin_adapter",
     "facebook_adapter",
+    "instagram_adapter",
 ]

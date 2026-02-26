@@ -617,3 +617,41 @@ class RevenueReportResponse(BaseModel):
     generated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ============================================================================
+# Device / Country Breakdown Schemas
+# ============================================================================
+
+
+class DeviceBreakdownItem(BaseModel):
+    """Performance data for a single device type."""
+
+    device: str
+    clicks: int
+    impressions: int
+    ctr: float
+    position: float
+
+
+class DeviceBreakdownResponse(BaseModel):
+    """Response containing device breakdown items."""
+
+    items: list[DeviceBreakdownItem]
+
+
+class CountryBreakdownItem(BaseModel):
+    """Performance data for a single country."""
+
+    country: str
+    clicks: int
+    impressions: int
+    ctr: float
+    position: float
+
+
+class CountryBreakdownResponse(BaseModel):
+    """Response containing country breakdown items with a total count."""
+
+    items: list[CountryBreakdownItem]
+    total: int

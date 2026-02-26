@@ -625,6 +625,13 @@ export default function ArticleEditorPage() {
         if (wpConnected) setShowWpModal(true);
       },
     },
+    // Formatting shortcuts
+    { key: "b", ctrl: true, handler: () => insertMarkdown("**", "**") },
+    { key: "i", ctrl: true, handler: () => insertMarkdown("*", "*") },
+    { key: "k", ctrl: true, handler: () => insertMarkdown("[", "](url)") },
+    { key: "e", ctrl: true, handler: () => insertMarkdown("`", "`") },
+    // View shortcuts
+    { key: "\\", ctrl: true, handler: () => setViewMode((m) => m === "edit" ? "preview" : "edit") },
   ]);
 
   async function handleImprove(type: string) {
@@ -1138,7 +1145,7 @@ export default function ArticleEditorPage() {
                   {/* Inline formatting group */}
                   <button
                     type="button"
-                    title="Bold"
+                    title="Bold (Ctrl+B)"
                     onClick={() => insertMarkdown("**", "**")}
                     className="p-1.5 rounded-lg hover:bg-surface-tertiary text-text-secondary hover:text-text-primary transition-colors"
                   >
@@ -1146,7 +1153,7 @@ export default function ArticleEditorPage() {
                   </button>
                   <button
                     type="button"
-                    title="Italic"
+                    title="Italic (Ctrl+I)"
                     onClick={() => insertMarkdown("*", "*")}
                     className="p-1.5 rounded-lg hover:bg-surface-tertiary text-text-secondary hover:text-text-primary transition-colors"
                   >
@@ -1154,7 +1161,7 @@ export default function ArticleEditorPage() {
                   </button>
                   <button
                     type="button"
-                    title="Inline Code"
+                    title="Inline Code (Ctrl+E)"
                     onClick={() => insertMarkdown("`", "`")}
                     className="p-1.5 rounded-lg hover:bg-surface-tertiary text-text-secondary hover:text-text-primary transition-colors"
                   >
@@ -1162,7 +1169,7 @@ export default function ArticleEditorPage() {
                   </button>
                   <button
                     type="button"
-                    title="Link"
+                    title="Link (Ctrl+K)"
                     onClick={() => insertMarkdown("[", "](url)")}
                     className="p-1.5 rounded-lg hover:bg-surface-tertiary text-text-secondary hover:text-text-primary transition-colors"
                   >

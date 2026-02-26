@@ -801,6 +801,17 @@ export const api = {
         url: "/analytics/revenue/report",
         params: { report_type: reportType },
       }),
+    // Device / Country Breakdown
+    deviceBreakdown: (days?: number) =>
+      apiRequest<{ items: DeviceBreakdownItem[] }>({
+        url: "/analytics/device-breakdown",
+        params: { days },
+      }),
+    countryBreakdown: (days?: number, top_n?: number) =>
+      apiRequest<{ items: CountryBreakdownItem[]; total: number }>({
+        url: "/analytics/country-breakdown",
+        params: { days, top_n },
+      }),
   },
 
   // Bulk Content
@@ -2188,6 +2199,23 @@ export interface RevenueReport {
   top_articles: unknown[] | null;
   top_keywords: unknown[] | null;
   generated_at: string;
+}
+
+// Device / Country Breakdown types
+export interface DeviceBreakdownItem {
+  device: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+}
+
+export interface CountryBreakdownItem {
+  country: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
 }
 
 // Bulk Content types

@@ -27,6 +27,16 @@ const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { keys: ["Ctrl", "S"], description: "Save article" },
       { keys: ["Ctrl", "Shift", "P"], description: "Publish to WordPress" },
       { keys: ["Ctrl", "N"], description: "New article" },
+      { keys: ["Ctrl", "\\"], description: "Toggle preview" },
+    ],
+  },
+  {
+    title: "Formatting",
+    shortcuts: [
+      { keys: ["Ctrl", "B"], description: "Bold" },
+      { keys: ["Ctrl", "I"], description: "Italic" },
+      { keys: ["Ctrl", "E"], description: "Inline code" },
+      { keys: ["Ctrl", "K"], description: "Insert link" },
     ],
   },
   {

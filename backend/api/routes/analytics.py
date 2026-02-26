@@ -55,6 +55,10 @@ from api.schemas.analytics import (
     ImportConversionsRequest,
     ImportConversionsResponse,
     RevenueReportResponse,
+    DeviceBreakdownItem,
+    DeviceBreakdownResponse,
+    CountryBreakdownItem,
+    CountryBreakdownResponse,
 )
 from api.routes.auth import get_current_user
 from api.utils import escape_like
@@ -698,6 +702,78 @@ async def get_daily_analytics(
         page_size=page_size,
         pages=math.ceil(total / page_size) if total > 0 else 0,
     )
+
+
+@router.get("/device-breakdown", response_model=DeviceBreakdownResponse)
+async def get_device_breakdown(
+    days: int = Query(28, ge=1, le=90),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get performance breakdown by device type (mobile, desktop, tablet)."""
+    connection = await get_gsc_connection(current_user.id, db)
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="GSC not connected",
+        )
+
+    from adapters.search.gsc_adapter import GSCAdapter, GSCCredentials
+    from core.security.encryption import decrypt_credential
+
+    decrypted_access_token = decrypt_credential(connection.access_token, settings.secret_key)
+    decrypted_refresh_token = decrypt_credential(connection.refresh_token, settings.secret_key)
+
+    credentials = GSCCredentials(
+        access_token=decrypted_access_token,
+        refresh_token=decrypted_refresh_token,
+        token_expiry=connection.token_expiry,
+        site_url=connection.site_url,
+    )
+
+    gsc = GSCAdapter()
+    raw = gsc.get_device_breakdown(credentials=credentials, site_url=connection.site_url, days=days)
+    items = [DeviceBreakdownItem(**row) for row in raw]
+    return DeviceBreakdownResponse(items=items)
+
+
+@router.get("/country-breakdown", response_model=CountryBreakdownResponse)
+async def get_country_breakdown(
+    days: int = Query(28, ge=1, le=90),
+    top_n: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get performance breakdown by country."""
+    connection = await get_gsc_connection(current_user.id, db)
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="GSC not connected",
+        )
+
+    from adapters.search.gsc_adapter import GSCAdapter, GSCCredentials
+    from core.security.encryption import decrypt_credential
+
+    decrypted_access_token = decrypt_credential(connection.access_token, settings.secret_key)
+    decrypted_refresh_token = decrypt_credential(connection.refresh_token, settings.secret_key)
+
+    credentials = GSCCredentials(
+        access_token=decrypted_access_token,
+        refresh_token=decrypted_refresh_token,
+        token_expiry=connection.token_expiry,
+        site_url=connection.site_url,
+    )
+
+    gsc = GSCAdapter()
+    raw = gsc.get_country_breakdown(
+        credentials=credentials,
+        site_url=connection.site_url,
+        days=days,
+        top_n=top_n,
+    )
+    items = [CountryBreakdownItem(**row) for row in raw]
+    return CountryBreakdownResponse(items=items, total=len(items))
 
 
 @router.get("/summary", response_model=AnalyticsSummaryResponse)
