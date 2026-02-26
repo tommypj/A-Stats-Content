@@ -93,10 +93,10 @@ export function ProjectSwitcher() {
               </button>
 
               {/* Divider */}
-              {projects.length > 0 && <div className="my-2 border-t border-surface-tertiary" />}
+              {projects.filter(p => !p.is_personal).length > 0 && <div className="my-2 border-t border-surface-tertiary" />}
 
               {/* Projects */}
-              {projects.map((project) => (
+              {projects.filter(p => !p.is_personal).map((project) => (
                 <button
                   key={project.id}
                   onClick={() => handleSwitch(project.id)}

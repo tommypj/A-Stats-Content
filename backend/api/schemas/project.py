@@ -81,6 +81,8 @@ class ProjectResponse(BaseModel):
     avatar_url: Optional[str] = None
     logo_url: Optional[str] = None  # Alias for avatar_url (frontend compatibility)
 
+    is_personal: bool = False
+
     # Billing
     subscription_tier: str
     subscription_status: str
@@ -342,6 +344,7 @@ class ProjectDetailResponse(BaseModel):
     owner_id: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
+    is_personal: bool = False
     subscription_tier: str = "free"
     subscription_status: str = "active"
     subscription_expires: Optional[datetime] = None

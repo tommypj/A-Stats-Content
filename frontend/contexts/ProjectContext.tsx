@@ -37,8 +37,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check if user is in personal workspace (no project selected)
-  const isPersonalWorkspace = currentProject === null;
+  // Check if user is in personal workspace (no project selected or personal project)
+  const isPersonalWorkspace = currentProject === null || currentProject?.is_personal === true;
 
   // Permission helpers
   const canEdit = isPersonalWorkspace || ["owner", "admin", "member"].includes(currentProject?.my_role || "");

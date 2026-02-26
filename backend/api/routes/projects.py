@@ -216,6 +216,7 @@ async def list_projects(
             "avatar_url": project.avatar_url,
             "logo_url": project.avatar_url,
             "owner_id": project.owner_id,
+            "is_personal": getattr(project, 'is_personal', False),
             "subscription_tier": project.subscription_tier,
             "subscription_status": project.subscription_status,
             "member_count": member_count,
@@ -300,7 +301,7 @@ async def get_current_project(
 
     return CurrentProjectResponse(
         project=response,
-        is_personal_workspace=False,
+        is_personal_workspace=getattr(project, 'is_personal', False),
     )
 
 
@@ -390,12 +391,23 @@ async def switch_project_by_body(
     Accepts project_id in the request body. Pass null to switch to personal workspace.
     """
     if request.project_id is None:
-        # Switch to personal workspace
-        current_user.current_project_id = None
+        # Switch to personal workspace — find the user's personal project
+        personal_result = await db.execute(
+            select(Project).where(
+                Project.owner_id == current_user.id,
+                Project.is_personal == True,
+                Project.deleted_at.is_(None),
+            )
+        )
+        personal_project = personal_result.scalar_one_or_none()
+        if personal_project:
+            current_user.current_project_id = personal_project.id
+        else:
+            current_user.current_project_id = None
         await db.commit()
         return SwitchProjectResponse(
             message="Switched to personal workspace",
-            current_project_id=None,
+            current_project_id=current_user.current_project_id,
         )
 
     # Verify membership before switching
@@ -549,6 +561,13 @@ async def delete_project(
 
     # Get project
     project = await get_project_by_id(project_id, db)
+
+    # Guard: cannot delete personal workspace
+    if getattr(project, 'is_personal', False):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete personal workspace",
+        )
 
     # Soft delete project
     project.deleted_at = datetime.now(timezone.utc)

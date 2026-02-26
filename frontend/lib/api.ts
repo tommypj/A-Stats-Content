@@ -1028,6 +1028,9 @@ export const api = {
     },
     getCurrent: async (): Promise<Project | null> => {
       const response = await cachedGet<{ project: Project | null; is_personal_workspace: boolean }>("/projects/current", 30_000);
+      if (response.project) {
+        response.project.is_personal = response.is_personal_workspace || response.project.is_personal;
+      }
       return response.project;
     },
     uploadLogo: (projectId: string, file: File) => {
@@ -2155,6 +2158,7 @@ export interface Project {
   slug: string;
   description?: string;
   logo_url?: string;
+  is_personal?: boolean;
   subscription_tier: ProjectSubscriptionTier;
   my_role: ProjectRole;
   member_count: number;

@@ -136,10 +136,47 @@ async def get_current_user(
             )
         )
         if not membership.scalar_one_or_none():
-            user.current_project_id = None
+            # Reset to personal project instead of NULL
+            personal = await db.execute(
+                select(Project.id).where(
+                    Project.owner_id == user.id,
+                    Project.is_personal == True,
+                    Project.deleted_at.is_(None),
+                )
+            )
+            user.current_project_id = personal.scalar_one_or_none()
             await db.commit()
 
     return user
+
+
+async def create_personal_project(db: AsyncSession, user: User) -> Project:
+    """Create a personal workspace project for a user."""
+    from infrastructure.database.models.project import ProjectMemberRole
+
+    project = Project(
+        name="Personal Workspace",
+        slug=f"personal-{str(user.id)[:8]}",
+        owner_id=user.id,
+        is_personal=True,
+        subscription_tier=user.subscription_tier or "free",
+        subscription_status=user.subscription_status or "active",
+        max_members=1,
+    )
+    db.add(project)
+    await db.flush()
+
+    member = ProjectMember(
+        project_id=project.id,
+        user_id=user.id,
+        role=ProjectMemberRole.OWNER.value,
+    )
+    db.add(member)
+
+    user.current_project_id = project.id
+    await db.flush()
+
+    return project
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -172,6 +209,11 @@ async def register(
     )
 
     db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    # Create personal workspace project
+    await create_personal_project(db, user)
     await db.commit()
     await db.refresh(user)
 

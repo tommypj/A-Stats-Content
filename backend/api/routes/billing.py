@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from infrastructure.database.connection import get_db
 from infrastructure.database.models.user import User, SubscriptionTier
+from infrastructure.database.models.project import Project
 from infrastructure.config.settings import settings
 from api.schemas.billing import (
     PlanInfo,
@@ -598,6 +599,19 @@ async def handle_webhook(
 
         else:
             logger.warning(f"Unknown webhook event type: {event_name}")
+
+        # Sync subscription tier to user's personal project
+        personal_project_result = await db.execute(
+            select(Project).where(
+                Project.owner_id == user.id,
+                Project.is_personal == True,
+            )
+        )
+        personal_project = personal_project_result.scalar_one_or_none()
+        if personal_project:
+            personal_project.subscription_tier = user.subscription_tier
+            if user.subscription_expires is not None:
+                personal_project.subscription_expires = user.subscription_expires
 
         # Commit changes
         await db.commit()

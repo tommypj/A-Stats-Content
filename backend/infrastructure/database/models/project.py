@@ -52,6 +52,7 @@ class Project(Base, TimestampMixin):
     )
     avatar_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_personal: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Owner (creator of the project)
     owner_id: Mapped[str] = mapped_column(
