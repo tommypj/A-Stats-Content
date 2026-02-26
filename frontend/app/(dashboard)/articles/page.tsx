@@ -527,7 +527,7 @@ export default function ArticlesPage() {
                   isChecked && "ring-2 ring-primary-400 bg-primary-50/30"
                 )}
               >
-                <div className="flex items-start gap-4">
+                <div className="flex items-start gap-3 sm:gap-4 min-w-0">
                   {/* Checkbox */}
                   {!isViewer && (
                     <div className="flex-shrink-0 pt-0.5">
@@ -541,7 +541,7 @@ export default function ArticlesPage() {
                   )}
 
                   {/* Status & SEO Score */}
-                  <div className="flex flex-col items-center gap-2 w-16">
+                  <div className="hidden sm:flex flex-col items-center gap-2 w-16">
                     <span className={clsx("w-full text-center px-2 py-1 rounded-lg text-xs font-medium", status.color)}>
                       {status.label}
                     </span>

@@ -654,7 +654,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Page content */}
-        <main id="main-content" className="p-4 lg:p-8">{children}</main>
+        <main id="main-content" className="p-4 lg:p-8 overflow-x-hidden">{children}</main>
       </div>
 
       {/* Global keyboard shortcuts dialog */}

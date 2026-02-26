@@ -486,9 +486,9 @@ export default function ContentCalendarPage() {
 
         {/* Grid */}
         {!loading && (
-          <>
+          <div className="overflow-x-auto">
             {/* Weekday header row */}
-            <div className="grid grid-cols-7 border-b border-surface-tertiary">
+            <div className="grid grid-cols-7 border-b border-surface-tertiary min-w-[500px]">
               {WEEKDAY_LABELS.map((label, i) => (
                 <div
                   key={label}
@@ -503,7 +503,7 @@ export default function ContentCalendarPage() {
             </div>
 
             {/* Day cells */}
-            <div className="grid grid-cols-7">
+            <div className="grid grid-cols-7 min-w-[500px]">
               {gridCells.map((day, cellIdx) => {
                 const colIdx = cellIdx % 7;
                 const key = day !== null ? toLocalDateKey(new Date(year, month, day)) : `empty-${cellIdx}`;
@@ -563,7 +563,7 @@ export default function ContentCalendarPage() {
                 );
               })}
             </div>
-          </>
+          </div>
         )}
       </div>
 

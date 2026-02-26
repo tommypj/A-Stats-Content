@@ -908,7 +908,7 @@ export default function ArticleEditorPage() {
   const seo = article.seo_analysis;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0">
       <ConfirmDialog
         isOpen={!!confirmAction}
         onClose={() => setConfirmAction(null)}
@@ -1048,9 +1048,9 @@ export default function ArticleEditorPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-3 min-w-0">
         {/* Main Editor */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-4 min-w-0">
           <Card className="p-4 space-y-4">
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-1.5">
@@ -1098,7 +1098,7 @@ export default function ArticleEditorPage() {
             {viewMode === "edit" ? (
               <div>
                 {/* Markdown toolbar */}
-                <div className="flex items-center gap-1 p-2 bg-surface-secondary rounded-t-xl border border-surface-tertiary border-b-0">
+                <div className="flex flex-wrap items-center gap-1 p-2 bg-surface-secondary rounded-t-xl border border-surface-tertiary border-b-0">
                   {/* Inline formatting group */}
                   <button
                     type="button"
@@ -1211,7 +1211,7 @@ export default function ArticleEditorPage() {
                 />
               </div>
             ) : (
-              <div className="prose prose-lg max-w-none min-h-[500px] px-4 py-3">
+              <div className="prose prose-lg max-w-none min-h-[500px] px-4 py-3 overflow-x-auto break-words">
                 {content ? (
                   <div dangerouslySetInnerHTML={{
                     __html: DOMPurify.sanitize(

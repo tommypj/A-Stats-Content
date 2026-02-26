@@ -337,7 +337,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-8 animate-in">
+    <div className="space-y-8 animate-in min-w-0">
       {/* Page header */}
       <div>
         <h1 className="text-2xl font-display font-bold text-text-primary">
@@ -413,9 +413,9 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent activity */}
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className="grid lg:grid-cols-2 gap-6 min-w-0">
         {/* Recent outlines */}
-        <div className="card">
+        <div className="card overflow-hidden">
           <div className="flex items-center justify-between p-5 border-b border-surface-tertiary">
             <h2 className="font-display font-semibold text-text-primary">
               Recent Outlines
@@ -472,7 +472,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Recent articles */}
-        <div className="card">
+        <div className="card overflow-hidden">
           <div className="flex items-center justify-between p-5 border-b border-surface-tertiary">
             <h2 className="font-display font-semibold text-text-primary">
               Recent Articles
@@ -516,8 +516,8 @@ export default function DashboardPage() {
                         <p className="text-sm font-medium text-text-primary truncate">
                           {article.title}
                         </p>
-                        <div className="flex items-center gap-2 text-xs text-text-muted">
-                          <span>{article.keyword}</span>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-text-muted">
+                          <span className="truncate max-w-[120px]">{article.keyword}</span>
                           {article.seo_score !== undefined && (
                             <>
                               <span>·</span>
@@ -527,7 +527,7 @@ export default function DashboardPage() {
                             </>
                           )}
                           <span>·</span>
-                          <span>{new Date(article.created_at).toLocaleDateString()}</span>
+                          <span className="whitespace-nowrap">{new Date(article.created_at).toLocaleDateString()}</span>
                         </div>
                       </div>
                       {article.word_count > 0 && (

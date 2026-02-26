@@ -212,7 +212,7 @@ export function CalendarView({
       }
 
       rows.push(
-        <div key={day.toString()} className="grid grid-cols-7 gap-0">
+        <div key={day.toString()} className="grid grid-cols-7 gap-0 min-w-[500px]">
           {days}
         </div>
       );
@@ -220,9 +220,9 @@ export function CalendarView({
     }
 
     return (
-      <div className="space-y-0">
+      <div className="overflow-x-auto">
         {/* Week day headers */}
-        <div className="grid grid-cols-7 gap-0 border-b border-surface-tertiary">
+        <div className="grid grid-cols-7 gap-0 border-b border-surface-tertiary min-w-[500px]">
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
             <div
               key={day}
@@ -300,7 +300,7 @@ export function CalendarView({
       );
     }
 
-    return <div className="flex gap-0 border-l border-surface-tertiary">{days}</div>;
+    return <div className="flex gap-0 border-l border-surface-tertiary overflow-x-auto min-w-0">{days}</div>;
   };
 
   const renderDayView = () => {
