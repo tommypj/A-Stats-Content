@@ -1051,7 +1051,7 @@ export default function ArticleEditorPage() {
       <div className="grid gap-6 lg:grid-cols-3 min-w-0">
         {/* Main Editor */}
         <div className="lg:col-span-2 space-y-4 min-w-0">
-          <Card className="p-4 space-y-4">
+          <Card className="p-4 space-y-4 overflow-hidden">
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-1.5">
                 Title
@@ -1094,7 +1094,7 @@ export default function ArticleEditorPage() {
             </div>
           </Card>
 
-          <Card className="p-4">
+          <Card className="p-4 overflow-hidden">
             {viewMode === "edit" ? (
               <div>
                 {/* Markdown toolbar */}
@@ -1261,7 +1261,7 @@ export default function ArticleEditorPage() {
         </div>
 
         {/* SEO Sidebar */}
-        <div className="space-y-4">
+        <div className="space-y-4 min-w-0">
           {/* Word Count Widget */}
           <WordCountWidget
             content={content}
@@ -1382,7 +1382,7 @@ export default function ArticleEditorPage() {
                 {seo.suggestions.map((suggestion) => (
                   <li key={suggestion} className="flex items-start gap-2 text-sm text-text-secondary">
                     <AlertCircle className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
-                    {suggestion}
+                    <span className="break-words min-w-0">{suggestion}</span>
                   </li>
                 ))}
               </ul>

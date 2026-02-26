@@ -1902,17 +1902,37 @@ export interface SocialAnalytics {
 
 // Admin types
 export interface AdminDashboardStats {
-  total_users: number;
-  users_trend: TrendData;
-  total_articles: number;
-  articles_trend: TrendData;
-  total_revenue: number;
-  revenue_trend: TrendData;
-  active_subscriptions: number;
-  subscriptions_trend: TrendData;
-  new_users_7d: Array<{ date: string; count: number }>;
-  subscription_distribution: Array<{ tier: string; count: number; percentage: number }>;
-  recent_activity: AdminAuditLog[];
+  users: {
+    total_users: number;
+    new_users_this_week: number;
+    new_users_this_month: number;
+    active_users_this_week: number;
+    verified_users: number;
+    pending_users: number;
+  };
+  content: {
+    total_articles: number;
+    total_outlines: number;
+    total_images: number;
+    articles_this_month: number;
+    outlines_this_month: number;
+    images_this_month: number;
+  };
+  subscriptions: {
+    free_tier: number;
+    starter_tier: number;
+    professional_tier: number;
+    enterprise_tier: number;
+    active_subscriptions: number;
+    cancelled_subscriptions: number;
+  };
+  revenue: {
+    monthly_recurring_revenue: number;
+    annual_recurring_revenue: number;
+    revenue_this_month: number;
+  };
+  platform_usage_7d: Array<{ date: string; value: number }>;
+  platform_usage_30d: Array<{ date: string; value: number }>;
 }
 
 export interface AdminUserQueryParams {
