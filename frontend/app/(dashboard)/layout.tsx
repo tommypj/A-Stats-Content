@@ -276,7 +276,16 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const { currentProject } = useProject();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set(["Social", "Analytics", "Projects"]));
+  const [expandedMenus, setExpandedMenus] = useState<Set<string>>(() => {
+    // Only auto-expand the submenu that contains the current active page
+    const initial = new Set<string>();
+    for (const item of navigation) {
+      if ("submenu" in item && item.submenu?.some((sub) => pathname.startsWith(sub.href))) {
+        initial.add(item.name);
+      }
+    }
+    return initial;
+  });
   const [user, setUser] = useState<UserResponse | null>(null);
   const [showShortcutsDialog, setShowShortcutsDialog] = useState(false);
 
@@ -376,7 +385,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto scrollbar-sidebar">
             {navigation.map((item) => {
               // Item with submenu
               if ("submenu" in item) {
