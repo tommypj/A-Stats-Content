@@ -165,7 +165,7 @@ function DayPanel({ date, items, onClose }: DayPanelProps) {
       />
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 bottom-0 z-40 w-80 bg-white shadow-2xl border-l border-surface-tertiary flex flex-col">
+      <div className="fixed right-0 top-0 bottom-0 z-40 w-full max-w-80 sm:w-80 bg-white shadow-2xl border-l border-surface-tertiary flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-surface-tertiary">
           <div>
@@ -413,10 +413,10 @@ export default function ContentCalendarPage() {
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       {/* Page header */}
       <div className="mb-6">
-        <div className="flex items-center justify-between mb-1">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-1">
           <div>
-            <h1 className="text-3xl font-bold flex items-center gap-3">
-              <Calendar className="h-8 w-8 text-primary-500" />
+            <h1 className="font-bold flex items-center gap-3">
+              <Calendar className="h-6 w-6 sm:h-8 sm:w-8 text-primary-500" />
               Content Calendar
             </h1>
             <p className="text-text-secondary mt-1">
@@ -521,7 +521,7 @@ export default function ContentCalendarPage() {
                     key={`${cellIdx}-${day}`}
                     onClick={() => day !== null && handleDayClick(day)}
                     className={cn(
-                      "min-h-[110px] p-1.5 border-b border-r border-surface-tertiary flex flex-col gap-1",
+                      "min-h-[80px] md:min-h-[110px] p-1 md:p-1.5 border-b border-r border-surface-tertiary flex flex-col gap-1",
                       isLastRow && "border-b-0",
                       isLastCol && "border-r-0",
                       today_ && "bg-primary-50 border-primary-200",

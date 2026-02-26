@@ -104,7 +104,7 @@ const Dialog = forwardRef<HTMLDivElement, DialogProps>(
                 variant="ghost"
                 size="icon"
                 onClick={onClose}
-                className="ml-4 -mr-2 -mt-2"
+                className="ml-4 -mr-2 -mt-2 min-h-[44px] min-w-[44px]"
                 aria-label="Close dialog"
               >
                 <X className="h-5 w-5" />

@@ -101,7 +101,7 @@ export function CalendarView({
           <div
             key={currentDay.toString()}
             className={cn(
-              "group min-h-[120px] border border-surface-tertiary p-2 cursor-pointer transition-colors",
+              "group min-h-[80px] md:min-h-[120px] border border-surface-tertiary p-1.5 md:p-2 cursor-pointer transition-colors",
               !isCurrentMonth && "bg-surface-secondary/50 text-text-secondary",
               isToday && "ring-2 ring-primary-500 ring-inset",
               "hover:bg-surface-secondary"
@@ -251,7 +251,7 @@ export function CalendarView({
         <div
           key={day.toString()}
           className={cn(
-            "flex-1 border-r border-surface-tertiary p-3 min-h-[400px]",
+            "flex-1 border-r border-surface-tertiary p-2 md:p-3 min-h-[200px] md:min-h-[400px]",
             isToday && "bg-primary-50"
           )}
         >

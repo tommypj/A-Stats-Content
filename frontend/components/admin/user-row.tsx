@@ -30,7 +30,7 @@ export function UserRow({
 
   return (
     <tr className="border-b border-surface-tertiary hover:bg-surface-secondary transition-colors">
-      <td className="p-4">
+      <td className="p-2 sm:p-3 md:p-4">
         <input
           type="checkbox"
           checked={isSelected}
@@ -38,46 +38,47 @@ export function UserRow({
           className="h-4 w-4 rounded border-surface-tertiary text-primary-500 focus:ring-primary-500"
         />
       </td>
-      <td className="p-4">
+      <td className="p-2 sm:p-3 md:p-4">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-semibold">
+          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-semibold flex-shrink-0">
             {user.name.charAt(0).toUpperCase()}
           </div>
-          <div>
-            <div className="font-medium text-text-primary">{user.name}</div>
-            <div className="text-sm text-text-muted">{user.email}</div>
+          <div className="min-w-0">
+            <div className="font-medium text-text-primary truncate">{user.name}</div>
+            <div className="text-sm text-text-muted truncate">{user.email}</div>
           </div>
         </div>
       </td>
-      <td className="p-4">
+      <td className="p-2 sm:p-3 md:p-4 hidden md:table-cell">
         <RoleBadge role={user.role} />
       </td>
-      <td className="p-4">
+      <td className="p-2 sm:p-3 md:p-4 hidden lg:table-cell">
         <SubscriptionBadge
           tier={user.subscription_tier}
           status={user.subscription_status}
         />
       </td>
-      <td className="p-4 text-sm text-text-secondary">
+      <td className="p-2 sm:p-3 md:p-4 text-sm text-text-secondary hidden lg:table-cell">
         {formatDistanceToNow(new Date(user.created_at), { addSuffix: true })}
       </td>
-      <td className="p-4">
+      <td className="p-2 sm:p-3 md:p-4">
         {user.is_suspended ? (
           <Badge variant="danger">Suspended</Badge>
         ) : (
           <Badge variant="success">Active</Badge>
         )}
       </td>
-      <td className="p-4">
-        <div className="flex items-center gap-2">
+      <td className="p-2 sm:p-3 md:p-4">
+        <div className="flex items-center gap-1">
           <Button
             size="sm"
             variant="ghost"
             onClick={() => router.push(`/admin/users/${user.id}`)}
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center"
           >
             <Eye className="h-4 w-4" />
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => onEdit(user)}>
+          <Button size="sm" variant="ghost" onClick={() => onEdit(user)} className="min-h-[44px] min-w-[44px] flex items-center justify-center">
             <Edit className="h-4 w-4" />
           </Button>
           {user.is_suspended ? (
@@ -85,11 +86,12 @@ export function UserRow({
               size="sm"
               variant="ghost"
               onClick={() => onUnsuspend(user)}
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center"
             >
               <CheckCircle className="h-4 w-4 text-green-500" />
             </Button>
           ) : (
-            <Button size="sm" variant="ghost" onClick={() => onSuspend(user)}>
+            <Button size="sm" variant="ghost" onClick={() => onSuspend(user)} className="min-h-[44px] min-w-[44px] flex items-center justify-center">
               <Ban className="h-4 w-4 text-red-500" />
             </Button>
           )}

@@ -39,7 +39,7 @@ export function LanguageSwitcher() {
             className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl border border-surface-tertiary shadow-lg z-50 py-1">
+          <div className="absolute right-0 mt-2 w-48 max-w-[calc(100vw-1rem)] bg-white rounded-xl border border-surface-tertiary shadow-lg z-50 py-1">
             {locales.map((locale) => {
               const isSelected = locale === currentLocale;
 

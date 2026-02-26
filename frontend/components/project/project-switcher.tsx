@@ -36,7 +36,7 @@ export function ProjectSwitcher() {
           "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
           "hover:bg-surface-secondary",
           "border border-surface-tertiary",
-          "min-w-[200px]",
+          "min-w-0 sm:min-w-[200px]",
           isLoading && "opacity-50 cursor-not-allowed"
         )}
       >
@@ -70,7 +70,7 @@ export function ProjectSwitcher() {
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 mt-2 w-64 max-w-[calc(100vw-2rem)] bg-white rounded-xl border border-surface-tertiary shadow-lg z-50 max-h-[60vh] overflow-y-auto">
+          <div className="absolute left-0 mt-2 w-[calc(100vw-2rem)] sm:w-64 max-w-[calc(100vw-2rem)] bg-white rounded-xl border border-surface-tertiary shadow-lg z-50 max-h-[60vh] overflow-y-auto">
             <div className="p-2">
               {/* Personal Workspace */}
               <button

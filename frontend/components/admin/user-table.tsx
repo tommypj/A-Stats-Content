@@ -28,9 +28,9 @@ export function UserTable({
   return (
     <div className="overflow-x-auto">
       <table className="w-full">
-        <thead className="bg-surface-secondary">
+        <thead className="bg-surface-secondary sticky top-0 z-10">
           <tr className="border-b border-surface-tertiary">
-            <th className="p-4 text-left">
+            <th className="p-2 sm:p-3 md:p-4 text-left">
               <input
                 type="checkbox"
                 checked={allSelected}
@@ -41,22 +41,22 @@ export function UserTable({
                 className="h-4 w-4 rounded border-surface-tertiary text-primary-500 focus:ring-primary-500"
               />
             </th>
-            <th className="p-4 text-left text-sm font-semibold text-text-primary">
+            <th className="p-2 sm:p-3 md:p-4 text-left text-sm font-semibold text-text-primary">
               User
             </th>
-            <th className="p-4 text-left text-sm font-semibold text-text-primary">
+            <th className="p-2 sm:p-3 md:p-4 text-left text-sm font-semibold text-text-primary hidden md:table-cell">
               Role
             </th>
-            <th className="p-4 text-left text-sm font-semibold text-text-primary">
+            <th className="p-2 sm:p-3 md:p-4 text-left text-sm font-semibold text-text-primary hidden lg:table-cell">
               Subscription
             </th>
-            <th className="p-4 text-left text-sm font-semibold text-text-primary">
+            <th className="p-2 sm:p-3 md:p-4 text-left text-sm font-semibold text-text-primary hidden lg:table-cell">
               Created
             </th>
-            <th className="p-4 text-left text-sm font-semibold text-text-primary">
+            <th className="p-2 sm:p-3 md:p-4 text-left text-sm font-semibold text-text-primary">
               Status
             </th>
-            <th className="p-4 text-left text-sm font-semibold text-text-primary">
+            <th className="p-2 sm:p-3 md:p-4 text-left text-sm font-semibold text-text-primary">
               Actions
             </th>
           </tr>

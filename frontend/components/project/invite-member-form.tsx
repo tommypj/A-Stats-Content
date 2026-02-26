@@ -63,7 +63,7 @@ export function InviteMemberForm({ onInvite }: InviteMemberFormProps) {
           <label className="block text-sm font-medium text-text-secondary mb-3">
             Role
           </label>
-          <div className="space-y-2">
+          <div className="space-y-2 sm:space-y-3">
             {roleOptions.map((option) => {
               const Icon = option.icon;
               return (

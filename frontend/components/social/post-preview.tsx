@@ -39,7 +39,7 @@ export function PostPreview({
   };
 
   const renderTwitterPreview = () => (
-    <div className="border border-surface-tertiary rounded-xl overflow-hidden">
+    <div className="border border-surface-tertiary rounded-xl overflow-hidden max-w-md">
       {/* Header */}
       <div className="p-4 flex items-start gap-3">
         <div className="h-12 w-12 rounded-full bg-surface-tertiary flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -129,7 +129,7 @@ export function PostPreview({
       {/* Media */}
       {mediaUrls.length > 0 && (
         <div className="mt-3">
-          <img src={mediaUrls[0]} alt="Post media" className="w-full object-cover max-h-96" />
+          <img src={mediaUrls[0]} alt="Post media" className="w-full object-cover max-h-64 sm:max-h-96" />
         </div>
       )}
 
@@ -180,7 +180,7 @@ export function PostPreview({
       {/* Media */}
       {mediaUrls.length > 0 && (
         <div>
-          <img src={mediaUrls[0]} alt="Post media" className="w-full object-cover max-h-96" />
+          <img src={mediaUrls[0]} alt="Post media" className="w-full object-cover max-h-64 sm:max-h-96" />
         </div>
       )}
 

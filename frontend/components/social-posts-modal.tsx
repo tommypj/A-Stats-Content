@@ -217,7 +217,7 @@ export default function SocialPostsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-surface rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-full sm:max-w-lg md:max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-surface border-b border-surface-tertiary p-6 flex items-start justify-between z-10">
           <div className="flex-1">

@@ -87,11 +87,11 @@ export function ProjectMembersList({ members, myRole, onUpdateRole, onRemove }: 
           return (
             <div
               key={member.id}
-              className="flex items-center justify-between p-4 rounded-xl border border-surface-tertiary hover:border-primary-200 transition-colors"
+              className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-4 rounded-xl border border-surface-tertiary hover:border-primary-200 transition-colors"
             >
-              <div className="flex items-center gap-4 flex-1">
+              <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
                 {/* Avatar */}
-                <div className="h-12 w-12 rounded-full bg-primary-100 flex items-center justify-center">
+                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
                   {member.avatar_url ? (
                     <img
                       src={member.avatar_url}
@@ -99,57 +99,57 @@ export function ProjectMembersList({ members, myRole, onUpdateRole, onRemove }: 
                       className="h-full w-full rounded-full object-cover"
                     />
                   ) : (
-                    <span className="text-lg font-medium text-primary-600">
+                    <span className="text-base sm:text-lg font-medium text-primary-600">
                       {member.name.charAt(0).toUpperCase()}
                     </span>
                   )}
                 </div>
 
                 {/* Info */}
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="font-medium text-text-primary">{member.name}</p>
-                    {isOwner && <Crown className="h-4 w-4 text-yellow-500" />}
+                    <p className="font-medium text-text-primary truncate">{member.name}</p>
+                    {isOwner && <Crown className="h-4 w-4 text-yellow-500 flex-shrink-0" />}
                   </div>
-                  <p className="text-sm text-text-muted">{member.email}</p>
+                  <p className="text-sm text-text-muted truncate">{member.email}</p>
                   <p className="text-xs text-text-muted mt-1">
                     Joined {format(new Date(member.joined_at), "MMM d, yyyy")}
                   </p>
                 </div>
+              </div>
 
-                {/* Role Badge & Selector */}
-                <div className="flex items-center gap-3">
-                  {canEdit ? (
-                    <select
-                      value={member.role}
-                      onChange={(e) => handleRoleChange(member.user_id, e.target.value as ProjectRole)}
-                      disabled={loadingMember === member.user_id}
-                      className="px-3 py-1.5 rounded-lg border border-surface-tertiary bg-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    >
-                      <option value="admin">Admin</option>
-                      <option value="member">Member</option>
-                      <option value="viewer">Viewer</option>
-                    </select>
-                  ) : (
-                    <Badge className={roleColors[member.role]}>
-                      <RoleIcon className="h-3 w-3 mr-1" />
-                      {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
-                    </Badge>
-                  )}
+              {/* Role Badge & Selector */}
+              <div className="flex items-center gap-3 pl-13 sm:pl-0">
+                {canEdit ? (
+                  <select
+                    value={member.role}
+                    onChange={(e) => handleRoleChange(member.user_id, e.target.value as ProjectRole)}
+                    disabled={loadingMember === member.user_id}
+                    className="px-3 py-1.5 rounded-lg border border-surface-tertiary bg-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="admin">Admin</option>
+                    <option value="member">Member</option>
+                    <option value="viewer">Viewer</option>
+                  </select>
+                ) : (
+                  <Badge className={roleColors[member.role]}>
+                    <RoleIcon className="h-3 w-3 mr-1" />
+                    {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+                  </Badge>
+                )}
 
-                  {/* Remove Button */}
-                  {canEdit && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleRemove(member.user_id, member.name)}
-                      disabled={loadingMember === member.user_id}
-                      className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
+                {/* Remove Button */}
+                {canEdit && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleRemove(member.user_id, member.name)}
+                    disabled={loadingMember === member.user_id}
+                    className="text-red-500 hover:text-red-600 hover:bg-red-50 min-h-[44px] min-w-[44px]"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </div>
           );

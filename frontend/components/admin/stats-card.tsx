@@ -26,12 +26,12 @@ export function StatsCard({
     return (
       <Card>
         <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
               <div className="h-4 bg-surface-tertiary rounded w-24 mb-2 animate-pulse" />
-              <div className="h-8 bg-surface-tertiary rounded w-32 animate-pulse" />
+              <div className="h-7 sm:h-8 bg-surface-tertiary rounded w-32 animate-pulse" />
             </div>
-            <div className={cn("h-12 w-12 rounded-lg bg-surface-tertiary animate-pulse")} />
+            <div className={cn("h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-surface-tertiary animate-pulse flex-shrink-0")} />
           </div>
         </CardContent>
       </Card>
@@ -41,10 +41,10 @@ export function StatsCard({
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex-1">
-            <p className="text-sm font-medium text-text-secondary">{title}</p>
-            <h3 className="text-3xl font-bold text-text-primary mt-1">{value}</h3>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-text-secondary truncate">{title}</p>
+            <h3 className="text-2xl sm:text-3xl font-bold text-text-primary mt-1">{value}</h3>
             {trend && (
               <div className="flex items-center gap-1 mt-2">
                 {trend.trend === "up" && (
@@ -73,11 +73,11 @@ export function StatsCard({
           </div>
           <div
             className={cn(
-              "h-12 w-12 rounded-lg flex items-center justify-center",
+              "h-10 w-10 sm:h-12 sm:w-12 rounded-lg flex items-center justify-center flex-shrink-0",
               colorClass
             )}
           >
-            <Icon className="h-6 w-6 text-white" />
+            <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
           </div>
         </div>
       </CardContent>
