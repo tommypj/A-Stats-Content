@@ -37,7 +37,7 @@ def upgrade() -> None:
                               images_generated_this_month, usage_reset_date,
                               max_members, created_at, updated_at)
         SELECT
-            gen_random_uuid()::text,
+            gen_random_uuid(),
             'Personal Workspace',
             'personal-' || LEFT(u.id::text, 8),
             u.id,
@@ -64,7 +64,7 @@ def upgrade() -> None:
     op.execute("""
         INSERT INTO project_members (id, project_id, user_id, role, joined_at, created_at, updated_at)
         SELECT
-            gen_random_uuid()::text,
+            gen_random_uuid(),
             p.id,
             p.owner_id,
             'owner',
