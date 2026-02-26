@@ -36,8 +36,9 @@ import {
   XCircle,
   TrendingUp,
   Download,
+  Zap,
 } from "lucide-react";
-import { api, Article, ArticleRevision, ArticleRevisionDetail, LinkSuggestion } from "@/lib/api";
+import { api, Article, ArticleRevision, ArticleRevisionDetail, LinkSuggestion, AEOScore } from "@/lib/api";
 import { calculateSEOScore, SEOScore } from "@/lib/seo-score";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { Button } from "@/components/ui/button";
@@ -497,6 +498,10 @@ export default function ArticleEditorPage() {
   // Export dropdown state
   const [showExportMenu, setShowExportMenu] = useState(false);
 
+  // AEO score state
+  const [aeoScore, setAeoScore] = useState<AEOScore | null>(null);
+  const [aeoLoading, setAeoLoading] = useState(false);
+
   // Confirmation dialog state
   const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string; confirmLabel?: string; variant?: "danger" | "warning" | "default" } | null>(null);
 
@@ -579,6 +584,10 @@ export default function ArticleEditorPage() {
     loadArticle();
     checkWordPressConnection();
   }, [loadArticle, checkWordPressConnection]);
+
+  useEffect(() => {
+    if (params.id) handleLoadAeo();
+  }, [params.id]);
 
   async function handleSave() {
     if (!article) return;
@@ -885,6 +894,33 @@ export default function ArticleEditorPage() {
       toast.error("Failed to export article");
     }
   }
+
+  const handleLoadAeo = async () => {
+    if (!params.id) return;
+    try {
+      setAeoLoading(true);
+      const data = await api.articles.getAeoScore(params.id as string);
+      setAeoScore(data);
+    } catch {
+      // Silent — AEO is optional
+    } finally {
+      setAeoLoading(false);
+    }
+  };
+
+  const handleRefreshAeo = async () => {
+    if (!params.id) return;
+    try {
+      setAeoLoading(true);
+      const data = await api.articles.refreshAeoScore(params.id as string);
+      setAeoScore(data);
+      toast.success("AEO score updated");
+    } catch {
+      toast.error("Failed to refresh AEO score");
+    } finally {
+      setAeoLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -1306,6 +1342,90 @@ export default function ArticleEditorPage() {
               <p className="text-sm text-text-muted text-center py-4">
                 Click refresh to analyze SEO
               </p>
+            )}
+          </Card>
+
+          {/* AEO Score */}
+          <Card className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-medium text-text-primary flex items-center gap-1.5">
+                <Zap className="h-4 w-4 text-purple-500" />
+                AEO Score
+              </h3>
+              <Button variant="ghost" size="sm" onClick={handleRefreshAeo} disabled={aeoLoading}>
+                <RefreshCw className={`h-4 w-4 ${aeoLoading ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
+
+            {aeoScore ? (
+              <div>
+                <div className="text-center mb-3">
+                  <div className={clsx(
+                    "inline-flex items-center justify-center w-20 h-20 rounded-full text-2xl font-bold",
+                    aeoScore.aeo_score >= 80 ? "bg-green-100 text-green-700" :
+                    aeoScore.aeo_score >= 50 ? "bg-yellow-100 text-yellow-700" :
+                    "bg-red-100 text-red-700"
+                  )}>
+                    {aeoScore.aeo_score}
+                  </div>
+                  <p className="text-sm text-text-secondary mt-2">
+                    {aeoScore.aeo_score >= 80 ? "Great AI readability!" :
+                     aeoScore.aeo_score >= 50 ? "Good, can be improved" :
+                     "Needs improvement"}
+                  </p>
+                  {aeoScore.previous_score !== null && aeoScore.previous_score !== undefined && (
+                    <p className="text-xs text-text-muted mt-1">
+                      Previous: {aeoScore.previous_score}
+                    </p>
+                  )}
+                </div>
+
+                {aeoScore.score_breakdown && (
+                  <div className="space-y-2 text-sm">
+                    {Object.entries(aeoScore.score_breakdown).map(([key, value]) => {
+                      const max = key === "entity_score" || key === "citation_readiness" ? 15 : key === "schema_score" ? 10 : 20;
+                      const pct = Math.round((Number(value) / max) * 100);
+                      return (
+                        <div key={key} className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-text-secondary capitalize">{key.replace(/_/g, " ")}</span>
+                            <span className="text-text-primary font-medium">{value}/{max}</span>
+                          </div>
+                          <div className="h-1.5 bg-surface-secondary rounded-full overflow-hidden">
+                            <div
+                              className={clsx(
+                                "h-full rounded-full",
+                                pct >= 70 ? "bg-green-500" : pct >= 40 ? "bg-yellow-500" : "bg-red-500"
+                              )}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {aeoScore.suggestions && aeoScore.suggestions.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-surface-tertiary">
+                    <p className="text-xs font-semibold text-text-secondary mb-2">Suggestions</p>
+                    <ul className="space-y-1.5">
+                      {aeoScore.suggestions.slice(0, 3).map((s, i) => (
+                        <li key={i} className="text-xs text-text-secondary flex items-start gap-1.5">
+                          <span className="text-primary-500 mt-0.5 shrink-0">•</span>
+                          <span className="break-words min-w-0">{typeof s === "string" ? s : s.action || s.description}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-sm text-text-muted">
+                  {aeoLoading ? "Calculating..." : "Click refresh to calculate AEO score"}
+                </p>
+              </div>
             )}
           </Card>
 

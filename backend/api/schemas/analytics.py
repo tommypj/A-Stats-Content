@@ -404,3 +404,62 @@ class RunDecayDetectionResponse(BaseModel):
 
     message: str
     new_alerts: int
+
+
+# ============================================================================
+# AEO (Answer Engine Optimization) Schemas
+# ============================================================================
+
+
+class AEOScoreBreakdown(BaseModel):
+    """Breakdown of AEO score components."""
+
+    structure_score: int = 0
+    faq_score: int = 0
+    entity_score: int = 0
+    conciseness_score: int = 0
+    schema_score: int = 0
+    citation_readiness: int = 0
+
+
+class AEOScoreResponse(BaseModel):
+    """AEO score for a single article."""
+
+    id: str
+    article_id: str
+    aeo_score: int = Field(..., description="0-100 AEO score")
+    score_breakdown: Optional[AEOScoreBreakdown] = None
+    suggestions: Optional[list] = None
+    previous_score: Optional[int] = None
+    scored_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AEOArticleSummary(BaseModel):
+    """Article summary with AEO score for overview lists."""
+
+    article_id: str
+    title: str
+    keyword: str
+    aeo_score: int
+    score_breakdown: Optional[dict] = None
+
+
+class AEOOverviewResponse(BaseModel):
+    """AEO overview for all user articles."""
+
+    total_scored: int = 0
+    average_score: int = 0
+    excellent_count: int = 0
+    good_count: int = 0
+    needs_work_count: int = 0
+    score_distribution: dict = Field(default_factory=dict)
+    top_articles: list[AEOArticleSummary] = Field(default_factory=list)
+    bottom_articles: list[AEOArticleSummary] = Field(default_factory=list)
+
+
+class AEOSuggestionsResponse(BaseModel):
+    """AI-generated AEO improvement suggestions."""
+
+    suggestions: list[dict] = Field(default_factory=list)

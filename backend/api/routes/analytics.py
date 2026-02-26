@@ -43,6 +43,8 @@ from api.schemas.analytics import (
     ContentHealthSummaryResponse,
     DecayRecoverySuggestionsResponse,
     RunDecayDetectionResponse,
+    AEOOverviewResponse,
+    AEOArticleSummary,
 )
 from api.routes.auth import get_current_user
 from api.utils import escape_like
@@ -1658,3 +1660,34 @@ async def mark_all_alerts_read(
     )
     await db.commit()
     return {"message": "All alerts marked as read"}
+
+
+# ============================================================================
+# AEO (Answer Engine Optimization) Endpoints
+# ============================================================================
+
+
+@router.get("/aeo/overview", response_model=AEOOverviewResponse)
+async def get_aeo_overview(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get AEO overview for all user articles."""
+    from services.aeo_scoring import get_aeo_overview as _get_aeo_overview
+
+    data = await _get_aeo_overview(db, current_user.id)
+
+    return AEOOverviewResponse(
+        total_scored=data["total_scored"],
+        average_score=data["average_score"],
+        excellent_count=data["excellent_count"],
+        good_count=data["good_count"],
+        needs_work_count=data["needs_work_count"],
+        score_distribution=data["score_distribution"],
+        top_articles=[
+            AEOArticleSummary(**a) for a in data["top_articles"]
+        ],
+        bottom_articles=[
+            AEOArticleSummary(**a) for a in data["bottom_articles"]
+        ],
+    )

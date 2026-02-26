@@ -1598,3 +1598,93 @@ async def get_link_suggestions(
     # Sort by relevance descending, return top 10
     suggestions.sort(key=lambda x: x["relevance_score"], reverse=True)
     return {"suggestions": suggestions[:10]}
+
+
+# ============================================================================
+# AEO (Answer Engine Optimization) Endpoints
+# ============================================================================
+
+
+@router.get("/{article_id}/aeo-score")
+async def get_aeo_score(
+    article_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get or calculate AEO score for an article."""
+    from services.aeo_scoring import score_and_save
+    from infrastructure.database.models.aeo import AEOScore as AEOScoreModel
+
+    # Check for existing recent score
+    existing_result = await db.execute(
+        select(AEOScoreModel)
+        .where(AEOScoreModel.article_id == article_id)
+        .order_by(AEOScoreModel.scored_at.desc())
+        .limit(1)
+    )
+    existing = existing_result.scalar_one_or_none()
+
+    if existing:
+        return {
+            "id": existing.id,
+            "article_id": existing.article_id,
+            "aeo_score": existing.aeo_score,
+            "score_breakdown": existing.score_breakdown,
+            "suggestions": existing.suggestions,
+            "previous_score": existing.previous_score,
+            "scored_at": existing.scored_at.isoformat(),
+        }
+
+    # No existing score — calculate one
+    score = await score_and_save(db, article_id, current_user.id)
+    if not score:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
+
+    return {
+        "id": score.id,
+        "article_id": score.article_id,
+        "aeo_score": score.aeo_score,
+        "score_breakdown": score.score_breakdown,
+        "suggestions": score.suggestions,
+        "previous_score": score.previous_score,
+        "scored_at": score.scored_at.isoformat(),
+    }
+
+
+@router.post("/{article_id}/aeo-score")
+async def refresh_aeo_score(
+    article_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Recalculate AEO score for an article."""
+    from services.aeo_scoring import score_and_save
+
+    score = await score_and_save(db, article_id, current_user.id)
+    if not score:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
+
+    return {
+        "id": score.id,
+        "article_id": score.article_id,
+        "aeo_score": score.aeo_score,
+        "score_breakdown": score.score_breakdown,
+        "suggestions": score.suggestions,
+        "previous_score": score.previous_score,
+        "scored_at": score.scored_at.isoformat(),
+    }
+
+
+@router.post("/{article_id}/aeo-optimize")
+@limiter.limit("10/minute")
+async def aeo_optimize(
+    request: Request,
+    article_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate AI-powered AEO improvement suggestions for an article."""
+    from services.aeo_scoring import generate_aeo_suggestions
+
+    result = await generate_aeo_suggestions(db, article_id, current_user.id)
+    return result

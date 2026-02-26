@@ -546,6 +546,22 @@ export const api = {
         params: { format },
         responseType: "blob",
       }),
+    // AEO
+    getAeoScore: (articleId: string) =>
+      apiRequest<AEOScore>({
+        url: `/articles/${articleId}/aeo-score`,
+      }),
+    refreshAeoScore: (articleId: string) =>
+      apiRequest<AEOScore>({
+        method: "POST",
+        url: `/articles/${articleId}/aeo-score`,
+      }),
+    aeoOptimize: (articleId: string) =>
+      apiRequest<AEOSuggestionsResponse>({
+        method: "POST",
+        url: `/articles/${articleId}/aeo-optimize`,
+        timeout: 60000,
+      }),
   },
 
   // Images
@@ -730,6 +746,11 @@ export const api = {
       apiRequest<{ message: string }>({
         method: "POST",
         url: "/analytics/decay/alerts/mark-all-read",
+      }),
+    // AEO
+    aeoOverview: () =>
+      apiRequest<AEOOverviewResponse>({
+        url: "/analytics/aeo/overview",
       }),
   },
 
@@ -1821,6 +1842,59 @@ export interface DecayAlertsParams {
   is_resolved?: boolean;
   sort_by?: string;
   sort_order?: "asc" | "desc";
+}
+
+// AEO (Answer Engine Optimization) types
+export interface AEOScoreBreakdown {
+  structure_score: number;
+  faq_score: number;
+  entity_score: number;
+  conciseness_score: number;
+  schema_score: number;
+  citation_readiness: number;
+}
+
+export interface AEOScore {
+  id: string;
+  article_id: string;
+  aeo_score: number;
+  score_breakdown?: AEOScoreBreakdown;
+  suggestions?: Array<{
+    action: string;
+    description: string;
+    category?: string;
+    estimated_impact?: "high" | "medium" | "low";
+  }>;
+  previous_score?: number;
+  scored_at: string;
+}
+
+export interface AEOArticleSummary {
+  article_id: string;
+  title: string;
+  keyword: string;
+  aeo_score: number;
+  score_breakdown?: Record<string, number>;
+}
+
+export interface AEOOverviewResponse {
+  total_scored: number;
+  average_score: number;
+  excellent_count: number;
+  good_count: number;
+  needs_work_count: number;
+  score_distribution: Record<string, number>;
+  top_articles: AEOArticleSummary[];
+  bottom_articles: AEOArticleSummary[];
+}
+
+export interface AEOSuggestionsResponse {
+  suggestions: Array<{
+    action: string;
+    description: string;
+    category?: string;
+    estimated_impact?: "high" | "medium" | "low";
+  }>;
 }
 
 // Billing / LemonSqueezy types

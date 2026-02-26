@@ -71,6 +71,7 @@ const navigation = [
       { name: "Article Performance", href: "/analytics/articles", icon: TrendingUp },
       { name: "Content Opportunities", href: "/analytics/opportunities", icon: Lightbulb },
       { name: "Content Health", href: "/analytics/content-health", icon: Activity },
+      { name: "AEO Scores", href: "/analytics/aeo", icon: Zap },
     ],
   },
   { name: "Knowledge", href: "/knowledge", icon: BookOpen },

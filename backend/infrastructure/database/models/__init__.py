@@ -17,6 +17,7 @@ from .social import (
 from .admin import AdminAuditLog, AuditAction, AuditTargetType
 from .project import Project, ProjectMember, ProjectInvitation, ProjectMemberRole, InvitationStatus
 from .generation import GenerationLog, AdminAlert
+from .aeo import AEOScore, AEOCitation
 
 __all__ = [
     "Base",
@@ -55,4 +56,6 @@ __all__ = [
     "InvitationStatus",
     "GenerationLog",
     "AdminAlert",
+    "AEOScore",
+    "AEOCitation",
 ]
