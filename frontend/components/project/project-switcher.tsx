@@ -33,44 +33,42 @@ export function ProjectSwitcher() {
         aria-expanded={isOpen}
         aria-label="Switch project"
         className={clsx(
-          "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-          "hover:bg-surface-secondary",
-          "border border-surface-tertiary",
-          "min-w-0 sm:min-w-[200px]",
+          "flex w-full items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+          "bg-primary-900/60 hover:bg-primary-800 border border-primary-700/50",
           isLoading && "opacity-50 cursor-not-allowed"
         )}
       >
-        <div className="flex items-center gap-2 flex-1 min-w-0">
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
           {currentProject?.logo_url ? (
             <img
               src={currentProject.logo_url}
               alt={currentProject.name}
-              className="h-5 w-5 rounded object-cover"
+              className="h-6 w-6 rounded object-cover"
             />
           ) : (
             <div
               className={clsx(
-                "h-5 w-5 rounded flex items-center justify-center",
-                isPersonalWorkspace ? "bg-blue-100" : "bg-primary-100"
+                "h-6 w-6 rounded flex items-center justify-center",
+                isPersonalWorkspace ? "bg-primary-700" : "bg-primary-700"
               )}
             >
               <Icon
                 className={clsx(
-                  "h-3 w-3",
-                  isPersonalWorkspace ? "text-blue-600" : "text-primary-600"
+                  "h-3.5 w-3.5",
+                  isPersonalWorkspace ? "text-cream-200" : "text-cream-200"
                 )}
               />
             </div>
           )}
-          <span className="truncate text-text-primary">{displayName}</span>
+          <span className="truncate text-cream-100">{displayName}</span>
         </div>
-        <ChevronDown className={clsx("h-4 w-4 text-text-muted transition-transform", isOpen && "rotate-180")} />
+        <ChevronDown className={clsx("h-4 w-4 text-primary-400 transition-transform", isOpen && "rotate-180")} />
       </button>
 
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 mt-2 w-[calc(100vw-2rem)] sm:w-64 max-w-[calc(100vw-2rem)] bg-white rounded-xl border border-surface-tertiary shadow-lg z-50 max-h-[60vh] overflow-y-auto">
+          <div className="absolute left-0 right-0 mt-2 rounded-xl bg-primary-900/95 backdrop-blur-md border border-primary-700 shadow-lg z-50 max-h-[60vh] overflow-y-auto scrollbar-sidebar">
             <div className="p-2">
               {/* Personal Workspace */}
               <button
@@ -78,22 +76,22 @@ export function ProjectSwitcher() {
                 className={clsx(
                   "flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-[44px]",
                   isPersonalWorkspace
-                    ? "bg-primary-50 text-primary-600"
-                    : "text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
+                    ? "bg-primary-700/60 text-cream-50"
+                    : "text-cream-300 hover:bg-primary-800 hover:text-cream-100"
                 )}
               >
-                <div className="h-8 w-8 rounded bg-blue-100 flex items-center justify-center">
-                  <User className="h-4 w-4 text-blue-600" />
+                <div className="h-8 w-8 rounded bg-primary-700 flex items-center justify-center">
+                  <User className="h-4 w-4 text-cream-200" />
                 </div>
                 <div className="flex-1 text-left">
                   <div className="font-medium">Personal Workspace</div>
-                  <div className="text-xs text-text-muted">Your private workspace</div>
+                  <div className="text-xs text-primary-400">Your private workspace</div>
                 </div>
-                {isPersonalWorkspace && <Check className="h-4 w-4 text-primary-600" />}
+                {isPersonalWorkspace && <Check className="h-4 w-4 text-cream-200" />}
               </button>
 
               {/* Divider */}
-              {projects.filter(p => !p.is_personal).length > 0 && <div className="my-2 border-t border-surface-tertiary" />}
+              {projects.filter(p => !p.is_personal).length > 0 && <div className="my-2 border-t border-primary-700" />}
 
               {/* Projects */}
               {projects.filter(p => !p.is_personal).map((project) => (
@@ -103,48 +101,48 @@ export function ProjectSwitcher() {
                   className={clsx(
                     "flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-[44px]",
                     currentProject?.id === project.id
-                      ? "bg-primary-50 text-primary-600"
-                      : "text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
+                      ? "bg-primary-700/60 text-cream-50"
+                      : "text-cream-300 hover:bg-primary-800 hover:text-cream-100"
                   )}
                 >
                   {project.logo_url ? (
                     <img src={project.logo_url} alt={project.name} className="h-8 w-8 rounded object-cover" />
                   ) : (
-                    <div className="h-8 w-8 rounded bg-primary-100 flex items-center justify-center">
-                      <FolderOpen className="h-4 w-4 text-primary-600" />
+                    <div className="h-8 w-8 rounded bg-primary-700 flex items-center justify-center">
+                      <FolderOpen className="h-4 w-4 text-cream-200" />
                     </div>
                   )}
                   <div className="flex-1 text-left min-w-0">
                     <div className="font-medium truncate">{project.name}</div>
-                    <div className="text-xs text-text-muted">
+                    <div className="text-xs text-primary-400">
                       {project.member_count} {project.member_count === 1 ? "member" : "members"} · {getRoleLabel(project.my_role)}
                     </div>
                   </div>
-                  {currentProject?.id === project.id && <Check className="h-4 w-4 text-primary-600" />}
+                  {currentProject?.id === project.id && <Check className="h-4 w-4 text-cream-200" />}
                 </button>
               ))}
 
               {/* Create Project */}
-              <div className="mt-2 pt-2 border-t border-surface-tertiary">
+              <div className="mt-2 pt-2 border-t border-primary-700">
                 <button
                   onClick={() => {
                     setIsOpen(false);
                     setShowCreateModal(true);
                   }}
-                  className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-text-secondary hover:bg-surface-secondary hover:text-text-primary transition-colors min-h-[44px]"
+                  className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-cream-300 hover:bg-primary-800 hover:text-cream-100 transition-colors min-h-[44px]"
                 >
-                  <div className="h-8 w-8 rounded border-2 border-dashed border-surface-tertiary flex items-center justify-center">
-                    <Plus className="h-4 w-4 text-text-muted" />
+                  <div className="h-8 w-8 rounded border-2 border-dashed border-primary-600 flex items-center justify-center">
+                    <Plus className="h-4 w-4 text-primary-400" />
                   </div>
                   <span className="font-medium">Create Project</span>
                 </button>
               </div>
 
               {/* Keyboard hint */}
-              <div className="mt-2 px-3 py-2 text-xs text-text-muted text-center border-t border-surface-tertiary">
-                <kbd className="px-2 py-1 bg-surface-secondary rounded text-xs font-mono">⌘</kbd>
+              <div className="mt-2 px-3 py-2 text-xs text-primary-400 text-center border-t border-primary-700">
+                <kbd className="px-2 py-1 bg-primary-800 rounded text-xs font-mono text-cream-300">⌘</kbd>
                 {" + "}
-                <kbd className="px-2 py-1 bg-surface-secondary rounded text-xs font-mono">T</kbd>
+                <kbd className="px-2 py-1 bg-primary-800 rounded text-xs font-mono text-cream-300">T</kbd>
                 {" to switch projects"}
               </div>
             </div>
