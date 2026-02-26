@@ -37,6 +37,7 @@ import {
   TrendingUp,
   Download,
   Zap,
+  Bot,
 } from "lucide-react";
 import { api, Article, ArticleRevision, ArticleRevisionDetail, LinkSuggestion, AEOScore } from "@/lib/api";
 import { calculateSEOScore, SEOScore } from "@/lib/seo-score";
@@ -256,6 +257,256 @@ function SerpPreview({ title, slug, metaDescription, keyword }: SerpPreviewProps
             {descOver && <span className="ml-1">— too long</span>}
             {descUnder && <span className="ml-1">— too short</span>}
           </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// AI Answer Preview — shows how content may appear when cited by AI engines
+// ---------------------------------------------------------------------------
+
+interface AiAnswerPreviewProps {
+  title: string;
+  content: string;
+  keyword: string;
+  url?: string;
+}
+
+type AiEngine = "chatgpt" | "perplexity" | "gemini";
+
+function extractAnswerSnippet(content: string): string {
+  if (!content.trim()) return "";
+
+  // Strip markdown formatting: headings, bold, italic, links, code, list markers
+  const stripped = content
+    .replace(/```[\s\S]*?```/g, "")       // fenced code blocks
+    .replace(/`[^`]+`/g, "")              // inline code
+    .replace(/!\[.*?\]\(.*?\)/g, "")      // images
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // links → text
+    .replace(/^#{1,6}\s+/gm, "")          // headings
+    .replace(/[*_]{1,2}([^*_]+)[*_]{1,2}/g, "$1") // bold/italic
+    .replace(/^[-*+]\s+/gm, "")           // unordered list markers
+    .replace(/^\d+\.\s+/gm, "")           // ordered list markers
+    .replace(/^>\s+/gm, "")               // blockquotes
+    .replace(/\n{2,}/g, "\n")             // collapse blank lines
+    .trim();
+
+  const lines = stripped.split("\n").map((l) => l.trim()).filter(Boolean);
+  const originalLines = content.split("\n").map((l) => l.trim());
+
+  // Try to find heading with FAQ/what-is/how-to and use the paragraph right after it
+  for (let i = 0; i < originalLines.length - 1; i++) {
+    const heading = originalLines[i];
+    if (/^#{1,3}\s.*(what is|how to|why|faq|definition)/i.test(heading)) {
+      // Look for the next non-empty, non-heading paragraph
+      for (let j = i + 1; j < originalLines.length; j++) {
+        const candidate = originalLines[j]
+          .replace(/^#{1,6}\s+/, "")
+          .replace(/[*_]{1,2}([^*_]+)[*_]{1,2}/g, "$1")
+          .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+          .trim();
+        if (candidate.length >= 50 && candidate.length <= 300 && !candidate.startsWith("#")) {
+          return candidate.length > 200 ? candidate.slice(0, 197) + "..." : candidate;
+        }
+      }
+    }
+  }
+
+  // Otherwise find the first qualifying paragraph
+  for (const line of lines) {
+    if (
+      line.length >= 50 &&
+      line.length <= 300 &&
+      !line.endsWith("?")
+    ) {
+      return line.length > 200 ? line.slice(0, 197) + "..." : line;
+    }
+  }
+
+  // Fallback: first substantial line, trimmed
+  const fallback = lines.find((l) => l.length >= 20) ?? "";
+  return fallback.length > 200 ? fallback.slice(0, 197) + "..." : fallback;
+}
+
+function calcSnippetQuality(snippet: string, keyword: string): number {
+  if (!snippet) return 0;
+  let score = 0;
+
+  // Has a concise direct answer (not starting with "In this article...")
+  if (!/^in this (article|post|guide)/i.test(snippet)) score += 30;
+
+  // Answer is 50-200 chars
+  if (snippet.length >= 50 && snippet.length <= 200) score += 20;
+  else if (snippet.length > 20) score += 8; // partial credit
+
+  // Contains the keyword
+  if (keyword && snippet.toLowerCase().includes(keyword.toLowerCase())) score += 20;
+
+  // Starts with a factual statement (not a question)
+  if (!snippet.trim().endsWith("?") && /^[A-Z]/.test(snippet.trim())) score += 15;
+
+  // Has structured data hints: numbers, definitions, or lists embedded
+  if (/\d+|:\s|e\.g\.|i\.e\.|such as|including|for example/i.test(snippet)) score += 15;
+
+  return Math.min(score, 100);
+}
+
+function AiAnswerPreview({ title, content, keyword, url }: AiAnswerPreviewProps) {
+  const [activeEngine, setActiveEngine] = useState<AiEngine>("chatgpt");
+
+  const snippet = useMemo(() => extractAnswerSnippet(content), [content]);
+  const qualityScore = useMemo(() => calcSnippetQuality(snippet, keyword), [snippet, keyword]);
+
+  const displayUrl = url
+    ? url.replace(/^https?:\/\//, "").replace(/\/$/, "")
+    : "yoursite.com";
+
+  const engines: { id: AiEngine; label: string }[] = [
+    { id: "chatgpt", label: "ChatGPT" },
+    { id: "perplexity", label: "Perplexity" },
+    { id: "gemini", label: "Gemini" },
+  ];
+
+  const qualityLabel =
+    qualityScore >= 80 ? "Excellent" :
+    qualityScore >= 60 ? "Good" :
+    qualityScore >= 40 ? "Fair" :
+    "Needs work";
+
+  const qualityColor =
+    qualityScore >= 80 ? "bg-green-500" :
+    qualityScore >= 60 ? "bg-yellow-500" :
+    qualityScore >= 40 ? "bg-orange-500" :
+    "bg-red-500";
+
+  const qualityTextColor =
+    qualityScore >= 80 ? "text-green-600" :
+    qualityScore >= 60 ? "text-yellow-600" :
+    qualityScore >= 40 ? "text-orange-600" :
+    "text-red-600";
+
+  const snippetText = snippet || "Add content to your article to see an AI answer preview.";
+  const hasSnippet = snippet.length > 0;
+
+  return (
+    <div className="bg-white rounded-xl border border-surface-tertiary p-4 space-y-3">
+      {/* Header */}
+      <div className="flex items-center gap-2">
+        <Bot className="h-4 w-4 text-purple-500 flex-shrink-0" />
+        <div>
+          <p className="text-sm font-medium text-text-primary leading-tight">AI Answer Preview</p>
+          <p className="text-xs text-text-muted leading-tight">
+            How your content may appear in AI search results
+          </p>
+        </div>
+      </div>
+
+      {/* Engine tab pills */}
+      <div className="flex items-center gap-1.5">
+        {engines.map((engine) => (
+          <button
+            key={engine.id}
+            type="button"
+            onClick={() => setActiveEngine(engine.id)}
+            className={clsx(
+              "px-2 py-1 rounded-lg text-xs font-medium transition-colors",
+              activeEngine === engine.id
+                ? "bg-purple-100 text-purple-700"
+                : "text-text-muted hover:bg-surface-secondary"
+            )}
+          >
+            {engine.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Preview panel */}
+      <div className="rounded-lg bg-surface-secondary border border-surface-tertiary p-3 space-y-2">
+        {activeEngine === "chatgpt" && (
+          <>
+            {/* ChatGPT style */}
+            <p className="text-xs text-text-secondary leading-relaxed">
+              {hasSnippet ? snippetText : <span className="italic text-text-muted">{snippetText}</span>}
+            </p>
+            {hasSnippet && (
+              <div className="pt-1.5 border-t border-surface-tertiary space-y-1">
+                <p className="text-xs font-semibold text-text-secondary">Sources</p>
+                <div className="flex items-center gap-1.5 text-xs text-purple-600">
+                  <span className="bg-purple-100 text-purple-700 rounded px-1 font-mono font-bold">1</span>
+                  <span className="font-medium truncate">{title || "Untitled article"}</span>
+                  <span className="text-text-muted">—</span>
+                  <span className="text-text-muted truncate">{displayUrl}</span>
+                  <ExternalLink className="h-3 w-3 flex-shrink-0 text-text-muted" />
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {activeEngine === "perplexity" && (
+          <>
+            {/* Perplexity style — inline citation */}
+            <p className="text-xs text-text-secondary leading-relaxed">
+              {hasSnippet ? (
+                <>
+                  {snippetText.length > 20
+                    ? snippetText.slice(0, Math.floor(snippetText.length * 0.6))
+                    : snippetText}
+                  <sup className="text-purple-600 font-bold ml-0.5 text-[10px]">[1]</sup>
+                  {snippetText.length > 20
+                    ? snippetText.slice(Math.floor(snippetText.length * 0.6))
+                    : ""}
+                </>
+              ) : (
+                <span className="italic text-text-muted">{snippetText}</span>
+              )}
+            </p>
+            {hasSnippet && (
+              <div className="mt-2 flex items-center gap-2 bg-white rounded-lg border border-surface-tertiary px-2.5 py-1.5">
+                <div className="w-4 h-4 rounded-sm bg-purple-200 flex items-center justify-center flex-shrink-0">
+                  <span className="text-[8px] font-bold text-purple-700">S</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-text-primary truncate">{title || "Untitled article"}</p>
+                  <p className="text-[10px] text-text-muted truncate">{displayUrl}</p>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {activeEngine === "gemini" && (
+          <>
+            {/* Gemini style — minimal, "Learn more" link */}
+            <p className="text-xs text-text-secondary leading-relaxed">
+              {hasSnippet ? snippetText : <span className="italic text-text-muted">{snippetText}</span>}
+            </p>
+            {hasSnippet && (
+              <div className="pt-1.5 border-t border-surface-tertiary flex items-center gap-1 text-xs text-purple-600">
+                <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                <span className="font-medium">Learn more</span>
+                <span className="text-text-muted">· {displayUrl}</span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Snippet quality score */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-text-muted font-medium">Snippet quality</span>
+          <span className={clsx("font-semibold tabular-nums", qualityTextColor)}>
+            {qualityScore}% — {qualityLabel}
+          </span>
+        </div>
+        <div className="w-full h-1.5 bg-surface-secondary rounded-full overflow-hidden">
+          <div
+            className={clsx("h-full rounded-full transition-all duration-500", qualityColor)}
+            style={{ width: `${qualityScore}%` }}
+          />
         </div>
       </div>
     </div>
@@ -1435,6 +1686,14 @@ export default function ArticleEditorPage() {
               </div>
             )}
           </Card>
+
+          {/* AI Answer Preview */}
+          <AiAnswerPreview
+            title={title}
+            content={content}
+            keyword={keyword}
+            url={article?.published_url ?? undefined}
+          />
 
           {/* SEO Analysis Details */}
           {seo && (
