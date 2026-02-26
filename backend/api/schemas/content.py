@@ -254,7 +254,7 @@ class ArticleImproveRequest(BaseModel):
 class BulkDeleteRequest(BaseModel):
     """Request body for bulk-delete endpoints."""
 
-    ids: List[str] = Field(..., min_length=1, description="List of resource IDs to delete")
+    ids: List[str] = Field(..., min_length=1, max_length=100, description="List of resource IDs to delete (max 100)")
 
 
 class BulkDeleteResponse(BaseModel):

@@ -93,7 +93,7 @@ const navigation = [
     icon: Building2,
     submenu: [
       { name: "Dashboard", href: "/agency", icon: LayoutDashboard },
-      { name: "Clients", href: "/agency", icon: Users },
+      { name: "Clients", href: "/agency/clients", icon: Users },
       { name: "Reports", href: "/agency/reports", icon: FileText },
       { name: "Branding", href: "/agency/branding", icon: Globe },
     ],

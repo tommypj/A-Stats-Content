@@ -1615,6 +1615,21 @@ async def get_aeo_score(
     from services.aeo_scoring import score_and_save
     from infrastructure.database.models.aeo import AEOScore as AEOScoreModel
 
+    # Verify article belongs to current user
+    if current_user.current_project_id:
+        ownership_query = select(Article).where(
+            Article.id == article_id,
+            Article.project_id == current_user.current_project_id,
+        )
+    else:
+        ownership_query = select(Article).where(
+            Article.id == article_id,
+            Article.user_id == current_user.id,
+        )
+    ownership_result = await db.execute(ownership_query)
+    if not ownership_result.scalar_one_or_none():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
+
     # Check for existing recent score
     existing_result = await db.execute(
         select(AEOScoreModel)

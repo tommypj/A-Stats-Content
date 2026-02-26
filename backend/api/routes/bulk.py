@@ -326,6 +326,22 @@ async def create_bulk_outline_job(
     from services.bulk_generation import create_bulk_outline_job as _create_job
     from services.bulk_generation import process_bulk_outline_job
 
+    # Validate template ownership if template_id is provided
+    if body.template_id:
+        tmpl_result = await db.execute(
+            select(ContentTemplate).where(
+                and_(
+                    ContentTemplate.id == body.template_id,
+                    ContentTemplate.user_id == current_user.id,
+                )
+            )
+        )
+        if not tmpl_result.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Template not found",
+            )
+
     keywords = [kw.model_dump() for kw in body.keywords]
     job = await _create_job(
         db=db,
