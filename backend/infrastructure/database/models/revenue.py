@@ -2,7 +2,7 @@
 Revenue attribution database models for Phase 4: Content-to-Revenue Attribution.
 """
 
-from datetime import datetime, timezone
+from datetime import date as date_type, datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
@@ -118,7 +118,7 @@ class ContentConversion(Base, TimestampMixin):
     keyword: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
     # Aggregation period
-    date: Mapped[datetime] = mapped_column(Date, nullable=False, index=True)
+    date: Mapped[date_type] = mapped_column(Date, nullable=False, index=True)
 
     # Metrics
     visits: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -178,8 +178,8 @@ class RevenueReport(Base, TimestampMixin):
 
     # Report classification and period
     report_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    period_start: Mapped[datetime] = mapped_column(Date, nullable=False)
-    period_end: Mapped[datetime] = mapped_column(Date, nullable=False)
+    period_start: Mapped[date_type] = mapped_column(Date, nullable=False)
+    period_end: Mapped[date_type] = mapped_column(Date, nullable=False)
 
     # Aggregate metrics
     total_organic_visits: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

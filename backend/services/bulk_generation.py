@@ -126,6 +126,7 @@ async def process_bulk_outline_job(
 
         start_time = time.time()
         outline_id = str(uuid4())
+        gen_log = None
 
         try:
             # Check usage limits
@@ -214,16 +215,17 @@ async def process_bulk_outline_job(
             item.processing_completed_at = datetime.now(timezone.utc)
             job.failed_items += 1
 
-            # Log failure
-            try:
-                duration_ms = int((time.time() - start_time) * 1000)
-                await tracker.log_failure(
-                    log_id=gen_log.id,
-                    error_message=str(e),
-                    duration_ms=duration_ms,
-                )
-            except Exception:
-                pass
+            # Log failure (only if gen_log was created)
+            if gen_log is not None:
+                try:
+                    duration_ms = int((time.time() - start_time) * 1000)
+                    await tracker.log_failure(
+                        log_id=gen_log.id,
+                        error_message=str(e),
+                        duration_ms=duration_ms,
+                    )
+                except Exception:
+                    pass
 
         await db.commit()
 

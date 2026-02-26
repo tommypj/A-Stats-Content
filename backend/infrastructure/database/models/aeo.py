@@ -45,13 +45,8 @@ class AEOScore(Base, TimestampMixin):
     # Overall score (0-100)
     aeo_score: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    # Sub-scores (0-100 each)
-    structure_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    faq_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    entity_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    conciseness_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    schema_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    citation_readiness: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Score breakdown (JSON: structure_score, faq_score, entity_score, conciseness_score, schema_score, citation_readiness)
+    score_breakdown: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     # AI suggestions for improvement
     suggestions: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)

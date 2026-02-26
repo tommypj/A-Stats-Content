@@ -1719,7 +1719,7 @@ async def get_revenue_overview_endpoint(
     """Get revenue attribution overview for the current user."""
     from services.revenue_attribution import get_revenue_overview
 
-    data = await get_revenue_overview(db, current_user.id, start_date, end_date)
+    data = await get_revenue_overview(current_user.id, db, start_date, end_date)
     return RevenueOverviewResponse(**data)
 
 
@@ -1735,7 +1735,7 @@ async def get_revenue_by_article_endpoint(
     """Get revenue attribution broken down by article."""
     from services.revenue_attribution import get_revenue_by_article
 
-    data = await get_revenue_by_article(db, current_user.id, start_date, end_date, page, page_size)
+    data = await get_revenue_by_article(current_user.id, db, start_date, end_date, page, page_size)
     return RevenueByArticleListResponse(**data)
 
 
@@ -1751,7 +1751,7 @@ async def get_revenue_by_keyword_endpoint(
     """Get revenue attribution broken down by keyword."""
     from services.revenue_attribution import get_revenue_by_keyword
 
-    data = await get_revenue_by_keyword(db, current_user.id, start_date, end_date, page, page_size)
+    data = await get_revenue_by_keyword(current_user.id, db, start_date, end_date, page, page_size)
     return RevenueByKeywordListResponse(**data)
 
 
@@ -1860,7 +1860,7 @@ async def import_conversions_endpoint(
     """Import conversion records for a given goal."""
     from services.revenue_attribution import import_conversions
 
-    data = await import_conversions(db, current_user.id, body.goal_id, body.conversions)
+    data = await import_conversions(current_user.id, db, body.goal_id, body.conversions)
     return ImportConversionsResponse(**data)
 
 
@@ -1873,5 +1873,5 @@ async def generate_revenue_report_endpoint(
     """Generate a pre-computed revenue attribution report."""
     from services.revenue_attribution import generate_revenue_report
 
-    data = await generate_revenue_report(db, current_user.id, report_type)
+    data = await generate_revenue_report(current_user.id, db, report_type)
     return RevenueReportResponse(**data)

@@ -165,7 +165,10 @@ async def detect_keyword_decay(
                 ))
 
         # Impressions decay
-        impressions_pct = ((curr_impressions - prev_impressions) / prev_impressions) * 100
+        if prev_impressions > 0:
+            impressions_pct = ((curr_impressions - prev_impressions) / prev_impressions) * 100
+        else:
+            impressions_pct = 0.0
         if impressions_pct <= IMPRESSIONS_WARNING_PCT:
             severity = "critical" if impressions_pct <= IMPRESSIONS_CRITICAL_PCT else "warning"
             alerts.append(ContentDecayAlert(
