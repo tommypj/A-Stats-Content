@@ -9,6 +9,7 @@ import {
   Target,
   RefreshCw,
   ArrowRight,
+  Activity,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -359,6 +360,25 @@ export default function AnalyticsPage() {
             <CardContent>
               <p className="text-sm text-text-secondary">
                 Analyze which pages are performing best and identify improvements
+              </p>
+            </CardContent>
+          </Link>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+          <Link href="/analytics/content-health">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-text-muted" />
+                  Content Health
+                </span>
+                <ArrowRight className="h-5 w-5 text-text-muted" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-text-secondary">
+                Monitor declining content and recover rankings
               </p>
             </CardContent>
           </Link>

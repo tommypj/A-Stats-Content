@@ -338,3 +338,69 @@ class ContentSuggestionsResponse(BaseModel):
 
     suggestions: List[ContentSuggestion] = Field(default_factory=list)
     based_on_keywords: List[str] = Field(default_factory=list)
+
+
+# ============================================================================
+# Content Decay / Content Health Schemas
+# ============================================================================
+
+
+class ContentDecayAlertResponse(BaseModel):
+    """Single content decay alert."""
+
+    id: str
+    user_id: str
+    project_id: Optional[str] = None
+    article_id: Optional[str] = None
+    alert_type: str = Field(..., description="position_drop, traffic_drop, ctr_drop, impressions_drop")
+    severity: str = Field(..., description="warning or critical")
+    keyword: Optional[str] = None
+    page_url: Optional[str] = None
+    metric_name: str
+    metric_before: float
+    metric_after: float
+    period_days: int
+    percentage_change: float
+    suggested_actions: Optional[dict] = None
+    is_read: bool = False
+    is_resolved: bool = False
+    resolved_at: Optional[datetime] = None
+    created_at: datetime
+    article_title: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ContentDecayAlertListResponse(BaseModel):
+    """Paginated list of content decay alerts."""
+
+    items: list[ContentDecayAlertResponse]
+    total: int
+    page: int
+    page_size: int
+    pages: int
+
+
+class ContentHealthSummaryResponse(BaseModel):
+    """Overall content health metrics."""
+
+    health_score: int = Field(..., description="0-100 health score")
+    total_published_articles: int = 0
+    declining_articles: int = 0
+    active_warnings: int = 0
+    active_criticals: int = 0
+    total_active_alerts: int = 0
+    recent_alerts: list[ContentDecayAlertResponse] = Field(default_factory=list)
+
+
+class DecayRecoverySuggestionsResponse(BaseModel):
+    """AI-generated recovery suggestions for a decay alert."""
+
+    suggestions: list[dict] = Field(default_factory=list)
+
+
+class RunDecayDetectionResponse(BaseModel):
+    """Response from triggering decay detection."""
+
+    message: str
+    new_alerts: int

@@ -16,6 +16,7 @@ from sqlalchemy import (
     Float,
     Date,
     Index,
+    JSON,
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -233,3 +234,57 @@ class DailyAnalytics(Base, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"<DailyAnalytics(date={self.date}, clicks={self.total_clicks}, impressions={self.total_impressions})>"
+
+
+class ContentDecayAlert(Base, TimestampMixin):
+    """Alert generated when content shows signs of declining performance."""
+
+    __tablename__ = "content_decay_alerts"
+
+    id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        primary_key=True,
+        default=lambda: str(uuid4()),
+    )
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    project_id: Mapped[Optional[str]] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    article_id: Mapped[Optional[str]] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("articles.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    alert_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    severity: Mapped[str] = mapped_column(String(20), nullable=False)
+    keyword: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    page_url: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    metric_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    metric_before: Mapped[float] = mapped_column(Float, nullable=False)
+    metric_after: Mapped[float] = mapped_column(Float, nullable=False)
+    period_days: Mapped[int] = mapped_column(Integer, default=7, nullable=False)
+    percentage_change: Mapped[float] = mapped_column(Float, nullable=False)
+    suggested_actions: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_resolved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        Index("ix_content_decay_alerts_user_type", "user_id", "alert_type"),
+        Index("ix_content_decay_alerts_unread", "user_id", "is_read"),
+        Index("ix_content_decay_alerts_created", "created_at"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ContentDecayAlert(type={self.alert_type}, severity={self.severity}, keyword={self.keyword})>"

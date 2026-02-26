@@ -38,6 +38,11 @@ from api.schemas.analytics import (
     ContentSuggestionRequest,
     ContentSuggestion,
     ContentSuggestionsResponse,
+    ContentDecayAlertResponse,
+    ContentDecayAlertListResponse,
+    ContentHealthSummaryResponse,
+    DecayRecoverySuggestionsResponse,
+    RunDecayDetectionResponse,
 )
 from api.routes.auth import get_current_user
 from api.utils import escape_like
@@ -48,6 +53,7 @@ from infrastructure.database.models.analytics import (
     KeywordRanking,
     PagePerformance,
     DailyAnalytics,
+    ContentDecayAlert,
 )
 from infrastructure.database.models.content import Article
 from infrastructure.config.settings import settings
@@ -1399,3 +1405,256 @@ async def suggest_content(
         suggestions=suggestions,
         based_on_keywords=request.keywords,
     )
+
+
+# ============================================================================
+# Content Decay / Content Health Endpoints
+# ============================================================================
+
+
+@router.get("/decay/health", response_model=ContentHealthSummaryResponse)
+async def get_content_health(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get overall content health score and summary."""
+    from services.content_decay import get_content_health_score
+
+    health_data = await get_content_health_score(db, current_user.id)
+
+    # Convert ORM alert objects to response dicts
+    recent_alerts_response = []
+    for alert in health_data.get("recent_alerts", []):
+        # Try to get article title
+        article_title = None
+        if alert.article_id:
+            art_result = await db.execute(
+                select(Article.title).where(Article.id == alert.article_id)
+            )
+            article_title = art_result.scalar_one_or_none()
+
+        recent_alerts_response.append(
+            ContentDecayAlertResponse(
+                id=alert.id,
+                user_id=alert.user_id,
+                project_id=alert.project_id,
+                article_id=alert.article_id,
+                alert_type=alert.alert_type,
+                severity=alert.severity,
+                keyword=alert.keyword,
+                page_url=alert.page_url,
+                metric_name=alert.metric_name,
+                metric_before=alert.metric_before,
+                metric_after=alert.metric_after,
+                period_days=alert.period_days,
+                percentage_change=alert.percentage_change,
+                suggested_actions=alert.suggested_actions,
+                is_read=alert.is_read,
+                is_resolved=alert.is_resolved,
+                resolved_at=alert.resolved_at,
+                created_at=alert.created_at,
+                article_title=article_title,
+            )
+        )
+
+    return ContentHealthSummaryResponse(
+        health_score=health_data["health_score"],
+        total_published_articles=health_data["total_published_articles"],
+        declining_articles=health_data["declining_articles"],
+        active_warnings=health_data["active_warnings"],
+        active_criticals=health_data["active_criticals"],
+        total_active_alerts=health_data["total_active_alerts"],
+        recent_alerts=recent_alerts_response,
+    )
+
+
+@router.get("/decay/alerts", response_model=ContentDecayAlertListResponse)
+async def list_decay_alerts(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    alert_type: Optional[str] = None,
+    severity: Optional[str] = None,
+    is_resolved: Optional[bool] = None,
+    sort_by: str = Query(default="created_at"),
+    sort_order: str = Query(default="desc"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List content decay alerts with filtering and pagination."""
+    conditions = [ContentDecayAlert.user_id == current_user.id]
+
+    if alert_type:
+        conditions.append(ContentDecayAlert.alert_type == alert_type)
+    if severity:
+        conditions.append(ContentDecayAlert.severity == severity)
+    if is_resolved is not None:
+        conditions.append(ContentDecayAlert.is_resolved == is_resolved)
+
+    # Count total
+    count_q = select(func.count(ContentDecayAlert.id)).where(and_(*conditions))
+    total = (await db.execute(count_q)).scalar() or 0
+
+    # Fetch items
+    order_col = getattr(ContentDecayAlert, sort_by, ContentDecayAlert.created_at)
+    order = order_col.desc() if sort_order == "desc" else order_col.asc()
+
+    items_q = (
+        select(ContentDecayAlert)
+        .where(and_(*conditions))
+        .order_by(order)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    items_result = await db.execute(items_q)
+    alerts = items_result.scalars().all()
+
+    # Enrich with article titles
+    alert_responses = []
+    for alert in alerts:
+        article_title = None
+        if alert.article_id:
+            art_result = await db.execute(
+                select(Article.title).where(Article.id == alert.article_id)
+            )
+            article_title = art_result.scalar_one_or_none()
+
+        alert_responses.append(
+            ContentDecayAlertResponse(
+                id=alert.id,
+                user_id=alert.user_id,
+                project_id=alert.project_id,
+                article_id=alert.article_id,
+                alert_type=alert.alert_type,
+                severity=alert.severity,
+                keyword=alert.keyword,
+                page_url=alert.page_url,
+                metric_name=alert.metric_name,
+                metric_before=alert.metric_before,
+                metric_after=alert.metric_after,
+                period_days=alert.period_days,
+                percentage_change=alert.percentage_change,
+                suggested_actions=alert.suggested_actions,
+                is_read=alert.is_read,
+                is_resolved=alert.is_resolved,
+                resolved_at=alert.resolved_at,
+                created_at=alert.created_at,
+                article_title=article_title,
+            )
+        )
+
+    pages_count = math.ceil(total / page_size) if total > 0 else 0
+
+    return ContentDecayAlertListResponse(
+        items=alert_responses,
+        total=total,
+        page=page,
+        page_size=page_size,
+        pages=pages_count,
+    )
+
+
+@router.post("/decay/detect", response_model=RunDecayDetectionResponse)
+async def trigger_decay_detection(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Manually trigger content decay detection for the current user."""
+    connection = await get_gsc_connection(current_user.id, db)
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="GSC not connected. Connect Google Search Console to detect content decay.",
+        )
+
+    from services.content_decay import run_decay_detection
+
+    new_count = await run_decay_detection(db, current_user.id, current_user.current_project_id)
+
+    return RunDecayDetectionResponse(
+        message=f"Decay detection complete. {new_count} new alert(s) found.",
+        new_alerts=new_count,
+    )
+
+
+@router.post("/decay/alerts/{alert_id}/read")
+async def mark_alert_read(
+    alert_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark a decay alert as read."""
+    result = await db.execute(
+        select(ContentDecayAlert).where(
+            and_(
+                ContentDecayAlert.id == alert_id,
+                ContentDecayAlert.user_id == current_user.id,
+            )
+        )
+    )
+    alert = result.scalar_one_or_none()
+    if not alert:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+
+    alert.is_read = True
+    await db.commit()
+    return {"message": "Alert marked as read"}
+
+
+@router.post("/decay/alerts/{alert_id}/resolve")
+async def resolve_alert(
+    alert_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark a decay alert as resolved."""
+    result = await db.execute(
+        select(ContentDecayAlert).where(
+            and_(
+                ContentDecayAlert.id == alert_id,
+                ContentDecayAlert.user_id == current_user.id,
+            )
+        )
+    )
+    alert = result.scalar_one_or_none()
+    if not alert:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+
+    alert.is_resolved = True
+    alert.resolved_at = datetime.now(timezone.utc)
+    await db.commit()
+    return {"message": "Alert resolved"}
+
+
+@router.post("/decay/alerts/{alert_id}/suggest", response_model=DecayRecoverySuggestionsResponse)
+async def suggest_recovery(
+    alert_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate AI-powered recovery suggestions for a specific decay alert."""
+    from services.content_decay import generate_recovery_suggestions
+
+    result = await generate_recovery_suggestions(db, alert_id, current_user.id)
+    return DecayRecoverySuggestionsResponse(suggestions=result.get("suggestions", []))
+
+
+@router.post("/decay/alerts/mark-all-read")
+async def mark_all_alerts_read(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark all unread decay alerts as read."""
+    from sqlalchemy import update
+
+    await db.execute(
+        update(ContentDecayAlert)
+        .where(
+            and_(
+                ContentDecayAlert.user_id == current_user.id,
+                ContentDecayAlert.is_read == False,
+            )
+        )
+        .values(is_read=True)
+    )
+    await db.commit()
+    return {"message": "All alerts marked as read"}

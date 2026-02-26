@@ -695,6 +695,42 @@ export const api = {
         data: { keywords, max_suggestions: maxSuggestions },
         timeout: 60000,
       }),
+    // Content Decay / Health
+    contentHealth: () =>
+      apiRequest<ContentHealthSummary2>({
+        url: "/analytics/decay/health",
+      }),
+    decayAlerts: (params?: DecayAlertsParams) =>
+      apiRequest<ContentDecayAlertListResponse>({
+        url: "/analytics/decay/alerts",
+        params,
+      }),
+    detectDecay: () =>
+      apiRequest<DecayDetectionResponse>({
+        method: "POST",
+        url: "/analytics/decay/detect",
+      }),
+    markAlertRead: (alertId: string) =>
+      apiRequest<{ message: string }>({
+        method: "POST",
+        url: `/analytics/decay/alerts/${alertId}/read`,
+      }),
+    resolveAlert: (alertId: string) =>
+      apiRequest<{ message: string }>({
+        method: "POST",
+        url: `/analytics/decay/alerts/${alertId}/resolve`,
+      }),
+    suggestRecovery: (alertId: string) =>
+      apiRequest<DecayRecoverySuggestions>({
+        method: "POST",
+        url: `/analytics/decay/alerts/${alertId}/suggest`,
+        timeout: 60000,
+      }),
+    markAllAlertsRead: () =>
+      apiRequest<{ message: string }>({
+        method: "POST",
+        url: "/analytics/decay/alerts/mark-all-read",
+      }),
   },
 
   // Billing / LemonSqueezy
@@ -1713,6 +1749,78 @@ export interface ContentSuggestion {
 export interface ContentSuggestionsResponse {
   suggestions: ContentSuggestion[];
   based_on_keywords: string[];
+}
+
+// Content Decay / Content Health types
+export interface ContentDecayAlert {
+  id: string;
+  user_id: string;
+  project_id?: string;
+  article_id?: string;
+  alert_type: "position_drop" | "traffic_drop" | "ctr_drop" | "impressions_drop";
+  severity: "warning" | "critical";
+  keyword?: string;
+  page_url?: string;
+  metric_name: string;
+  metric_before: number;
+  metric_after: number;
+  period_days: number;
+  percentage_change: number;
+  suggested_actions?: {
+    suggestions: Array<{
+      action: string;
+      description: string;
+      priority: "high" | "medium" | "low";
+      estimated_impact: "high" | "medium" | "low";
+    }>;
+  };
+  is_read: boolean;
+  is_resolved: boolean;
+  resolved_at?: string;
+  created_at: string;
+  article_title?: string;
+}
+
+export interface ContentDecayAlertListResponse {
+  items: ContentDecayAlert[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export interface ContentHealthSummary2 {
+  health_score: number;
+  total_published_articles: number;
+  declining_articles: number;
+  active_warnings: number;
+  active_criticals: number;
+  total_active_alerts: number;
+  recent_alerts: ContentDecayAlert[];
+}
+
+export interface DecayRecoverySuggestions {
+  suggestions: Array<{
+    action: string;
+    description: string;
+    priority: "high" | "medium" | "low";
+    estimated_impact: "high" | "medium" | "low";
+  }>;
+}
+
+export interface DecayDetectionResponse {
+  message: string;
+  new_alerts: number;
+}
+
+export interface DecayAlertsParams {
+  page?: number;
+  page_size?: number;
+  alert_type?: string;
+  severity?: string;
+  is_resolved?: boolean;
+  sort_by?: string;
+  sort_order?: "asc" | "desc";
 }
 
 // Billing / LemonSqueezy types
