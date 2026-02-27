@@ -9,8 +9,9 @@ test.describe("Knowledge vault", () => {
   test("knowledge overview loads", async ({ page }) => {
     await page.goto("/knowledge");
     await expect(page).not.toHaveURL(/login/);
+    // Heading is "Knowledge Vault"
     await expect(
-      page.getByRole("heading", { name: /knowledge/i })
+      page.getByRole("heading", { name: /knowledge vault|knowledge/i }).first()
     ).toBeVisible({ timeout: 10_000 });
   });
 
@@ -24,9 +25,11 @@ test.describe("Knowledge vault", () => {
 
   test("can see add source option", async ({ page }) => {
     await page.goto("/knowledge/sources");
+    await expect(page).not.toHaveURL(/login/);
+    // Page has an "Upload Document" button
     await expect(
-      page.getByRole("button", { name: /add|upload|new source/i })
-        .or(page.getByText(/add source|upload/i))
+      page.getByRole("button", { name: /upload|add|new source/i }).first()
+        .or(page.getByText(/upload document|add source/i).first())
     ).toBeVisible({ timeout: 10_000 });
   });
 

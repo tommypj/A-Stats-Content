@@ -44,12 +44,8 @@ test.describe("Sidebar navigation", () => {
         page.getByText(/something went wrong|application error|unexpected error/i)
       ).not.toBeVisible();
 
-      // Must have visible content (at minimum a heading or nav)
-      await expect(
-        page.getByRole("heading").first()
-          .or(page.locator("nav, aside").first())
-          .or(page.locator("main").first())
-      ).toBeVisible({ timeout: 15_000 });
+      // Must have a main content area rendered
+      await expect(page.locator("main")).toBeVisible({ timeout: 15_000 });
     });
   }
 });

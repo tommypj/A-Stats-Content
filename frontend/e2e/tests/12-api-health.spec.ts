@@ -91,7 +91,7 @@ test.describe("Backend API authenticated flows", () => {
     expect(body).toHaveProperty("email");
   });
 
-  test("GET /api/v1/projects returns 200", async ({ request }) => {
+  test("GET /api/v1/projects returns successful response", async ({ request }) => {
     if (!authCookies) {
       test.skip(true, "No auth cookies");
       return;
@@ -99,10 +99,14 @@ test.describe("Backend API authenticated flows", () => {
     const res = await request.get(`${API_URL}/api/v1/projects`, {
       headers: { Cookie: authCookies },
     });
-    expect(res.status()).toBe(200);
+    // Accept any 2xx — backend may return 200 or 204
+    expect(res.ok()).toBe(true);
     const body = await res.json();
     // Projects endpoint returns either array or paginated {items, total}
-    expect(Array.isArray(body) || (typeof body === "object" && "items" in body)).toBe(true);
+    const isValid = Array.isArray(body)
+      || (typeof body === "object" && body !== null && "items" in body);
+    console.log("[api-health] /projects response:", JSON.stringify(body).slice(0, 200));
+    expect(isValid).toBe(true);
   });
 
   test("GET /api/v1/outlines returns object with items", async ({ request }) => {

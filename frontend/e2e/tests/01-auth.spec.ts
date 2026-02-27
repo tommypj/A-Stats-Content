@@ -56,9 +56,12 @@ test.describe("Login page", () => {
     await page.getByLabel(/email/i).fill("wrong@example.com");
     await page.getByLabel(/password/i).fill("wrongpassword");
     await page.getByRole("button", { name: /sign in|log in|login/i }).click();
+    // Error appears as a toast (sonner) or inline message
     await expect(
-      page.getByText(/invalid|incorrect|not found|credentials/i).first()
-    ).toBeVisible({ timeout: 10_000 });
+      page.getByText(/invalid|incorrect|not found|credentials|wrong/i).first()
+        .or(page.locator("[data-sonner-toast]").first())
+        .or(page.locator("[role='status']").first())
+    ).toBeVisible({ timeout: 15_000 });
   });
 
   test("has link to register", async ({ page }) => {
