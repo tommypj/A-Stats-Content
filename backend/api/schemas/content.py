@@ -3,7 +3,7 @@ Content API schemas for outlines, articles, and images.
 """
 
 from datetime import datetime
-from typing import Literal, Optional, List, Dict, Any
+from typing import ClassVar, Literal, Optional, List, Dict, Any, Set
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -111,9 +111,9 @@ class ArticleGenerateRequest(BaseModel):
     language: Optional[str] = Field(None, max_length=10, description="Content language code (e.g., 'en', 'ro')")
 
     # GEN-47: Validate enum-like fields against values the AI adapter actually supports
-    VALID_WRITING_STYLES = {"editorial", "narrative", "listicle", "balanced"}
-    VALID_VOICES = {"first_person", "second_person", "third_person"}
-    VALID_LIST_USAGES = {"minimal", "balanced", "heavy"}
+    VALID_WRITING_STYLES: ClassVar[Set[str]] = {"editorial", "narrative", "listicle", "balanced"}
+    VALID_VOICES: ClassVar[Set[str]] = {"first_person", "second_person", "third_person"}
+    VALID_LIST_USAGES: ClassVar[Set[str]] = {"minimal", "balanced", "heavy"}
 
     @field_validator("writing_style")
     @classmethod
