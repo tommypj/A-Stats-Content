@@ -49,9 +49,14 @@ class TokenResponse(BaseModel):
 
 
 class RefreshTokenRequest(BaseModel):
-    """Refresh token request schema."""
+    """Refresh token request schema.
 
-    refresh_token: str
+    refresh_token is Optional because the token can now be supplied via the
+    HttpOnly cookie instead of the request body.  API clients that still send
+    the token in the body continue to work unchanged.
+    """
+
+    refresh_token: Optional[str] = None
 
 
 class UserResponse(BaseModel):

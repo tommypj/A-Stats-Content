@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { api, getImageUrl, parseApiError } from "@/lib/api";
+import { useAuthStore } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -760,9 +761,9 @@ export default function SettingsPage() {
     setIsDeleting(true);
     try {
       await api.auth.deleteAccount();
-      // Clear auth tokens and redirect to login
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("refresh_token");
+      // Cookies are cleared server-side on account deletion.
+      // Clear Zustand state and redirect to login.
+      useAuthStore.getState().logout();
       toast.success("Your account has been deleted.");
       router.push("/login");
     } catch {

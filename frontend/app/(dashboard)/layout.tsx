@@ -43,6 +43,7 @@ import { clsx } from "clsx";
 import { ProjectProvider, useProject } from "@/contexts/ProjectContext";
 import { ProjectSwitcher } from "@/components/project/project-switcher";
 import { api, UserResponse, GenerationNotification } from "@/lib/api";
+import { useAuthStore } from "@/stores/auth";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { KeyboardShortcutsDialog } from "@/components/ui/keyboard-shortcuts-dialog";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
@@ -328,10 +329,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         const data = await api.auth.me();
         setUser(data);
       } catch {
-        // Failed to load user — token is likely invalid/expired.
+        // Failed to load user — cookie is likely invalid/expired.
+        // No localStorage tokens to clear; cookies are managed by the browser/backend.
         // Redirect to login.
-        localStorage.removeItem("auth_token");
-        localStorage.removeItem("refresh_token");
         router.push("/login");
       }
     };
@@ -695,20 +695,22 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  // Use Zustand persisted state — avoids flash of "unauthenticated" on page refresh.
+  // Actual session validity is re-checked by DashboardContent via /auth/me.
+  const { isAuthenticated: zustandAuthenticated, isLoading: zustandLoading } = useAuthStore();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem("auth_token");
-    if (!token) {
-      router.push("/login");
-    } else {
+    if (zustandLoading) return; // Wait for Zustand hydration to complete
+    if (zustandAuthenticated) {
       setIsAuthenticated(true);
+    } else {
+      router.push("/login");
     }
-  }, [router]);
+  }, [zustandAuthenticated, zustandLoading, router]);
 
-  // Safety timeout: if the auth check never resolves (e.g. localStorage cleared
-  // mid-load), stop showing the spinner after 10 seconds to avoid an infinite
-  // loading state.
+  // Safety timeout: if Zustand hydration never completes (edge case), redirect
+  // to login after 10 seconds to avoid an infinite loading state.
   useEffect(() => {
     const timeout = setTimeout(() => {
       setIsAuthenticated((prev) => {

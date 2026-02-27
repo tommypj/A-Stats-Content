@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, parseApiError, ProjectInvitationPublic } from "@/lib/api";
+import { useAuthStore } from "@/stores/auth";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,17 +44,18 @@ export default function InviteAcceptPage() {
   const [isAccepting, setIsAccepting] = useState(false);
   const [error, setError] = useState("");
   const [invitation, setInvitation] = useState<InvitationInfo | null>(null);
+  const { isAuthenticated } = useAuthStore();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     loadInvitation();
-    checkAuth();
   }, [token]);
 
-  const checkAuth = () => {
-    const authToken = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
-    setIsLoggedIn(!!authToken);
-  };
+  // Mirror Zustand isAuthenticated into local isLoggedIn state so the
+  // invite UI reflects the correct login state without reading localStorage.
+  useEffect(() => {
+    setIsLoggedIn(isAuthenticated);
+  }, [isAuthenticated]);
 
   const loadInvitation = async () => {
     try {

@@ -48,39 +48,27 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     try {
-      const response = await api.auth.login(data.email, data.password);
+      // The login endpoint sets HttpOnly auth cookies via Set-Cookie.
+      // We do not need to read or store tokens manually.
+      await api.auth.login(data.email, data.password);
 
-      // Temporarily store token only long enough to fetch user info.
-      // We write to localStorage here so the apiClient interceptor can
-      // attach the Authorization header for the /auth/me call that follows.
-      // The authoritative write (including Zustand state) happens in login()
-      // below. If me() fails the token is removed in the catch block.
-      localStorage.setItem("auth_token", response.access_token);
-      if (response.refresh_token) {
-        localStorage.setItem("refresh_token", response.refresh_token);
-      }
       let user;
       try {
+        // The cookie is already set — fetch user profile to populate Zustand state.
         user = await api.auth.me();
       } catch (meError) {
-        // /me failed — remove the tokens we just stored so the user is not
-        // left in a half-authenticated state.
-        localStorage.removeItem("auth_token");
-        localStorage.removeItem("refresh_token");
+        // /me failed — the login cookies will expire naturally or be overwritten
+        // on next login. No localStorage to clean up.
         throw meError;
       }
 
-      login(
-        {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role as "user" | "admin" | "super_admin",
-          subscription_tier: (user.subscription_tier as "free" | "starter" | "professional" | "enterprise") || "free",
-        },
-        response.access_token,
-        response.refresh_token
-      );
+      login({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role as "user" | "admin" | "super_admin",
+        subscription_tier: (user.subscription_tier as "free" | "starter" | "professional" | "enterprise") || "free",
+      });
 
       toast.success("Welcome back!");
       router.push("/dashboard");

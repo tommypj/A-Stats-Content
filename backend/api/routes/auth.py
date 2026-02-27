@@ -8,7 +8,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header, Request, UploadFile, File
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import select, delete, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,6 +41,36 @@ from api.schemas.auth import (
 
 logger = logging.getLogger(__name__)
 
+
+def _get_cookie_kwargs(settings_obj) -> dict:
+    """Return cookie kwargs based on environment."""
+    is_production = getattr(settings_obj, 'environment', 'development') == 'production'
+    return dict(
+        httponly=True,
+        secure=is_production,
+        samesite="none" if is_production else "lax",
+        path="/",
+    )
+
+
+def _set_auth_cookies(response: JSONResponse, access_token: str, refresh_token: str, settings_obj) -> None:
+    """Set HttpOnly auth cookies on response."""
+    kwargs = _get_cookie_kwargs(settings_obj)
+    # Access token: same expiry as JWT (in seconds)
+    access_max_age = getattr(settings_obj, 'jwt_access_token_expire_minutes', 60) * 60
+    # Refresh token: 7 days default
+    refresh_max_age = getattr(settings_obj, 'jwt_refresh_token_expire_days', 7) * 86400
+    response.set_cookie("access_token", access_token, max_age=access_max_age, **kwargs)
+    response.set_cookie("refresh_token", refresh_token, max_age=refresh_max_age, **kwargs)
+
+
+def _clear_auth_cookies(response: JSONResponse, settings_obj) -> None:
+    """Clear auth cookies on logout."""
+    kwargs = _get_cookie_kwargs(settings_obj)
+    response.delete_cookie("access_token", **kwargs)
+    response.delete_cookie("refresh_token", **kwargs)
+
+
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 # Initialize token service
@@ -65,20 +95,33 @@ class ResendVerificationRequest(BaseModel):
 
 
 async def get_current_user(
+    request: Request,
     authorization: Annotated[str | None, Header()] = None,
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """
     Dependency to get the current authenticated user.
+
+    Checks the Authorization header first (Bearer token) for backward compatibility
+    with existing API clients. Falls back to the HttpOnly access_token cookie for
+    browser-based requests using the new cookie auth flow.
     """
-    if not authorization or not authorization.startswith("Bearer "):
+    # Try Authorization header first (API clients, tests, backward compat)
+    token = None
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ", 1)[1]
+
+    # Fall back to HttpOnly cookie
+    if not token:
+        token = request.cookies.get("access_token")
+
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid authorization header",
+            detail="Not authenticated",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    token = authorization.split(" ", 1)[1] if " " in authorization else ""
     payload = token_service.verify_access_token(token)
 
     if not payload:
@@ -314,12 +357,17 @@ async def login(
         role=user.role,
     )
 
-    return {
+    # Return tokens in the JSON body (backward compat) AND set HttpOnly cookies
+    # for browser-based clients (XSS protection).
+    response_data = {
         "access_token": access_token,
         "refresh_token": refresh_token,
         "token_type": "bearer",
         "expires_in": settings.jwt_access_token_expire_minutes * 60,
     }
+    response = JSONResponse(content=response_data)
+    _set_auth_cookies(response, access_token, refresh_token, settings)
+    return response
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -331,8 +379,24 @@ async def refresh_token(
 ) -> dict:
     """
     Refresh access token using refresh token.
+
+    Accepts the refresh token from the HttpOnly cookie first (browser clients),
+    then falls back to the request body (API clients / backward compat).
+    RefreshTokenRequest.refresh_token is now Optional so body-only requests
+    that omit it are valid when the cookie is present.
     """
-    payload = token_service.verify_refresh_token(body.refresh_token)
+    # Try cookie first, then fall back to request body
+    refresh_tok = request.cookies.get("refresh_token")
+    if not refresh_tok:
+        refresh_tok = body.refresh_token if body and body.refresh_token else None
+
+    if not refresh_tok:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token required",
+        )
+
+    payload = token_service.verify_refresh_token(refresh_tok)
 
     if not payload:
         raise HTTPException(
@@ -368,12 +432,17 @@ async def refresh_token(
         role=user.role,
     )
 
-    return {
+    # Return tokens in the JSON body (backward compat) AND rotate the HttpOnly
+    # cookies so the next refresh cycle picks up the new refresh token.
+    response_data = {
         "access_token": access_token,
         "refresh_token": refresh_token,
         "token_type": "bearer",
         "expires_in": settings.jwt_access_token_expire_minutes * 60,
     }
+    response = JSONResponse(content=response_data)
+    _set_auth_cookies(response, access_token, refresh_token, settings)
+    return response
 
 
 @router.get("/me", response_model=UserResponse)
@@ -604,7 +673,7 @@ async def resend_verification(
 async def logout(
     request: Request,
     current_user: Annotated[User, Depends(get_current_user)],
-) -> dict:
+) -> JSONResponse:
     """
     Logout current user.
 
@@ -613,8 +682,13 @@ async def logout(
     the token on logout. Password change and password reset do invalidate all
     previously issued tokens via the password_changed_at timestamp check in
     get_current_user().
+
+    Clears the HttpOnly auth cookies so browser-based clients are fully signed
+    out without relying on the client-side token deletion.
     """
-    return {"message": "Logged out successfully"}
+    response = JSONResponse(content={"message": "Logged out successfully"})
+    _clear_auth_cookies(response, settings)
+    return response
 
 
 @router.delete("/account", status_code=status.HTTP_200_OK)

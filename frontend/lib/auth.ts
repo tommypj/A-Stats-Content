@@ -10,14 +10,16 @@ import { api } from "./api";
 /**
  * Hook to require authentication.
  * Redirects to login if not authenticated.
+ * Validates the session server-side via /auth/me on initial load.
  */
 export function useRequireAuth(redirectTo: string = "/login") {
   const router = useRouter();
-  const { isAuthenticated, isLoading, setUser, setLoading, token } = useAuthStore();
+  const { isAuthenticated, isLoading, setUser, setLoading } = useAuthStore();
 
   useEffect(() => {
     async function checkAuth() {
-      if (token) {
+      if (isAuthenticated) {
+        // Zustand says we are authenticated — verify server-side via cookie.
         try {
           const user = await api.auth.me();
           setUser({
@@ -30,12 +32,12 @@ export function useRequireAuth(redirectTo: string = "/login") {
         } catch (error) {
           const status = (error as any)?.response?.status;
           if (status === 401 || status === 403) {
-            // Token invalid or forbidden — clear and redirect
-            localStorage.removeItem("auth_token");
+            // Cookie invalid or expired — clear state and redirect.
+            // No localStorage to clean up — cookies are managed by the browser.
             setUser(null);
             router.push(redirectTo);
           } else {
-            // Network or server error — don't log the user out
+            // Network or server error — don't log the user out.
             console.error("Auth check failed:", error);
             setLoading(false);
           }
@@ -51,7 +53,7 @@ export function useRequireAuth(redirectTo: string = "/login") {
     } else if (!isAuthenticated) {
       router.push(redirectTo);
     }
-  }, [isAuthenticated, isLoading, token, router, redirectTo, setUser, setLoading]);
+  }, [isAuthenticated, isLoading, router, redirectTo, setUser, setLoading]);
 
   return { isAuthenticated, isLoading };
 }
@@ -93,14 +95,9 @@ export function useRequireRole(requiredRole: "admin" | "super_admin" | "user") {
 
 /**
  * Get auth headers for API requests.
+ * Now returns empty object — auth cookies are forwarded automatically
+ * via withCredentials: true on the axios instance.
  */
 export function getAuthHeaders(): Record<string, string> {
-  const token = typeof window !== "undefined"
-    ? localStorage.getItem("auth_token")
-    : null;
-
-  if (token) {
-    return { Authorization: `Bearer ${token}` };
-  }
-  return {};
+  return {}; // Cookies are sent automatically via withCredentials
 }

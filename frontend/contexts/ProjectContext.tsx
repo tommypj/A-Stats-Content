@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { api } from "@/lib/api";
 import type { Project, ProjectCreateRequest } from "@/lib/api";
+import { useAuthStore } from "@/stores/auth";
 
 export interface ProjectContextType {
   currentProject: Project | null;
@@ -103,14 +104,15 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Initial load — only fire if a token is present; the interceptor handles
-  // the redirect when no token exists or when refresh fails.
+  const { isAuthenticated } = useAuthStore();
+
+  // Initial load — only fire when authenticated; the interceptor handles
+  // the redirect when the session cookie is absent or refresh fails.
   useEffect(() => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
-    if (token) {
+    if (isAuthenticated) {
       loadProjects();
     }
-  }, [loadProjects]);
+  }, [isAuthenticated, loadProjects]);
 
   // Switch to a different project (or null for personal workspace)
   const switchProject = useCallback(async (projectId: string | null) => {

@@ -58,6 +58,7 @@ async function cachedGet<T>(url: string, ttlMs: number, params?: Record<string, 
  */
 export const apiClient: AxiosInstance = axios.create({
   baseURL: `${API_URL}/api/v1`,
+  withCredentials: true, // Send HttpOnly cookies with all requests
   headers: {
     "Content-Type": "application/json",
   },
@@ -83,20 +84,12 @@ export function getImageUrl(url: string | null | undefined): string {
 const AI_TIMEOUT = 180000; // 3 minutes
 
 /**
- * Request interceptor for adding auth token
+ * Request interceptor — no-op for auth.
+ * Tokens are sent automatically via HttpOnly cookies (withCredentials: true).
+ * The Authorization header approach has been removed in favour of cookie auth.
  */
 apiClient.interceptors.request.use(
-  (config) => {
-    // Get token from localStorage or cookie
-    const token =
-      typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
-
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-
-    return config;
-  },
+  (config) => config,
   (error) => Promise.reject(error)
 );
 
@@ -146,12 +139,8 @@ apiClient.interceptors.response.use(
       !originalRequest.url?.includes("/auth/refresh") &&
       typeof window !== "undefined"
     ) {
-      const refreshToken = localStorage.getItem("refresh_token");
-
-      if (!refreshToken) {
-        forceLogout();
-        return Promise.reject(error);
-      }
+      // Refresh token is sent automatically via HttpOnly cookie (withCredentials).
+      // No need to read it from localStorage.
 
       if (isRefreshing) {
         // Another refresh is in progress — queue this request
@@ -162,11 +151,9 @@ apiClient.interceptors.response.use(
         }
         return new Promise((resolve, reject) => {
           failedQueue.push({
-            resolve: (token: string) => {
+            resolve: (_token: string) => {
+              // Cookies are sent automatically — no Authorization header needed.
               originalRequest._retry = true;
-              if (originalRequest.headers) {
-                originalRequest.headers.Authorization = `Bearer ${token}`;
-              }
               resolve(apiClient(originalRequest));
             },
             reject,
@@ -178,24 +165,19 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const { data } = await axios.post(`${API_URL}/api/v1/auth/refresh`, {
-          refresh_token: refreshToken,
-        });
+        // Send empty body — the refresh token cookie is forwarded automatically via withCredentials.
+        // The server will set new HttpOnly cookies in the Set-Cookie response header.
+        await axios.post(
+          `${API_URL}/api/v1/auth/refresh`,
+          {}, // empty body
+          { withCredentials: true }
+        );
 
-        const newAccessToken = data.access_token;
-        const newRefreshToken = data.refresh_token;
+        // New cookies are set automatically by the browser from the Set-Cookie response.
+        // Pass a placeholder non-null value to processQueue so queued requests are retried.
+        processQueue(null, "cookie");
 
-        localStorage.setItem("auth_token", newAccessToken);
-        if (newRefreshToken) {
-          localStorage.setItem("refresh_token", newRefreshToken);
-        }
-
-        processQueue(null, newAccessToken);
-
-        // Retry the original request with new token
-        if (originalRequest.headers) {
-          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-        }
+        // Retry the original request — cookies are sent automatically.
         return apiClient(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
@@ -311,11 +293,10 @@ export const api = {
     logout: async (): Promise<void> => {
       try {
         await apiRequest<void>({ method: "POST", url: "/auth/logout" });
+        // The backend clears the HttpOnly auth cookies via Set-Cookie on this endpoint.
       } catch {
-        // Best-effort server-side logout; clear local state regardless
+        // Best-effort server-side logout; clear local Zustand state regardless.
       }
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("refresh_token");
     },
     forgotPassword: (email: string) =>
       apiRequest<{ message: string }>({

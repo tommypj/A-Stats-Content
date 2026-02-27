@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import { api } from "@/lib/api";
+import { useAuthStore } from "@/stores/auth";
 
 const navigation = [
   { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
@@ -62,9 +63,14 @@ export default function AdminLayout({
   const [adminName, setAdminName] = useState("Admin User");
   const [adminRole, setAdminRole] = useState("Admin");
 
-  const handleSignOut = useCallback(() => {
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("refresh_token");
+  const handleSignOut = useCallback(async () => {
+    // Call backend logout to clear HttpOnly cookies server-side.
+    try {
+      await api.auth.logout();
+    } catch {
+      // Best-effort; proceed with local logout regardless.
+    }
+    useAuthStore.getState().logout();
     router.push("/login");
   }, [router]);
 
@@ -84,35 +90,26 @@ export default function AdminLayout({
     }
   }, [isAdmin]);
 
-  useEffect(() => {
-    // Synchronous JWT decode on mount to eliminate async API round-trip.
-    // This is a UX optimisation only — actual data access is enforced by
-    // backend get_current_admin_user on every API endpoint.
-    // NOTE: Full middleware-level protection requires AUTH-02 (HttpOnly cookies).
-    const checkAdminRole = () => {
-      try {
-        const token = localStorage.getItem("auth_token");
-        if (!token) {
-          router.replace("/login");
-          return;
-        }
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        if (!["admin", "super_admin"].includes(payload.role)) {
-          router.replace("/dashboard");
-          return;
-        }
-        setAdminName(payload.name || payload.sub || "Admin User");
-        setAdminRole(payload.role === "super_admin" ? "Super Admin" : "Admin");
-        setIsAdmin(true);
-        setLoading(false);
-      } catch {
-        // Malformed token — redirect to login
-        router.replace("/login");
-      }
-    };
+  const { user: zustandUser, isAuthenticated: zustandAuthenticated, isLoading: zustandLoading } = useAuthStore();
 
-    checkAdminRole();
-  }, [router]);
+  useEffect(() => {
+    // Use Zustand persisted user state to check admin role.
+    // Actual endpoint-level access control is enforced by backend get_current_admin_user.
+    if (zustandLoading) return; // Wait for Zustand hydration
+
+    if (!zustandAuthenticated || !zustandUser) {
+      router.replace("/login");
+      return;
+    }
+    if (!["admin", "super_admin"].includes(zustandUser.role)) {
+      router.replace("/dashboard");
+      return;
+    }
+    setAdminName(zustandUser.name || zustandUser.email || "Admin User");
+    setAdminRole(zustandUser.role === "super_admin" ? "Super Admin" : "Admin");
+    setIsAdmin(true);
+    setLoading(false);
+  }, [zustandUser, zustandAuthenticated, zustandLoading, router]);
 
   if (loading) {
     return (

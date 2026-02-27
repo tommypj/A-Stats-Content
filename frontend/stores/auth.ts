@@ -11,16 +11,12 @@ export interface User {
 
 interface AuthState {
   user: User | null;
-  token: string | null;
-  refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
 
   // Actions
   setUser: (user: User | null) => void;
-  setToken: (token: string | null) => void;
-  setRefreshToken: (refreshToken: string | null) => void;
-  login: (user: User, token: string, refreshToken?: string) => void;
+  login: (user: User) => void;
   logout: () => void;
   setLoading: (loading: boolean) => void;
 }
@@ -29,8 +25,6 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       user: null,
-      token: null,
-      refreshToken: null,
       isAuthenticated: false,
       isLoading: true,
 
@@ -40,46 +34,22 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: !!user,
         }),
 
-      setToken: (token) => {
-        if (token) {
-          localStorage.setItem("auth_token", token);
-        } else {
-          localStorage.removeItem("auth_token");
-        }
-        set({ token });
-      },
-
-      setRefreshToken: (refreshToken) => {
-        if (refreshToken) {
-          localStorage.setItem("refresh_token", refreshToken);
-        } else {
-          localStorage.removeItem("refresh_token");
-        }
-        set({ refreshToken });
-      },
-
-      login: (user, token, refreshToken) => {
-        localStorage.setItem("auth_token", token);
-        if (refreshToken) {
-          localStorage.setItem("refresh_token", refreshToken);
-        }
+      login: (user) => {
+        // Tokens are stored in HttpOnly cookies set by the server — no localStorage writes needed.
         set({
           user,
-          token,
-          refreshToken: refreshToken || null,
           isAuthenticated: true,
           isLoading: false,
         });
       },
 
       logout: () => {
-        localStorage.removeItem("auth_token");
-        localStorage.removeItem("refresh_token");
+        // Cookies are cleared by the backend /auth/logout endpoint.
+        // Here we only clear Zustand state.
         set({
           user: null,
-          token: null,
-          refreshToken: null,
           isAuthenticated: false,
+          isLoading: false,
         });
       },
 
@@ -87,10 +57,12 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: "auth-storage",
+      // Only persist user object and isAuthenticated flag.
+      // This prevents a flash of "not authenticated" on page refresh
+      // while the actual auth is re-validated server-side via cookie.
+      // Tokens are NOT persisted — they live in HttpOnly cookies.
       partialize: (state) => ({
         user: state.user,
-        token: state.token,
-        refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
       }),
     }
