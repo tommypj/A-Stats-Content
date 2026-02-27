@@ -532,6 +532,11 @@ export const api = {
         data: { seed_keyword: seedKeyword, count },
         timeout: AI_TIMEOUT,
       }),
+    keywordHistory: () =>
+      apiRequest<KeywordHistoryResponse>({
+        method: "GET",
+        url: "/articles/keyword-history",
+      }),
     exportAll: (format: "csv" = "csv") =>
       apiClient.get("/articles/export", {
         params: { format },
@@ -1667,6 +1672,18 @@ export interface KeywordSuggestion {
 export interface KeywordSuggestionsResponse {
   seed_keyword: string;
   suggestions: KeywordSuggestion[];
+  cached?: boolean;
+}
+
+export interface KeywordHistoryEntry {
+  seed_keyword: string;
+  searched_at: string;
+  expires_at: string;
+  result: KeywordSuggestionsResponse;
+}
+
+export interface KeywordHistoryResponse {
+  history: KeywordHistoryEntry[];
 }
 
 export interface GeneratedImage {

@@ -10,7 +10,9 @@ import math
 import re
 import time
 import markdown
-from datetime import datetime, timezone
+import json
+import redis.asyncio as aioredis
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import uuid4
 
@@ -43,6 +45,7 @@ from api.utils import escape_like
 from infrastructure.database.connection import get_db, async_session_maker
 from infrastructure.database.models import Article, ArticleRevision, Outline, User, ContentStatus
 from infrastructure.database.models.project import Project
+from infrastructure.database.models.keyword_cache import KeywordResearchCache
 from adapters.ai.anthropic_adapter import content_ai_service, GeneratedArticle
 from infrastructure.config.settings import settings
 from services.generation_tracker import GenerationTracker
@@ -716,14 +719,66 @@ class KeywordSuggestionRequest(BaseModel):
     count: int = Field(10, ge=5, le=20)
 
 
+KEYWORD_CACHE_TTL_DAYS = 30
+REDIS_KW_TTL = 60 * 60 * 24 * 30  # 30 days in seconds
+
+
 @router.post("/keyword-suggestions")
 @limiter.limit("5/minute")
 async def get_keyword_suggestions(
     request: Request,
     body: KeywordSuggestionRequest,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get AI-powered keyword suggestions based on a seed keyword."""
+    normalized = body.seed_keyword.strip().lower()
+    redis_key = f"kw_research:{current_user.id}:{normalized}"
+
+    # 1. Redis fast-path
+    redis_client = None
+    try:
+        redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
+        cached_raw = await redis_client.get(redis_key)
+        if cached_raw:
+            result = json.loads(cached_raw)
+            result["cached"] = True
+            return result
+    except Exception as redis_err:
+        logger.warning("Redis keyword cache read failed: %s", redis_err)
+    finally:
+        if redis_client:
+            await redis_client.aclose()
+
+    # 2. DB fallback
+    now = datetime.now(timezone.utc)
+    db_result = await db.execute(
+        select(KeywordResearchCache)
+        .where(KeywordResearchCache.user_id == current_user.id)
+        .where(KeywordResearchCache.seed_keyword_normalized == normalized)
+        .where(KeywordResearchCache.expires_at > now)
+        .order_by(KeywordResearchCache.created_at.desc())
+        .limit(1)
+    )
+    cached_row = db_result.scalar_one_or_none()
+    if cached_row:
+        result = json.loads(cached_row.result_json)
+        result["cached"] = True
+        # Backfill Redis
+        redis_client = None
+        try:
+            redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
+            ttl = int((cached_row.expires_at - now).total_seconds())
+            if ttl > 0:
+                await redis_client.setex(redis_key, ttl, cached_row.result_json)
+        except Exception:
+            pass
+        finally:
+            if redis_client:
+                await redis_client.aclose()
+        return result
+
+    # 3. Call AI (existing logic)
     prompt = f"""Given the seed keyword "{body.seed_keyword}", suggest {body.count} related keywords for SEO content creation.
 
 For each keyword, provide:
@@ -737,7 +792,6 @@ Return as a JSON array with objects having: keyword, intent, difficulty, content
 Only return the JSON array, no other text."""
 
     try:
-        import json
         from adapters.ai.anthropic_adapter import content_ai_service
 
         client = content_ai_service._client
@@ -774,12 +828,79 @@ Only return the JSON array, no other text."""
         except (json.JSONDecodeError, ValueError):
             logger.warning("AI returned invalid JSON for keyword suggestions: %s", text[:200])
             raise HTTPException(status_code=502, detail="AI returned invalid response — please try again")
-        return {"seed_keyword": body.seed_keyword, "suggestions": suggestions}
+
+        result = {"seed_keyword": body.seed_keyword, "suggestions": suggestions}
+        result_str = json.dumps(result)
+        expires_at = now + timedelta(days=KEYWORD_CACHE_TTL_DAYS)
+
+        # Store in DB
+        try:
+            # Remove expired entries for this user+keyword first
+            await db.execute(
+                delete(KeywordResearchCache)
+                .where(KeywordResearchCache.user_id == current_user.id)
+                .where(KeywordResearchCache.seed_keyword_normalized == normalized)
+            )
+            cache_entry = KeywordResearchCache(
+                user_id=current_user.id,
+                seed_keyword_normalized=normalized,
+                seed_keyword_original=body.seed_keyword.strip(),
+                result_json=result_str,
+                expires_at=expires_at,
+            )
+            db.add(cache_entry)
+            await db.commit()
+        except Exception as db_err:
+            logger.warning("Failed to store keyword research in DB cache: %s", db_err)
+            await db.rollback()
+
+        # Store in Redis
+        redis_client = None
+        try:
+            redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
+            await redis_client.setex(redis_key, REDIS_KW_TTL, result_str)
+        except Exception as redis_err:
+            logger.warning("Failed to store keyword research in Redis: %s", redis_err)
+        finally:
+            if redis_client:
+                await redis_client.aclose()
+
+        result["cached"] = False
+        return result
     except HTTPException:
         raise
     except Exception as e:
         logger.error("Keyword suggestion failed: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to generate keyword suggestions")
+
+
+@router.get("/keyword-history")
+async def get_keyword_history(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(20, ge=1, le=50),
+):
+    """Return the user's recent keyword research history (non-expired entries only)."""
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        select(KeywordResearchCache)
+        .where(KeywordResearchCache.user_id == current_user.id)
+        .where(KeywordResearchCache.expires_at > now)
+        .order_by(KeywordResearchCache.created_at.desc())
+        .limit(limit)
+    )
+    rows = result.scalars().all()
+    return {
+        "history": [
+            {
+                "seed_keyword": row.seed_keyword_original,
+                "searched_at": row.created_at.isoformat(),
+                "expires_at": row.expires_at.isoformat(),
+                "result": json.loads(row.result_json),
+            }
+            for row in rows
+        ]
+    }
 
 
 @router.get("/export")

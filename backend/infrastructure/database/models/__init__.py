@@ -21,6 +21,7 @@ from .aeo import AEOScore, AEOCitation
 from .bulk import ContentTemplate, BulkJob, BulkJobItem
 from .revenue import ConversionGoal, ContentConversion, RevenueReport
 from .agency import AgencyProfile, ClientWorkspace, ReportTemplate, GeneratedReport
+from .keyword_cache import KeywordResearchCache
 
 __all__ = [
     "Base",
@@ -71,4 +72,5 @@ __all__ = [
     "ClientWorkspace",
     "ReportTemplate",
     "GeneratedReport",
+    "KeywordResearchCache",
 ]

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Search,
@@ -8,8 +8,14 @@ import {
   AlertCircle,
   ArrowRight,
   Lightbulb,
+  Clock,
 } from "lucide-react";
-import { api, KeywordSuggestion, KeywordSuggestionsResponse } from "@/lib/api";
+import {
+  api,
+  KeywordSuggestion,
+  KeywordSuggestionsResponse,
+  KeywordHistoryEntry,
+} from "@/lib/api";
 
 // Badge color helpers
 function intentBadgeClass(intent: KeywordSuggestion["intent"]): string {
@@ -53,6 +59,15 @@ export default function KeywordResearchPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<KeywordSuggestionsResponse | null>(null);
+  const [history, setHistory] = useState<KeywordHistoryEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+
+  useEffect(() => {
+    api.articles.keywordHistory()
+      .then((data) => setHistory(data.history))
+      .catch(() => {}) // history is non-critical; silent fail
+      .finally(() => setHistoryLoading(false));
+  }, []);
 
   async function handleSubmit(e?: React.FormEvent) {
     if (e) e.preventDefault();
@@ -66,6 +81,19 @@ export default function KeywordResearchPage() {
     try {
       const data = await api.articles.keywordSuggestions(trimmed, 10);
       setResult(data);
+
+      // Prepend to history if not already cached
+      if (!data.cached) {
+        setHistory((prev) => [
+          {
+            seed_keyword: data.seed_keyword,
+            searched_at: new Date().toISOString(),
+            expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            result: data,
+          },
+          ...prev.filter((h) => h.seed_keyword.toLowerCase() !== data.seed_keyword.toLowerCase()),
+        ]);
+      }
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Failed to generate keyword suggestions";
@@ -134,6 +162,28 @@ export default function KeywordResearchPage() {
         </div>
       )}
 
+      {/* Recent searches history */}
+      {!isLoading && !historyLoading && history.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-sm font-medium text-text-secondary mb-2">Recent searches</h3>
+          <div className="flex flex-wrap gap-2">
+            {history.map((entry) => (
+              <button
+                key={entry.seed_keyword}
+                onClick={() => {
+                  setSeedKeyword(entry.seed_keyword);
+                  setResult(entry.result);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm bg-surface-secondary border border-surface-tertiary text-text-secondary hover:border-primary-300 hover:text-primary-600 transition-colors"
+              >
+                <Clock className="h-3.5 w-3.5" />
+                {entry.seed_keyword}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Loading skeleton */}
       {isLoading && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -163,6 +213,14 @@ export default function KeywordResearchPage() {
               {" "}for &ldquo;<span className="italic">{result.seed_keyword}</span>&rdquo;
             </p>
           </div>
+
+          {result.cached && (
+            <div className="flex items-center gap-1.5 text-xs text-text-muted mb-3">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-secondary border border-surface-tertiary text-text-secondary text-xs">
+                Served from cache · saves AI tokens
+              </span>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {result.suggestions.map((item) => (
