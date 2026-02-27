@@ -403,6 +403,7 @@ async def get_aeo_overview(
             ),
         )
         .where(AEOScore.user_id == user_id)
+        .limit(10000)  # ANA-33: Cap result set to prevent unbounded memory use
     )
     scores_result = await db.execute(scores_q)
     scores = scores_result.scalars().all()

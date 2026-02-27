@@ -125,12 +125,14 @@ async def get_dashboard_stats(
     )
     new_users_month = new_users_month_result.scalar() or 0
 
-    # Active users this week (users who logged in)
+    # Active users this week (users who logged in, excluding suspended users)
+    # ADM-26: Exclude SUSPENDED users from active user count
     active_users_week_result = await db.execute(
         select(func.count(User.id)).where(
             and_(
                 User.last_login >= week_ago,
-                User.status == UserStatus.ACTIVE.value
+                User.status == UserStatus.ACTIVE.value,
+                User.status != UserStatus.SUSPENDED.value,
             )
         )
     )

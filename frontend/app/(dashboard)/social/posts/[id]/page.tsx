@@ -39,7 +39,8 @@ const PLATFORM_ICONS: Record<SocialPlatform, React.ReactNode> = {
 export default function PostDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const postId = params.id as string;
+  const rawId = params.id;
+  const postId = Array.isArray(rawId) ? rawId[0] : (rawId ?? "");
 
   const [post, setPost] = useState<SocialPost | null>(null);
   const [analytics, setAnalytics] = useState<SocialAnalytics[]>([]);
@@ -127,6 +128,10 @@ export default function PostDetailPage() {
       toast.error("Failed to retry post");
     }
   };
+
+  if (!postId) {
+    return <div>Invalid post ID</div>;
+  }
 
   if (loading) {
     return (

@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from api.middleware.rate_limit import limiter
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select, func, and_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,6 +35,13 @@ class KeywordInput(BaseModel):
     keyword: str = Field(..., min_length=1, max_length=500)
     title: Optional[str] = Field(None, max_length=500)
     target_audience: Optional[str] = Field(None, max_length=500)
+
+    @field_validator("keyword")
+    @classmethod
+    def keyword_not_blank(cls, v):
+        if not v or not v.strip():
+            raise ValueError("Keyword cannot be empty")
+        return v.strip()
 
 
 class CreateBulkOutlineJobRequest(BaseModel):

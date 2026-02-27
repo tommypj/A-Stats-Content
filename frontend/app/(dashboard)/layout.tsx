@@ -190,8 +190,9 @@ function NotificationBell() {
   useEffect(() => {
     fetchNotifications();
     const interval = setInterval(() => {
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
-      fetchNotifications();
+      if (document.visibilityState === "visible") {
+        fetchNotifications();
+      }
     }, 30_000);
     return () => clearInterval(interval);
   }, [fetchNotifications]);

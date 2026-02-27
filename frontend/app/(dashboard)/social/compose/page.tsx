@@ -138,6 +138,10 @@ export default function ComposePage() {
 
       // Filter out blob: URLs — only send actual remote URLs to the backend
       const remoteMediaUrls = mediaUrls.filter((url) => !url.startsWith("blob:"));
+      const blobCount = mediaUrls.length - remoteMediaUrls.length;
+      if (blobCount > 0) {
+        toast.error("Image upload failed — post will be sent without images");
+      }
 
       await api.social.createPost({
         content,

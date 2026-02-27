@@ -146,6 +146,7 @@ export default function LoginPage() {
 
         <div className="flex items-center justify-between">
           <label className="flex items-center gap-2 cursor-pointer">
+            {/* TODO: Use rememberMe to set token expiry */}
             <input
               type="checkbox"
               className="h-4 w-4 rounded border-surface-tertiary text-primary-500 focus:ring-primary-500"

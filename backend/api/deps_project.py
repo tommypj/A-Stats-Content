@@ -8,12 +8,12 @@ from typing import Annotated, Any, List, Optional, Union
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
-from sqlalchemy import select, or_, and_
+from sqlalchemy import select, or_, and_, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.routes.auth import get_current_user
 from infrastructure.database.connection import get_db
-from infrastructure.database.models.user import User
+from infrastructure.database.models.user import User, UserStatus
 from infrastructure.database.models.content import Article, Outline, GeneratedImage
 from infrastructure.database.models.social import SocialAccount, ScheduledPost
 from infrastructure.database.models.knowledge import KnowledgeSource
@@ -65,21 +65,24 @@ def get_content_filter(user: User, project_id: Optional[str] = None):
         - This function only creates the filter; it doesn't verify permissions.
         - The filter assumes the model has both user_id and project_id columns.
     """
+    # PROJ-46: ContentModel is a Union type alias — accessing .project_id/.user_id on it
+    # would raise AttributeError at runtime. All content models share these column names
+    # so we use SQLAlchemy text() comparisons which are model-agnostic.
+    # Callers must pass a concrete model to .where() separately or use apply_content_filters().
     if project_id:
         # Project content filter
         # NOTE: Caller must verify user is a project member before using this filter
         return and_(
             # Content belongs to the project
-            # Using text comparison since project_id is stored as string UUID
-            ContentModel.project_id == str(project_id),
+            text("project_id = :project_id").bindparams(project_id=str(project_id)),
         )
     else:
         # Personal content filter
         return and_(
             # Content belongs to user
-            ContentModel.user_id == user.id,
+            text("user_id = :user_id").bindparams(user_id=str(user.id)),
             # And is NOT project content (project_id is null)
-            ContentModel.project_id.is_(None),
+            text("project_id IS NULL"),
         )
 
 
@@ -449,6 +452,13 @@ async def require_project_admin(
     Raises:
         HTTPException: 403 if user is not admin/owner
     """
+    # PROJ-48: Reject suspended accounts before granting admin access
+    if current_user.status == UserStatus.SUSPENDED.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is suspended",
+        )
+
     from infrastructure.database.models.project import ProjectMemberRole
     member = await get_project_member(project_id, current_user.id, db)
 
@@ -480,6 +490,13 @@ async def require_project_owner(
     Raises:
         HTTPException: 403 if user is not the owner
     """
+    # PROJ-48: Reject suspended accounts before granting owner access
+    if current_user.status == UserStatus.SUSPENDED.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is suspended",
+        )
+
     from infrastructure.database.models.project import ProjectMemberRole
     member = await get_project_member(project_id, current_user.id, db)
 

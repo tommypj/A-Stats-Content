@@ -11,6 +11,7 @@ from typing import Optional
 from uuid import uuid4
 
 from sqlalchemy import select, func, and_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from infrastructure.database.models.analytics import (
@@ -91,6 +92,7 @@ async def detect_keyword_decay(
     prev_result = await db.execute(prev_q)
     prev_data = {row.keyword: row for row in prev_result.all()}
 
+    # ANA-29: No N+1 here — keywords and articles are each loaded in a single batch query.
     # Match articles to keywords
     articles_q = select(Article.id, Article.keyword, Article.project_id, Article.published_url).where(
         Article.user_id == user_id
@@ -101,7 +103,8 @@ async def detect_keyword_decay(
     alerts: list[ContentDecayAlert] = []
 
     for keyword, curr in current_data.items():
-        prev = prev_data.get(keyword)
+        # ANA-32: Normalise case for consistent cross-period matching
+        prev = prev_data.get(keyword) or prev_data.get(keyword.lower())
         if not prev:
             continue
 
@@ -116,6 +119,10 @@ async def detect_keyword_decay(
         curr_impressions = curr.impressions or 0
         curr_ctr = float(curr.ctr or 0)
         prev_ctr = float(prev.ctr or 0)
+
+        # ANA-31: Truncate excessively long keywords before any DB or dict operations
+        if keyword and len(keyword) > 200:
+            keyword = keyword[:200]
 
         # Look up article
         article_info = article_map.get(keyword.lower())
@@ -244,8 +251,15 @@ async def run_decay_detection(
         if (a.keyword, a.alert_type) not in existing_keys
     ]
 
+    # ANA-30: Catch IntegrityError per-alert to handle concurrent duplicate inserts
     for alert in new_alerts:
-        db.add(alert)
+        try:
+            db.add(alert)
+            await db.flush()
+        except IntegrityError:
+            await db.rollback()
+            # Alert already exists (concurrent insert), skip it
+            logger.debug("Skipping duplicate decay alert for keyword=%s type=%s", alert.keyword, alert.alert_type)
 
     if new_alerts:
         await db.commit()
@@ -313,6 +327,9 @@ Return as JSON array of objects with keys: action, description, priority, estima
     try:
         response = await content_ai_service.generate_text(prompt, max_tokens=1500)
         import json
+        # ANA-34: Cap AI response size before parsing to prevent memory/CPU abuse
+        if len(response) > 50000:
+            response = response[:50000]
         # Try to parse JSON from the response
         # Strip markdown code fences if present
         text = response.strip()

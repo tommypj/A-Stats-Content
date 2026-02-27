@@ -19,6 +19,7 @@ Rate Limits:
 """
 
 import ipaddress
+import logging
 import re
 
 from starlette.requests import Request
@@ -26,6 +27,8 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from infrastructure.config.settings import settings
+
+logger = logging.getLogger(__name__)
 
 # Simple pattern to quickly reject obviously invalid IPs before parsing
 _IP_LIKE = re.compile(r"^[\d.:a-fA-F]+$")
@@ -82,6 +85,13 @@ RATE_LIMITS = {
 # SlowAPIMiddleware; per-endpoint @limiter.limit decorators (e.g. "5/minute"
 # on /login) override this default for those specific endpoints.
 _storage_uri = settings.redis_url if settings.redis_url else "memory://"
+
+# RATE-LIMIT-01: Warn when falling back to in-memory storage — not safe in multi-worker prod
+if not settings.redis_url:
+    logger.warning(
+        "Rate limiter using in-memory storage — not suitable for multi-worker production"
+    )
+
 limiter = Limiter(
     key_func=_get_real_ip,
     storage_uri=_storage_uri,

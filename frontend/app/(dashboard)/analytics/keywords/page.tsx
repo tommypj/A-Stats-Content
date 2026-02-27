@@ -132,28 +132,32 @@ export default function KeywordsPage() {
   }
 
   function exportToCSV() {
-    const data = getSortedAndFilteredKeywords();
-    const headers = ["Keyword", "Clicks", "Impressions", "CTR", "Position"];
-    const rows = data.map((k) => [
-      k.keyword,
-      k.clicks,
-      k.impressions,
-      (k.ctr * 100).toFixed(2) + "%",
-      k.position.toFixed(1),
-    ]);
+    try {
+      const data = getSortedAndFilteredKeywords();
+      const headers = ["Keyword", "Clicks", "Impressions", "CTR", "Position"];
+      const rows = data.map((k) => [
+        k.keyword,
+        k.clicks,
+        k.impressions,
+        (k.ctr * 100).toFixed(2) + "%",
+        k.position.toFixed(1),
+      ]);
 
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
-    ].join("\n");
+      const csvContent = [
+        headers.join(","),
+        ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
+      ].join("\n");
 
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `keywords-${new Date().toISOString().split("T")[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+      const blob = new Blob([csvContent], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `keywords-${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Export failed");
+    }
   }
 
   const formatNumber = (num: number) => {

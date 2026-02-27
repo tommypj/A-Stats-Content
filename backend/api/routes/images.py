@@ -91,15 +91,22 @@ async def _run_image_generation(
             await db.commit()
 
             # Call the AI service (Replicate)
-            generated = await asyncio.wait_for(
-                image_ai_service.generate_image(
-                    prompt=prompt,
-                    width=width,
-                    height=height,
-                    style=style,
-                ),
-                timeout=120.0,  # 2-minute hard limit
-            )
+            try:
+                generated = await asyncio.wait_for(
+                    image_ai_service.generate_image(
+                        prompt=prompt,
+                        width=width,
+                        height=height,
+                        style=style,
+                    ),
+                    timeout=120.0,  # 2-minute hard limit
+                )
+            except asyncio.TimeoutError:
+                # IMG-25: Mark record as failed on timeout so callers see a terminal state
+                image.status = "failed"
+                image.error_message = "Generation timed out"
+                await db.commit()
+                raise
 
             # Store the external URL immediately
             image.url = generated.url

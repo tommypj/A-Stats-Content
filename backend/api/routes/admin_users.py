@@ -198,6 +198,8 @@ async def list_users(
     if filters:
         query = query.where(and_(*filters))
 
+    # ADM-18: Note: count and items queries are separate — minor race condition possible
+    # (a full fix requires wrapping both in REPEATABLE READ isolation)
     # Get total count
     count_query = select(func.count()).select_from(User)
     if filters:

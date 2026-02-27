@@ -80,6 +80,7 @@ export default function AnalyticsPage() {
       setLastSync(status.last_sync || null);
     } catch (error) {
       console.error("Failed to check analytics status:", error);
+      toast.error("Failed to load analytics status");
     } finally {
       setIsLoading(false);
     }

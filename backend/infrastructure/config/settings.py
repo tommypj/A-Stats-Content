@@ -95,6 +95,7 @@ class Settings(BaseSettings):
     anthropic_api_key: Optional[str] = None
     anthropic_model: str = "claude-sonnet-4-20250514"
     anthropic_max_tokens: int = 4096
+    anthropic_timeout: int = 300
 
     # Replicate (Image Generation)
     replicate_api_token: Optional[str] = None

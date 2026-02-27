@@ -13,6 +13,12 @@ from ..config import get_settings
 
 settings = get_settings()
 
+# INFRA-16: Enforce SSL for database connections in production to prevent MITM attacks
+if settings.environment == "production":
+    _connect_args = {"ssl": "require"}
+else:
+    _connect_args = {}
+
 # Create async engine
 engine = create_async_engine(
     settings.database_url,
@@ -20,6 +26,7 @@ engine = create_async_engine(
     pool_pre_ping=True,
     pool_size=settings.db_pool_size,
     max_overflow=settings.db_max_overflow,
+    connect_args=_connect_args,
 )
 
 # Session factory

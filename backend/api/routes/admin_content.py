@@ -9,7 +9,8 @@ from typing import Annotated, Optional, List
 from datetime import datetime
 from math import ceil
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from api.middleware.rate_limit import limiter
 from sqlalchemy import select, func, delete, or_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -267,6 +268,13 @@ async def delete_article(
     article_title = article.title
     article_user_id = article.user_id
 
+    # ADM-22: Require super_admin to delete unscoped (no project) articles
+    if article.project_id is None and admin_user.role != UserRole.SUPER_ADMIN.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only super_admin can delete unscoped articles",
+        )
+
     # Delete article (cascade will handle related records)
     await db.execute(delete(Article).where(Article.id == article_id))
     await db.commit()
@@ -398,6 +406,13 @@ async def delete_outline(
 
     outline_title = outline.title
     outline_user_id = outline.user_id
+
+    # ADM-22: Require super_admin to delete unscoped (no project) outlines
+    if outline.project_id is None and admin_user.role != UserRole.SUPER_ADMIN.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only super_admin can delete unscoped outlines",
+        )
 
     # Delete outline (cascade will handle related records)
     await db.execute(delete(Outline).where(Outline.id == outline_id))
@@ -762,7 +777,9 @@ async def delete_social_post(
 
 
 @router.post("/bulk-delete", response_model=BulkDeleteResponse)
+@limiter.limit("10/minute")  # ADM-23: Rate limit bulk admin operations
 async def bulk_delete_content(
+    http_request: Request,
     request: BulkDeleteRequest,
     admin_user: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db),

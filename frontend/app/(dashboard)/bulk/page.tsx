@@ -73,6 +73,7 @@ export default function BulkContentPage() {
   // Poll for active jobs
   useEffect(() => {
     if (!pollingActive) return;
+    if (jobs.length === 0) return; // no jobs to poll
     const interval = setInterval(async () => {
       try {
         const jobsRes = await api.bulk.jobs({ page: 1, page_size: 20 });
@@ -84,14 +85,16 @@ export default function BulkContentPage() {
       }
     }, 5000);
     return () => clearInterval(interval);
-  }, [pollingActive]);
+  }, [pollingActive, jobs.length]);
 
   const parseKeywords = (): BulkKeywordInput[] => {
-    return keywords
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-      .map((line) => ({ keyword: line }));
+    const uniqueKeywords = [...new Set(
+      keywords
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+    )];
+    return uniqueKeywords.map((line) => ({ keyword: line }));
   };
 
   const handleCreate = async () => {

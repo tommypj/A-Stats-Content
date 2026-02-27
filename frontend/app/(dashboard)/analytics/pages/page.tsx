@@ -133,28 +133,32 @@ export default function PagesPage() {
   }
 
   function exportToCSV() {
-    const data = getSortedAndFilteredPages();
-    const headers = ["Page URL", "Clicks", "Impressions", "CTR", "Position"];
-    const rows = data.map((p) => [
-      p.page_url,
-      p.clicks,
-      p.impressions,
-      (p.ctr * 100).toFixed(2) + "%",
-      p.position.toFixed(1),
-    ]);
+    try {
+      const data = getSortedAndFilteredPages();
+      const headers = ["Page URL", "Clicks", "Impressions", "CTR", "Position"];
+      const rows = data.map((p) => [
+        p.page_url,
+        p.clicks,
+        p.impressions,
+        (p.ctr * 100).toFixed(2) + "%",
+        p.position.toFixed(1),
+      ]);
 
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
-    ].join("\n");
+      const csvContent = [
+        headers.join(","),
+        ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
+      ].join("\n");
 
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `pages-${new Date().toISOString().split("T")[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+      const blob = new Blob([csvContent], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `pages-${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Export failed");
+    }
   }
 
   function truncateUrl(url: string, maxLength: number = 60) {

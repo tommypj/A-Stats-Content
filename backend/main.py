@@ -95,7 +95,11 @@ async def lifespan(app: FastAPI):
     if settings.environment == "production":
         try:
             import redis.asyncio as aioredis
-            _redis_check = aioredis.from_url(settings.redis_url)
+            # INFRA-02: Configure connection pool to cap max connections and prevent exhaustion
+            _redis_check = aioredis.from_url(
+                settings.redis_url,
+                max_connections=20,
+            )
             await _redis_check.ping()
             await _redis_check.aclose()
             logger.info("Redis connectivity confirmed for rate limiter")
@@ -196,8 +200,9 @@ async def limit_request_body_size(request: Request, call_next):
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     # INFRA-05: Log full stack trace in dev only — production logs only type+message to avoid leaking internals.
+    # INFRA-06: Truncate exc message to 200 chars to prevent leaking DB connection strings or secrets.
     if settings.environment == "production":
-        logger.error("Unhandled exception: %s: %s", type(exc).__name__, str(exc))
+        logger.error("Unhandled exception: %s: %s", type(exc).__name__, str(exc)[:200])
     else:
         logger.error("Unhandled exception: %s", str(exc), exc_info=True)
     return JSONResponse(

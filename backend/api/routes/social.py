@@ -8,7 +8,7 @@ import secrets
 import time
 from datetime import datetime, timezone, date
 from typing import Optional, List
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote
 import math
 
 import httpx
@@ -171,6 +171,7 @@ async def initiate_connection(
             detail=f"OAuth for {platform} is not yet implemented. Currently supported: facebook, instagram.",
         )
 
+    # TODO: Move state token to httpOnly cookie for better CSRF protection (requires frontend update)  # SM-35
     return ConnectAccountResponse(
         authorization_url=authorization_url,
         state=state,
@@ -194,9 +195,11 @@ async def oauth_callback(
     frontend_callback = f"{settings.frontend_url}/social/callback"
 
     # Handle OAuth error from provider
+    # SM-36: Sanitize provider error params to prevent open redirect / injection
     if error:
+        error_msg = quote(str(error_description or error or "OAuth error"), safe="")
         return RedirectResponse(
-            url=f"{frontend_callback}?error={error}&platform={platform}"
+            url=f"{frontend_callback}?error={error_msg}&platform={platform}"
         )
 
     if not code or not state:
@@ -291,6 +294,9 @@ async def oauth_callback(
     )
 
 
+# SM-40: TODO: This helper should only raise ValueError/httpx.HTTPError (not HTTPException)
+# so that the route handler controls the HTTP response. Any HTTPException added here
+# would bypass FastAPI's exception handling if caught by the caller's generic except clause.
 async def _facebook_exchange_and_profile(code: str) -> tuple[dict, dict]:
     """
     Exchange Facebook OAuth code for a long-lived page access token
@@ -316,6 +322,9 @@ async def _facebook_exchange_and_profile(code: str) -> tuple[dict, dict]:
             )
 
         token_data = token_resp.json()
+        # SM-37: Check for error field before accessing access_token
+        if "error" in token_data:
+            raise ValueError(f"Facebook token exchange failed: {token_data['error'].get('message', 'Unknown error')}")
         short_token = token_data.get("access_token")
         if not short_token:
             raise ValueError("Facebook token response missing 'access_token'")

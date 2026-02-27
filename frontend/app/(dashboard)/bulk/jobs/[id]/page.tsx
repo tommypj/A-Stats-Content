@@ -32,19 +32,21 @@ const ITEM_STATUS: Record<string, { icon: typeof CheckCircle2; color: string }> 
 export default function BulkJobDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const rawId = params.id;
+  const jobId = Array.isArray(rawId) ? rawId[0] : (rawId ?? "");
   const [job, setJob] = useState<BulkJobDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadJob = useCallback(async () => {
     try {
-      const data = await api.bulk.getJob(params.id as string);
+      const data = await api.bulk.getJob(jobId);
       setJob(data);
     } catch (err) {
       toast.error(parseApiError(err).message);
     } finally {
       setIsLoading(false);
     }
-  }, [params.id]);
+  }, [jobId]);
 
   useEffect(() => {
     loadJob();
@@ -78,6 +80,10 @@ export default function BulkJobDetailPage() {
       toast.error(parseApiError(err).message);
     }
   };
+
+  if (!jobId) {
+    return <div>Not found</div>;
+  }
 
   if (isLoading) {
     return (

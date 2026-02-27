@@ -203,6 +203,22 @@ async def create_project_checkout(
             detail="Payment system not configured",
         )
 
+    # BILL-30: Validate variant_id against known configured variants
+    allowed_variants = {
+        settings.lemonsqueezy_variant_starter_monthly,
+        settings.lemonsqueezy_variant_starter_yearly,
+        settings.lemonsqueezy_variant_professional_monthly,
+        settings.lemonsqueezy_variant_professional_yearly,
+        settings.lemonsqueezy_variant_enterprise_monthly,
+        settings.lemonsqueezy_variant_enterprise_yearly,
+    }
+    allowed_variants = {str(v) for v in allowed_variants if v}
+    if allowed_variants and str(request.variant_id) not in allowed_variants:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid subscription variant",
+        )
+
     # Build checkout URL with project context
     # Format: https://YOUR_STORE.lemonsqueezy.com/checkout/buy/{variant_id}
     store_url = f"https://{settings.lemonsqueezy_store_id}.lemonsqueezy.com"

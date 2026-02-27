@@ -541,15 +541,16 @@ async def query_knowledge(
             )
 
     # KV-06: Limit chunk loading to prevent O(N) memory exhaustion.
-    # We cap at 500 chunks; for large vaults this may miss some relevant results,
-    # but prevents the query from becoming unbounded.
+    # KV-09: Reduced hard cap from 500 to 50; 500 × 2KB = ~1MB per query in memory.
+    # For large vaults this may miss some relevant results, but prevents
+    # the query from becoming unbounded.
     source_ids = [s.id for s in sources]
     source_title_map = {s.id: s.title for s in sources}
 
     chunks_result = await db.execute(
         select(KnowledgeChunk)
         .where(KnowledgeChunk.source_id.in_(source_ids))
-        .limit(500)
+        .limit(50)
     )
     all_chunks = chunks_result.scalars().all()
 
@@ -588,6 +589,9 @@ async def query_knowledge(
     query_time_ms = int((time.time() - start_time) * 1000)
 
     # Log the query
+    # KV-11: KnowledgeQuery model lacks project_id — query stats span all user projects.
+    # TODO: Add project_id column to KnowledgeQuery model + Alembic migration,
+    #       then pass project_id=current_user.current_project_id here.
     query_log = KnowledgeQuery(
         id=str(uuid4()),
         user_id=current_user.id,
@@ -710,11 +714,13 @@ async def reprocess_source(
 
     Use *force=true* to reprocess sources that are already in COMPLETED status.
     """
+    # KV-08: Use with_for_update() to prevent race condition between ownership check
+    # and chunk loading — ensures no concurrent reprocess can interleave
     result = await db.execute(
         select(KnowledgeSource).where(
             KnowledgeSource.id == source_id,
             _build_ownership_filter(current_user),
-        )
+        ).with_for_update()
     )
     source = result.scalar_one_or_none()
     if not source:
@@ -739,7 +745,7 @@ async def reprocess_source(
             detail="Original file is no longer available on disk. Please re-upload the document.",
         )
 
-    # Validate file path is within expected storage directory
+    # KV-10: Validate file path BEFORE opening/reading the file to prevent path traversal
     from services.knowledge_processor import KNOWLEDGE_STORAGE_DIR
     resolved = Path(source.file_url).resolve()
     if not resolved.is_relative_to(KNOWLEDGE_STORAGE_DIR.resolve()):
@@ -749,7 +755,7 @@ async def reprocess_source(
             detail="Invalid file path",
         )
 
-    # Read the stored file and reprocess
+    # Read the stored file and reprocess (path validated above)
     with open(source.file_url, "rb") as fh:
         file_content = fh.read()
 

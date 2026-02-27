@@ -538,7 +538,8 @@ async def import_conversions(
         imported_count += 1
 
     if imported_count:
-        await db.flush()
+        # ANA-27: Use commit() not flush() to ensure data is persisted even on interrupt
+        await db.commit()
 
     return {
         "imported_count": imported_count,

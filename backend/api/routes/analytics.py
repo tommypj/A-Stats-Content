@@ -9,7 +9,7 @@ from urllib.parse import urlencode, urlparse, urlunparse
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy import select, func, and_, or_, desc
+from sqlalchemy import select, func, and_, or_, desc, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.schemas.analytics import (
@@ -1598,7 +1598,7 @@ async def get_content_health(
 
 @router.get("/decay/alerts", response_model=ContentDecayAlertListResponse)
 async def list_decay_alerts(
-    page: int = Query(default=1, ge=1),
+    page: int = Query(default=1, ge=1, le=1000),  # ANA-24: cap page to prevent unbounded offset
     page_size: int = Query(default=20, ge=1, le=100),
     alert_type: Optional[str] = None,
     severity: Optional[str] = None,
@@ -1622,8 +1622,11 @@ async def list_decay_alerts(
     count_q = select(func.count(ContentDecayAlert.id)).where(and_(*conditions))
     total = (await db.execute(count_q)).scalar() or 0
 
-    # Fetch items
-    order_col = getattr(ContentDecayAlert, sort_by, ContentDecayAlert.created_at)
+    # ANA-25/ANA-28: Whitelist sort_by to prevent attribute injection
+    ALLOWED_SORT_FIELDS = {"created_at", "severity", "article_id", "status", "alert_type"}
+    if sort_by not in ALLOWED_SORT_FIELDS:
+        sort_by = "created_at"
+    order_col = getattr(ContentDecayAlert, sort_by)
     order = order_col.desc() if sort_order == "desc" else order_col.asc()
 
     items_q = (
@@ -1969,6 +1972,10 @@ async def delete_conversion_goal(
     if not goal:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found")
 
+    # ANA-26: Delete associated ContentConversion records before deleting the goal
+    await db.execute(
+        delete(ContentConversion).where(ContentConversion.goal_id == goal_id)
+    )
     await db.delete(goal)
     await db.commit()
     return {"message": "Goal deleted"}

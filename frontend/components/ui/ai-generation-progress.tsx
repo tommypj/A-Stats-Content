@@ -131,7 +131,7 @@ export function AIGenerationProgress({
     return () => clearInterval(interval);
   }, [isGenerating, tips]);
 
-  if (!isGenerating) return null;
+  if (!isGenerating) return <div className="hidden" aria-hidden="true" />;
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);

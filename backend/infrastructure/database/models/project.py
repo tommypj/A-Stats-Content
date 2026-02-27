@@ -185,7 +185,7 @@ class ProjectMember(Base, TimestampMixin):
 
     # Soft delete
     deleted_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        DateTime(timezone=True), nullable=True, index=True  # DB-06: index for deleted_at IS NULL filters
     )
 
     # Relationships

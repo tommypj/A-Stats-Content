@@ -419,8 +419,8 @@ class LinkedInAdapter(BaseSocialAdapter):
                 except ValueError as e:
                     logger.warning("Skipping media URL due to SSRF validation failure: %s", e)
                     continue
-                # Download media
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                # Download media — SM-25: per-file download timeout
+                async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
                     media_response = await client.get(media_url)
                     media_response.raise_for_status()
                     media_bytes = media_response.content
@@ -561,6 +561,12 @@ class LinkedInAdapter(BaseSocialAdapter):
                     asset_id = register_result["value"]["asset"]
                 except (KeyError, TypeError) as e:
                     raise SocialAPIError(f"Unexpected LinkedIn upload registration response structure: {e}")
+
+                # SM-28: Validate that the presigned upload URL is a LinkedIn-controlled domain
+                from urllib.parse import urlparse as _parse_upload_url
+                _parsed_upload = _parse_upload_url(upload_url)
+                if not (_parsed_upload.scheme == "https" and _parsed_upload.netloc.endswith(".linkedin.com")):
+                    raise ValueError(f"Unexpected LinkedIn upload URL domain: {_parsed_upload.netloc}")
 
                 # Step 2: Upload binary data
                 logger.info("Uploading media binary to LinkedIn")

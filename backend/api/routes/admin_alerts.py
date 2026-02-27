@@ -72,8 +72,14 @@ async def list_alerts(
     if alert_type:
         query = query.where(AdminAlert.alert_type == alert_type)
 
-    # Count
-    count_query = select(func.count()).select_from(query.subquery())
+    # ADM-29: Use direct func.count() instead of subquery for efficiency
+    count_query = select(func.count(AdminAlert.id))
+    if is_read is not None:
+        count_query = count_query.where(AdminAlert.is_read == is_read)
+    if severity:
+        count_query = count_query.where(AdminAlert.severity == severity)
+    if alert_type:
+        count_query = count_query.where(AdminAlert.alert_type == alert_type)
     total = (await db.execute(count_query)).scalar() or 0
 
     # Paginate

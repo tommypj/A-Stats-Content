@@ -108,7 +108,12 @@ export default function ArticlesPage() {
   // Debounce search keyword — reset to page 1 when keyword changes
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedKeyword(searchKeyword);
+      const trimmed = searchKeyword.trim();
+      if (searchKeyword !== "" && !trimmed) {
+        toast.error("Keyword cannot be empty");
+        return;
+      }
+      setDebouncedKeyword(trimmed);
       setPage(1);
     }, 300);
     return () => clearTimeout(timer);

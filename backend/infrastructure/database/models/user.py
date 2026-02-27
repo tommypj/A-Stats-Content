@@ -73,6 +73,7 @@ class User(Base, TimestampMixin):
         String(50),
         default=UserStatus.PENDING.value,
         nullable=False,
+        index=True,  # DB-04: index for login/suspension checks that filter by status
     )
 
     # Email verification

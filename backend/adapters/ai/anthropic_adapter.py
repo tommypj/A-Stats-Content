@@ -73,7 +73,7 @@ class AnthropicContentService:
         if settings.anthropic_api_key:
             self._client = anthropic.AsyncAnthropic(
                 api_key=settings.anthropic_api_key,
-                timeout=300.0,
+                timeout=float(settings.anthropic_timeout),
             )
         else:
             self._client = None
@@ -275,6 +275,10 @@ Respond in JSON format:
             )
             for s in data.get("sections", [])
         ]
+
+        # GEN-33: cap sections to prevent AI returning excessive counts
+        if len(sections) > 20:
+            sections = sections[:20]
 
         return GeneratedOutline(
             title=data.get("title", f"Article about {keyword}"),

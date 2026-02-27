@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, JSON, Index
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, TimestampMixin
 
@@ -97,6 +97,14 @@ class KnowledgeSource(Base, TimestampMixin):
         DateTime(timezone=True), nullable=True
     )
 
+    # DB-09: ORM-level cascade so that deleting a KnowledgeSource via session.delete()
+    # removes all child KnowledgeChunks at the ORM layer (not just at DB level).
+    chunks = relationship(
+        "KnowledgeChunk",
+        back_populates="source",
+        cascade="all, delete-orphan",
+    )
+
     # Indexes
     __table_args__ = (
         Index("ix_knowledge_sources_user_status", "user_id", "status"),
@@ -151,6 +159,9 @@ class KnowledgeChunk(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
+
+    # DB-09: back_populates to complete the bidirectional relationship
+    source = relationship("KnowledgeSource", back_populates="chunks")
 
     # Indexes
     __table_args__ = (

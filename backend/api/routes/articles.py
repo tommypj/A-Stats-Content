@@ -452,6 +452,10 @@ async def _run_article_generation(
 
         except Exception as e:
             logger.error("Background generation failed for article %s: %s", article_id, e, exc_info=True)
+            try:
+                await db.rollback()
+            except Exception:
+                pass
             # Use a fresh session to mark as failed (original session may be broken)
             try:
                 async with async_session_maker() as err_db:
@@ -517,10 +521,10 @@ async def generate_article(
             detail="Outline not found",
         )
 
-    if not outline.sections:
+    if outline.sections is None or not isinstance(outline.sections, list) or len(outline.sections) == 0:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Outline has no sections. Generate outline first.",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Outline has no sections to generate from",
         )
 
     # Check usage limit
@@ -702,7 +706,7 @@ class KeywordSuggestionRequest(BaseModel):
 
 
 @router.post("/keyword-suggestions")
-@limiter.limit("10/minute")
+@limiter.limit("5/minute")
 async def get_keyword_suggestions(
     request: Request,
     body: KeywordSuggestionRequest,
@@ -1099,7 +1103,11 @@ async def improve_article(
             detail="Article has no content to improve",
         )
 
-    # PROJ-01: Check monthly AI usage limit before calling AI
+    # GEN-23: improve_article currently counts against the full article generation quota
+    # which is likely unintended — AI improvement is a lighter operation than full generation.
+    # TODO: improve_article should use a separate quota (e.g., resource_type="proofread")
+    #       with a higher limit (e.g., 3× the article limit) once a dedicated quota exists.
+    # For now it reuses the article check to avoid completely bypassing limits.
     tracker = GenerationTracker(db)
     if not await tracker.check_limit(
         project_id=current_user.current_project_id,

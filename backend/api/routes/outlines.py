@@ -235,7 +235,7 @@ async def export_all_outlines(
             Outline.user_id == current_user.id,
             Outline.project_id.is_(None),
         )
-    query = query.order_by(Outline.created_at.desc())
+    query = query.order_by(Outline.created_at.desc()).limit(1000)
     result = await db.execute(query)
     outlines = result.scalars().all()
 

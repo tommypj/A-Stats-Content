@@ -75,9 +75,9 @@ async def process_bulk_outline_job(
     from adapters.ai.anthropic_adapter import content_ai_service
     from services.generation_tracker import GenerationTracker
 
-    # Fetch job
+    # Fetch job — with_for_update prevents concurrent workers from double-processing (BULK-29)
     job_result = await db.execute(
-        select(BulkJob).where(and_(BulkJob.id == job_id, BulkJob.user_id == user_id))
+        select(BulkJob).where(and_(BulkJob.id == job_id, BulkJob.user_id == user_id)).with_for_update()
     )
     job = job_result.scalar_one_or_none()
     if not job:
@@ -192,6 +192,10 @@ async def process_bulk_outline_job(
                 estimated_read_time=generated.estimated_read_time,
                 ai_model=settings.anthropic_model,
             )
+            # BULK-30: propagate language to the outline record when the field exists
+            if hasattr(outline, 'language') and language:
+                outline.language = language
+
             db.add(outline)
 
             duration_ms = int((time.time() - start_time) * 1000)

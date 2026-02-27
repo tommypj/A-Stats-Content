@@ -139,10 +139,16 @@ class TokenService:
                 algorithms=[self._algorithm],
             )
 
+            # INFRA-AUTH-01: Validate required fields exist before accessing them
+            required_fields = ["sub", "exp", "type"]
+            for field in required_fields:
+                if field not in payload:
+                    raise JWTError(f"Missing required field: {field}")
+
             return TokenPayload(
                 sub=payload.get("sub"),
                 exp=datetime.fromtimestamp(payload.get("exp"), tz=timezone.utc),
-                iat=datetime.fromtimestamp(payload.get("iat"), tz=timezone.utc),
+                iat=datetime.fromtimestamp(payload.get("iat", 0), tz=timezone.utc),
                 type=payload.get("type"),
                 email=payload.get("email"),
                 role=payload.get("role"),

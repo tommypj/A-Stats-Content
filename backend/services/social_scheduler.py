@@ -7,7 +7,7 @@ platforms, and tracks results.
 """
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 import logging
 
@@ -206,6 +206,15 @@ class SocialSchedulerService:
                 f"({account.platform_username})"
             )
 
+            # SM-41: Validate platform_user_id before attempting post
+            if not account.platform_user_id:
+                logger.error("Account %s has no platform_user_id, skipping post", account.id)
+                target.publish_error = "Account configuration incomplete"
+                return PostResult(
+                    success=False,
+                    error_message="Account configuration incomplete: missing platform_user_id",
+                )
+
             # Decrypt credentials — map DB column names to SocialCredentials fields
             try:
                 credentials = SocialCredentials(
@@ -304,11 +313,18 @@ class SocialSchedulerService:
             return result
 
         except SocialRateLimitError as e:
-            # Retry once after a short backoff
-            retry_delay = getattr(e, "retry_after", 30) or 30
-            retry_delay = min(retry_delay, 120)  # Cap at 2 minutes
+            # SM-30: Extract retry_after from error and store on the post record
+            retry_delay = getattr(e, "retry_after", None)
+            if retry_delay is None:
+                # Try to parse from error string if retry_after not set as attribute
+                import re as _re
+                _m = _re.search(r"retry.after[:\s]+(\d+)", str(e), _re.IGNORECASE)
+                retry_delay = int(_m.group(1)) if _m else 60
+            retry_delay = int(retry_delay)
+            retry_delay = min(max(retry_delay, 1), 120)  # Cap at 2 minutes, minimum 1s
+            post.scheduled_at = datetime.now(timezone.utc) + timedelta(seconds=retry_delay)
             logger.warning(
-                f"Rate limit hit for {account.platform}, retrying in {retry_delay}s: {e}"
+                f"Rate limit hit for {account.platform}, rescheduled in {retry_delay}s: {e}"
             )
             await asyncio.sleep(retry_delay)
             try:

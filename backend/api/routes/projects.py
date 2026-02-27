@@ -362,12 +362,13 @@ async def update_brand_voice(
     # AUTH-06: Require admin/owner role to modify brand voice.
     await require_project_admin(project_id, current_user, db)
 
+    # PROJ-42: Use with_for_update() to prevent TOCTOU race conditions on concurrent updates
     stmt = select(Project).where(
         and_(
             Project.id == project_id,
             Project.deleted_at.is_(None),
         )
-    )
+    ).with_for_update()
     result = await db.execute(stmt)
     project = result.scalar_one_or_none()
 
@@ -669,6 +670,17 @@ async def remove_member(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Remove a member from the project. Requires admin or owner. Cannot remove owner."""
+    # PROJ-38: Verify project exists and is not deleted before proceeding
+    project_check = await db.execute(
+        select(Project).where(
+            Project.id == project_id,
+            Project.deleted_at.is_(None),
+        )
+    )
+    project = project_check.scalar_one_or_none()
+    if not project or project.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
     await require_project_admin(project_id, current_user, db)
 
     result = await db.execute(

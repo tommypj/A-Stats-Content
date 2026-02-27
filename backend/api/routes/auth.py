@@ -283,6 +283,13 @@ async def login(
             detail="Account is inactive",
         )
 
+    # INFRA-AUTH-05: Block unverified (PENDING) users even if is_active is True
+    if user.status == UserStatus.PENDING.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please verify your email address before logging in",
+        )
+
     if user.status == UserStatus.SUSPENDED.value:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

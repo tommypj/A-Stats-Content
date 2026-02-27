@@ -247,6 +247,13 @@ async def cancel_subscription(
             detail="No active subscription to cancel",
         )
 
+    # BILL-25: Prevent redundant cancellation API calls for already-terminated subscriptions
+    if current_user.subscription_status in ("cancelled", "expired"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Subscription is already cancelled or expired",
+        )
+
     logger.info(f"Subscription cancellation requested for user {current_user.id}")
 
     async with httpx.AsyncClient() as client:
@@ -343,7 +350,9 @@ async def handle_project_subscription_webhook(
             project.subscription_tier = tier
             project.subscription_status = subscription_status or "active"  # BILL-08
             project.lemonsqueezy_customer_id = str(customer_id) if customer_id else None
-            project.lemonsqueezy_subscription_id = str(subscription_id) if subscription_id else None
+            # BILL-28: only overwrite subscription_id when webhook provides one
+            if subscription_id is not None:
+                project.lemonsqueezy_subscription_id = str(subscription_id)
             project.lemonsqueezy_variant_id = str(variant_id) if variant_id else None  # BILL-07
 
             if renews_at:
@@ -523,6 +532,11 @@ async def handle_webhook(
         logger.warning("Unknown subscription_status from webhook: %s", subscription_status)
         subscription_status = "active"  # safe default, webhook event type drives logic
 
+    # BILL-24: Reject paid events that are missing subscription_id to avoid corrupting records
+    if event_name in ("subscription_created", "order_created") and not subscription_id:
+        logger.warning("Webhook %s missing subscription_id, ignoring", event_name)
+        return {"status": "ok"}
+
     logger.info(
         f"Webhook received: event={event_name}, user_id={user_id}, "
         f"project_id={project_id}, subscription_id={subscription_id}, status={subscription_status}"
@@ -589,7 +603,9 @@ async def handle_webhook(
             user.subscription_tier = tier
             user.subscription_status = subscription_status or "active"  # BILL-08
             user.lemonsqueezy_customer_id = str(customer_id) if customer_id else None
-            user.lemonsqueezy_subscription_id = str(subscription_id) if subscription_id else None
+            # BILL-28: only overwrite subscription_id when webhook provides one
+            if subscription_id is not None:
+                user.lemonsqueezy_subscription_id = str(subscription_id)
 
             if renews_at:
                 user.subscription_expires = _parse_iso_datetime(renews_at)

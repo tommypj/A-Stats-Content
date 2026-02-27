@@ -40,6 +40,7 @@ import {
   Bot,
 } from "lucide-react";
 import { api, Article, ArticleRevision, ArticleRevisionDetail, LinkSuggestion, AEOScore } from "@/lib/api";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { calculateSEOScore, SEOScore } from "@/lib/seo-score";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { Button } from "@/components/ui/button";
@@ -699,7 +700,8 @@ function formatRevisionType(revisionType: string): string {
 export default function ArticleEditorPage() {
   const params = useParams();
   const router = useRouter();
-  const articleId = params.id as string;
+  const rawArticleId = params.id;
+  const articleId = Array.isArray(rawArticleId) ? rawArticleId[0] : (rawArticleId ?? "");
 
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(true);
@@ -745,6 +747,7 @@ export default function ArticleEditorPage() {
   const [showLinkSuggestions, setShowLinkSuggestions] = useState(false);
   const [linkSuggestions, setLinkSuggestions] = useState<LinkSuggestion[]>([]);
   const [loadingLinks, setLoadingLinks] = useState(false);
+  const [linkSuggestionsError, setLinkSuggestionsError] = useState(false);
 
   // Export dropdown state
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -1087,6 +1090,10 @@ export default function ArticleEditorPage() {
         setRestoringRevisionId(revisionId);
         try {
           const updated = await api.articles.restoreRevision(article.id, revisionId);
+          if (!updated) {
+            toast.error("Failed to restore revision");
+            return;
+          }
           setArticle(updated);
           setTitle(updated.title);
           setContent(updated.content || "");
@@ -1113,13 +1120,14 @@ export default function ArticleEditorPage() {
     const nextOpen = !showLinkSuggestions;
     setShowLinkSuggestions(nextOpen);
     // Lazy-load suggestions only when opening for the first time
-    if (nextOpen && linkSuggestions.length === 0) {
+    if (nextOpen && linkSuggestions.length === 0 && !linkSuggestionsError) {
       setLoadingLinks(true);
       try {
         const data = await api.articles.linkSuggestions(articleId);
         setLinkSuggestions(data.suggestions);
       } catch (error) {
         toast.error("Failed to load link suggestions");
+        setLinkSuggestionsError(true);
       } finally {
         setLoadingLinks(false);
       }
@@ -1202,6 +1210,7 @@ export default function ArticleEditorPage() {
   const seo = article.seo_analysis;
 
   return (
+    <ErrorBoundary>
     <div className="space-y-6 min-w-0">
       <ConfirmDialog
         isOpen={!!confirmAction}
@@ -1572,7 +1581,7 @@ export default function ArticleEditorPage() {
           {/* SERP Preview */}
           <SerpPreview
             title={title}
-            slug={article.slug || ""}
+            slug={article.slug || article.title?.toLowerCase().replace(/\s+/g, "-") || "article"}
             metaDescription={metaDescription}
             keyword={keyword}
           />
@@ -1945,6 +1954,17 @@ export default function ArticleEditorPage() {
                   <div className="flex items-center justify-center py-4">
                     <Loader2 className="h-4 w-4 animate-spin text-text-muted" />
                   </div>
+                ) : linkSuggestionsError ? (
+                  <div className="text-center py-3 space-y-2">
+                    <p className="text-xs text-red-500">Failed to load link suggestions.</p>
+                    <button
+                      type="button"
+                      onClick={() => { setLinkSuggestionsError(false); handleToggleLinkSuggestions(); }}
+                      className="text-xs text-primary-600 hover:underline"
+                    >
+                      Retry
+                    </button>
+                  </div>
                 ) : linkSuggestions.length === 0 ? (
                   <p className="text-xs text-text-muted text-center py-3">
                     No related articles found. Try publishing more articles with overlapping keywords.
@@ -2016,5 +2036,6 @@ export default function ArticleEditorPage() {
         onClose={() => setShowSocialModal(false)}
       />
     </div>
+    </ErrorBoundary>
   );
 }

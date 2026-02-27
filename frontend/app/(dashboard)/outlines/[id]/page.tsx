@@ -25,7 +25,8 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 export default function OutlineDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const outlineId = params.id as string;
+  const rawId = params.id;
+  const outlineId = Array.isArray(rawId) ? rawId[0] : (rawId ?? "");
 
   const [outline, setOutline] = useState<Outline | null>(null);
   const [loading, setLoading] = useState(true);

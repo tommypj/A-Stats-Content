@@ -204,8 +204,11 @@ export default function AdminDashboardPage() {
                     stroke="#6b7280"
                     fontSize={12}
                     tickFormatter={(value) => {
-                      const date = new Date(value);
-                      return `${date.getMonth() + 1}/${date.getDate()}`;
+                      try {
+                        return new Date(value).toLocaleDateString();
+                      } catch {
+                        return value;
+                      }
                     }}
                   />
                   <YAxis stroke="#6b7280" fontSize={12} />

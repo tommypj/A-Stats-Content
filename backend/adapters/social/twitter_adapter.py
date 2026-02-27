@@ -487,8 +487,8 @@ class TwitterAdapter(BaseSocialAdapter):
                 except ValueError as e:
                     logger.warning("Skipping media URL due to SSRF validation failure: %s", e)
                     continue
-                # Download media
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                # Download media — SM-26: per-file download timeout
+                async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
                     media_response = await client.get(media_url)
                     media_response.raise_for_status()
                     media_bytes = media_response.content

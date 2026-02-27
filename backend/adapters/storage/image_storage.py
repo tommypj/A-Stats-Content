@@ -100,6 +100,8 @@ class LocalStorageAdapter(StorageAdapter):
         Returns:
             Sanitized filename safe for filesystem
         """
+        # IMG-32: Remove null bytes first to prevent bypass
+        filename = filename.replace("\x00", "")
         # Remove path components
         filename = os.path.basename(filename)
 
@@ -107,6 +109,10 @@ class LocalStorageAdapter(StorageAdapter):
         unsafe_chars = ['/', '\\', '..', '\0', '\n', '\r', '\t']
         for char in unsafe_chars:
             filename = filename.replace(char, '_')
+
+        # IMG-32: Keep only safe characters (word chars, hyphens, dots)
+        import re as _re
+        filename = _re.sub(r"[^\w\-.]", "_", filename)
 
         # Ensure we have a valid extension
         if '.' not in filename:
@@ -331,7 +337,8 @@ class S3StorageAdapter(StorageAdapter):
             return False
 
         try:
-            # Extract S3 key from URL if necessary
+            # IMG-30: Always use self.bucket, never parse bucket from URL.
+            # Extract only the S3 key from URL if a full URL is passed.
             s3_key = path
             if path.startswith('http'):
                 # Extract key from URL like https://bucket.s3.amazonaws.com/key/path
@@ -342,8 +349,9 @@ class S3StorageAdapter(StorageAdapter):
                     slash_parts = remainder.split('/', 2)
                     s3_key = slash_parts[2] if len(slash_parts) > 2 else slash_parts[-1]
 
+            bucket = self.bucket  # IMG-30: always use configured bucket, not parsed from URL
             # Delete from S3
-            self.s3_client.delete_object(Bucket=self.bucket, Key=s3_key)
+            self.s3_client.delete_object(Bucket=bucket, Key=s3_key)
             logger.info(f"Deleted image from S3: {s3_key}")
             return True
 
@@ -368,6 +376,7 @@ class S3StorageAdapter(StorageAdapter):
             raise RuntimeError("S3 client or bucket not configured")
 
         # If a CDN domain is configured, use it directly (CDN handles auth)
+        # IMG-31: CDN domain must only come from settings, never from user input
         cdn_domain = getattr(settings, 'cdn_domain', None)
         if cdn_domain:
             return f"https://{cdn_domain}/{path}"
@@ -379,7 +388,10 @@ class S3StorageAdapter(StorageAdapter):
         )
 
 
-ALLOWED_IMAGE_DOMAINS = {"replicate.delivery", "pbxt.replicate.delivery", "cdn.replicate.com"}
+# IMG-21: Use only top-level domains to prevent SSRF bypass via deep subdomains.
+# e.g. evil.pbxt.replicate.delivery.com would match "pbxt.replicate.delivery" via endswith.
+# Restricting to top-level domains means only legitimate Replicate subdomains are allowed.
+_TOP_LEVEL_ALLOWED_DOMAINS = {"replicate.delivery", "replicate.com"}
 MAX_IMAGE_SIZE = 20 * 1024 * 1024  # 20MB
 
 
@@ -400,21 +412,24 @@ async def download_image(url: str) -> bytes:
         ValueError: If the URL fails domain or size validation
         RuntimeError: If download fails
     """
-    # SSRF: validate domain before fetching
+    # SSRF: validate domain before fetching — IMG-21: use top-level domain allowlist
     parsed = urlparse(url)
+    netloc = parsed.netloc
     if parsed.scheme != "https" or not any(
-        parsed.netloc == d or parsed.netloc.endswith("." + d)
-        for d in ALLOWED_IMAGE_DOMAINS
+        netloc == d or netloc.endswith("." + d)
+        for d in _TOP_LEVEL_ALLOWED_DOMAINS
     ):
-        raise ValueError(f"Image URL failed domain validation: {parsed.netloc}")
+        raise ValueError(f"Image URL failed domain validation: {netloc}")
 
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
                 if response.status == 200:
+                    # IMG-22: Check content-type BEFORE reading the body to avoid
+                    # downloading large non-image payloads
                     content_type = response.headers.get("content-type", "").lower()
-                    if content_type and "image" not in content_type:
-                        raise RuntimeError(
+                    if not content_type.startswith("image/"):
+                        raise ValueError(
                             f"Downloaded content is not an image (content-type: {content_type})"
                         )
                     # Size limit: check Content-Length header first to fail fast

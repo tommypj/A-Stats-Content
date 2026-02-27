@@ -4,7 +4,7 @@ Social media scheduling API schemas.
 
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # ============================================
@@ -88,6 +88,21 @@ class CreatePostRequest(BaseModel):
     targets: Optional[List[PostTargetRequest]] = Field(
         None, description="Platform-specific overrides"
     )
+
+    # SM-33: Validate media_urls as a list of valid HTTP/HTTPS URL strings
+    @field_validator("media_urls")
+    @classmethod
+    def validate_media_urls(cls, v):
+        if v is None:
+            return []
+        if not isinstance(v, list):
+            raise ValueError("media_urls must be a list")
+        for url in v:
+            if not isinstance(url, str):
+                raise ValueError("Each media URL must be a string")
+            if not url.startswith(("http://", "https://")):
+                raise ValueError(f"Invalid media URL: {url}")
+        return v
 
 
 class UpdatePostRequest(BaseModel):

@@ -76,6 +76,8 @@ class GenerationTracker:
         if log.project_id:
             try:
                 usage_service = ProjectUsageService(self.db)
+                # GEN-22: resource_type is stored singular ("article") — add "s" to match
+                # ProjectUsageService which uses plural keys ("articles", "outlines", "images")
                 await usage_service.increment_usage(log.project_id, log.resource_type + "s")
             except Exception as e:
                 logger.warning("Failed to increment usage for project %s: %s", log.project_id, e)
@@ -215,7 +217,8 @@ class GenerationTracker:
             usage_service = ProjectUsageService(self.db)
             # Reset usage if needed
             await usage_service.reset_project_usage_if_needed(project_id)
-            # Check limit — resource_type should be plural: 'articles', 'outlines', 'images'
+            # GEN-22: resource_type arrives singular ("article") — add "s" to match
+            # ProjectUsageService which expects plural keys ("articles", "outlines", "images")
             return await usage_service.check_project_limit(project_id, resource_type + "s")
         except Exception as e:
             logger.error("Failed to check project usage limit: %s", str(e))

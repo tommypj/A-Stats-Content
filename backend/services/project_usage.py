@@ -162,7 +162,14 @@ class ProjectUsageService:
         Raises:
             ValueError: If resource type is invalid or project not found
         """
-        project = await self.get_project(project_id)
+        # GEN-30: Use with_for_update() to prevent TOCTOU — concurrent improve_article
+        # requests that both pass the check before either increments the counter
+        result = await self.db.execute(
+            select(Project).where(Project.id == str(project_id)).with_for_update()
+        )
+        project = result.scalar_one_or_none()
+        if not project:
+            raise ValueError(f"Project {project_id} not found")
         limits = self.get_project_limits(project)
 
         # Map resource type to (current_usage, limit).
@@ -288,7 +295,15 @@ class ProjectUsageService:
         Returns:
             True if usage was reset, False otherwise
         """
-        project = await self.get_project(project_id)
+        # GEN-24: Use with_for_update() to prevent race condition where two concurrent
+        # requests both read stale usage_reset_date and both attempt to reset counters
+        from infrastructure.database.models.project import Project as _Project
+        result = await self.db.execute(
+            select(_Project).where(_Project.id == str(project_id)).with_for_update()
+        )
+        project = result.scalar_one_or_none()
+        if not project:
+            return False
 
         # Check if reset is needed
         if not project.usage_reset_date:

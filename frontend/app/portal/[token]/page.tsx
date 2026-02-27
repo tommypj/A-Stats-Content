@@ -107,7 +107,12 @@ export default function ClientPortalPage() {
 
     async function loadPortal() {
       try {
-        const result = await api.agency.portal(token);
+        const result = await Promise.race([
+          api.agency.portal(token),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("timeout")), 10000)
+          ),
+        ]);
         if (!cancelled) {
           setData(result);
         }
