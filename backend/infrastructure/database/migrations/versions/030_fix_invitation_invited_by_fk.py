@@ -19,12 +19,28 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Drop existing FK and re-add with ON DELETE SET NULL
-    op.drop_constraint(
-        "project_invitations_invited_by_fkey",
-        "project_invitations",
-        type_="foreignkey",
-    )
+    # Drop the existing FK on invited_by using a DO block so it succeeds regardless
+    # of the constraint's actual name in the target database.
+    op.execute("""
+        DO $$
+        DECLARE
+            v_constraint_name text;
+        BEGIN
+            SELECT c.conname INTO v_constraint_name
+            FROM pg_constraint c
+            JOIN pg_class t ON c.conrelid = t.oid
+            JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(c.conkey)
+            WHERE t.relname = 'project_invitations'
+              AND c.contype = 'f'
+              AND a.attname = 'invited_by'
+            LIMIT 1;
+
+            IF v_constraint_name IS NOT NULL THEN
+                EXECUTE 'ALTER TABLE project_invitations DROP CONSTRAINT '
+                    || quote_ident(v_constraint_name);
+            END IF;
+        END $$;
+    """)
     op.create_foreign_key(
         "project_invitations_invited_by_fkey",
         "project_invitations",
