@@ -200,12 +200,12 @@ Tone: {tone}
 Target word count: {word_count_target} words{language_context}
 
 Generate a detailed outline with:
-1. A compelling, SEO-optimized title{f' (in {language_name})' if language != 'en' else ''}
+1. A compelling, SEO-optimized title that is 30-60 characters long and includes the keyword "{keyword}"{f' (in {language_name})' if language != 'en' else ''}
 2. 5-7 main sections with H2 headings{f' (in {language_name})' if language != 'en' else ''}
 3. 2-4 subheadings (H3) per section
 4. Brief notes for each section describing the content
 5. Estimated word count per section
-6. A meta description (150-160 characters){f' (in {language_name})' if language != 'en' else ''}
+6. A meta description (150-160 characters) that includes the keyword "{keyword}"{f' (in {language_name})' if language != 'en' else ''}
 
 Respond in JSON format:
 {{
@@ -317,6 +317,23 @@ Respond in JSON format:
         word_min = int(word_count_target * 0.85)
         word_max = int(word_count_target * 1.15)
 
+        # Build content format guidelines that respect list_usage and writing_style
+        if list_usage == "heavy" or writing_style == "listicle":
+            format_guidelines = """4. Structure content for maximum scannability — use bullet points and numbered lists as a primary format alongside paragraphs
+5. Open with a brief introduction (1-2 paragraphs) that hooks the reader, then dive into structured content
+6. Under each heading, use a mix of short paragraphs and lists. Lead with a brief context paragraph, then use a list to present key points
+7. When you use a list, each item should have a bold lead-in followed by a 1-2 sentence explanation"""
+        elif list_usage == "minimal":
+            format_guidelines = """4. Write rich, flowing paragraphs as the ONLY content format — avoid bullet points and numbered lists almost entirely
+5. Open with a compelling introduction (2-3 paragraphs) that hooks the reader through narrative prose
+6. Under each heading, write 3-4 substantive paragraphs. Do NOT use lists unless absolutely necessary (e.g., a sequence of 5+ steps)
+7. If you must use a single list, limit it to one in the entire article, and surround it with explanatory paragraphs"""
+        else:
+            format_guidelines = """4. Write rich, flowing paragraphs as the PRIMARY content format, with occasional lists where they genuinely help
+5. Open with a compelling introduction (2-3 paragraphs) that hooks the reader without using lists
+6. Under each heading, write at least 2-3 substantive paragraphs BEFORE considering any list
+7. When you do use a list, introduce it with a paragraph and follow it with analysis or a connecting paragraph"""
+
         prompt = f"""Write a complete, SEO-optimized article based on this outline:
 
 Title: {title}
@@ -333,21 +350,23 @@ IMPORTANT WRITING GUIDELINES:
 1. **WORD COUNT IS CRITICAL**: The article MUST be approximately {word_count_target} words. Distribute the word budget across sections proportionally to the per-section targets shown above. Do NOT write more than {word_max} words total.
 2. **COMPLETE ALL SECTIONS**: You MUST write content for EVERY section in the outline. Do not stop early. All {len(sections)} sections must be covered.
 3. Follow the outline structure exactly — use the provided H2 and H3 headings
-4. Write rich, flowing paragraphs as the PRIMARY content format
-5. Open with a compelling introduction (2-3 paragraphs) that hooks the reader without using lists
-6. Under each heading, write at least 2-3 substantive paragraphs BEFORE considering any list
-7. When you do use a list, introduce it with a paragraph and follow it with analysis or a connecting paragraph
+{format_guidelines}
 8. End with a conclusion that synthesizes key insights and includes a call-to-action
 9. Vary your paragraph openings — do not start consecutive paragraphs the same way
 10. Include specific examples, case studies, or scenarios to illustrate points
 11. Use transitional phrases to connect sections naturally
+
+SEO REQUIREMENTS (these are critical for ranking):
+12. **Keyword in introduction**: Naturally mention "{keyword}" within the first 1-2 sentences of the article
+13. **Internal/external links**: Include 2-3 contextual markdown links throughout the article — use descriptive anchor text. Examples: [relevant anchor text](https://example.com/relevant-page). Place them naturally within paragraphs where a source, tool, or related concept is mentioned
+14. **Keyword density**: Use "{keyword}" naturally throughout the article, aiming for roughly 1-2% density. Do NOT force it — only place it where it reads naturally
 {custom_context}
 
-Write the article in markdown format.
+Write the article in markdown format. Start directly with the introduction — do NOT repeat the title as an H1.
 
 At the very end, after the article, add:
 ---
-META_DESCRIPTION: [A compelling 150-160 character meta description]"""
+META_DESCRIPTION: [A compelling 150-160 character meta description that MUST include the keyword "{keyword}"]"""
 
         # Generate with retry on truncation
         max_attempts = 2
