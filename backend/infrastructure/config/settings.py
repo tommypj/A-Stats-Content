@@ -98,6 +98,7 @@ class Settings(BaseSettings):
     anthropic_model: str = "claude-sonnet-4-20250514"
     anthropic_max_tokens: int = 4096
     anthropic_timeout: int = 300
+    ai_request_timeout: int = 60  # GEN-31: timeout (seconds) for short AI requests (e.g. proofread)
 
     # Replicate (Image Generation)
     replicate_api_token: Optional[str] = None

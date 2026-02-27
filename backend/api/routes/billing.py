@@ -652,7 +652,11 @@ async def handle_webhook(
 
         elif event_name == WebhookEventType.SUBSCRIPTION_PAYMENT_FAILED.value:
             # Payment failed - don't downgrade yet, let LemonSqueezy retry
-            logger.warning(f"Payment failed for user {user_id}")
+            # BILL-33: structured log includes subscription_id for easier ops investigation
+            logger.warning(
+                "Payment failed for user %s (subscription %s)",
+                user_id, subscription_id,
+            )
 
         elif event_name == WebhookEventType.SUBSCRIPTION_RESUMED.value:
             # Subscription resumed
@@ -666,7 +670,11 @@ async def handle_webhook(
 
         elif event_name == WebhookEventType.SUBSCRIPTION_PAUSED.value:
             # Subscription paused - keep tier until expiration
-            logger.info(f"Subscription paused for user {user_id}")
+            # BILL-33: structured log includes subscription_id for easier ops investigation
+            logger.info(
+                "Subscription paused for user %s (subscription %s)",
+                user_id, subscription_id,
+            )
 
         elif event_name == WebhookEventType.SUBSCRIPTION_UNPAUSED.value:
             # Subscription unpaused
@@ -690,8 +698,11 @@ async def handle_webhook(
         personal_project = personal_project_result.scalar_one_or_none()
         if personal_project:
             personal_project.subscription_tier = user.subscription_tier
-            if user.subscription_expires is not None:
-                personal_project.subscription_expires = user.subscription_expires
+            # BILL-27: propagate subscription_status so personal project stays in sync
+            if hasattr(personal_project, "subscription_status"):
+                personal_project.subscription_status = user.subscription_status
+            # BILL-37: always mirror subscription_expires (including None) to avoid stale values
+            personal_project.subscription_expires = user.subscription_expires
         else:
             # BILL-13/BILL-23: warn if personal project is missing so ops can investigate
             logger.warning(

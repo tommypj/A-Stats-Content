@@ -54,8 +54,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/articles", tags=["articles"])
 
-# Timeout (seconds) for the grammar proofread pass — named constant for easy tuning
-PROOFREAD_TIMEOUT_SECONDS = 60
+# Timeout (seconds) for the grammar proofread pass — sourced from settings so it can be
+# overridden via environment variable (GEN-31)
+PROOFREAD_TIMEOUT_SECONDS = getattr(settings, "ai_request_timeout", 60)
 
 # Limit concurrent AI generation tasks to prevent resource exhaustion
 _generation_semaphore = asyncio.Semaphore(5)

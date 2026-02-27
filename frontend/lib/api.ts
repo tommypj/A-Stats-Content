@@ -181,7 +181,13 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        forceLogout();
+        // Only force-logout on a genuine auth failure (401/403 HTTP response).
+        // A network error or timeout has no response object — in that case we
+        // reject silently so a connectivity blip does not sign the user out.
+        const refreshAxiosError = refreshError as AxiosError;
+        if (refreshAxiosError.response?.status === 401 || refreshAxiosError.response?.status === 403) {
+          forceLogout();
+        }
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

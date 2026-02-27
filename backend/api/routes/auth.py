@@ -921,8 +921,10 @@ async def export_my_data(
         "last_login": current_user.last_login.isoformat() if current_user.last_login else None,
     }
 
-    # Articles
-    result = await db.execute(select(Article).where(Article.user_id == user_id))
+    # Articles — AUTH-24: exclude soft-deleted rows
+    result = await db.execute(
+        select(Article).where(Article.user_id == user_id, Article.deleted_at.is_(None))
+    )
     articles = [
         {
             "id": str(a.id),
@@ -937,8 +939,10 @@ async def export_my_data(
         for a in result.scalars().all()
     ]
 
-    # Outlines
-    result = await db.execute(select(Outline).where(Outline.user_id == user_id))
+    # Outlines — AUTH-24: exclude soft-deleted rows
+    result = await db.execute(
+        select(Outline).where(Outline.user_id == user_id, Outline.deleted_at.is_(None))
+    )
     outlines = [
         {
             "id": str(o.id),

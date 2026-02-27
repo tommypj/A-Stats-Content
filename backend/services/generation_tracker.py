@@ -32,7 +32,13 @@ class GenerationTracker:
         resource_id: str,
         input_metadata: Optional[dict] = None,
     ) -> GenerationLog:
-        """Log the start of a generation. Returns the log entry for later update."""
+        """Log the start of a generation. Returns the log entry for later update.
+
+        GEN-35: DB failures here are non-fatal — a warning is logged and a
+        detached (unsaved) log object is returned so generation proceeds
+        uninterrupted.  Callers (log_success / log_failure) already guard
+        against a missing log row via scalar_one_or_none checks.
+        """
         log = GenerationLog(
             id=str(uuid4()),
             user_id=user_id,
@@ -46,11 +52,13 @@ class GenerationTracker:
         try:
             self.db.add(log)
             await self.db.flush()
-            return log
         except Exception as e:
-            logger.error("Failed to create generation log: %s", e)
-            await self.db.rollback()
-            raise
+            logger.warning("Failed to log generation start (non-fatal): %s", e)
+            # Do not re-raise — allow generation to proceed even if tracking fails.
+            # The log object is returned in a detached/unsaved state; subsequent
+            # log_success / log_failure calls will find no matching row and skip
+            # their updates silently (they already guard with scalar_one_or_none).
+        return log
 
     async def log_success(
         self,

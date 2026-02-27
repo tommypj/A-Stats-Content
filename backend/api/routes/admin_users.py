@@ -79,6 +79,10 @@ async def create_audit_log(
     """
     Create an audit log entry for admin actions.
     """
+    # ADM-20: pre-truncate description before insert to avoid DB column overflow errors
+    MAX_DETAIL_LENGTH = 500  # matches expected DB column length for description strings
+    description = description[:MAX_DETAIL_LENGTH] if description else description
+
     # Combine description, metadata, and user_agent into the details JSON field
     details = metadata.copy() if metadata else {}
     if description:

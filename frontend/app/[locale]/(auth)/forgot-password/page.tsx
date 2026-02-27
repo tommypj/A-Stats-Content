@@ -24,7 +24,6 @@ export default function ForgotPasswordPage() {
   const tErrors = useTranslations("auth.errors");
   const [isLoading, setIsLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
-  const [sentEmail, setSentEmail] = useState("");
 
   const {
     register,
@@ -45,7 +44,6 @@ export default function ForgotPasswordPage() {
       // Ignore errors to prevent email enumeration
     } finally {
       // Always show success to prevent email enumeration
-      setSentEmail(data.email);
       setEmailSent(true);
       setIsLoading(false);
     }
