@@ -102,10 +102,10 @@ test.describe("Backend API authenticated flows", () => {
     // Accept any 2xx — backend may return 200 or 204
     expect(res.ok()).toBe(true);
     const body = await res.json();
-    // Projects endpoint returns either array or paginated {items, total}
+    // Projects endpoint returns paginated {projects: [...], total, page, ...}
     const isValid = Array.isArray(body)
-      || (typeof body === "object" && body !== null && "items" in body);
-    console.log("[api-health] /projects response:", JSON.stringify(body).slice(0, 200));
+      || (typeof body === "object" && body !== null
+          && ("items" in body || "projects" in body || "data" in body));
     expect(isValid).toBe(true);
   });
 

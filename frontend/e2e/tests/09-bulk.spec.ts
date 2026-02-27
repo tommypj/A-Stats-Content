@@ -27,11 +27,7 @@ test.describe("Bulk content", () => {
   test("bulk job creation form is accessible", async ({ page }) => {
     await page.goto("/bulk");
     await expect(page).not.toHaveURL(/login/);
-    // Either shows existing jobs or an option to create
-    await expect(
-      page.getByRole("button", { name: /new job|create|import|upload csv/i }).first()
-        .or(page.getByText(/no jobs|get started|create your first|generate/i).first())
-        .or(page.locator("main"))
-    ).toBeVisible({ timeout: 10_000 });
+    // Page should have main content area
+    await expect(page.locator("main")).toBeVisible({ timeout: 10_000 });
   });
 });

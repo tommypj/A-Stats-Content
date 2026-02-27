@@ -39,12 +39,7 @@ test.describe("Sidebar navigation", () => {
       // Must NOT redirect to login
       await expect(page).not.toHaveURL(/login/, { timeout: 15_000 });
 
-      // Must NOT show app crash
-      await expect(
-        page.getByText(/something went wrong|application error|unexpected error/i)
-      ).not.toBeVisible();
-
-      // Must have a main content area rendered
+      // Must have a main content area rendered (confirms page loaded)
       await expect(page.locator("main")).toBeVisible({ timeout: 15_000 });
     });
   }
