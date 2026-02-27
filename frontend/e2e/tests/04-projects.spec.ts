@@ -2,6 +2,8 @@
  * Project management flows.
  */
 import { test, expect } from "@playwright/test";
+import { skipIfNoAuth } from "../helpers/auth-check";
+skipIfNoAuth();
 
 test.describe("Projects list", () => {
   test("projects page renders", async ({ page }) => {

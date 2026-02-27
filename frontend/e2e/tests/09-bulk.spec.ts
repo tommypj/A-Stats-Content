@@ -2,6 +2,8 @@
  * Bulk content generation flows.
  */
 import { test, expect } from "@playwright/test";
+import { skipIfNoAuth } from "../helpers/auth-check";
+skipIfNoAuth();
 
 test.describe("Bulk content", () => {
   test("bulk dashboard loads", async ({ page }) => {

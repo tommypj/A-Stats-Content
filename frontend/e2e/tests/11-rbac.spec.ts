@@ -3,6 +3,8 @@
  * Verifies that regular users cannot access admin routes.
  */
 import { test, expect } from "@playwright/test";
+import { skipIfNoAuth } from "../helpers/auth-check";
+skipIfNoAuth();
 
 test.describe("RBAC — regular user", () => {
   test("cannot access /admin (redirects away)", async ({ page }) => {

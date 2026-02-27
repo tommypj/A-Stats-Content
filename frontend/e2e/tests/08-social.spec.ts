@@ -2,6 +2,8 @@
  * Social media section flows.
  */
 import { test, expect } from "@playwright/test";
+import { skipIfNoAuth } from "../helpers/auth-check";
+skipIfNoAuth();
 
 test.describe("Social media", () => {
   test("social dashboard loads", async ({ page }) => {

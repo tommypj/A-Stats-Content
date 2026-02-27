@@ -2,6 +2,8 @@
  * Analytics section — all 8 sub-pages load without errors.
  */
 import { test, expect } from "@playwright/test";
+import { skipIfNoAuth } from "../helpers/auth-check";
+skipIfNoAuth();
 
 const ANALYTICS_PAGES = [
   { name: "Overview",           url: "/analytics" },

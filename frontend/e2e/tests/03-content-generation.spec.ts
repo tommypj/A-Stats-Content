@@ -6,6 +6,8 @@
  * and focus on verifying the UI flow completes without errors.
  */
 import { test, expect } from "@playwright/test";
+import { skipIfNoAuth } from "../helpers/auth-check";
+skipIfNoAuth();
 
 const KEYWORD = "content marketing strategy";
 

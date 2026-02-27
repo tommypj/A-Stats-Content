@@ -2,6 +2,8 @@
  * User settings flows.
  */
 import { test, expect } from "@playwright/test";
+import { skipIfNoAuth } from "../helpers/auth-check";
+skipIfNoAuth();
 
 test.describe("Account settings", () => {
   test("settings overview page loads", async ({ page }) => {

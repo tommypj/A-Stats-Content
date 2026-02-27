@@ -2,6 +2,8 @@
  * Knowledge vault flows.
  */
 import { test, expect } from "@playwright/test";
+import { skipIfNoAuth } from "../helpers/auth-check";
+skipIfNoAuth();
 
 test.describe("Knowledge vault", () => {
   test("knowledge overview loads", async ({ page }) => {

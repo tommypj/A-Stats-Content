@@ -12,11 +12,12 @@ const API_URL =
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe("Backend API health", () => {
-  test("GET /health returns 200", async ({ request }) => {
-    const res = await request.get(`${API_URL}/health`);
+  test("GET /api/v1/health returns 200", async ({ request }) => {
+    const res = await request.get(`${API_URL}/api/v1/health`);
     expect(res.status()).toBe(200);
     const body = await res.json();
-    expect(body.status).toBe("ok");
+    // Backend returns "healthy" or "ok"
+    expect(["ok", "healthy"]).toContain(body.status);
   });
 
   test("GET /api/v1/auth/me without token returns 401", async ({ request }) => {

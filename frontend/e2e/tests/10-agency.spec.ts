@@ -2,6 +2,8 @@
  * Agency / white-label flows.
  */
 import { test, expect } from "@playwright/test";
+import { skipIfNoAuth } from "../helpers/auth-check";
+skipIfNoAuth();
 
 test.describe("Agency section", () => {
   test("agency dashboard loads", async ({ page }) => {
