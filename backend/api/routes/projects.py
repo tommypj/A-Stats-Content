@@ -347,7 +347,7 @@ async def update_brand_voice(
     """
     Update the brand voice settings for the current project.
 
-    Requires an active project to be selected.
+    Requires an active project to be selected and ADMIN or OWNER role.
     """
     project_id = getattr(current_user, 'current_project_id', None)
     if not project_id:
@@ -355,6 +355,9 @@ async def update_brand_voice(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No project selected. Switch to a project before updating brand voice.",
         )
+
+    # AUTH-06: Require admin/owner role to modify brand voice.
+    await require_project_admin(project_id, current_user, db)
 
     stmt = select(Project).where(
         and_(
@@ -562,10 +565,10 @@ async def delete_project(
     # Get project
     project = await get_project_by_id(project_id, db)
 
-    # Guard: cannot delete personal workspace
+    # Guard: cannot delete personal workspace (PROJ-10: use 403, not 400)
     if getattr(project, 'is_personal', False):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot delete personal workspace",
         )
 
@@ -591,6 +594,152 @@ async def delete_project(
 # =============================================================================
 # Project Switching
 # =============================================================================
+
+# =============================================================================
+# Member Management Endpoints (PROJ-04)
+# =============================================================================
+
+
+@router.patch("/{project_id}/members/{member_user_id}", response_model=UpdateMemberRoleResponse)
+async def update_member_role(
+    project_id: str,
+    member_user_id: str,
+    data: UpdateMemberRoleRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Update a project member's role. Requires admin or owner."""
+    # Verify caller is admin/owner
+    caller = await require_project_admin(project_id, current_user, db)
+
+    # Only owner can assign/change owner role
+    if data.role == ProjectMemberRole.OWNER.value and caller.role != ProjectMemberRole.OWNER.value:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the project owner can assign the owner role")
+
+    # Get target member
+    result = await db.execute(
+        select(ProjectMember).where(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == member_user_id,
+            ProjectMember.deleted_at.is_(None),
+        )
+    )
+    member = result.scalar_one_or_none()
+    if not member:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+
+    # Cannot demote the project owner unless you ARE the owner reassigning it
+    if member.role == ProjectMemberRole.OWNER.value and caller.role != ProjectMemberRole.OWNER.value:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot change the owner's role")
+
+    old_role = member.role
+    member.role = data.role
+    await db.commit()
+    await db.refresh(member)
+
+    return UpdateMemberRoleResponse(
+        success=True,
+        message=f"Role updated from {old_role} to {data.role}",
+        member=ProjectMemberResponse.model_validate(member),
+    )
+
+
+@router.delete("/{project_id}/members/{member_user_id}", response_model=RemoveMemberResponse)
+async def remove_member(
+    project_id: str,
+    member_user_id: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Remove a member from the project. Requires admin or owner. Cannot remove owner."""
+    await require_project_admin(project_id, current_user, db)
+
+    result = await db.execute(
+        select(ProjectMember).where(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == member_user_id,
+            ProjectMember.deleted_at.is_(None),
+        )
+    )
+    member = result.scalar_one_or_none()
+    if not member:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+
+    if member.role == ProjectMemberRole.OWNER.value:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot remove the project owner. Transfer ownership first.")
+
+    member.deleted_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    return RemoveMemberResponse(success=True, message="Member removed from project")
+
+
+@router.post("/{project_id}/leave", response_model=LeaveProjectResponse)
+async def leave_project(
+    project_id: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Leave a project. The owner cannot leave — transfer ownership first."""
+    membership = await get_project_member(project_id, current_user.id, db)
+
+    if membership.role == ProjectMemberRole.OWNER.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Project owner cannot leave. Transfer ownership to another member first.",
+        )
+
+    membership.deleted_at = datetime.now(timezone.utc)
+
+    # Clear current_project_id if they were in this project
+    if current_user.current_project_id == project_id:
+        current_user.current_project_id = None
+
+    await db.commit()
+
+    return LeaveProjectResponse(success=True, message="You have left the project")
+
+
+@router.post("/{project_id}/transfer-ownership", response_model=TransferOwnershipResponse)
+async def transfer_ownership(
+    project_id: str,
+    data: TransferOwnershipRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Transfer project ownership to another member. Only the current owner can do this."""
+    await require_project_owner(project_id, current_user, db)
+
+    # Get new owner's membership
+    new_owner_result = await db.execute(
+        select(ProjectMember).where(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == data.new_owner_id,
+            ProjectMember.deleted_at.is_(None),
+        )
+    )
+    new_owner_member = new_owner_result.scalar_one_or_none()
+    if not new_owner_member:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="New owner must already be a project member")
+
+    # Demote current owner to admin, promote new owner
+    caller_member = await get_project_member(project_id, current_user.id, db)
+    caller_member.role = ProjectMemberRole.ADMIN.value
+    new_owner_member.role = ProjectMemberRole.OWNER.value
+
+    # Update project owner_id
+    project = await get_project_by_id(project_id, db)
+    project.owner_id = data.new_owner_id
+
+    await db.commit()
+
+    return TransferOwnershipResponse(
+        success=True,
+        message="Ownership transferred successfully",
+        new_owner_id=data.new_owner_id,
+        previous_owner_role=ProjectMemberRole.ADMIN.value,
+    )
+
 
 @router.post("/{project_id}/switch", response_model=SwitchProjectResponse)
 async def switch_project(

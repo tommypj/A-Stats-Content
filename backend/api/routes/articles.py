@@ -42,6 +42,7 @@ from api.routes.auth import get_current_user
 from api.utils import escape_like
 from infrastructure.database.connection import get_db, async_session_maker
 from infrastructure.database.models import Article, ArticleRevision, Outline, User, ContentStatus
+from infrastructure.database.models.project import Project
 from adapters.ai.anthropic_adapter import content_ai_service, GeneratedArticle
 from infrastructure.config.settings import settings
 from services.generation_tracker import GenerationTracker
@@ -131,8 +132,8 @@ def analyze_seo(content: str, keyword: str, title: str, meta_description: str) -
     words = content.split()
     word_count = len(words)
 
-    # Keyword density
-    keyword_count = content_lower.count(keyword_lower)
+    # Keyword density (whole-word matches only to avoid substring false positives)
+    keyword_count = len(re.findall(r'\b' + re.escape(keyword_lower) + r'\b', content_lower))
     keyword_density = (keyword_count / word_count * 100) if word_count > 0 else 0
 
     # Check headings
@@ -144,9 +145,9 @@ def analyze_seo(content: str, keyword: str, title: str, meta_description: str) -
     internal_links = len(re.findall(r"\[.*?\]\(/", content))
     external_links = len(re.findall(r"\[.*?\]\(https?://", content))
 
-    # Image alt texts
+    # Image alt texts — SEO-05: articles with zero images should NOT receive full marks
     images = re.findall(r"!\[(.*?)\]\(", content)
-    image_alt_texts = all(alt.strip() for alt in images) if images else True
+    image_alt_texts = bool(images) and all(alt.strip() for alt in images)
 
     # Basic readability (average sentence length)
     sentences = re.split(r"[.!?]+", content)
@@ -160,7 +161,8 @@ def analyze_seo(content: str, keyword: str, title: str, meta_description: str) -
     elif keyword_density > 3:
         suggestions.append(f"Reduce keyword stuffing (currently {keyword_density:.1f}%)")
 
-    if keyword_lower not in title.lower():
+    title_has_keyword = bool(re.search(r'\b' + re.escape(keyword_lower) + r'\b', title.lower()))
+    if not title_has_keyword:
         suggestions.append("Add target keyword to the title")
 
     if not meta_description:
@@ -182,7 +184,7 @@ def analyze_seo(content: str, keyword: str, title: str, meta_description: str) -
     # Calculate overall score
     score = 50
     score += 10 if 1 <= keyword_density <= 3 else 0
-    score += 10 if keyword_lower in title.lower() else 0
+    score += 10 if title_has_keyword else 0
     score += 10 if meta_description and 120 <= len(meta_description) <= 160 else 0
     score += 10 if headings_structure == "good" else 0
     score += 5 if internal_links >= 2 else 0
@@ -191,7 +193,7 @@ def analyze_seo(content: str, keyword: str, title: str, meta_description: str) -
     return {
         "score": min(100, score),
         "keyword_density": round(keyword_density, 2),
-        "title_has_keyword": keyword_lower in title.lower(),
+        "title_has_keyword": title_has_keyword,
         "meta_description_length": len(meta_description) if meta_description else 0,
         "headings_structure": headings_structure,
         "h2_count": h2_count,
@@ -543,6 +545,16 @@ async def generate_article(
     await db.commit()
     await db.refresh(article)
 
+    # PROJ-07: Load brand_voice from current project to apply as defaults.
+    brand_voice: dict = {}
+    if project_id:
+        proj_result = await db.execute(
+            select(Project).where(Project.id == project_id, Project.deleted_at.is_(None))
+        )
+        proj = proj_result.scalar_one_or_none()
+        if proj and isinstance(proj.brand_voice, dict):
+            brand_voice = proj.brand_voice
+
     # Kick off generation as an asyncio task on the event loop
     # (more reliable than BackgroundTasks for long-running async work)
     task = asyncio.create_task(
@@ -555,12 +567,12 @@ async def generate_article(
             outline_sections=outline.sections,
             outline_tone=body.tone or outline.tone,
             outline_target_audience=body.target_audience or outline.target_audience,
-            writing_style=body.writing_style or "balanced",
-            voice=body.voice or "second_person",
-            list_usage=body.list_usage or "balanced",
-            custom_instructions=body.custom_instructions,
+            writing_style=body.writing_style or brand_voice.get("writing_style") or "balanced",
+            voice=body.voice or brand_voice.get("voice") or "second_person",
+            list_usage=body.list_usage or brand_voice.get("list_usage") or "balanced",
+            custom_instructions=body.custom_instructions or brand_voice.get("custom_instructions"),
             word_count_target=outline.word_count_target or 1500,
-            language=body.language or current_user.language or "en",
+            language=body.language or brand_voice.get("language") or current_user.language or "en",
         )
     )
     _active_generation_tasks[article_id] = task
@@ -1064,6 +1076,18 @@ async def improve_article(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Article has no content to improve",
+        )
+
+    # PROJ-01: Check monthly AI usage limit before calling AI
+    tracker = GenerationTracker(db)
+    if not await tracker.check_limit(
+        project_id=current_user.current_project_id,
+        resource_type="article",
+        user_id=current_user.id,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Monthly article generation limit reached. Upgrade your plan to continue.",
         )
 
     # Save current content as a revision so the user can revert after AI changes it
@@ -1677,6 +1701,20 @@ async def refresh_aeo_score(
 ):
     """Recalculate AEO score for an article."""
     from services.aeo_scoring import score_and_save
+
+    # ANA-02: Verify article ownership before allowing re-scoring
+    if current_user.current_project_id:
+        ownership_query = select(Article).where(
+            Article.id == article_id,
+            Article.project_id == current_user.current_project_id,
+        )
+    else:
+        ownership_query = select(Article).where(
+            Article.id == article_id,
+            Article.user_id == current_user.id,
+        )
+    if not (await db.execute(ownership_query)).scalar_one_or_none():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
 
     score = await score_and_save(db, article_id, current_user.id)
     if not score:

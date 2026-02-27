@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from infrastructure.database.connection import get_db
-from infrastructure.database.models.user import User
+from infrastructure.database.models.user import User, UserRole
 from infrastructure.database.models.content import Article, Outline, GeneratedImage
 from infrastructure.database.models.social import ScheduledPost, PostTarget
 from infrastructure.database.models.admin import AdminAuditLog, AuditAction, AuditTargetType
@@ -534,6 +534,25 @@ async def delete_image(
             detail=f"Image with ID {image_id} not found",
         )
 
+    # IMG-07: Regular admins can only delete images scoped to projects they own/manage.
+    # super_admin has unrestricted access.
+    if admin_user.role != UserRole.SUPER_ADMIN.value and image.project_id:
+        from infrastructure.database.models.project import ProjectMember
+        from infrastructure.database.models.project import ProjectMemberRole
+        member_result = await db.execute(
+            select(ProjectMember).where(
+                ProjectMember.project_id == image.project_id,
+                ProjectMember.user_id == admin_user.id,
+                ProjectMember.deleted_at.is_(None),
+            )
+        )
+        member = member_result.scalar_one_or_none()
+        if not member:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to delete images from this project",
+            )
+
     image_prompt = image.prompt[:50]  # First 50 chars
     image_user_id = image.user_id
     image_url = image.url
@@ -767,36 +786,34 @@ async def bulk_delete_content(
     deleted_count = 0
     failed_ids = []
 
-    # Delete each item
+    # ADM-03: Delete each item in its own savepoint so one failure doesn't abort all others
     for item_id in request.ids:
         try:
-            # Get item to verify existence
-            result = await db.execute(select(model).where(model.id == item_id))
-            item = result.scalar_one_or_none()
+            async with db.begin_nested():
+                # Get item to verify existence
+                result = await db.execute(select(model).where(model.id == item_id))
+                item = result.scalar_one_or_none()
 
-            if not item:
-                failed_ids.append(item_id)
-                continue
+                if not item:
+                    failed_ids.append(item_id)
+                    continue
 
-            # Store user_id before deletion
-            item_user_id = item.user_id
+                # Store user_id before deletion
+                item_user_id = item.user_id
 
-            # Delete item
-            await db.execute(delete(model).where(model.id == item_id))
+                # Delete item
+                await db.execute(delete(model).where(model.id == item_id))
 
-            # Log to audit
-            await log_audit(
-                db=db,
-                admin_user=admin_user,
-                action=audit_action,
-                target_type=target_type,
-                target_id=item_id,
-                target_user_id=item_user_id,
-                details={
-                    "bulk_delete": True,
-                    "deleted_by_admin": admin_user.email,
-                },
-            )
+                # Log to audit (inside savepoint so it rolls back with the delete)
+                audit_log = AdminAuditLog(
+                    admin_user_id=admin_user.id,
+                    action=audit_action.value,
+                    target_type=target_type.value,
+                    target_id=item_id,
+                    target_user_id=item_user_id,
+                    details={"bulk_delete": True, "deleted_by_admin": admin_user.email},
+                )
+                db.add(audit_log)
 
             deleted_count += 1
 
@@ -804,7 +821,7 @@ async def bulk_delete_content(
             logger.error(f"Failed to delete {request.content_type} {item_id}: {e}")
             failed_ids.append(item_id)
 
-    # Commit all changes
+    # Commit all successful savepoints
     await db.commit()
 
     # Log bulk operation summary

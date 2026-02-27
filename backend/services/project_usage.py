@@ -101,6 +101,10 @@ class ProjectUsageService:
             ProjectLimits schema with limits for current tier
         """
         tier = project.subscription_tier
+        # Treat expired subscriptions as free tier
+        now = datetime.now(timezone.utc)
+        if project.subscription_expires and project.subscription_expires < now:
+            tier = SubscriptionTier.FREE.value
         limits = PROJECT_TIER_LIMITS.get(tier, PROJECT_TIER_LIMITS[SubscriptionTier.FREE.value])
 
         return ProjectLimits(

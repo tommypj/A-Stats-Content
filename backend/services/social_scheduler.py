@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 import logging
 
-from sqlalchemy import select, and_
+from sqlalchemy import select, update, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -68,33 +68,46 @@ class SocialSchedulerService:
         """Find and publish posts that are due."""
         async with async_session_maker() as db:
             try:
-                # Find posts that are due for publishing
+                # SM-03: Atomically claim due posts by updating their status to PUBLISHING
+                # before loading them.  Any concurrent scheduler instance will skip posts
+                # already in PUBLISHING state, eliminating the race condition.
                 now = datetime.now(timezone.utc)
 
-                stmt = (
-                    select(ScheduledPost)
-                    .options(
-                        selectinload(ScheduledPost.targets).selectinload(PostTarget.social_account)
-                    )
+                claim_stmt = (
+                    update(ScheduledPost)
                     .where(
                         and_(
                             ScheduledPost.scheduled_at <= now,
                             ScheduledPost.status == PostStatus.SCHEDULED.value,
                         )
                     )
-                    .order_by(ScheduledPost.scheduled_at)
+                    .values(status=PostStatus.PUBLISHING.value)
+                    .returning(ScheduledPost.id)
                 )
+                claimed = await db.execute(claim_stmt)
+                claimed_ids = [row[0] for row in claimed.fetchall()]
+                await db.commit()  # Commit the claim so other instances see it immediately
 
-                result = await db.execute(stmt)
-                due_posts = result.scalars().all()
-
-                if not due_posts:
+                if not claimed_ids:
                     logger.debug("No posts due for publishing")
                     return
 
-                logger.info(f"Found {len(due_posts)} posts due for publishing")
+                logger.info(f"Claimed {len(claimed_ids)} posts for publishing")
 
-                # Process each post
+                # Load the claimed posts with their targets
+                load_stmt = (
+                    select(ScheduledPost)
+                    .options(
+                        selectinload(ScheduledPost.targets).selectinload(PostTarget.social_account)
+                    )
+                    .where(ScheduledPost.id.in_(claimed_ids))
+                    .order_by(ScheduledPost.scheduled_at)
+                )
+                result = await db.execute(load_stmt)
+                due_posts = result.scalars().all()
+
+                # Process each post (status is already PUBLISHING — _process_post
+                # will NOT re-set it to PUBLISHING; it only changes to PUBLISHED/FAILED)
                 for post in due_posts:
                     await self._process_post(post, db)
 
@@ -116,8 +129,8 @@ class SocialSchedulerService:
         try:
             logger.info(f"Processing post {post.id} scheduled for {post.scheduled_at}")
 
-            # Update post status to PUBLISHING
-            post.status = PostStatus.PUBLISHING.value
+            # SM-03: Status is already set to PUBLISHING by the atomic claim in
+            # process_due_posts. Just record the attempt timestamp.
             post.publish_attempted_at = datetime.now(timezone.utc)
             await db.flush()
 
@@ -231,20 +244,36 @@ class SocialSchedulerService:
                     credentials = await adapter.refresh_token(credentials)
                     await self._update_account_tokens(account, credentials, db)
                 except Exception as refresh_err:
+                    # SM-05: Permanently disable the account so we stop attempting to
+                    # publish to it on every scheduler tick.  LinkedIn and Facebook
+                    # tokens cannot be refreshed — the user must reconnect.
+                    account.is_active = False
                     logger.warning(
-                        f"Token refresh failed for {account.platform}: {refresh_err}"
+                        "Permanently disabled %s account %s due to token expiry: %s",
+                        account.platform,
+                        account.platform_username,
+                        refresh_err,
                     )
+                    # TODO SM-05: send reconnect notification email to account owner
                     return PostResult(
                         success=False,
                         error_message=f"Token expired — please reconnect your {account.platform} account",
                     )
 
-            # Publish the post — Facebook requires page_id and page_token from account metadata
+            # Publish the post — Facebook requires page_id and page_token
             extra_kwargs = {}
             if account.platform in ("facebook", "instagram"):
-                metadata = account.account_metadata or {}
-                extra_kwargs["page_id"] = metadata.get("page_id")
-                extra_kwargs["page_token"] = metadata.get("page_token")
+                # SM-04: Use platform_user_id as page_id (same value) and decrypt
+                # access_token_encrypted for page_token instead of plaintext account_metadata.
+                extra_kwargs["page_id"] = account.platform_user_id
+                if account.access_token_encrypted:
+                    extra_kwargs["page_token"] = decrypt_credential(
+                        account.access_token_encrypted, settings.secret_key
+                    )
+                else:
+                    # Fallback for legacy records
+                    metadata = account.account_metadata or {}
+                    extra_kwargs["page_token"] = metadata.get("page_token")
 
             result: PostResult
             if post.media_urls:

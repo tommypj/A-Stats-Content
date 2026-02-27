@@ -55,74 +55,8 @@ from core.security.encryption import encrypt_credential, decrypt_credential
 
 router = APIRouter(prefix="/social", tags=["Social Media"])
 
-# OAuth state TTL (10 minutes)
-_OAUTH_STATE_TTL = 600
-_OAUTH_MAX_STATES = 1000  # Max in-memory entries before pruning
-
-# In-memory fallback for OAuth state (used only when Redis is unavailable)
-_oauth_states: dict[str, dict] = {}
-_oauth_states_lock = asyncio.Lock()
-
-
-def _prune_expired_states() -> None:
-    """Remove expired entries from the in-memory state dict.
-
-    Must be called while holding ``_oauth_states_lock``.
-    """
-    now = time.time()
-    expired = [k for k, v in _oauth_states.items() if now - v["created_at"] > _OAUTH_STATE_TTL]
-    for k in expired:
-        del _oauth_states[k]
-
-
-async def _store_oauth_state(state: str, user_id: str) -> None:
-    """Store OAuth state in Redis with a 10-minute TTL.
-
-    Falls back to an in-memory dict when Redis is not reachable so that
-    single-process development environments continue to work.
-    """
-    data = json.dumps({"user_id": str(user_id)})
-    try:
-        import redis.asyncio as aioredis
-        r = aioredis.from_url(settings.redis_url)
-        await r.setex(f"oauth_state:{state}", _OAUTH_STATE_TTL, data)
-        await r.aclose()
-    except (ImportError, OSError, ConnectionError, TypeError, ValueError):
-        # Redis unavailable or misconfigured — prune expired entries and enforce size cap
-        async with _oauth_states_lock:
-            _prune_expired_states()
-            if len(_oauth_states) >= _OAUTH_MAX_STATES:
-                # Drop oldest entries to make room
-                oldest = sorted(_oauth_states, key=lambda k: _oauth_states[k]["created_at"])
-                for k in oldest[:len(_oauth_states) - _OAUTH_MAX_STATES + 1]:
-                    del _oauth_states[k]
-            _oauth_states[state] = {"user_id": str(user_id), "created_at": time.time()}
-
-
-async def _verify_oauth_state(state: str) -> Optional[str]:
-    """Verify and consume an OAuth state. Returns user_id or None.
-
-    Attempts Redis first; falls back to the in-memory dict when Redis is
-    not reachable.
-    """
-    try:
-        import redis.asyncio as aioredis
-        r = aioredis.from_url(settings.redis_url)
-        raw = await r.getdel(f"oauth_state:{state}")
-        await r.aclose()
-        if raw is None:
-            return None
-        parsed = json.loads(raw)
-        return parsed.get("user_id")
-    except (ImportError, OSError, ConnectionError, TypeError, ValueError, json.JSONDecodeError, KeyError):
-        # Redis unavailable or misconfigured — fallback to in-memory pop with expiry check
-        async with _oauth_states_lock:
-            entry = _oauth_states.pop(state, None)
-        if not entry:
-            return None
-        if time.time() - entry["created_at"] > _OAUTH_STATE_TTL:
-            return None
-        return entry["user_id"]
+# OAuth state helpers delegated to shared module
+from api.oauth_helpers import store_oauth_state as _store_oauth_state, verify_oauth_state as _verify_oauth_state
 
 
 # ============================================
@@ -171,11 +105,11 @@ async def list_connected_accounts(
     db: AsyncSession = Depends(get_db),
 ):
     """List user's connected social media accounts."""
-    result = await db.execute(
-        select(SocialAccount)
-        .where(SocialAccount.user_id == current_user.id)
-        .order_by(SocialAccount.created_at.desc())
-    )
+    # SM-06: Scope to current project to prevent cross-project IDOR.
+    query = select(SocialAccount).where(SocialAccount.user_id == current_user.id)
+    if current_user.current_project_id:
+        query = query.where(SocialAccount.project_id == current_user.current_project_id)
+    result = await db.execute(query.order_by(SocialAccount.created_at.desc()))
     accounts = result.scalars().all()
 
     return SocialAccountListResponse(
@@ -530,7 +464,7 @@ async def verify_account(
     # Token verification: check if access_token is present and not expired
     # Full platform API verification requires per-platform adapter calls;
     # for now, validate that the stored credentials are non-empty.
-    is_valid = bool(account.access_token)
+    is_valid = bool(account.access_token_encrypted)
     account.last_verified_at = datetime.now(timezone.utc)
     account.verification_error = None if is_valid else "Token expired or invalid"
     account.is_active = is_valid

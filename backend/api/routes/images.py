@@ -123,8 +123,18 @@ async def _run_image_generation(
                     image_data=image_data,
                     filename=filename,
                 )
-                image.local_path = local_path
-                await db.commit()
+                try:
+                    image.local_path = local_path
+                    await db.commit()
+                except Exception:
+                    # DB commit failed — delete the saved file to prevent orphan
+                    try:
+                        await storage_adapter.delete_image(local_path)
+                    except Exception as cleanup_err:
+                        logger.error(
+                            "Failed to cleanup orphaned image file %s: %s", local_path, cleanup_err
+                        )
+                    raise
             except (httpx.HTTPError, OSError, ValueError) as dl_err:
                 logger.warning(
                     "Failed to cache image locally for %s: %s", image_id, dl_err
@@ -419,12 +429,16 @@ async def delete_image(
             detail="Image not found",
         )
 
-    # Delete from storage if local path exists
+    # Delete from storage if local path exists — IMG-05: fail the request if deletion fails.
     if image.local_path:
         try:
             await storage_adapter.delete_image(image.local_path)
-        except OSError:
-            logger.warning("Failed to delete local image file: %s", image.local_path)
+        except Exception as del_err:
+            logger.error("Failed to delete local image file %s: %s", image.local_path, del_err)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to delete image file from storage. Image record not deleted.",
+            )
 
     # Delete from database
     await db.delete(image)

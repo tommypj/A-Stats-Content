@@ -8,12 +8,14 @@ import math
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
+from api.middleware.rate_limit import limiter
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func, and_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.routes.auth import get_current_user
+from api.deps_project import get_project_member
 from infrastructure.database.connection import get_db, async_session_maker
 from infrastructure.database.models import User
 from infrastructure.database.models.bulk import ContentTemplate, BulkJob, BulkJobItem
@@ -163,6 +165,10 @@ async def create_template(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new content template."""
+    # BULK-04: Verify project membership before creating resources under it.
+    if current_user.current_project_id:
+        await get_project_member(current_user.current_project_id, current_user.id, db)
+
     template = ContentTemplate(
         id=str(uuid4()),
         user_id=current_user.id,
@@ -317,14 +323,32 @@ async def get_job(
 
 
 @router.post("/jobs/outlines", response_model=BulkJobResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("5/minute")
 async def create_bulk_outline_job(
     body: CreateBulkOutlineJobRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Create and start a bulk outline generation job."""
     from services.bulk_generation import create_bulk_outline_job as _create_job
     from services.bulk_generation import process_bulk_outline_job
+
+    # BULK-04: Verify project membership before creating job resources under it.
+    if current_user.current_project_id:
+        await get_project_member(current_user.current_project_id, current_user.id, db)
+
+    # BULK-06: Check outline usage limits at job creation so the user finds out immediately.
+    from services.generation_tracker import GenerationTracker
+    tracker = GenerationTracker(db)
+    limit_ok = await tracker.check_limit(
+        current_user.current_project_id, "outline", user_id=current_user.id
+    )
+    if not limit_ok:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Monthly outline generation limit reached. Please upgrade your plan.",
+        )
 
     # Validate template ownership if template_id is provided
     if body.template_id:
@@ -405,6 +429,20 @@ async def retry_failed_items(
     job = job_result.scalar_one_or_none()
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+
+    # BULK-03: Prevent duplicate background tasks for an already-running job
+    if job.status == "processing":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Job is already processing. Wait for it to complete before retrying.",
+        )
+
+    # BULK-07: Prevent retry when there are no failed items (avoids corrupting completed jobs).
+    if job.failed_items == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No failed items to retry.",
+        )
 
     # Reset failed items to pending
     await db.execute(

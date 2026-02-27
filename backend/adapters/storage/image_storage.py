@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import aiofiles
 import aiohttp
@@ -379,6 +379,10 @@ class S3StorageAdapter(StorageAdapter):
         )
 
 
+ALLOWED_IMAGE_DOMAINS = {"replicate.delivery", "pbxt.replicate.delivery", "cdn.replicate.com"}
+MAX_IMAGE_SIZE = 20 * 1024 * 1024  # 20MB
+
+
 async def download_image(url: str) -> bytes:
     """
     Download an image from a URL.
@@ -393,8 +397,17 @@ async def download_image(url: str) -> bytes:
         Raw image bytes
 
     Raises:
+        ValueError: If the URL fails domain or size validation
         RuntimeError: If download fails
     """
+    # SSRF: validate domain before fetching
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or not any(
+        parsed.netloc == d or parsed.netloc.endswith("." + d)
+        for d in ALLOWED_IMAGE_DOMAINS
+    ):
+        raise ValueError(f"Image URL failed domain validation: {parsed.netloc}")
+
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
@@ -404,13 +417,21 @@ async def download_image(url: str) -> bytes:
                         raise RuntimeError(
                             f"Downloaded content is not an image (content-type: {content_type})"
                         )
+                    # Size limit: check Content-Length header first to fail fast
+                    content_length = response.headers.get("content-length")
+                    if content_length and int(content_length) > MAX_IMAGE_SIZE:
+                        raise ValueError(f"Image too large: {content_length} bytes")
                     image_data = await response.read()
+                    if len(image_data) > MAX_IMAGE_SIZE:
+                        raise ValueError(f"Downloaded image exceeds {MAX_IMAGE_SIZE} bytes")
                     logger.info(f"Downloaded image from {url} ({len(image_data)} bytes)")
                     return image_data
                 else:
                     raise RuntimeError(
                         f"Failed to download image. Status: {response.status}"
                     )
+    except (ValueError, RuntimeError):
+        raise
     except aiohttp.ClientError as e:
         logger.error(f"Network error downloading image from {url}: {e}")
         raise RuntimeError(f"Network error: {e}")

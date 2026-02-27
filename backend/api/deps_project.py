@@ -245,56 +245,6 @@ async def verify_content_edit(
     )
 
 
-def validate_project_content_creation(
-    user: User,
-    project_id: Optional[str] = None,
-) -> None:
-    """
-    Validate that a user can create content for a specific project.
-
-    This should be called when creating new content with a project_id.
-
-    Args:
-        user: The authenticated user
-        project_id: The project ID to create content for (None = personal content)
-
-    Raises:
-        HTTPException: 400 if project_id is invalid
-        HTTPException: 403 if user doesn't have permission to create project content
-
-    Usage:
-        ```python
-        @router.post("/articles")
-        async def create_article(
-            data: ArticleCreate,
-            current_user: User = Depends(get_current_user),
-            db: AsyncSession = Depends(get_db),
-        ):
-            validate_project_content_creation(current_user, data.project_id)
-            article = Article(
-                user_id=current_user.id,
-                project_id=data.project_id,
-                title=data.title,
-                # ...
-            )
-            db.add(article)
-            await db.commit()
-        ```
-
-    Notes:
-        - Personal content (project_id=None) is always allowed
-        - Project content requires MEMBER+ role verification
-        - This is a synchronous validation; use verify_project_membership for async checks
-    """
-    if project_id is None:
-        # Personal content - always allowed
-        return
-
-    # project_id is set — the caller must also verify membership via verify_project_membership
-    # (validate_project_content_creation is a sync guard; async membership check is separate).
-    # Allow the call to proceed; actual DB-level verification happens in the route.
-    return
-
 
 # Helper function to build content list query with project filtering
 def apply_content_filters(

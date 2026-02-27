@@ -90,6 +90,24 @@ async def lifespan(app: FastAPI):
         logger.info("Development mode - initializing database...")
         await init_db()
 
+    # INFRA-08: In production, validate Redis is reachable — rate limiter falls
+    # back to per-process in-memory storage which is ineffective in multi-instance.
+    if settings.environment == "production":
+        try:
+            import redis.asyncio as aioredis
+            _redis_check = aioredis.from_url(settings.redis_url)
+            await _redis_check.ping()
+            await _redis_check.aclose()
+            logger.info("Redis connectivity confirmed for rate limiter")
+        except Exception as _redis_err:
+            logger.critical(
+                "INFRA-08: Redis is unreachable in production (%s). "
+                "Rate limiting will use per-process in-memory storage — "
+                "this is insecure in multi-instance deployments.",
+                _redis_err,
+            )
+            # Do not raise — allow startup to proceed, but alert loudly
+
     # Initialize Redis post queue (optional)
     logger.info("Connecting to Redis for post queue...")
     await post_queue.connect()
@@ -122,14 +140,14 @@ async def lifespan(app: FastAPI):
     except asyncio.CancelledError:
         pass
 
-    # Stop scheduler
+    # Stop scheduler — INFRA-07: wait up to 30 s for in-flight publishes to complete
     logger.info("Stopping social media scheduler...")
     await scheduler_service.stop()
     scheduler_task.cancel()
 
     try:
-        await scheduler_task
-    except asyncio.CancelledError:
+        await asyncio.wait_for(asyncio.shield(scheduler_task), timeout=30.0)
+    except (asyncio.CancelledError, asyncio.TimeoutError):
         pass
 
     # Disconnect Redis
@@ -161,7 +179,11 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error("Unhandled exception: %s", str(exc), exc_info=True)
+    # INFRA-05: Log full stack trace in dev only — production logs only type+message to avoid leaking internals.
+    if settings.environment == "production":
+        logger.error("Unhandled exception: %s: %s", type(exc).__name__, str(exc))
+    else:
+        logger.error("Unhandled exception: %s", str(exc), exc_info=True)
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error"},
@@ -197,8 +219,25 @@ async def request_logging_middleware(request: Request, call_next):
 @app.middleware("http")
 async def add_request_id(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+    # INFRA-04: Store in request.state so log handlers and dependencies can correlate logs.
+    request.state.request_id = request_id
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
+    return response
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    # TODO: Add Content-Security-Policy once frontend inline scripts/styles are audited
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    if settings.environment == "production":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    # IMG-09: Generated images are immutable (content-addressed by ID) — cache aggressively
+    if request.url.path.startswith("/uploads/"):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     return response
 
 

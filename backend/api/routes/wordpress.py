@@ -30,7 +30,7 @@ from api.schemas.wordpress import (
 )
 from api.routes.auth import get_current_user
 from infrastructure.database.connection import get_db
-from infrastructure.database.models import User, Article, GeneratedImage
+from infrastructure.database.models import User, Article, GeneratedImage, ContentStatus
 from infrastructure.database.models.project import Project
 from infrastructure.config.settings import settings
 from core.security.encryption import encrypt_credential, decrypt_credential
@@ -594,6 +594,8 @@ async def publish_to_wordpress(
             article.wordpress_post_id = wp_post["id"]
             article.published_url = wp_post["link"]
             article.published_at = datetime.now(timezone.utc)
+            # GEN-06: Mark article as published so it's distinguishable from drafts.
+            article.status = ContentStatus.PUBLISHED.value
 
             await db.commit()
 

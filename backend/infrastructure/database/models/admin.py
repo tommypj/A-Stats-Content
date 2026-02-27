@@ -37,6 +37,9 @@ class AuditAction(str, Enum):
     SOCIAL_POST_DELETED = "social_post_deleted"
     BULK_DELETE_CONTENT = "bulk_delete_content"
 
+    # Alert management
+    ALERTS_MARK_ALL_READ = "alerts_mark_all_read"
+
     # System actions
     SETTINGS_UPDATED = "settings_updated"
     DATA_EXPORT = "data_export"

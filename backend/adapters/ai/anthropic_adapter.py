@@ -164,6 +164,16 @@ CRITICAL RULES:
 8. When citing research or studies, be specific — name the institution, year, or researcher when possible. Do not say "studies show" without attribution.
 9. GRAMMAR AND LANGUAGE QUALITY: Use impeccable grammar throughout. Ensure subject-verb agreement, correct tense consistency, proper use of articles (a/an/the), correct prepositions, and natural sentence flow. Every sentence must be grammatically correct and publication-ready."""
 
+    @staticmethod
+    def _sanitize_prompt_input(text: Optional[str], max_length: int) -> str:
+        """Strip control characters and limit length to prevent prompt injection."""
+        if not text:
+            return ""
+        import re as _re
+        text = _re.sub(r'[\r\n\t\x00-\x1f\x7f]', ' ', text)
+        text = _re.sub(r' +', ' ', text).strip()
+        return text[:max_length]
+
     async def generate_outline(
         self,
         keyword: str,
@@ -171,6 +181,10 @@ CRITICAL RULES:
         tone: str = "professional",
         word_count_target: int = 1500,
         language: str = "en",
+        writing_style: str = "balanced",
+        voice: str = "second_person",
+        list_usage: str = "balanced",
+        custom_instructions: Optional[str] = None,
     ) -> GeneratedOutline:
         """
         Generate an article outline based on keyword and parameters.
@@ -188,7 +202,14 @@ CRITICAL RULES:
             # Return mock data for development
             return self._mock_outline(keyword, word_count_target)
 
+        # GEN-02: Sanitize all user-supplied inputs before interpolation
+        keyword = self._sanitize_prompt_input(keyword, 200)
+        tone = self._sanitize_prompt_input(tone, 50)
+        target_audience = self._sanitize_prompt_input(target_audience, 500) if target_audience else None
+        custom_instructions = self._sanitize_prompt_input(custom_instructions, 1000) if custom_instructions else None
+
         audience_context = f"Target audience: {target_audience}" if target_audience else ""
+        custom_context = f"\nAdditional instructions: {custom_instructions}" if custom_instructions else ""
         language_name = self._get_language_name(language)
         language_context = f"\nLanguage: Write ALL content (title, headings, notes, meta description) in {language_name}." if language != "en" else ""
 
@@ -197,7 +218,7 @@ CRITICAL RULES:
 Keyword: {keyword}
 {audience_context}
 Tone: {tone}
-Target word count: {word_count_target} words{language_context}
+Target word count: {word_count_target} words{language_context}{custom_context}
 
 Generate a detailed outline with:
 1. A compelling, SEO-optimized title that is 30-60 characters long and includes the keyword "{keyword}"{f' (in {language_name})' if language != 'en' else ''}
@@ -226,7 +247,7 @@ Respond in JSON format:
         message = await _retry_with_backoff(lambda: self._client.messages.create(
             model=self._model,
             max_tokens=self._max_tokens,
-            system=self._get_system_prompt(writing_style="balanced", voice="second_person", list_usage="balanced", language=language),
+            system=self._get_system_prompt(writing_style=writing_style, voice=voice, list_usage=list_usage, language=language),
             messages=[{"role": "user", "content": prompt}],
         ))
 
@@ -289,6 +310,13 @@ Respond in JSON format:
         if not self._client:
             # Return mock data for development
             return self._mock_article(title, keyword, sections)
+
+        # GEN-02: Sanitize all user-supplied inputs before interpolation
+        keyword = self._sanitize_prompt_input(keyword, 200)
+        tone = self._sanitize_prompt_input(tone, 50)
+        target_audience = self._sanitize_prompt_input(target_audience, 500) if target_audience else None
+        custom_instructions = self._sanitize_prompt_input(custom_instructions, 1000) if custom_instructions else None
+        title = self._sanitize_prompt_input(title, 300)
 
         audience_context = f"Target audience: {target_audience}" if target_audience else ""
         custom_context = f"\nAdditional instructions from the user:\n{custom_instructions}" if custom_instructions else ""

@@ -85,26 +85,29 @@ export default function AdminLayout({
   }, [isAdmin]);
 
   useEffect(() => {
-    const checkAdminRole = async () => {
+    // Synchronous JWT decode on mount to eliminate async API round-trip.
+    // This is a UX optimisation only — actual data access is enforced by
+    // backend get_current_admin_user on every API endpoint.
+    // NOTE: Full middleware-level protection requires AUTH-02 (HttpOnly cookies).
+    const checkAdminRole = () => {
       try {
         const token = localStorage.getItem("auth_token");
         if (!token) {
-          router.push("/login");
+          router.replace("/login");
           return;
         }
-
-        const user = await api.auth.me();
-        if (user.role !== "admin" && user.role !== "super_admin") {
-          router.push("/dashboard");
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        if (!["admin", "super_admin"].includes(payload.role)) {
+          router.replace("/dashboard");
           return;
         }
-
-        setAdminName(user.name || "Admin User");
-        setAdminRole(user.role === "super_admin" ? "Super Admin" : "Admin");
+        setAdminName(payload.name || payload.sub || "Admin User");
+        setAdminRole(payload.role === "super_admin" ? "Super Admin" : "Admin");
         setIsAdmin(true);
         setLoading(false);
       } catch {
-        handleSignOut();
+        // Malformed token — redirect to login
+        router.replace("/login");
       }
     };
 

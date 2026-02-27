@@ -15,12 +15,14 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Request,
     status,
     Query,
     UploadFile,
     Form,
     File,
 )
+from api.middleware.rate_limit import limiter
 from sqlalchemy import select, func, and_, desc, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -165,7 +167,9 @@ async def _process_document(
 # ---------------------------------------------------------------------------
 
 @router.post("/upload", response_model=SourceUploadResponse)
+@limiter.limit("20/minute")  # KV-02: rate limit upload/query to prevent DoS
 async def upload_document(
+    request: Request,
     file: UploadFile = File(...),
     title: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
@@ -461,9 +465,17 @@ async def delete_source(
         delete(KnowledgeChunk).where(KnowledgeChunk.source_id == source_id)
     )
 
-    # Delete on-disk file
+    # Delete on-disk file — KV-04: validate path resolves within storage dir before deletion.
     if source.file_url:
-        kp.delete_file(source.file_url)
+        from pathlib import Path
+        try:
+            resolved = Path(source.file_url).resolve()
+            if resolved.is_relative_to(kp.KNOWLEDGE_STORAGE_DIR.resolve()):
+                kp.delete_file(source.file_url)
+            else:
+                logger.warning("Skipping file deletion: path %s is outside storage dir", source.file_url)
+        except Exception as path_err:
+            logger.warning("Invalid file path for deletion %s: %s", source.file_url, path_err)
 
     await db.delete(source)
     await db.commit()
@@ -474,7 +486,9 @@ async def delete_source(
 # ---------------------------------------------------------------------------
 
 @router.post("/query", response_model=QueryResponse)
+@limiter.limit("30/minute")  # KV-02: rate limit knowledge queries
 async def query_knowledge(
+    http_request: Request,
     request: QueryRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -501,8 +515,8 @@ async def query_knowledge(
 
         if len(sources) != len(request.source_ids):
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="One or more specified sources not found",
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied or source not found",
             )
 
         incomplete = [s for s in sources if s.status != SourceStatus.COMPLETED.value]
@@ -526,12 +540,16 @@ async def query_knowledge(
                 detail="No completed knowledge sources found. Please upload and process documents first.",
             )
 
-    # Fetch all chunks for the relevant sources
+    # KV-06: Limit chunk loading to prevent O(N) memory exhaustion.
+    # We cap at 500 chunks; for large vaults this may miss some relevant results,
+    # but prevents the query from becoming unbounded.
     source_ids = [s.id for s in sources]
     source_title_map = {s.id: s.title for s in sources}
 
     chunks_result = await db.execute(
-        select(KnowledgeChunk).where(KnowledgeChunk.source_id.in_(source_ids))
+        select(KnowledgeChunk)
+        .where(KnowledgeChunk.source_id.in_(source_ids))
+        .limit(500)
     )
     all_chunks = chunks_result.scalars().all()
 
@@ -637,6 +655,8 @@ async def get_knowledge_stats(
     )
     sources_by_type = {row.file_type: row.count for row in type_stats}
 
+    # KV-03: KnowledgeQuery lacks project_id — query counts span all user projects.
+    # TODO: Add project_id to KnowledgeQuery model + migration, then filter here.
     total_queries_result = await db.execute(
         select(func.count(KnowledgeQuery.id)).where(
             KnowledgeQuery.user_id == current_user.id

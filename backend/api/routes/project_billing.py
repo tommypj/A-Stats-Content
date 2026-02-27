@@ -159,7 +159,7 @@ async def get_project_subscription(
         subscription_expires=project.subscription_expires,
         customer_id=project.lemonsqueezy_customer_id,
         subscription_id=project.lemonsqueezy_subscription_id,
-        variant_id=project.lemonsqueezy_subscription_id,
+        variant_id=project.lemonsqueezy_variant_id,  # BILL-07: use actual variant_id
         usage=usage_stats,
         limits=limits,
         can_manage=is_owner,

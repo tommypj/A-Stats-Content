@@ -172,9 +172,13 @@ class GenerationTracker:
                 # Reset monthly counters if we've crossed into a new month
                 await self._reset_user_usage_if_needed(user)
 
-                # Get plan limits
+                # Get plan limits — treat expired subscriptions as free tier
                 from core.plans import PLANS
-                plan = PLANS.get(user.subscription_tier or "free", PLANS["free"])
+                now = datetime.now(timezone.utc)
+                tier = user.subscription_tier or "free"
+                if user.subscription_expires and user.subscription_expires < now:
+                    tier = "free"
+                plan = PLANS.get(tier, PLANS["free"])
                 limits = plan.get("limits", {})
 
                 # Map resource_type to limit key

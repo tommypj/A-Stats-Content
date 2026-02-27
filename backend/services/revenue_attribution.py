@@ -9,6 +9,7 @@ the service never blocks the event loop.
 import logging
 import math
 from datetime import date, datetime, timedelta, timezone
+from urllib.parse import urlparse, urlunparse
 from uuid import uuid4
 
 from sqlalchemy import select, func, and_, desc
@@ -44,6 +45,26 @@ def _default_date_range(
     if start_date is None:
         start_date = end_date - timedelta(days=days - 1)
     return start_date, end_date
+
+
+def _normalize_url(url: str) -> str:
+    """ANA-06: Canonicalize a URL for matching against article published_url.
+
+    Normalizations applied:
+    - Strip query string and fragment
+    - Lower-case scheme and host
+    - Remove www. prefix
+    - Strip trailing slash from path
+    - Force https scheme (treat http and https as the same)
+    """
+    try:
+        p = urlparse(url.strip())
+        scheme = "https"
+        host = (p.netloc or "").lower().lstrip("www.").lstrip(".")
+        path = p.path.rstrip("/")
+        return urlunparse((scheme, host, path, "", "", ""))
+    except Exception:
+        return url.rstrip("/")
 
 
 def _safe_rate(numerator: float, denominator: float) -> float:
@@ -460,7 +481,7 @@ async def import_conversions(
     )
     article_rows = (await db.execute(articles_q)).all()
     url_to_article: dict[str, str] = {
-        row.published_url.rstrip("/"): row.id
+        _normalize_url(row.published_url): row.id
         for row in article_rows
         if row.published_url
     }
@@ -496,8 +517,8 @@ async def import_conversions(
         conversions_count = int(item.get("conversions", 0))
         revenue = float(item.get("revenue", 0.0))
 
-        # Match article by normalised URL
-        normalised_url = page_url.rstrip("/")
+        # Match article by normalised URL (ANA-06: full normalization)
+        normalised_url = _normalize_url(page_url)
         article_id = url_to_article.get(normalised_url)
         if article_id:
             matched_article_ids.add(article_id)

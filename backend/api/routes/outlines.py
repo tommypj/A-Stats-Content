@@ -480,15 +480,35 @@ async def update_outline(
             detail="Outline not found",
         )
 
-    ALLOWED_UPDATE_FIELDS = {"title", "keyword", "target_audience", "tone", "sections", "word_count_target"}
+    # GEN-04: Include "status" so PUT requests can change outline status (e.g., mark as reviewed).
+    ALLOWED_UPDATE_FIELDS = {"title", "keyword", "target_audience", "tone", "sections", "word_count_target", "status"}
     # Update fields
     update_data = request.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         if field not in ALLOWED_UPDATE_FIELDS:
             continue
         if field == "sections" and value is not None:
-            # Convert Pydantic models to dicts
-            value = [s.model_dump() if hasattr(s, "model_dump") else s for s in value]
+            # GEN-05: Validate section structure before storing
+            if not isinstance(value, list):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="sections must be a list",
+                )
+            validated = []
+            for i, s in enumerate(value):
+                s_dict = s.model_dump() if hasattr(s, "model_dump") else s
+                if not isinstance(s_dict, dict):
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=f"sections[{i}] must be an object",
+                    )
+                if "heading" not in s_dict or not isinstance(s_dict.get("heading"), str):
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=f"sections[{i}] must have a string 'heading' field",
+                    )
+                validated.append(s_dict)
+            value = validated
         setattr(outline, field, value)
 
     await db.commit()
@@ -559,6 +579,13 @@ async def regenerate_outline(
             detail="Outline not found",
         )
 
+    # GEN-03: Prevent concurrent regeneration — reject if already in progress.
+    if outline.status == ContentStatus.GENERATING.value:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Outline is already being regenerated. Please wait for it to complete.",
+        )
+
     # Check usage limit before changing status
     project_id = getattr(current_user, 'current_project_id', None)
     tracker = GenerationTracker(db)
@@ -567,6 +594,16 @@ async def regenerate_outline(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Monthly outline generation limit reached. Please upgrade your plan.",
         )
+
+    # PROJ-08: Load brand_voice from current project for regeneration defaults.
+    brand_voice: dict = {}
+    if project_id:
+        proj_result = await db.execute(
+            select(Project).where(Project.id == project_id, Project.deleted_at.is_(None))
+        )
+        proj = proj_result.scalar_one_or_none()
+        if proj and isinstance(proj.brand_voice, dict):
+            brand_voice = proj.brand_voice
 
     outline.status = ContentStatus.GENERATING.value
     await db.commit()
@@ -587,7 +624,11 @@ async def regenerate_outline(
             target_audience=outline.target_audience,
             tone=outline.tone,
             word_count_target=outline.word_count_target,
-            language=current_user.language or "en",
+            language=brand_voice.get("language") or current_user.language or "en",
+            writing_style=brand_voice.get("writing_style") or "balanced",
+            voice=brand_voice.get("voice") or "second_person",
+            list_usage=brand_voice.get("list_usage") or "balanced",
+            custom_instructions=brand_voice.get("custom_instructions"),
         )
 
         outline.title = generated.title

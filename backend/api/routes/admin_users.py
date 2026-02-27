@@ -264,8 +264,9 @@ async def update_user(
 
     Admin access required. Cannot demote yourself from super_admin.
     """
-    # Get user
-    result = await db.execute(select(User).where(User.id == user_id))
+    # ADM-06: Use FOR UPDATE to prevent concurrent requests from both passing the
+    # self-demotion check before either commits the role change.
+    result = await db.execute(select(User).where(User.id == user_id).with_for_update())
     user = result.scalar_one_or_none()
 
     if not user:
@@ -278,6 +279,14 @@ async def update_user(
     changes = {}
     old_values = {}
     new_values = {}
+
+    # Prevent regular admin from modifying other admin/super_admin accounts
+    if user.role in (UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value):
+        if admin_user.role != UserRole.SUPER_ADMIN.value:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only super_admin can modify admin accounts",
+            )
 
     # Prevent self-demotion for super_admin
     if request.role and user.id == admin_user.id:
@@ -393,13 +402,18 @@ async def suspend_user(
             detail="User is already suspended",
         )
 
-    # Suspend user
+    # Suspend user — ADM-07: require and persist reason
     old_status = user.status
     user.status = UserStatus.SUSPENDED.value
+    user.is_suspended = True
     user.suspended_at = datetime.now(timezone.utc)
+    user.suspended_reason = request.reason  # ADM-07: persist reason to DB field
 
     await db.commit()
     await db.refresh(user)
+
+    # ADM-07: TODO — send suspension notification email once email service has
+    # a send_suspension_email() method in the adapter.
 
     # Create audit log
     await create_audit_log(

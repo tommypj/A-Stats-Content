@@ -161,7 +161,6 @@ async def process_bulk_outline_job(
             # Generate outline
             generated = await content_ai_service.generate_outline(
                 keyword=item.keyword or "",
-                title=item.title,
                 tone=tone,
                 target_audience=target_audience,
                 word_count_target=word_count,

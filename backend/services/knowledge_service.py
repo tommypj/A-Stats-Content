@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adapters.knowledge import ChromaAdapter, EmbeddingService, DocumentProcessor
@@ -408,27 +408,31 @@ Answer:"""
             Dictionary with statistics
         """
         try:
-            # Get source counts by status
-            result = await db.execute(
-                select(KnowledgeSource).where(KnowledgeSource.user_id == user_id)
+            # KV-05: Use SQL aggregates instead of loading all rows into memory
+            agg_result = await db.execute(
+                select(
+                    func.count(KnowledgeSource.id).label("total"),
+                    func.count(KnowledgeSource.id)
+                    .filter(KnowledgeSource.status == SourceStatus.COMPLETED.value)
+                    .label("completed"),
+                    func.coalesce(func.sum(KnowledgeSource.chunk_count), 0).label("chunks"),
+                    func.coalesce(func.sum(KnowledgeSource.char_count), 0).label("chars"),
+                ).where(KnowledgeSource.user_id == user_id)
             )
-            sources = result.scalars().all()
-
-            total_sources = len(sources)
-            completed_sources = sum(
-                1 for s in sources if s.status == SourceStatus.COMPLETED.value
-            )
-            total_chunks = sum(s.chunk_count for s in sources)
-            total_chars = sum(s.char_count for s in sources)
+            row = agg_result.one()
+            total_sources = row.total
+            completed_sources = row.completed
+            total_chunks = row.chunks
+            total_chars = row.chars
 
             # Get ChromaDB stats
             chroma_stats = await self.chroma.get_collection_stats(user_id)
 
-            # Get recent query count
+            # Get query count via SQL aggregate
             query_result = await db.execute(
-                select(KnowledgeQuery).where(KnowledgeQuery.user_id == user_id)
+                select(func.count(KnowledgeQuery.id)).where(KnowledgeQuery.user_id == user_id)
             )
-            total_queries = len(query_result.scalars().all())
+            total_queries = query_result.scalar() or 0
 
             return {
                 "total_sources": total_sources,

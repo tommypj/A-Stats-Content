@@ -78,6 +78,10 @@ class Project(Base, TimestampMixin):
     lemonsqueezy_subscription_id: Mapped[Optional[str]] = mapped_column(
         String(255), nullable=True
     )
+    # BILL-07: Store variant_id separately so the frontend can determine the current plan variant.
+    lemonsqueezy_variant_id: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True
+    )
 
     # Project limits (shared across all members)
     max_members: Mapped[int] = mapped_column(default=5, nullable=False)
@@ -229,10 +233,11 @@ class ProjectInvitation(Base, TimestampMixin):
         nullable=False,
         index=True,
     )
-    invited_by: Mapped[str] = mapped_column(
+    # PROJ-09: SET NULL (not CASCADE) so deleting the inviter preserves the audit trail.
+    invited_by: Mapped[Optional[str]] = mapped_column(
         UUID(as_uuid=False),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
         index=True,
     )
 
@@ -279,6 +284,11 @@ class ProjectInvitation(Base, TimestampMixin):
         UUID(as_uuid=False),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
+    )
+
+    # Soft delete (PROJ-03: required for GDPR compliance and consistency with all other models)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
     # Relationships

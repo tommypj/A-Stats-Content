@@ -224,11 +224,15 @@ async def register(
     user.email_verification_token = verification_token
     await db.commit()
 
-    await email_service.send_verification_email(
-        to_email=user.email,
-        user_name=user.name,
-        verification_token=verification_token,
-    )
+    # AUTH-08: Catch email service errors so registration still succeeds.
+    try:
+        await email_service.send_verification_email(
+            to_email=user.email,
+            user_name=user.name,
+            verification_token=verification_token,
+        )
+    except Exception as email_err:
+        logger.error("Failed to send verification email to %s: %s", user.email, email_err)
 
     return user
 
@@ -249,10 +253,24 @@ async def login(
     )
     user = result.scalar_one_or_none()
 
-    if not user or not password_hasher.verify(login_data.password, user.password_hash):
+    # AUTH-03: Always run bcrypt to prevent timing-based user-existence enumeration.
+    # When user is not found, verify against a dummy hash (result is discarded).
+    _DUMMY_HASH = "$2b$12$WmDNGEj9s7YLV5sV/N7aBOpWL0.T5.R5ZQOeKHNlLB.d7WN4HFXIC"
+    password_ok = password_hasher.verify(
+        login_data.password,
+        user.password_hash if user else _DUMMY_HASH,
+    )
+    if not user or not password_ok:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
+        )
+
+    # AUTH-04: Reject inactive accounts (covers deleted_at soft-delete and any future statuses).
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is inactive",
         )
 
     if user.status == UserStatus.SUSPENDED.value:
@@ -314,6 +332,17 @@ async def refresh_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found or inactive",
         )
+
+    # AUTH-01: Reject tokens issued before the last password change
+    if user.password_changed_at:
+        pwd_changed = user.password_changed_at
+        if pwd_changed.tzinfo is None:
+            pwd_changed = pwd_changed.replace(tzinfo=timezone.utc)
+        if payload.iat < pwd_changed:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token invalidated due to password change. Please log in again.",
+            )
 
     # Create new tokens
     access_token, refresh_token = token_service.create_token_pair(
@@ -384,12 +413,15 @@ async def request_password_reset(
         user.password_reset_expires = datetime.now(timezone.utc) + timedelta(hours=1)
         await db.commit()
 
-        # Send password reset email
-        await email_service.send_password_reset_email(
-            to_email=user.email,
-            user_name=user.name,
-            reset_token=reset_token,
-        )
+        # AUTH-08: Catch email service errors — still return success to caller.
+        try:
+            await email_service.send_password_reset_email(
+                to_email=user.email,
+                user_name=user.name,
+                reset_token=reset_token,
+            )
+        except Exception as email_err:
+            logger.error("Failed to send password reset email to %s: %s", user.email, email_err)
 
     return {"message": "If the email exists, a password reset link has been sent"}
 

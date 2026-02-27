@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from infrastructure.database.connection import get_db
 from infrastructure.database.models.user import User
 from infrastructure.database.models.generation import AdminAlert
+from infrastructure.database.models.admin import AdminAuditLog, AuditAction, AuditTargetType
 from api.deps_admin import get_current_admin_user
 from api.schemas.generation import (
     AdminAlertResponse,
@@ -181,8 +182,17 @@ async def mark_all_read(
     db: AsyncSession = Depends(get_db),
 ):
     """Mark all alerts as read."""
-    await db.execute(
+    result = await db.execute(
         sql_update(AdminAlert).where(AdminAlert.is_read == False).values(is_read=True)
     )
+    # ADM-05: audit log inside the same transaction
+    audit_log = AdminAuditLog(
+        admin_user_id=admin_user.id,
+        action=AuditAction.ALERTS_MARK_ALL_READ.value,
+        target_type=AuditTargetType.SYSTEM.value,
+        target_id=None,
+        details={"marked_count": result.rowcount},
+    )
+    db.add(audit_log)
     await db.commit()
     return {"message": "All alerts marked as read"}

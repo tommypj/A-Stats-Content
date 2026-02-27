@@ -61,6 +61,7 @@ from api.schemas.analytics import (
     CountryBreakdownResponse,
 )
 from api.routes.auth import get_current_user
+from api.oauth_helpers import store_oauth_state, require_valid_oauth_state
 from api.utils import escape_like
 from infrastructure.database.connection import get_db
 from infrastructure.database.models import User
@@ -139,8 +140,9 @@ async def get_gsc_auth_url(
             detail="Google OAuth not configured",
         )
 
-    # Generate state for CSRF protection
+    # Generate state for CSRF protection and store it server-side
     state = str(uuid4())
+    await store_oauth_state(state, str(current_user.id))
 
     # Build OAuth URL with proper URL encoding
     params = {
@@ -173,6 +175,9 @@ async def gsc_oauth_callback(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Missing code or state parameter",
         )
+
+    # Validate OAuth state to prevent CSRF attacks
+    await require_valid_oauth_state(state)
 
     try:
         # Import encryption and GSC adapter
@@ -432,6 +437,24 @@ async def sync_gsc_data(
 
         # Initialize GSC adapter
         gsc_adapter = GSCAdapter()
+
+        # ANA-03: Proactively refresh and persist token if expired, before any API calls.
+        token_expiry = connection.token_expiry
+        if token_expiry.tzinfo is None:
+            token_expiry = token_expiry.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) >= token_expiry:
+            try:
+                credentials = gsc_adapter.refresh_tokens(credentials)
+                connection.access_token = encrypt_credential(credentials.access_token, settings.secret_key)
+                connection.token_expiry = credentials.token_expiry
+                await db.commit()
+                logger.info("GSC token refreshed and persisted for user %s", current_user.id)
+            except Exception as refresh_err:
+                logger.error("Failed to refresh GSC token for user %s: %s", current_user.id, refresh_err)
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="GSC token expired and refresh failed. Please reconnect Google Search Console.",
+                )
 
         # Fetch keyword rankings (last 28 days)
         keywords_data = gsc_adapter.get_keyword_rankings(
@@ -1511,16 +1534,20 @@ async def get_content_health(
 
     health_data = await get_content_health_score(db, current_user.id)
 
+    # ANA-04: Batch-fetch all article titles in one query instead of N+1
+    recent_alerts_list = health_data.get("recent_alerts", [])
+    article_ids_health = [a.article_id for a in recent_alerts_list if a.article_id]
+    title_map_health: dict = {}
+    if article_ids_health:
+        title_rows = await db.execute(
+            select(Article.id, Article.title).where(Article.id.in_(article_ids_health))
+        )
+        title_map_health = {row.id: row.title for row in title_rows.all()}
+
     # Convert ORM alert objects to response dicts
     recent_alerts_response = []
-    for alert in health_data.get("recent_alerts", []):
-        # Try to get article title
-        article_title = None
-        if alert.article_id:
-            art_result = await db.execute(
-                select(Article.title).where(Article.id == alert.article_id)
-            )
-            article_title = art_result.scalar_one_or_none()
+    for alert in recent_alerts_list:
+        article_title = title_map_health.get(alert.article_id) if alert.article_id else None
 
         recent_alerts_response.append(
             ContentDecayAlertResponse(
@@ -1597,15 +1624,19 @@ async def list_decay_alerts(
     items_result = await db.execute(items_q)
     alerts = items_result.scalars().all()
 
+    # ANA-04: Batch-fetch article titles in one query to avoid N+1
+    article_ids_list = [a.article_id for a in alerts if a.article_id]
+    title_map_list: dict = {}
+    if article_ids_list:
+        title_rows_list = await db.execute(
+            select(Article.id, Article.title).where(Article.id.in_(article_ids_list))
+        )
+        title_map_list = {row.id: row.title for row in title_rows_list.all()}
+
     # Enrich with article titles
     alert_responses = []
     for alert in alerts:
-        article_title = None
-        if alert.article_id:
-            art_result = await db.execute(
-                select(Article.title).where(Article.id == alert.article_id)
-            )
-            article_title = art_result.scalar_one_or_none()
+        article_title = title_map_list.get(alert.article_id) if alert.article_id else None
 
         alert_responses.append(
             ContentDecayAlertResponse(

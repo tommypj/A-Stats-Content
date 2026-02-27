@@ -325,7 +325,7 @@ class ChromaAdapter:
         """
         import asyncio
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(self._executor, lambda: func(*args, **kwargs))
 
     def __del__(self):

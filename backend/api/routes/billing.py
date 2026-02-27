@@ -320,8 +320,10 @@ async def handle_project_subscription_webhook(
         if event_name == WebhookEventType.SUBSCRIPTION_CREATED.value:
             # New project subscription
             project.subscription_tier = tier
+            project.subscription_status = subscription_status or "active"  # BILL-08
             project.lemonsqueezy_customer_id = str(customer_id) if customer_id else None
             project.lemonsqueezy_subscription_id = str(subscription_id) if subscription_id else None
+            project.lemonsqueezy_variant_id = str(variant_id) if variant_id else None  # BILL-07
 
             if renews_at:
                 project.subscription_expires = _parse_iso_datetime(renews_at)
@@ -331,6 +333,8 @@ async def handle_project_subscription_webhook(
         elif event_name == WebhookEventType.SUBSCRIPTION_UPDATED.value:
             # Project subscription updated
             project.subscription_tier = tier
+            project.subscription_status = subscription_status or "active"  # BILL-08
+            project.lemonsqueezy_variant_id = str(variant_id) if variant_id else None  # BILL-07
 
             if renews_at:
                 project.subscription_expires = _parse_iso_datetime(renews_at)
@@ -341,17 +345,19 @@ async def handle_project_subscription_webhook(
                 logger.info(f"Project subscription updated: project_id={project_id}, tier={tier}, status={subscription_status}")
 
         elif event_name == WebhookEventType.SUBSCRIPTION_CANCELLED.value:
-            # Project subscription cancelled - keep tier until expiration
-            if renews_at:
-                project.subscription_expires = _parse_iso_datetime(renews_at)
-
-            logger.info(f"Project subscription cancelled: project_id={project_id}, expires={renews_at}")
+            # BILL-04: Revoke features immediately on cancellation rather than waiting
+            # for the billing period to end. subscription_expires = now() means
+            # BILL-01's expiry check in check_limit() will immediately treat them as free.
+            project.subscription_expires = datetime.now(timezone.utc)
+            logger.info(f"Project subscription cancelled: project_id={project_id}, access revoked immediately")
 
         elif event_name == WebhookEventType.SUBSCRIPTION_EXPIRED.value:
             # Project subscription expired - downgrade to free
             project.subscription_tier = SubscriptionTier.FREE.value
+            project.subscription_status = "expired"  # BILL-08
             project.subscription_expires = None
             project.lemonsqueezy_subscription_id = None
+            project.lemonsqueezy_variant_id = None  # BILL-07
 
             logger.info(f"Project subscription expired: project_id={project_id}, downgraded to free")
 
@@ -439,19 +445,39 @@ async def handle_webhook(
                 detail="Invalid webhook signature",
             )
     else:
+        # BILL-06: Return 403 (not 503) when secret is unconfigured — prevents aggressive LS retries.
         logger.error("Webhook rejected: LEMONSQUEEZY_WEBHOOK_SECRET not configured")
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Webhook verification not configured")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Webhook verification not configured")
 
     # Parse webhook payload
     try:
         payload = json.loads(body)
     except json.JSONDecodeError:
         logger.error("Invalid JSON in webhook payload")
-        # Always return 200 to acknowledge receipt, even on errors
-        return {"status": "error", "message": "Invalid JSON"}
+        # BILL-05: Return 400 so LemonSqueezy stops retrying a malformed payload.
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON payload")
+
+    # Idempotency: deduplicate webhook events using Redis (24h TTL covers LemonSqueezy retry window)
+    meta = payload.get("meta", {})
+    event_id = meta.get("event_id") or payload.get("id")
+    if event_id:
+        try:
+            import redis.asyncio as aioredis
+            from infrastructure.config.settings import settings as _settings
+            r = aioredis.from_url(_settings.redis_url)
+            redis_key = f"webhook:processed:{event_id}"
+            already_processed = await r.exists(redis_key)
+            if not already_processed:
+                await r.setex(redis_key, 86400, "1")  # 24h TTL
+            await r.aclose()
+            if already_processed:
+                logger.info("Duplicate webhook event %s — skipping", event_id)
+                return {"status": "ok", "message": "already processed"}
+        except Exception as redis_err:
+            logger.warning("Redis unavailable for webhook dedup (event %s): %s", event_id, redis_err)
+            # Acceptable degradation — proceed without idempotency guard
 
     # Extract event info
-    meta = payload.get("meta", {})
     event_name = meta.get("event_name")
     custom_data = meta.get("custom_data", {}) or {}
     user_id = custom_data.get("user_id")
@@ -527,6 +553,7 @@ async def handle_webhook(
         if event_name == WebhookEventType.SUBSCRIPTION_CREATED.value:
             # New subscription
             user.subscription_tier = tier
+            user.subscription_status = subscription_status or "active"  # BILL-08
             user.lemonsqueezy_customer_id = str(customer_id) if customer_id else None
             user.lemonsqueezy_subscription_id = str(subscription_id) if subscription_id else None
 
@@ -538,6 +565,7 @@ async def handle_webhook(
         elif event_name == WebhookEventType.SUBSCRIPTION_UPDATED.value:
             # Subscription updated (plan change, status change, etc.)
             user.subscription_tier = tier
+            user.subscription_status = subscription_status or "active"  # BILL-08
 
             if renews_at:
                 user.subscription_expires = _parse_iso_datetime(renews_at)
@@ -550,15 +578,15 @@ async def handle_webhook(
                 logger.info(f"Subscription updated for user {user_id}: tier={tier}, status={subscription_status}")
 
         elif event_name == WebhookEventType.SUBSCRIPTION_CANCELLED.value:
-            # Subscription cancelled - keep tier until expiration
-            if renews_at:
-                user.subscription_expires = _parse_iso_datetime(renews_at)
-
-            logger.info(f"Subscription cancelled for user {user_id}, will expire at {renews_at}")
+            # BILL-04: Revoke features immediately on cancellation
+            user.subscription_status = "cancelled"  # BILL-08
+            user.subscription_expires = datetime.now(timezone.utc)
+            logger.info(f"Subscription cancelled for user {user_id}, access revoked immediately")
 
         elif event_name == WebhookEventType.SUBSCRIPTION_EXPIRED.value:
             # Subscription expired - downgrade to free
             user.subscription_tier = SubscriptionTier.FREE.value
+            user.subscription_status = "expired"  # BILL-08
             user.subscription_expires = None
             user.lemonsqueezy_subscription_id = None
 
@@ -578,6 +606,7 @@ async def handle_webhook(
         elif event_name == WebhookEventType.SUBSCRIPTION_RESUMED.value:
             # Subscription resumed
             user.subscription_tier = tier
+            user.subscription_status = "active"  # BILL-08
 
             if renews_at:
                 user.subscription_expires = _parse_iso_datetime(renews_at)

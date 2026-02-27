@@ -6,7 +6,8 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from api.middleware.rate_limit import limiter
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -407,7 +408,9 @@ async def resend_project_invitation(
 
 
 @router.get("/invitations/{token}", response_model=ProjectInvitationPublicResponse, tags=["public-invitations"])
+@limiter.limit("20/minute")  # AUTH-12: prevent brute-force enumeration of invitation tokens
 async def get_invitation_details(
+    request: Request,
     token: str,
     db: AsyncSession = Depends(get_db),
 ):
@@ -454,7 +457,9 @@ async def get_invitation_details(
 
 
 @router.post("/invitations/{token}/accept", response_model=ProjectInvitationAcceptResponse, tags=["public-invitations"])
+@limiter.limit("10/minute")  # AUTH-12
 async def accept_invitation(
+    request: Request,
     token: str,
     current_user: Optional[User] = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

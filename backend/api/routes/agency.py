@@ -5,13 +5,15 @@ Provides full CRUD for agency profiles, client workspaces, report templates,
 and report generation, plus a public token-based client portal endpoint.
 """
 
+import asyncio
 import math
 from datetime import date, datetime, timezone, timedelta
 from typing import Optional
 from uuid import uuid4
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
+from api.middleware.rate_limit import limiter
 from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy import select, func, and_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -410,8 +412,10 @@ async def delete_client_workspace(
 
 
 @router.post("/clients/{workspace_id}/enable-portal", response_model=ClientWorkspaceResponse)
+@limiter.limit("5/minute")
 async def enable_client_portal(
     workspace_id: str,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -419,7 +423,7 @@ async def enable_client_portal(
     profile = await get_agency_profile(current_user.id, db)
     workspace = await get_client_workspace_for_agency(workspace_id, profile.id, db)
 
-    workspace.portal_access_token = secrets.token_urlsafe(32)
+    workspace.portal_access_token = secrets.token_urlsafe(48)  # 64-char base64 token
     workspace.is_portal_enabled = True
 
     await db.commit()
@@ -758,6 +762,20 @@ async def list_generated_reports(
 
     conditions = [GeneratedReport.agency_id == profile.id]
     if client_workspace_id:
+        # AGY-04: Validate workspace belongs to THIS agency before filtering (prevents timing oracle).
+        ws_check = await db.execute(
+            select(ClientWorkspace.id).where(
+                and_(
+                    ClientWorkspace.id == client_workspace_id,
+                    ClientWorkspace.agency_id == profile.id,
+                )
+            )
+        )
+        if not ws_check.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Client workspace not found",
+            )
         conditions.append(GeneratedReport.client_workspace_id == client_workspace_id)
 
     result = await db.execute(
@@ -815,6 +833,12 @@ class PortalSummaryResponse(BaseModel):
     total_revenue: float
     top_pages: list[dict]
     top_keywords: list[dict]
+    # Branding fields for white-label portal customisation
+    agency_logo_url: Optional[str] = None
+    brand_colors: Optional[dict] = None
+    contact_email: Optional[str] = None
+    footer_text: Optional[str] = None
+    client_logo_url: Optional[str] = None
 
 
 @router.get("/portal/{token}", response_model=PortalSummaryResponse)
@@ -882,102 +906,120 @@ async def get_portal_data(
             total_revenue=0.0,
             top_pages=[],
             top_keywords=[],
+            agency_logo_url=agency.logo_url if agency else None,
+            brand_colors=agency.brand_colors if agency else None,
+            contact_email=agency.contact_email if agency else None,
+            footer_text=agency.footer_text if agency else None,
+            client_logo_url=workspace.client_logo_url,
         )
 
-    # Daily analytics aggregation
-    daily_agg = await db.execute(
-        select(
-            func.coalesce(func.sum(DailyAnalytics.total_clicks), 0).label("total_clicks"),
-            func.coalesce(func.sum(DailyAnalytics.total_impressions), 0).label(
-                "total_impressions"
-            ),
-        ).where(
-            and_(
-                DailyAnalytics.user_id == project_owner_id,
-                DailyAnalytics.date >= period_start,
-                DailyAnalytics.date <= period_end,
+    # AGY-05: Run all aggregation queries under a 10-second timeout so a slow DB
+    # doesn't hang public portal requests indefinitely.
+    async def _aggregate():
+        # Daily analytics aggregation
+        daily_agg = await db.execute(
+            select(
+                func.coalesce(func.sum(DailyAnalytics.total_clicks), 0).label("total_clicks"),
+                func.coalesce(func.sum(DailyAnalytics.total_impressions), 0).label(
+                    "total_impressions"
+                ),
+            ).where(
+                and_(
+                    DailyAnalytics.user_id == project_owner_id,
+                    DailyAnalytics.date >= period_start,
+                    DailyAnalytics.date <= period_end,
+                )
             )
         )
-    )
-    daily_row = daily_agg.one()
-    total_clicks = int(daily_row.total_clicks)
-    total_impressions = int(daily_row.total_impressions)
+        daily_row = daily_agg.one()
+        _total_clicks = int(daily_row.total_clicks)
+        _total_impressions = int(daily_row.total_impressions)
 
-    # Conversion aggregation (only if analytics feature is allowed or no filter set)
-    allowed = workspace.allowed_features or {}
-    conv_agg = await db.execute(
-        select(
-            func.coalesce(func.sum(ContentConversion.conversions), 0).label(
-                "total_conversions"
-            ),
-            func.coalesce(func.sum(ContentConversion.revenue), 0).label("total_revenue"),
-        ).where(
-            and_(
-                ContentConversion.project_id == workspace.project_id,
-                ContentConversion.date >= period_start,
-                ContentConversion.date <= period_end,
+        # Conversion aggregation
+        conv_agg = await db.execute(
+            select(
+                func.coalesce(func.sum(ContentConversion.conversions), 0).label(
+                    "total_conversions"
+                ),
+                func.coalesce(func.sum(ContentConversion.revenue), 0).label("total_revenue"),
+            ).where(
+                and_(
+                    ContentConversion.project_id == workspace.project_id,
+                    ContentConversion.date >= period_start,
+                    ContentConversion.date <= period_end,
+                )
             )
         )
-    )
-    conv_row = conv_agg.one()
-    total_conversions = int(conv_row.total_conversions)
-    total_revenue = float(conv_row.total_revenue)
+        conv_row = conv_agg.one()
+        _total_conversions = int(conv_row.total_conversions)
+        _total_revenue = float(conv_row.total_revenue)
 
-    # Top pages
-    pages_result = await db.execute(
-        select(
-            PagePerformance.page_url,
-            func.sum(PagePerformance.clicks).label("clicks"),
-            func.sum(PagePerformance.impressions).label("impressions"),
-        )
-        .where(
-            and_(
-                PagePerformance.user_id == project_owner_id,
-                PagePerformance.date >= period_start,
-                PagePerformance.date <= period_end,
+        # Top pages
+        pages_result = await db.execute(
+            select(
+                PagePerformance.page_url,
+                func.sum(PagePerformance.clicks).label("clicks"),
+                func.sum(PagePerformance.impressions).label("impressions"),
             )
+            .where(
+                and_(
+                    PagePerformance.user_id == project_owner_id,
+                    PagePerformance.date >= period_start,
+                    PagePerformance.date <= period_end,
+                )
+            )
+            .group_by(PagePerformance.page_url)
+            .order_by(desc("clicks"))
+            .limit(5)
         )
-        .group_by(PagePerformance.page_url)
-        .order_by(desc("clicks"))
-        .limit(5)
-    )
-    top_pages = [
-        {
-            "page_url": row.page_url,
-            "clicks": int(row.clicks),
-            "impressions": int(row.impressions),
-        }
-        for row in pages_result.all()
-    ]
+        _top_pages = [
+            {
+                "page_url": row.page_url,
+                "clicks": int(row.clicks),
+                "impressions": int(row.impressions),
+            }
+            for row in pages_result.all()
+        ]
 
-    # Top keywords
-    keywords_result = await db.execute(
-        select(
-            KeywordRanking.keyword,
-            func.sum(KeywordRanking.clicks).label("clicks"),
-            func.sum(KeywordRanking.impressions).label("impressions"),
-            func.avg(KeywordRanking.position).label("avg_position"),
-        )
-        .where(
-            and_(
-                KeywordRanking.user_id == project_owner_id,
-                KeywordRanking.date >= period_start,
-                KeywordRanking.date <= period_end,
+        # Top keywords
+        keywords_result = await db.execute(
+            select(
+                KeywordRanking.keyword,
+                func.sum(KeywordRanking.clicks).label("clicks"),
+                func.sum(KeywordRanking.impressions).label("impressions"),
+                func.avg(KeywordRanking.position).label("avg_position"),
             )
+            .where(
+                and_(
+                    KeywordRanking.user_id == project_owner_id,
+                    KeywordRanking.date >= period_start,
+                    KeywordRanking.date <= period_end,
+                )
+            )
+            .group_by(KeywordRanking.keyword)
+            .order_by(desc("clicks"))
+            .limit(5)
         )
-        .group_by(KeywordRanking.keyword)
-        .order_by(desc("clicks"))
-        .limit(5)
-    )
-    top_keywords = [
-        {
-            "keyword": row.keyword,
-            "clicks": int(row.clicks),
-            "impressions": int(row.impressions),
-            "avg_position": round(float(row.avg_position), 2),
-        }
-        for row in keywords_result.all()
-    ]
+        _top_keywords = [
+            {
+                "keyword": row.keyword,
+                "clicks": int(row.clicks),
+                "impressions": int(row.impressions),
+                "avg_position": round(float(row.avg_position), 2),
+            }
+            for row in keywords_result.all()
+        ]
+        return _total_clicks, _total_impressions, _total_conversions, _total_revenue, _top_pages, _top_keywords
+
+    try:
+        total_clicks, total_impressions, total_conversions, total_revenue, top_pages, top_keywords = (
+            await asyncio.wait_for(_aggregate(), timeout=10.0)
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Portal data temporarily unavailable — please try again shortly",
+        )
 
     return PortalSummaryResponse(
         client_name=workspace.client_name,
@@ -990,4 +1032,9 @@ async def get_portal_data(
         total_revenue=total_revenue,
         top_pages=top_pages,
         top_keywords=top_keywords,
+        agency_logo_url=agency.logo_url if agency else None,
+        brand_colors=agency.brand_colors if agency else None,
+        contact_email=agency.contact_email if agency else None,
+        footer_text=agency.footer_text if agency else None,
+        client_logo_url=workspace.client_logo_url,
     )
