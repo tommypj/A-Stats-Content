@@ -2,10 +2,13 @@
 Project management API routes for multi-tenancy.
 """
 
+import logging
 import math
 from datetime import datetime, timezone
 from typing import Annotated, Optional, List
 import re
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy import select, func, and_, or_, update as sql_update, delete as sql_delete
@@ -571,6 +574,20 @@ async def delete_project(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot delete personal workspace",
         )
+
+    # Defensive: log a warning if the project somehow has multiple owners
+    owner_count_result = await db.execute(
+        select(func.count()).select_from(ProjectMember).where(
+            and_(
+                ProjectMember.project_id == project_id,
+                ProjectMember.role == ProjectMemberRole.OWNER.value,
+                ProjectMember.deleted_at.is_(None),
+            )
+        )
+    )
+    owner_count = owner_count_result.scalar_one()
+    if owner_count > 1:
+        logger.warning("delete_project: project %s has %d owners, proceeding with delete", project_id, owner_count)
 
     # Soft delete project
     project.deleted_at = datetime.now(timezone.utc)

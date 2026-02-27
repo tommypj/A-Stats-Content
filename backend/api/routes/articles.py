@@ -51,6 +51,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/articles", tags=["articles"])
 
+# Timeout (seconds) for the grammar proofread pass — named constant for easy tuning
+PROOFREAD_TIMEOUT_SECONDS = 60
+
 # Limit concurrent AI generation tasks to prevent resource exhaustion
 _generation_semaphore = asyncio.Semaphore(5)
 
@@ -374,7 +377,7 @@ async def _run_article_generation(
                         content=generated.content,
                         language=language,
                     ),
-                    timeout=60.0,
+                    timeout=PROOFREAD_TIMEOUT_SECONDS,
                 )
                 # Update generated content with proofread version
                 generated = GeneratedArticle(
@@ -612,6 +615,9 @@ async def list_articles(
         )
 
     if status:
+        VALID_STATUSES = {s.value for s in ContentStatus}
+        if status not in VALID_STATUSES:
+            raise HTTPException(status_code=400, detail=f"Invalid status value: {status}")
         query = query.where(Article.status == status)
     if keyword:
         query = query.where(Article.keyword.ilike(f"%{escape_like(keyword)}%"))

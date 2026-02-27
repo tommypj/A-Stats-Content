@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Literal, Optional, List, Dict, Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # ============================================================================
@@ -109,6 +109,32 @@ class ArticleGenerateRequest(BaseModel):
         description="Custom instructions for the AI writer",
     )
     language: Optional[str] = Field(None, max_length=10, description="Content language code (e.g., 'en', 'ro')")
+
+    # GEN-47: Validate enum-like fields against values the AI adapter actually supports
+    VALID_WRITING_STYLES = {"editorial", "narrative", "listicle", "balanced"}
+    VALID_VOICES = {"first_person", "second_person", "third_person"}
+    VALID_LIST_USAGES = {"minimal", "balanced", "heavy"}
+
+    @field_validator("writing_style")
+    @classmethod
+    def validate_writing_style(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in cls.VALID_WRITING_STYLES:
+            raise ValueError(f"Invalid writing_style '{v}'. Must be one of: {sorted(cls.VALID_WRITING_STYLES)}")
+        return v
+
+    @field_validator("voice")
+    @classmethod
+    def validate_voice(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in cls.VALID_VOICES:
+            raise ValueError(f"Invalid voice '{v}'. Must be one of: {sorted(cls.VALID_VOICES)}")
+        return v
+
+    @field_validator("list_usage")
+    @classmethod
+    def validate_list_usage(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in cls.VALID_LIST_USAGES:
+            raise ValueError(f"Invalid list_usage '{v}'. Must be one of: {sorted(cls.VALID_LIST_USAGES)}")
+        return v
 
 
 class ArticleCreateRequest(BaseModel):

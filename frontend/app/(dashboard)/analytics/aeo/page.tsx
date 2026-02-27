@@ -182,8 +182,8 @@ export default function AEOPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {Object.entries(overview.score_distribution).map(([range, count]) => {
-                  const maxCount = Math.max(...Object.values(overview.score_distribution), 1);
+                {Object.entries(overview?.score_distribution ?? {}).map(([range, count]) => {
+                  const maxCount = Math.max(...Object.values(overview?.score_distribution ?? {}), 1);
                   const pct = (count / maxCount) * 100;
                   const barColor =
                     range === "81-100" ? "bg-green-500" :

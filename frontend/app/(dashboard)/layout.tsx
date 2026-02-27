@@ -704,6 +704,21 @@ export default function DashboardLayout({
     }
   }, [router]);
 
+  // Safety timeout: if the auth check never resolves (e.g. localStorage cleared
+  // mid-load), stop showing the spinner after 10 seconds to avoid an infinite
+  // loading state.
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setIsAuthenticated((prev) => {
+        if (!prev) {
+          router.push("/login");
+        }
+        return prev;
+      });
+    }, 10000);
+    return () => clearTimeout(timeout);
+  }, [router]);
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface-secondary">

@@ -5,7 +5,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: "user" | "admin";
+  role: "user" | "admin" | "super_admin";
   subscription_tier: "free" | "starter" | "professional" | "enterprise";
 }
 

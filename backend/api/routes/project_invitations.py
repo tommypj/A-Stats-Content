@@ -107,6 +107,10 @@ async def list_project_invitations(
     - Filter by status (pending, expired, accepted, revoked)
     - Paginated results
     """
+    VALID_INVITATION_STATUSES = {"pending", "accepted", "declined", "expired", "revoked"}
+    if status_filter and status_filter not in VALID_INVITATION_STATUSES:
+        raise HTTPException(status_code=400, detail=f"Invalid status filter. Must be one of: {', '.join(sorted(VALID_INVITATION_STATUSES))}")
+
     # Build query
     query = select(ProjectInvitation).where(ProjectInvitation.project_id == project_id)
 

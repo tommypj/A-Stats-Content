@@ -115,7 +115,7 @@ async def get_current_user(
         pwd_changed = user.password_changed_at
         if pwd_changed.tzinfo is None:
             pwd_changed = pwd_changed.replace(tzinfo=timezone.utc)
-        if pwd_changed > token_iat:
+        if token_iat < pwd_changed:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token invalidated due to security event",
@@ -580,11 +580,14 @@ async def resend_verification(
         user.email_verification_token = verification_token
         await db.commit()
 
-        await email_service.send_verification_email(
-            to_email=user.email,
-            user_name=user.name,
-            verification_token=verification_token,
-        )
+        try:
+            await email_service.send_verification_email(
+                to_email=user.email,
+                user_name=user.name,
+                verification_token=verification_token,
+            )
+        except Exception as email_err:
+            logger.error("Failed to send verification email to %s: %s", user.email, email_err)
 
     return {"message": "If the email exists and is not verified, a verification link has been sent"}
 
@@ -713,6 +716,14 @@ async def delete_account(
 _AVATAR_MAX_SIZE = 2 * 1024 * 1024
 _AVATAR_ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
+# Magic bytes for supported image formats (server-side validation independent of Content-Type header)
+_AVATAR_MAGIC_BYTES = {
+    b'\xff\xd8\xff': 'image/jpeg',
+    b'\x89PNG': 'image/png',
+    b'GIF8': 'image/gif',
+    b'RIFF': 'image/webp',  # RIFF....WEBP
+}
+
 
 @router.post("/me/avatar", response_model=UserResponse)
 @limiter.limit("10/minute")
@@ -746,6 +757,13 @@ async def upload_avatar(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uploaded file is empty.",
+        )
+
+    # Validate actual file content via magic bytes (mitigates spoofed Content-Type headers)
+    if not any(image_data.startswith(magic) for magic in _AVATAR_MAGIC_BYTES):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid image file format",
         )
 
     # Determine extension from content type
@@ -889,7 +907,7 @@ async def export_my_data(
     ]
 
     # Project memberships
-    result = await db.execute(select(ProjectMember).where(ProjectMember.user_id == user_id))
+    result = await db.execute(select(ProjectMember).where(ProjectMember.user_id == user_id, ProjectMember.deleted_at.is_(None)))
     memberships = [
         {
             "project_id": str(m.project_id),

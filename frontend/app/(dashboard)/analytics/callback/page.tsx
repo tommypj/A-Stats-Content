@@ -41,6 +41,17 @@ function AnalyticsCallbackContent() {
       return;
     }
 
+    // CSRF state validation: compare URL state against value stored when OAuth
+    // was initiated. Clear the stored value regardless of outcome.
+    const expectedState = sessionStorage.getItem("gsc_oauth_state");
+    sessionStorage.removeItem("gsc_oauth_state");
+    if (!expectedState || state !== expectedState) {
+      setStatus("error");
+      setErrorMessage("Invalid OAuth state parameter. This may be a CSRF attempt. Please try connecting again.");
+      toast.error("OAuth state mismatch — please try again");
+      return;
+    }
+
     try {
       await api.analytics.handleCallback(code, state);
       setStatus("success");

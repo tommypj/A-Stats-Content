@@ -395,6 +395,14 @@ class UpdateMemberRoleRequest(BaseModel):
 
     role: str = Field(..., description="New role")
 
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v: str) -> str:
+        valid_roles = ["owner", "admin", "editor", "viewer"]
+        if v not in valid_roles:
+            raise ValueError(f"Role must be one of: {', '.join(valid_roles)}")
+        return v
+
 
 class UpdateMemberRoleResponse(BaseModel):
     """Response after updating member role."""

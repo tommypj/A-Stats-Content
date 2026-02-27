@@ -24,14 +24,21 @@ export function useRequireAuth(redirectTo: string = "/login") {
             id: user.id,
             email: user.email,
             name: user.name,
-            role: user.role as "user" | "admin",
+            role: user.role as "user" | "admin" | "super_admin",
             subscription_tier: (user.subscription_tier || "free") as "free" | "starter" | "professional" | "enterprise",
           });
-        } catch {
-          // Token invalid, clear it
-          localStorage.removeItem("auth_token");
-          setUser(null);
-          router.push(redirectTo);
+        } catch (error) {
+          const status = (error as any)?.response?.status;
+          if (status === 401 || status === 403) {
+            // Token invalid or forbidden — clear and redirect
+            localStorage.removeItem("auth_token");
+            setUser(null);
+            router.push(redirectTo);
+          } else {
+            // Network or server error — don't log the user out
+            console.error("Auth check failed:", error);
+            setLoading(false);
+          }
         }
       } else {
         router.push(redirectTo);
@@ -69,19 +76,19 @@ export function useRedirectIfAuthenticated(redirectTo: string = "/dashboard") {
 /**
  * Check if user has required role.
  */
-export function useRequireRole(requiredRole: "admin" | "user") {
+export function useRequireRole(requiredRole: "admin" | "super_admin" | "user") {
   const { user, isAuthenticated } = useAuthStore();
   const router = useRouter();
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      if (requiredRole === "admin" && user.role !== "admin") {
+      if (requiredRole === "admin" && user.role !== "admin" && user.role !== "super_admin") {
         router.push("/dashboard");
       }
     }
   }, [user, isAuthenticated, requiredRole, router]);
 
-  return { hasRole: user?.role === requiredRole || user?.role === "admin" };
+  return { hasRole: user?.role === requiredRole || user?.role === "admin" || user?.role === "super_admin" };
 }
 
 /**

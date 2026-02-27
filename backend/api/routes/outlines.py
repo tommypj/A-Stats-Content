@@ -91,8 +91,13 @@ async def create_outline(
         status=ContentStatus.GENERATING.value if body.auto_generate else ContentStatus.DRAFT.value,
     )
 
-    db.add(outline)
-    await db.commit()
+    try:
+        db.add(outline)
+        await db.commit()
+        await db.refresh(outline)
+    except Exception:
+        await db.rollback()
+        raise
 
     # Auto-generate with AI if requested
     if body.auto_generate:
@@ -187,6 +192,9 @@ async def list_outlines(
 
     # Apply filters
     if status:
+        VALID_STATUSES = {s.value for s in ContentStatus}
+        if status not in VALID_STATUSES:
+            raise HTTPException(status_code=400, detail=f"Invalid status value: {status}")
         query = query.where(Outline.status == status)
     if keyword:
         query = query.where(Outline.keyword.ilike(f"%{escape_like(keyword)}%"))

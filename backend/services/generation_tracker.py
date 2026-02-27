@@ -43,9 +43,14 @@ class GenerationTracker:
             input_metadata=input_metadata,
             cost_credits=0,  # Not charged yet
         )
-        self.db.add(log)
-        await self.db.flush()
-        return log
+        try:
+            self.db.add(log)
+            await self.db.flush()
+            return log
+        except Exception as e:
+            logger.error("Failed to create generation log: %s", e)
+            await self.db.rollback()
+            raise
 
     async def log_success(
         self,

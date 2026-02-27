@@ -30,6 +30,7 @@ export default function LoginPage() {
   const { login } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
   const {
     register,
@@ -74,7 +75,7 @@ export default function LoginPage() {
           id: user.id,
           email: user.email,
           name: user.name,
-          role: user.role as "user" | "admin",
+          role: user.role as "user" | "admin" | "super_admin",
           subscription_tier: (user.subscription_tier as "free" | "starter" | "professional" | "enterprise") || "free",
         },
         response.access_token,
@@ -86,6 +87,17 @@ export default function LoginPage() {
     } catch (error) {
       const apiError = parseApiError(error);
       toast.error(apiError.message || tErrors("invalidCredentials"));
+      // Client-side rate limiting: disable the submit button for 5 seconds
+      setCooldownSeconds(5);
+      const interval = setInterval(() => {
+        setCooldownSeconds((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     } finally {
       setIsLoading(false);
     }
@@ -152,10 +164,10 @@ export default function LoginPage() {
         <Button
           type="submit"
           className="w-full"
-          disabled={isLoading}
+          disabled={isLoading || cooldownSeconds > 0}
           isLoading={isLoading}
         >
-          {t("submit")}
+          {cooldownSeconds > 0 ? `Retry in ${cooldownSeconds}s` : t("submit")}
         </Button>
       </form>
 

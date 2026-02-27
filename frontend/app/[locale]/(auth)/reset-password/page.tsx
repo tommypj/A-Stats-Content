@@ -45,7 +45,7 @@ export default function ResetPasswordPage() {
   const [isInvalid, setIsInvalid] = useState(false);
 
   useEffect(() => {
-    if (!token) {
+    if (!token || token.length < 10) {
       setIsInvalid(true);
     }
   }, [token]);

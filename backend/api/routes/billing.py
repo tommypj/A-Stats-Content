@@ -49,7 +49,10 @@ def _parse_iso_datetime(value: str) -> Optional[datetime]:
     expiry date when the webhook payload contains a malformed timestamp.
     """
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed < datetime.now(timezone.utc):
+            logger.warning("Webhook subscription_expires %s is in the past", parsed)
+        return parsed
     except (ValueError, AttributeError) as e:
         logger.warning("Failed to parse datetime '%s': %s — skipping expiry update", value, e)
         return None
@@ -367,6 +370,7 @@ async def handle_project_subscription_webhook(
             # for the billing period to end. subscription_expires = now() means
             # BILL-01's expiry check in check_limit() will immediately treat them as free.
             project.subscription_expires = datetime.now(timezone.utc)
+            project.subscription_status = "cancelled"  # BILL-27
             logger.info(f"Project subscription cancelled: project_id={project_id}, access revoked immediately")
 
         elif event_name == WebhookEventType.SUBSCRIPTION_EXPIRED.value:
@@ -672,10 +676,11 @@ async def handle_webhook(
             if user.subscription_expires is not None:
                 personal_project.subscription_expires = user.subscription_expires
         else:
-            # BILL-13: warn if personal project is missing so ops can investigate
+            # BILL-13/BILL-23: warn if personal project is missing so ops can investigate
             logger.warning(
-                "BILL-13: No personal project found for user %s — subscription sync skipped",
-                user_id,
+                "BILL-23: Personal project not found for user %s (tier=%s) — subscription sync skipped. "
+                "User and project tiers may diverge.",
+                user_id, tier,
             )
 
         # Commit changes

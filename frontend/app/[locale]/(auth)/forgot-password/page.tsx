@@ -61,7 +61,7 @@ export default function ForgotPasswordPage() {
           {t("sent.title")}
         </h1>
         <p className="mt-2 text-text-secondary">
-          {t("sent.description", { email: sentEmail })}
+          If an account exists with that email, you&apos;ll receive password reset instructions shortly.
         </p>
         <Link
           href="/login"

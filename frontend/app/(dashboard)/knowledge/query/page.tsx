@@ -56,7 +56,7 @@ function QueryPageContent() {
     const newHistory = [
       { query, timestamp: new Date().toISOString() },
       ...queryHistory.filter((item) => item.query !== query),
-    ].slice(0, 5); // Keep only last 5 unique queries
+    ].slice(0, 50); // Keep only last 50 unique queries
 
     setQueryHistory(newHistory);
     localStorage.setItem("knowledge_query_history", JSON.stringify(newHistory));
@@ -155,6 +155,7 @@ function QueryPageContent() {
             <CardContent>
               <div className="prose prose-sm max-w-none">
                 <ReactMarkdown
+                  skipHtml={true}
                   components={{
                     h1: ({ children }) => (
                       <h1 className="text-2xl font-bold text-text-primary mb-4">
