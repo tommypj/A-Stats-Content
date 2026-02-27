@@ -82,6 +82,7 @@ async def create_outline(
     outline = Outline(
         id=outline_id,
         user_id=current_user.id,
+        project_id=project_id,
         title=f"Article about {body.keyword}",
         keyword=body.keyword,
         target_audience=effective_target_audience,

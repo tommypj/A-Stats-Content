@@ -224,9 +224,12 @@ async def create_article(
     word_count = len(request.content.split()) if request.content else 0
     content_html = markdown.markdown(request.content) if request.content else None
 
+    project_id = getattr(current_user, 'current_project_id', None)
+
     article = Article(
         id=article_id,
         user_id=current_user.id,
+        project_id=project_id,
         outline_id=request.outline_id,
         title=request.title,
         slug=slug,

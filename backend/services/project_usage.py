@@ -161,8 +161,10 @@ class ProjectUsageService:
         project = await self.get_project(project_id)
         limits = self.get_project_limits(project)
 
-        # Map resource type to usage field and limit
-        resource_map = {
+        # Map resource type to (current_usage, limit).
+        # Members count is computed lazily to avoid triggering a
+        # relationship lazy-load inside an async session context.
+        resource_map: dict[str, tuple[int, int]] = {
             "articles": (
                 project.articles_generated_this_month,
                 limits.articles_per_month,
@@ -175,17 +177,26 @@ class ProjectUsageService:
                 project.images_generated_this_month,
                 limits.images_per_month,
             ),
-            "members": (
-                len([m for m in project.members if m.deleted_at is None]),
-                limits.max_members,
-            ),
         }
 
-        if resource not in resource_map:
+        valid_resources = list(resource_map.keys()) + ["members"]
+        if resource not in valid_resources:
             raise ValueError(
                 f"Invalid resource type: {resource}. "
-                f"Must be one of: {', '.join(resource_map.keys())}"
+                f"Must be one of: {', '.join(valid_resources)}"
             )
+
+        # For members, query the count explicitly to avoid async lazy-load issues
+        if resource == "members":
+            from infrastructure.database.models.project import ProjectMember
+            count_result = await self.db.execute(
+                select(func.count()).select_from(ProjectMember).where(
+                    ProjectMember.project_id == str(project_id),
+                    ProjectMember.deleted_at.is_(None),
+                )
+            )
+            current_members = count_result.scalar() or 0
+            resource_map["members"] = (current_members, limits.max_members)
 
         current_usage, limit = resource_map[resource]
 
