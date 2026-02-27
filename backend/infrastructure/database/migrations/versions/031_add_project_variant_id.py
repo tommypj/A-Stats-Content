@@ -18,10 +18,18 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "projects",
-        sa.Column("lemonsqueezy_variant_id", sa.String(255), nullable=True),
-    )
+    op.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'projects'
+                  AND column_name = 'lemonsqueezy_variant_id'
+            ) THEN
+                ALTER TABLE projects ADD COLUMN lemonsqueezy_variant_id VARCHAR(255);
+            END IF;
+        END $$;
+    """)
 
 
 def downgrade() -> None:
