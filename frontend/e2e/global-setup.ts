@@ -1,15 +1,13 @@
 /**
  * Global setup — runs once before the entire test suite.
  *
- * Priority:
- *   1. If TEST_EMAIL + TEST_PASSWORD env vars are set, log in directly.
- *   2. Otherwise, register a new account and try to log in.
- *      If the account is inactive (email verification required), write an
- *      EMPTY auth state so authenticated tests are skipped gracefully.
+ * Logs in through the VERCEL FRONTEND (not the API directly) so that:
+ *   - HttpOnly cookies are set for the Railway domain
+ *   - Zustand auth-storage is populated in localStorage for the Vercel domain
+ *   - Both are saved in storageState and reused across all tests
  *
- * To run the full suite including authenticated tests, create a verified
- * account and pass credentials:
- *   TEST_EMAIL=you@example.com TEST_PASSWORD=yourpass npx playwright test
+ * Usage:
+ *   TEST_EMAIL=you@example.com TEST_PASSWORD=pass npx playwright test
  */
 import { chromium } from "@playwright/test";
 import * as fs from "fs";
@@ -27,11 +25,8 @@ const META_FILE = path.join(AUTH_DIR, "test-meta.json");
 const EMPTY_STATE = JSON.stringify({ cookies: [], origins: [] });
 
 export const TEST_NAME = "Playwright Tester";
+export const TEST_EMAIL = process.env.TEST_EMAIL ?? `e2e-${Date.now()}@e2etests.io`;
 export const TEST_PASSWORD = process.env.TEST_PASSWORD ?? "E2eTest!Password9";
-
-// Use env var or generate a timestamped email
-export const TEST_EMAIL =
-  process.env.TEST_EMAIL ?? `e2e-${Date.now()}@e2etests.io`;
 
 async function globalSetup() {
   if (!fs.existsSync(AUTH_DIR)) fs.mkdirSync(AUTH_DIR, { recursive: true });
@@ -40,66 +35,61 @@ async function globalSetup() {
   const context = await browser.newContext({ baseURL: BASE_URL });
   const page = await context.newPage();
 
-  // ── 1. Register (skip if using pre-provided credentials) ─────────────────
+  // ── Register if no credentials provided ──────────────────────────────────
   if (!process.env.TEST_EMAIL) {
     console.log(`[setup] Registering test user: ${TEST_EMAIL}`);
     const regRes = await page.request.post(`${API_URL}/api/v1/auth/register`, {
       data: { name: TEST_NAME, email: TEST_EMAIL, password: TEST_PASSWORD },
     });
-
     if (!regRes.ok()) {
       const body = await regRes.text();
       if (!body.toLowerCase().includes("already")) {
-        console.warn(`[setup] Registration failed (${regRes.status()}): ${body}`);
-        console.warn("[setup] Proceeding with empty auth state — authenticated tests will be skipped.");
+        console.warn(`[setup] Registration failed — writing empty auth state`);
         fs.writeFileSync(AUTH_STATE, EMPTY_STATE);
         await browser.close();
         return;
       }
-      console.log("[setup] User already exists — proceeding to login");
     }
   } else {
     console.log(`[setup] Using provided credentials for: ${TEST_EMAIL}`);
   }
 
-  // ── 2. Login ─────────────────────────────────────────────────────────────
-  console.log("[setup] Logging in…");
-  const loginRes = await page.request.post(`${API_URL}/api/v1/auth/login`, {
-    data: { email: TEST_EMAIL, password: TEST_PASSWORD },
-  });
+  // ── Log in through the Vercel UI ─────────────────────────────────────────
+  // This populates BOTH the Railway HttpOnly cookies AND Zustand localStorage
+  console.log("[setup] Navigating to login page…");
+  await page.goto(`${BASE_URL}/en/login`);
 
-  if (!loginRes.ok()) {
-    const body = await loginRes.text();
-    const isVerificationRequired =
-      body.toLowerCase().includes("inactive") ||
-      body.toLowerCase().includes("verify") ||
-      body.toLowerCase().includes("not verified");
+  await page.getByLabel(/email/i).fill(TEST_EMAIL);
+  await page.getByLabel(/password/i).fill(TEST_PASSWORD);
+  await page.getByRole("button", { name: /sign in|log in|login/i }).click();
 
-    if (isVerificationRequired) {
-      console.warn(
-        "\n⚠️  Email verification required.\n" +
-          "   Authenticated tests will be SKIPPED.\n" +
-          "   To run them, create a verified account and set:\n" +
-          `     TEST_EMAIL=<email> TEST_PASSWORD=<pass> npx playwright test\n`
-      );
+  // Wait for redirect to dashboard (proves auth succeeded)
+  try {
+    await page.waitForURL(/\/dashboard/, { timeout: 20_000 });
+    console.log(`[setup] ✓ Logged in — on dashboard`);
+  } catch {
+    // Check if we got an error message
+    const errorText = await page.getByText(/invalid|inactive|verify|error/i).first().textContent().catch(() => "");
+    if (errorText) {
+      console.warn(`[setup] Login failed: ${errorText}`);
     } else {
-      console.warn(`[setup] Login failed (${loginRes.status()}): ${body}`);
+      console.warn(`[setup] Login did not reach /dashboard (current: ${page.url()})`);
     }
-
+    console.warn("[setup] Writing empty auth state — authenticated tests will be SKIPPED");
     fs.writeFileSync(AUTH_STATE, EMPTY_STATE);
     await browser.close();
     return;
   }
 
-  // ── 3. Save storage state ────────────────────────────────────────────────
-  await context.storageState({ path: AUTH_STATE });
-  console.log(`[setup] ✓ Auth state saved for ${TEST_EMAIL}`);
+  // Wait for the page to fully hydrate (Zustand store written to localStorage)
+  await page.waitForTimeout(2_000);
 
-  // ── 4. Persist meta for teardown ─────────────────────────────────────────
-  fs.writeFileSync(
-    META_FILE,
-    JSON.stringify({ email: TEST_EMAIL, password: TEST_PASSWORD })
-  );
+  // ── Save storageState (cookies + localStorage) ────────────────────────────
+  await context.storageState({ path: AUTH_STATE });
+  console.log(`[setup] ✓ Auth state saved (cookies + localStorage)`);
+
+  // Persist meta for teardown
+  fs.writeFileSync(META_FILE, JSON.stringify({ email: TEST_EMAIL, password: TEST_PASSWORD }));
 
   await browser.close();
 }

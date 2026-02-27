@@ -58,13 +58,18 @@ export const useAuthStore = create<AuthState>()(
     {
       name: "auth-storage",
       // Only persist user object and isAuthenticated flag.
-      // This prevents a flash of "not authenticated" on page refresh
-      // while the actual auth is re-validated server-side via cookie.
       // Tokens are NOT persisted — they live in HttpOnly cookies.
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
       }),
+      // Set isLoading to false once localStorage hydration completes.
+      // Without this, isLoading stays `true` (its default) on page refresh,
+      // causing the dashboard's 10-second safety timeout to fire and redirect
+      // to login even for authenticated users.
+      onRehydrateStorage: () => (state) => {
+        state?.setLoading(false);
+      },
     }
   )
 );
