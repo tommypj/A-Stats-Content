@@ -2,6 +2,7 @@
 Admin user management API routes.
 """
 
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Optional
 from math import ceil
@@ -34,6 +35,8 @@ from api.schemas.admin import (
     AdminUserInfo,
     UsageStatsResponse,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["Admin - Users"])
 

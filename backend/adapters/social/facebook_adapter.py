@@ -8,9 +8,29 @@ Supports Instagram posting via Facebook API for business accounts.
 
 import logging
 from typing import List, Optional, Dict, Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse as _urlparse
 
 import httpx
+
+# SM-23: SSRF protection — only allow media URLs from trusted domains
+_ALLOWED_MEDIA_DOMAINS = {
+    "replicate.delivery",
+    "pbxt.replicate.delivery",
+    "cdn.replicate.com",
+    "uploads.a-stats.online",
+}
+
+
+def _validate_media_url(url: str) -> None:
+    """Raise ValueError if the URL scheme is not HTTPS or domain is not whitelisted."""
+    parsed = _urlparse(url)
+    if parsed.scheme != "https":
+        raise ValueError(f"Media URL must use HTTPS: {url}")
+    if not any(
+        parsed.netloc == d or parsed.netloc.endswith("." + d)
+        for d in _ALLOWED_MEDIA_DOMAINS
+    ):
+        raise ValueError(f"Media URL domain not allowed: {parsed.netloc}")
 
 from infrastructure.config.settings import settings
 from .base import (
@@ -455,6 +475,12 @@ class FacebookAdapter(BaseSocialAdapter):
         try:
             # For single image, use photos endpoint
             if len(media_urls) == 1:
+                # SM-23: Validate media URL before passing to Facebook API (SSRF protection)
+                try:
+                    _validate_media_url(media_urls[0])
+                except ValueError as e:
+                    logger.warning("Rejecting media URL due to SSRF validation failure: %s", e)
+                    raise SocialValidationError(f"Media URL not allowed: {e}") from e
                 post_data = {
                     "url": media_urls[0],
                     "message": text,

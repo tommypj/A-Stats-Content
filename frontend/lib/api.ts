@@ -1,5 +1,6 @@
 import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from "axios";
 import { toast } from "sonner";
+import { useAuthStore } from "@/stores/auth";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -127,8 +128,7 @@ let isLoggingOut = false;
 function forceLogout() {
   if (isLoggingOut) return;
   isLoggingOut = true;
-  localStorage.removeItem("auth_token");
-  localStorage.removeItem("refresh_token");
+  useAuthStore.getState().logout();
   window.location.href = "/login";
 }
 

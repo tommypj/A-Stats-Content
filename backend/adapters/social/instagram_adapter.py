@@ -14,8 +14,29 @@ Key differences from FacebookAdapter:
 
 import logging
 from typing import List, Optional, Dict, Any
+from urllib.parse import urlparse as _urlparse
 
 import httpx
+
+# SM-24: SSRF protection — only allow media URLs from trusted domains
+_ALLOWED_MEDIA_DOMAINS = {
+    "replicate.delivery",
+    "pbxt.replicate.delivery",
+    "cdn.replicate.com",
+    "uploads.a-stats.online",
+}
+
+
+def _validate_media_url(url: str) -> None:
+    """Raise ValueError if the URL scheme is not HTTPS or domain is not whitelisted."""
+    parsed = _urlparse(url)
+    if parsed.scheme != "https":
+        raise ValueError(f"Media URL must use HTTPS: {url}")
+    if not any(
+        parsed.netloc == d or parsed.netloc.endswith("." + d)
+        for d in _ALLOWED_MEDIA_DOMAINS
+    ):
+        raise ValueError(f"Media URL domain not allowed: {parsed.netloc}")
 
 from infrastructure.config.settings import settings
 from .base import (
@@ -403,6 +424,13 @@ class InstagramAdapter(BaseSocialAdapter):
         user_id = ig_user_id or credentials.account_id
         access_token = credentials.access_token
         image_url = media_urls[0]
+
+        # SM-24: Validate media URL before passing to Instagram API (SSRF protection)
+        try:
+            _validate_media_url(image_url)
+        except ValueError as e:
+            logger.warning("Rejecting media URL due to SSRF validation failure: %s", e)
+            raise SocialValidationError(f"Media URL not allowed: {e}") from e
 
         if self.mock_mode:
             logger.info("Mock mode: Would post to Instagram account %s: %s...", user_id, text[:50])

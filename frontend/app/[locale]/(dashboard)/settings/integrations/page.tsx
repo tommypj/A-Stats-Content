@@ -74,6 +74,10 @@ export default function IntegrationsSettingsPage() {
       toast.error("Please fill in all fields");
       return;
     }
+    if (!/^https?:\/\//i.test(wpFormData.site_url)) {
+      toast.error("WordPress site URL must start with http:// or https://");
+      return;
+    }
 
     setWpConnecting(true);
     try {
@@ -183,15 +187,19 @@ export default function IntegrationsSettingsPage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-green-900">Site URL</span>
-                    <a
-                      href={wpSiteUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-green-700 hover:text-green-800 flex items-center gap-1"
-                    >
-                      {wpSiteUrl}
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
+                    {/^https?:\/\//i.test(wpSiteUrl) ? (
+                      <a
+                        href={wpSiteUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-green-700 hover:text-green-800 flex items-center gap-1"
+                      >
+                        {wpSiteUrl}
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    ) : (
+                      <span className="text-sm text-green-700">{wpSiteUrl}</span>
+                    )}
                   </div>
                   {wpSiteName && (
                     <div className="flex items-center justify-between">

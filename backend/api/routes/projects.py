@@ -443,13 +443,13 @@ async def get_project(
     # Get project with members
     stmt = (
         select(Project)
-        .where(Project.id == project_id)
+        .where(Project.id == project_id, Project.deleted_at.is_(None))
         .options(selectinload(Project.members))
     )
     result = await db.execute(stmt)
     project = result.scalar_one_or_none()
 
-    if not project or project.deleted_at is not None:
+    if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Project not found",
@@ -669,6 +669,15 @@ async def remove_member(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot remove the project owner. Transfer ownership first.")
 
     member.deleted_at = datetime.now(timezone.utc)
+
+    # PROJ-40: If the removed user currently has this project active, clear it
+    removed_user_result = await db.execute(
+        select(User).where(User.id == member_user_id)
+    )
+    removed_user = removed_user_result.scalar_one_or_none()
+    if removed_user and str(removed_user.current_project_id) == str(project_id):
+        removed_user.current_project_id = None
+
     await db.commit()
 
     return RemoveMemberResponse(success=True, message="Member removed from project")

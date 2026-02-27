@@ -221,23 +221,25 @@ async def generate_image(
     Poll GET /images/{id} (status field) or GET /notifications/tasks/{task_id}/status
     to track progress.  The notification bell will also pick up completion.
     """
+    # Check usage limit before creating any records
+    project_id = getattr(current_user, "current_project_id", None)
+
     # Validate article_id if provided
     if body.article_id:
-        result = await db.execute(
-            select(Article).where(
-                Article.id == body.article_id,
-                Article.user_id == current_user.id,
-            )
+        article_query = select(Article).where(
+            Article.id == body.article_id,
+            Article.user_id == current_user.id,
         )
+        # IMG-26: also scope by project_id to prevent cross-project access
+        if project_id:
+            article_query = article_query.where(Article.project_id == project_id)
+        result = await db.execute(article_query)
         article = result.scalar_one_or_none()
         if not article:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Article not found",
             )
-
-    # Check usage limit before creating any records
-    project_id = getattr(current_user, "current_project_id", None)
     tracker = GenerationTracker(db)
     if not await tracker.check_limit(project_id, "image", user_id=current_user.id):
         raise HTTPException(

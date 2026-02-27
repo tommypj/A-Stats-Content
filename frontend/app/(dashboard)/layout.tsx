@@ -45,6 +45,7 @@ import { ProjectSwitcher } from "@/components/project/project-switcher";
 import { api, UserResponse, GenerationNotification } from "@/lib/api";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { KeyboardShortcutsDialog } from "@/components/ui/keyboard-shortcuts-dialog";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -672,7 +673,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Page content */}
-        <main id="main-content" className="p-4 lg:p-8 overflow-x-hidden">{children}</main>
+        <main id="main-content" className="p-4 lg:p-8 overflow-x-hidden">
+          <ErrorBoundary>{children}</ErrorBoundary>
+        </main>
       </div>
 
       {/* Global keyboard shortcuts dialog */}

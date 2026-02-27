@@ -543,7 +543,13 @@ async def delete_image(
 
     # IMG-07: Regular admins can only delete images scoped to projects they own/manage.
     # super_admin has unrestricted access.
-    if admin_user.role != UserRole.SUPER_ADMIN.value and image.project_id:
+    if image.project_id is None:
+        if admin_user.role != UserRole.SUPER_ADMIN.value:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only super_admin can delete unscoped images",
+            )
+    elif admin_user.role != UserRole.SUPER_ADMIN.value:
         from infrastructure.database.models.project import ProjectMember
         from infrastructure.database.models.project import ProjectMemberRole
         member_result = await db.execute(

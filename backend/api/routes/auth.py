@@ -144,7 +144,15 @@ async def get_current_user(
                     Project.deleted_at.is_(None),
                 )
             )
-            user.current_project_id = personal.scalar_one_or_none()
+            personal_project_id = personal.scalar_one_or_none()
+            if personal_project_id is None:
+                # AUTH-22: personal workspace missing — clear gracefully, log for operator
+                logger.warning(
+                    "AUTH-22: No personal workspace found for user %s while resetting "
+                    "current_project_id. Clearing to None.",
+                    user.id,
+                )
+            user.current_project_id = personal_project_id
             # AUTH-11: use flush() instead of commit() inside a dependency to avoid
             # interfering with the calling route's transaction boundary.
             await db.flush()

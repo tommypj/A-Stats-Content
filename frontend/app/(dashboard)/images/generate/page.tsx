@@ -163,8 +163,15 @@ function GenerateImageContent() {
           setGeneratedImage(image);
           if (pollRef.current) clearInterval(pollRef.current);
           pollRef.current = null;
-        } else if (image.status === "failed" || attempts >= maxAttempts) {
-          setError("Image generation failed or timed out");
+        } else if (image.status === "failed") {
+          setError("Image generation failed. Please try again.");
+          setGeneratedImage((prev) => prev ? { ...prev, status: "failed" } : prev);
+          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = null;
+        } else if (attempts >= maxAttempts) {
+          toast.error("Image generation timed out. Please try again.");
+          setError("Image generation timed out. Please try again.");
+          setGeneratedImage((prev) => prev ? { ...prev, status: "failed" } : prev);
           if (pollRef.current) clearInterval(pollRef.current);
           pollRef.current = null;
         }

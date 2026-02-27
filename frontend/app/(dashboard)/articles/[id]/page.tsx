@@ -1509,7 +1509,13 @@ export default function ArticleEditorPage() {
                 {content ? (
                   <div dangerouslySetInnerHTML={{
                     __html: DOMPurify.sanitize(
-                      marked.parse(content, { async: false }) as string
+                      marked.parse(content, { async: false, breaks: true, gfm: true }) as string,
+                      {
+                        ALLOWED_TAGS: ['h1','h2','h3','h4','h5','h6','p','br','strong','em','u','s','ul','ol','li','a','blockquote','code','pre','hr','img','table','thead','tbody','tr','th','td'],
+                        ALLOWED_ATTR: ['href','src','alt','title','class','target','rel'],
+                        FORBID_TAGS: ['script','iframe','object','embed','form','input'],
+                        FORBID_ATTR: ['onerror','onload','onclick','onmouseover'],
+                      }
                     )
                   }} />
                 ) : (

@@ -982,7 +982,6 @@ async def update_article(
         # GEN-09: validate status transitions — users may only move between DRAFT and COMPLETED.
         # GENERATING, FAILED, and PUBLISHED are system-managed states.
         if field == "status" and value is not None:
-            from infrastructure.database.models.content import ContentStatus
             _user_settable = {ContentStatus.DRAFT.value, ContentStatus.COMPLETED.value}
             if value not in _user_settable:
                 raise HTTPException(
@@ -1532,6 +1531,8 @@ async def restore_article_revision(
     )
     revision = revision_result.scalar_one_or_none()
     if not revision:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Revision not found")
+    if revision.article_id != article_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Revision not found")
 
     # Backup the current state before overwriting

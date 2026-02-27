@@ -68,6 +68,7 @@ export default function ContentHealthPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isDetecting, setIsDetecting] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState<string | null>(null);
+  const [isResolving, setIsResolving] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<string>("");
   const [filterSeverity, setFilterSeverity] = useState<string>("");
   const [showResolved, setShowResolved] = useState(false);
@@ -143,6 +144,7 @@ export default function ContentHealthPage() {
 
   const handleResolve = async (alertId: string) => {
     try {
+      setIsResolving(alertId);
       await api.analytics.resolveAlert(alertId);
       toast.success("Alert resolved");
       setAlerts((prev) => prev.filter((a) => a.id !== alertId));
@@ -155,6 +157,8 @@ export default function ContentHealthPage() {
       }
     } catch (err) {
       toast.error(parseApiError(err).message);
+    } finally {
+      setIsResolving(null);
     }
   };
 
@@ -496,6 +500,7 @@ export default function ContentHealthPage() {
                           onClick={() => handleResolve(alert.id)}
                           variant="ghost"
                           size="sm"
+                          disabled={isResolving === alert.id}
                         >
                           <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
                           Resolve

@@ -270,6 +270,7 @@ async def oauth_callback(
     else:
         new_account = SocialAccount(
             user_id=user.id,
+            project_id=user.current_project_id,  # SM-38: scope account to current project
             platform=platform,
             platform_user_id=platform_user_id,
             platform_username=profile.get("username"),

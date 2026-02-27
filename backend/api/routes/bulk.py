@@ -209,6 +209,10 @@ async def update_template(
     if not template:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
 
+    # BULK-22: Verify the user has access to the project that owns this template.
+    if template.project_id:
+        await get_project_member(template.project_id, current_user.id, db)
+
     if body.name is not None:
         template.name = body.name
     if body.description is not None:
@@ -244,6 +248,10 @@ async def delete_template(
     template = result.scalar_one_or_none()
     if not template:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
+
+    # BULK-22: Verify the user has access to the project that owns this template.
+    if template.project_id:
+        await get_project_member(template.project_id, current_user.id, db)
 
     await db.delete(template)
     await db.commit()

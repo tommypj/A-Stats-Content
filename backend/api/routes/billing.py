@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from typing import Annotated, Optional
 from urllib.parse import urlencode
 
+VALID_SUBSCRIPTION_STATUSES = {"active", "cancelled", "paused", "expired", "past_due", "unpaid", "on_trial"}
+
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Header
 from sqlalchemy import select
@@ -324,6 +326,12 @@ async def handle_project_subscription_webhook(
             settings.lemonsqueezy_variant_enterprise_yearly,
         ]:
             tier = SubscriptionTier.ENTERPRISE.value
+        else:
+            # BILL-22: variant_id didn't match any known tier — defaulting to free
+            logger.warning(
+                "BILL-22: variant_id %s did not match any known tier — defaulting to free",
+                variant_id,
+            )
 
     # Handle different event types
     try:
@@ -506,6 +514,11 @@ async def handle_webhook(
     subscription_status = attributes.get("status")
     renews_at = attributes.get("renews_at")
 
+    # BILL-21: Validate subscription_status from webhook payload
+    if subscription_status and subscription_status not in VALID_SUBSCRIPTION_STATUSES:
+        logger.warning("Unknown subscription_status from webhook: %s", subscription_status)
+        subscription_status = "active"  # safe default, webhook event type drives logic
+
     logger.info(
         f"Webhook received: event={event_name}, user_id={user_id}, "
         f"project_id={project_id}, subscription_id={subscription_id}, status={subscription_status}"
@@ -558,6 +571,12 @@ async def handle_webhook(
             settings.lemonsqueezy_variant_enterprise_yearly,
         ]:
             tier = SubscriptionTier.ENTERPRISE.value
+        else:
+            # BILL-22: variant_id didn't match any known tier — defaulting to free
+            logger.warning(
+                "BILL-22: variant_id %s did not match any known tier — defaulting to free",
+                variant_id,
+            )
 
     # Handle different event types
     try:

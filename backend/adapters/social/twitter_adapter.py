@@ -10,9 +10,29 @@ import hashlib
 import base64
 import secrets
 from typing import List, Optional, Dict, Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse as _urlparse
 
 import httpx
+
+# SM-22: SSRF protection — only allow media downloads from trusted domains
+_ALLOWED_MEDIA_DOMAINS = {
+    "replicate.delivery",
+    "pbxt.replicate.delivery",
+    "cdn.replicate.com",
+    "uploads.a-stats.online",
+}
+
+
+def _validate_media_url(url: str) -> None:
+    """Raise ValueError if the URL scheme is not HTTPS or domain is not whitelisted."""
+    parsed = _urlparse(url)
+    if parsed.scheme != "https":
+        raise ValueError(f"Media URL must use HTTPS: {url}")
+    if not any(
+        parsed.netloc == d or parsed.netloc.endswith("." + d)
+        for d in _ALLOWED_MEDIA_DOMAINS
+    ):
+        raise ValueError(f"Media URL domain not allowed: {parsed.netloc}")
 
 from infrastructure.config.settings import settings
 from .base import (
@@ -461,6 +481,12 @@ class TwitterAdapter(BaseSocialAdapter):
             # Upload all media first
             media_ids = []
             for media_url in media_urls:
+                # SM-22: Validate media URL before downloading (SSRF protection)
+                try:
+                    _validate_media_url(media_url)
+                except ValueError as e:
+                    logger.warning("Skipping media URL due to SSRF validation failure: %s", e)
+                    continue
                 # Download media
                 async with httpx.AsyncClient(timeout=self.timeout) as client:
                     media_response = await client.get(media_url)

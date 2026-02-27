@@ -152,7 +152,7 @@ async def list_project_invitations(
                 created_at=inv.created_at,
                 project_name=project.name,
                 project_slug=project.slug,
-                inviter_name=inv.inviter.name if inv.inviter else None,
+                inviter_name=inv.inviter.name if inv.inviter else "Deleted User",
                 inviter_email=inv.inviter.email if inv.inviter else None,
             )
         )
@@ -186,11 +186,24 @@ async def create_project_invitation(
     - Sets expiration to 7 days from now
     - Sends invitation email
     """
-    # Check if project can add more members
-    if not project.can_add_member():
+    # PROJ-26: personal workspaces cannot have invited members
+    if project.is_personal:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Project has reached maximum member limit ({project.max_members})",
+            detail="Cannot invite members to a personal workspace",
+        )
+
+    # PROJ-27: use a live COUNT query instead of the potentially-stale in-memory list
+    member_count_result = await db.execute(
+        select(func.count()).select_from(ProjectMember).where(
+            and_(ProjectMember.project_id == project.id, ProjectMember.deleted_at.is_(None))
+        )
+    )
+    current_member_count = member_count_result.scalar_one()
+    if current_member_count >= project.max_members:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Project has reached its member limit",
         )
 
     # Check if user with this email already exists and is already a member
@@ -397,7 +410,7 @@ async def resend_project_invitation(
         created_at=invitation.created_at,
         project_name=project.name,
         project_slug=project.slug,
-        inviter_name=invitation.inviter.name if invitation.inviter else None,
+        inviter_name=invitation.inviter.name if invitation.inviter else "Deleted User",
         inviter_email=invitation.inviter.email if invitation.inviter else None,
     )
 
@@ -448,7 +461,7 @@ async def get_invitation_details(
         project_name=invitation.project.name,
         project_slug=invitation.project.slug,
         project_logo_url=invitation.project.avatar_url,
-        inviter_name=invitation.inviter.name,
+        inviter_name=invitation.inviter.name if invitation.inviter else "Unknown",
         role=invitation.role,
         expires_at=invitation.expires_at,
         is_expired=is_expired,
