@@ -7,7 +7,7 @@ import hmac
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Annotated
+from typing import Annotated, Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Header
@@ -30,6 +30,7 @@ from api.schemas.billing import (
     WebhookEventType,
 )
 from api.routes.auth import get_current_user
+from api.middleware.rate_limit import limiter
 from core.plans import PLANS
 
 # Configure logging
@@ -38,13 +39,17 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/billing", tags=["billing"])
 
 
-def _parse_iso_datetime(value: str) -> datetime:
-    """Parse ISO 8601 datetime string, handling Z suffix and invalid formats."""
+def _parse_iso_datetime(value: str) -> Optional[datetime]:
+    """Parse ISO 8601 datetime string, handling Z suffix and invalid formats.
+
+    Returns None on failure so callers don't accidentally set an immediate
+    expiry date when the webhook payload contains a malformed timestamp.
+    """
     try:
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
     except (ValueError, AttributeError) as e:
-        logger.warning("Failed to parse datetime '%s': %s", value, e)
-        return datetime.now(timezone.utc)
+        logger.warning("Failed to parse datetime '%s': %s — skipping expiry update", value, e)
+        return None
 
 
 def get_variant_id(plan: str, billing_cycle: str) -> str:
@@ -134,8 +139,10 @@ async def get_subscription_status(
 
 
 @router.post("/checkout", response_model=CheckoutResponse)
+@limiter.limit("5/minute")
 async def create_checkout(
-    request: CheckoutRequest,
+    request: Request,
+    body: CheckoutRequest,
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """
@@ -144,14 +151,14 @@ async def create_checkout(
     Returns a checkout URL where the user can complete payment.
     """
     # Validate plan
-    if request.plan not in ["starter", "professional", "enterprise"]:
+    if body.plan not in ["starter", "professional", "enterprise"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid plan. Must be one of: starter, professional, enterprise",
         )
 
     # Validate billing cycle
-    if request.billing_cycle not in ["monthly", "yearly"]:
+    if body.billing_cycle not in ["monthly", "yearly"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid billing cycle. Must be 'monthly' or 'yearly'",
@@ -165,7 +172,7 @@ async def create_checkout(
         )
 
     # Get variant ID for the plan and billing cycle
-    variant_id = get_variant_id(request.plan, request.billing_cycle)
+    variant_id = get_variant_id(body.plan, body.billing_cycle)
 
     # Build checkout URL with query parameters
     # LemonSqueezy checkout format:
@@ -179,7 +186,7 @@ async def create_checkout(
 
     logger.info(
         f"Created checkout session for user {current_user.id}, "
-        f"plan={request.plan}, billing_cycle={request.billing_cycle}"
+        f"plan={body.plan}, billing_cycle={body.billing_cycle}"
     )
 
     return CheckoutResponse(checkout_url=checkout_url)
@@ -216,7 +223,9 @@ async def get_customer_portal(
 
 
 @router.post("/cancel", response_model=SubscriptionCancelResponse)
+@limiter.limit("5/minute")
 async def cancel_subscription(
+    request: Request,
     current_user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db),
 ):
@@ -521,7 +530,8 @@ async def handle_webhook(
         logger.error("No user_id in webhook custom_data")
         return {"status": "error", "message": "Missing user_id"}
 
-    result = await db.execute(select(User).where(User.id == user_id))
+    # BILL-09: row-level lock prevents concurrent webhook updates from racing
+    result = await db.execute(select(User).where(User.id == user_id).with_for_update())
     user = result.scalar_one_or_none()
 
     if not user:
@@ -641,6 +651,12 @@ async def handle_webhook(
             personal_project.subscription_tier = user.subscription_tier
             if user.subscription_expires is not None:
                 personal_project.subscription_expires = user.subscription_expires
+        else:
+            # BILL-13: warn if personal project is missing so ops can investigate
+            logger.warning(
+                "BILL-13: No personal project found for user %s — subscription sync skipped",
+                user_id,
+            )
 
         # Commit changes
         await db.commit()

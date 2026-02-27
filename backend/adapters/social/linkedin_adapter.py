@@ -333,7 +333,12 @@ class LinkedInAdapter(BaseSocialAdapter):
                     raise SocialAPIError(f"Post creation failed: {error_msg}")
 
                 result = response.json()
-                post_id = result.get("id", "")
+                # SM-12: LinkedIn v2 API returns post URN at result["value"]["id"];
+                # fall back to root-level "id" for older response formats
+                post_id = (
+                    result.get("value", {}).get("id")
+                    or result.get("id", "")
+                )
                 post_url = f"https://www.linkedin.com/feed/update/{post_id}"
 
                 logger.info(f"LinkedIn post created successfully: {post_url}")

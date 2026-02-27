@@ -38,6 +38,16 @@ from api.schemas.admin import (
 router = APIRouter(prefix="/admin", tags=["Admin - Users"])
 
 
+def get_client_ip(request: Optional[Request]) -> Optional[str]:
+    """Return the real client IP, preferring X-Forwarded-For (set by Cloudflare/proxy)."""
+    if not request:
+        return None
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.client.host if request.client else None
+
+
 # Initialize token service
 token_service = TokenService(
     secret_key=settings.jwt_secret_key,
@@ -72,6 +82,16 @@ async def create_audit_log(
         details["description"] = description
     if user_agent:
         details["user_agent"] = user_agent
+
+    # ADM-15: truncate details if they exceed 10KB to prevent unbounded JSON growth
+    import json as _json
+    _MAX_DETAILS_BYTES = 10 * 1024
+    try:
+        if len(_json.dumps(details).encode()) > _MAX_DETAILS_BYTES:
+            details = {"_truncated": True, "description": details.get("description", "")[:500]}
+            logger.warning("Audit log details exceeded 10KB — truncated for action %s", action.value)
+    except Exception:
+        pass
 
     audit_log = AdminAuditLog(
         admin_user_id=admin_user.id,
@@ -361,7 +381,7 @@ async def update_user(
             "old_values": old_values,
             "new_values": new_values,
         },
-        ip_address=http_request.client.host if http_request else None,
+        ip_address=get_client_ip(http_request),
         user_agent=user_agent,
     )
 
@@ -429,7 +449,7 @@ async def suspend_user(
             "new_status": user.status,
             "suspended_at": user.suspended_at.isoformat(),
         },
-        ip_address=http_request.client.host if http_request else None,
+        ip_address=get_client_ip(http_request),
         user_agent=user_agent,
     )
 
@@ -493,7 +513,7 @@ async def unsuspend_user(
             "new_status": user.status,
             "was_suspended_at": old_suspended_at.isoformat() if old_suspended_at else None,
         },
-        ip_address=http_request.client.host if http_request else None,
+        ip_address=get_client_ip(http_request),
         user_agent=user_agent,
     )
 
@@ -566,7 +586,7 @@ async def delete_user(
             "soft_delete": soft_delete,
             "deleted_at": deleted_at.isoformat(),
         },
-        ip_address=http_request.client.host if http_request else None,
+        ip_address=get_client_ip(http_request),
         user_agent=user_agent,
     )
 
@@ -638,7 +658,7 @@ async def force_password_reset(
             "email_sent": email_sent,
             "send_email_requested": request.send_email,
         },
-        ip_address=http_request.client.host if http_request else None,
+        ip_address=get_client_ip(http_request),
         user_agent=user_agent,
     )
 
@@ -806,7 +826,7 @@ async def reset_user_usage(
             "old_outlines": old_outlines,
             "old_images": old_images,
         },
-        ip_address=http_request.client.host if http_request else None,
+        ip_address=get_client_ip(http_request),
         user_agent=user_agent,
     )
 

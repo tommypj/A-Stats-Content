@@ -129,8 +129,9 @@ def analyze_seo(content: str, keyword: str, title: str, meta_description: str) -
     """
     content_lower = content.lower()
     keyword_lower = keyword.lower()
-    words = content.split()
-    word_count = len(words)
+    # SEO-08: normalize whitespace for consistent word count across backend/frontend
+    words = re.split(r'\s+', content.strip())
+    word_count = len(words) if words and words[0] else 0
 
     # Keyword density (whole-word matches only to avoid substring false positives)
     keyword_count = len(re.findall(r'\b' + re.escape(keyword_lower) + r'\b', content_lower))
@@ -139,7 +140,8 @@ def analyze_seo(content: str, keyword: str, title: str, meta_description: str) -
     # Check headings
     h2_count = len(re.findall(r"^##\s", content, re.MULTILINE))
     h3_count = len(re.findall(r"^###\s", content, re.MULTILINE))
-    headings_structure = "good" if h2_count >= 3 and h3_count >= 2 else "needs_improvement"
+    # SEO-09: relax to H2 count only — valid flat articles without H3s were penalized
+    headings_structure = "good" if h2_count >= 3 else "needs_improvement"
 
     # Links
     internal_links = len(re.findall(r"\[.*?\]\(/", content))
@@ -150,7 +152,8 @@ def analyze_seo(content: str, keyword: str, title: str, meta_description: str) -
     image_alt_texts = bool(images) and all(alt.strip() for alt in images)
 
     # Basic readability (average sentence length)
-    sentences = re.split(r"[.!?]+", content)
+    # SEO-13: filter empty strings to avoid inflated sentence count
+    sentences = [s for s in re.split(r"[.!?]+", content) if s.strip()]
     avg_sentence_length = word_count / len(sentences) if sentences else 0
     readability_score = min(100, max(0, 100 - (avg_sentence_length - 15) * 2))
 
@@ -182,13 +185,16 @@ def analyze_seo(content: str, keyword: str, title: str, meta_description: str) -
         suggestions.append("Consider adding external links to authoritative sources")
 
     # Calculate overall score
-    score = 50
-    score += 10 if 1 <= keyword_density <= 3 else 0
-    score += 10 if title_has_keyword else 0
-    score += 10 if meta_description and 120 <= len(meta_description) <= 160 else 0
-    score += 10 if headings_structure == "good" else 0
-    score += 5 if internal_links >= 2 else 0
-    score += 5 if external_links >= 1 else 0
+    # SEO-11: start from 0 (not 50) so un-optimised articles don't score 50% automatically
+    score = 0
+    score += 20 if 1 <= keyword_density <= 3 else 0
+    score += 20 if title_has_keyword else 0
+    score += 15 if meta_description and 120 <= len(meta_description) <= 160 else 0
+    score += 15 if headings_structure == "good" else 0
+    score += 15 if internal_links >= 2 else 0
+    score += 10 if external_links >= 1 else 0
+    # SEO-05: only award image alt text points when images exist AND they all have alt text
+    score += 5 if image_alt_texts else 0
 
     return {
         "score": min(100, score),
@@ -973,6 +979,16 @@ async def update_article(
     for field, value in update_data.items():
         if field not in ALLOWED_UPDATE_FIELDS:
             continue
+        # GEN-09: validate status transitions — users may only move between DRAFT and COMPLETED.
+        # GENERATING, FAILED, and PUBLISHED are system-managed states.
+        if field == "status" and value is not None:
+            from infrastructure.database.models.content import ContentStatus
+            _user_settable = {ContentStatus.DRAFT.value, ContentStatus.COMPLETED.value}
+            if value not in _user_settable:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Invalid status '{value}'. Users may only set 'draft' or 'completed'.",
+                )
         setattr(article, field, value)
 
     # Update derived fields
@@ -1095,10 +1111,14 @@ async def improve_article(
     await _save_revision(db, article, revision_type, current_user.id)
 
     try:
-        improved_content = await content_ai_service.improve_content(
-            content=article.content,
-            improvement_type=body.improvement_type,
-            keyword=article.keyword,
+        # GEN-10: add timeout to prevent hanging on slow AI responses
+        improved_content = await asyncio.wait_for(
+            content_ai_service.improve_content(
+                content=article.content,
+                improvement_type=body.improvement_type,
+                keyword=article.keyword,
+            ),
+            timeout=120.0,
         )
 
         article.content = improved_content
@@ -1119,6 +1139,11 @@ async def improve_article(
         except Exception as seo_err:
             logger.warning("SEO re-analysis failed for article %s: %s", article_id, seo_err)
 
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="Article improvement timed out. Please try again.",
+        )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1132,7 +1157,9 @@ async def improve_article(
 
 
 @router.post("/{article_id}/analyze-seo", response_model=ArticleResponse)
+@limiter.limit("10/minute")
 async def analyze_article_seo(
+    request: Request,
     article_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

@@ -5,7 +5,7 @@ Analytics API routes for Google Search Console integration.
 import math
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse, urlunparse
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -77,6 +77,18 @@ from infrastructure.database.models.content import Article
 from infrastructure.config.settings import settings
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
+
+# ANA-09: GSC data is typically delayed by this many days — use a named constant
+GSC_DATA_LAG_DAYS = 3
+
+
+def _strip_query_from_url(url: str) -> str:
+    """Remove query string and fragment from a URL for consistent storage (ANA-10)."""
+    try:
+        p = urlparse(url)
+        return urlunparse((p.scheme, p.netloc, p.path, "", "", ""))
+    except Exception:
+        return url
 
 
 # ============================================================================
@@ -479,8 +491,8 @@ async def sync_gsc_data(
 
         # Sync keyword rankings (upsert to avoid duplicates)
         for keyword_item in keywords_data:
-            # Get the date from the data (GSC returns data with 2-3 day delay)
-            end_date = date_type.today() - timedelta(days=3)
+            # Get the date from the data (GSC returns data with a lag; see GSC_DATA_LAG_DAYS)
+            end_date = date_type.today() - timedelta(days=GSC_DATA_LAG_DAYS)
 
             stmt = insert(KeywordRanking).values(
                 user_id=current_user.id,
@@ -506,12 +518,12 @@ async def sync_gsc_data(
 
         # Sync page performance (upsert to avoid duplicates)
         for page_item in pages_data:
-            end_date = date_type.today() - timedelta(days=3)
+            end_date = date_type.today() - timedelta(days=GSC_DATA_LAG_DAYS)
 
             stmt = insert(PagePerformance).values(
                 user_id=current_user.id,
                 site_url=connection.site_url,
-                page_url=page_item["page"],
+                page_url=_strip_query_from_url(page_item["page"]),  # ANA-10: strip query strings
                 date=end_date,
                 clicks=page_item["clicks"],
                 impressions=page_item["impressions"],
@@ -1887,11 +1899,13 @@ async def list_conversion_goals(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List all conversion goals for the current user."""
+    """List conversion goals scoped to the current project (or all user goals if no project set)."""
+    # ANA-11: scope to current project to avoid cross-project data leaks
+    conditions = [ConversionGoal.user_id == current_user.id]
+    if current_user.current_project_id:
+        conditions.append(ConversionGoal.project_id == current_user.current_project_id)
     result = await db.execute(
-        select(ConversionGoal).where(
-            ConversionGoal.user_id == current_user.id
-        ).order_by(desc(ConversionGoal.created_at))
+        select(ConversionGoal).where(and_(*conditions)).order_by(desc(ConversionGoal.created_at))
     )
     goals = result.scalars().all()
     return ConversionGoalListResponse(

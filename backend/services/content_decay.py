@@ -226,14 +226,16 @@ async def run_decay_detection(
         return 0
 
     # Deduplicate: don't create alert if same type+keyword already exists unresolved
+    # ANA-07: scope dedup to current project to avoid cross-project suppression
+    dedup_conditions = [
+        ContentDecayAlert.user_id == user_id,
+        ContentDecayAlert.is_resolved == False,
+    ]
+    if project_id:
+        dedup_conditions.append(ContentDecayAlert.project_id == project_id)
     existing_q = select(
         ContentDecayAlert.keyword, ContentDecayAlert.alert_type
-    ).where(
-        and_(
-            ContentDecayAlert.user_id == user_id,
-            ContentDecayAlert.is_resolved == False,
-        )
-    )
+    ).where(and_(*dedup_conditions))
     existing_result = await db.execute(existing_q)
     existing_keys = {(row.keyword, row.alert_type) for row in existing_result.all()}
 

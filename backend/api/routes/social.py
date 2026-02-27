@@ -12,8 +12,9 @@ from urllib.parse import urlencode
 import math
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query, Body
 from fastapi.responses import RedirectResponse
+from api.middleware.rate_limit import limiter
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -119,7 +120,9 @@ async def list_connected_accounts(
 
 
 @router.get("/{platform}/connect", response_model=ConnectAccountResponse)
+@limiter.limit("10/minute")
 async def initiate_connection(
+    request: Request,
     platform: str,
     current_user: User = Depends(get_current_user),
 ):
@@ -484,7 +487,9 @@ async def verify_account(
 
 
 @router.post("/posts", response_model=ScheduledPostResponse, status_code=201)
+@limiter.limit("30/minute")
 async def create_scheduled_post(
+    http_request: Request,
     request: CreatePostRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -812,6 +817,19 @@ async def update_scheduled_post(
         post.link_url = request.link_url
 
     if request.status is not None:
+        # SM-11: only allow DRAFT ↔ SCHEDULED transitions from user input;
+        # PUBLISHING, PUBLISHED, and FAILED are system-managed states.
+        _allowed_transitions = {
+            PostStatus.DRAFT.value: {PostStatus.SCHEDULED.value},
+            PostStatus.SCHEDULED.value: {PostStatus.DRAFT.value},
+        }
+        current = post.status
+        allowed = _allowed_transitions.get(current, set())
+        if request.status not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot transition post from '{current}' to '{request.status}'",
+            )
         post.status = request.status
 
     await db.commit()

@@ -203,7 +203,8 @@ class GenerationTracker:
                 return current_usage < limit
             except Exception as e:
                 logger.error("Failed to check user-level limit for user %s: %s", user_id, e)
-                return True  # Fail open
+                # PROJ-14: fail closed for consistency with project-level check
+                return False
 
         try:
             usage_service = ProjectUsageService(self.db)
@@ -233,7 +234,8 @@ class GenerationTracker:
                 user.usage_reset_date = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc)
             else:
                 user.usage_reset_date = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc)
-            await self.db.flush()
+            # PROJ-13: commit immediately so concurrent requests see the updated reset_date
+            await self.db.commit()
             logger.info("Initialized usage reset date and reset counters for user %s", user.id)
             return True
 
@@ -250,7 +252,8 @@ class GenerationTracker:
                 user.usage_reset_date = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc)
             else:
                 user.usage_reset_date = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc)
-            await self.db.flush()
+            # PROJ-13: commit immediately so concurrent requests see the updated reset_date
+            await self.db.commit()
             logger.info("Reset monthly usage counters for user %s", user.id)
             return True
 

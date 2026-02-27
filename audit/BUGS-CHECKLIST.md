@@ -398,18 +398,18 @@
 ---
 
 ## Summary Progress
-| Section | Status | Issues Found | Fixed (this session) |
+| Section | Status | Issues Found | Fixed (all sessions) |
 |---------|--------|-------------|-------|
-| 1 — Auth & Authorization | ✅ Audited | 18 | AUTH-01,03,04,05,06,07,08,12 |
-| 2 — Project & Team | ✅ Audited | 24 | PROJ-01,02,03,04,07,08,09,10 |
-| 3 — Content Generation | ✅ Audited | 20 | GEN-01,02,03,04,05,06 |
-| 4 — Bulk Generation | ✅ Audited | 20 | BULK-01,02,03,04,06,07 |
-| 5 — Analytics | ✅ Audited | 20 | ANA-01,02,03,04,06 |
+| 1 — Auth & Authorization | ✅ Audited | 18 | AUTH-01,03,04,05,06,07,08,11,12,14 |
+| 2 — Project & Team | ✅ Audited | 24 | PROJ-01,02,03,04,07,08,09,10,13,14,16 |
+| 3 — Content Generation | ✅ Audited | 20 | GEN-01,02,03,04,05,06,09,10 |
+| 4 — Bulk Generation | ✅ Audited | 20 | BULK-01,02,03,04,06,07,10 |
+| 5 — Analytics | ✅ Audited | 20 | ANA-01,02,03,04,06,07,09,10,11 |
 | 6 — Knowledge Vault | ✅ Audited | 20 | KV-01,02,03,04,05,06,07 |
-| 7 — Social Media | ✅ Audited | 20 | SM-01(not-a-bug),02,03,04,05,06 |
+| 7 — Social Media | ✅ Audited | 20 | SM-01(not-a-bug),02,03,04,05,06,09,11,12 |
 | 8 — Images | ✅ Audited | 20 | IMG-01,02,03,05,07,08(already-fixed),09 |
 | 9 — Agency Mode | ✅ Audited | 12 | AGY-01,02,03(already-fixed),04,05 |
-| 10 — Billing | ✅ Audited | 15 | BILL-01,03,04,05,06,07,08 |
-| 11 — Admin Panel | ✅ Audited | 15 | ADM-01,02,03,05,06,07 |
-| 12 — SEO Scoring | ✅ Audited | 20 | SEO-01,04(via-01),05 |
-| 13 — Infrastructure | ✅ Audited | 20 | INFRA-01,02,04,05,07,08 |
+| 10 — Billing | ✅ Audited | 15 | BILL-01,03,04,05,06,07,08,09,10,12,13 |
+| 11 — Admin Panel | ✅ Audited | 15 | ADM-01,02,03,05,06,07,08,09,10,14,15 |
+| 12 — SEO Scoring | ✅ Audited | 20 | SEO-01,04(via-01),05,07,08,09,11,12(already-done),13 |
+| 13 — Infrastructure | ✅ Audited | 20 | INFRA-01,02,04,05,06,07,08,09,10,12,13,15 |

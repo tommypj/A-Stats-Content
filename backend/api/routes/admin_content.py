@@ -442,6 +442,13 @@ async def list_all_images(
 
     Admin-only endpoint for content moderation.
     """
+    # ADM-14: Reject inverted date ranges — they produce always-false WHERE clauses
+    if start_date and end_date and start_date > end_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="start_date must be before end_date",
+        )
+
     # Build query
     query = select(GeneratedImage)
 
@@ -836,6 +843,8 @@ async def bulk_delete_content(
             "total_requested": len(request.ids),
             "deleted_count": deleted_count,
             "failed_count": len(failed_ids),
+            # ADM-09: include failed IDs for a complete audit trail
+            "failed_ids": failed_ids if failed_ids else None,
             "deleted_by_admin": admin_user.email,
         },
     )

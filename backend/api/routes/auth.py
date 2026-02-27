@@ -145,7 +145,9 @@ async def get_current_user(
                 )
             )
             user.current_project_id = personal.scalar_one_or_none()
-            await db.commit()
+            # AUTH-11: use flush() instead of commit() inside a dependency to avoid
+            # interfering with the calling route's transaction boundary.
+            await db.flush()
 
     return user
 
@@ -306,7 +308,7 @@ async def login(
 
 
 @router.post("/refresh", response_model=TokenResponse)
-@limiter.limit("10/minute")
+@limiter.limit("5/minute")  # AUTH-14: tightened from 10/min to match login limit
 async def refresh_token(
     request: Request,
     body: RefreshTokenRequest,

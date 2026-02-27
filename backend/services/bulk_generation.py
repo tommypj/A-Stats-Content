@@ -239,6 +239,10 @@ async def process_bulk_outline_job(
     else:
         job.status = "partially_failed"
 
+    # PROJ-16: populate error_summary when there are failures
+    if job.failed_items > 0:
+        job.error_summary = f"{job.failed_items}/{job.total_items} items failed"
+
     job.completed_at = datetime.now(timezone.utc)
     await db.commit()
     logger.info("Bulk job %s finished: %d/%d completed, %d failed",

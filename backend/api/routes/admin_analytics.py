@@ -8,7 +8,8 @@ platform health, user activity, content generation, revenue, and system metrics.
 from datetime import date, datetime, timedelta, timezone
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
+from api.middleware.rate_limit import limiter
 from sqlalchemy import select, func, and_, or_, desc, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -83,7 +84,9 @@ TIER_PRICING = {
 
 
 @router.get("/dashboard", response_model=DashboardStatsResponse)
+@limiter.limit("10/minute")
 async def get_dashboard_stats(
+    request: Request,
     current_admin: Annotated[User, Depends(get_current_admin_user)],
     db: AsyncSession = Depends(get_db),
 ):
@@ -297,7 +300,9 @@ async def get_dashboard_stats(
 
 
 @router.get("/users", response_model=UserAnalyticsResponse)
+@limiter.limit("10/minute")
 async def get_user_analytics(
+    request: Request,
     current_admin: Annotated[User, Depends(get_current_admin_user)],
     db: AsyncSession = Depends(get_db),
 ):
@@ -486,7 +491,9 @@ async def get_user_analytics(
 
 
 @router.get("/content", response_model=ContentAnalyticsResponse)
+@limiter.limit("10/minute")
 async def get_content_analytics(
+    request: Request,
     current_admin: Annotated[User, Depends(get_current_admin_user)],
     db: AsyncSession = Depends(get_db),
 ):
@@ -684,7 +691,9 @@ async def get_content_analytics(
 
 
 @router.get("/revenue", response_model=RevenueAnalyticsResponse)
+@limiter.limit("10/minute")
 async def get_revenue_analytics(
+    request: Request,
     current_admin: Annotated[User, Depends(get_current_admin_user)],
     db: AsyncSession = Depends(get_db),
 ):
@@ -899,7 +908,9 @@ async def get_revenue_analytics(
 
 
 @router.get("/system", response_model=SystemHealthResponse)
+@limiter.limit("10/minute")
 async def get_system_health(
+    request: Request,
     current_admin: Annotated[User, Depends(get_current_admin_user)],
     db: AsyncSession = Depends(get_db),
 ):

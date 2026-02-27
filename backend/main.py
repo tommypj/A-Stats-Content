@@ -177,6 +177,22 @@ app.add_middleware(SlowAPIMiddleware)
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
+# INFRA-13: reject request bodies larger than 5MB to prevent memory exhaustion
+_MAX_BODY_SIZE = 5 * 1024 * 1024  # 5MB
+
+
+@app.middleware("http")
+async def limit_request_body_size(request: Request, call_next):
+    if request.method in ("POST", "PUT", "PATCH"):
+        content_length = request.headers.get("content-length")
+        if content_length and int(content_length) > _MAX_BODY_SIZE:
+            return JSONResponse(
+                status_code=413,
+                content={"detail": "Request body too large (max 5MB)"},
+            )
+    return await call_next(request)
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     # INFRA-05: Log full stack trace in dev only — production logs only type+message to avoid leaking internals.
@@ -218,7 +234,16 @@ async def request_logging_middleware(request: Request, call_next):
 
 @app.middleware("http")
 async def add_request_id(request: Request, call_next):
-    request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+    incoming = request.headers.get("X-Request-ID")
+    # INFRA-09: Only accept the caller's ID if it is a valid UUID to prevent log injection.
+    if incoming:
+        try:
+            uuid.UUID(incoming)
+            request_id = incoming
+        except ValueError:
+            request_id = str(uuid.uuid4())
+    else:
+        request_id = str(uuid.uuid4())
     # INFRA-04: Store in request.state so log handlers and dependencies can correlate logs.
     request.state.request_id = request_id
     response = await call_next(request)

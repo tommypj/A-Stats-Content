@@ -5,6 +5,7 @@ Bulk content generation API routes.
 import asyncio
 import logging
 import math
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
@@ -378,7 +379,26 @@ async def create_bulk_outline_job(
     # Start processing in background
     async def _run():
         async with async_session_maker() as session:
-            await process_bulk_outline_job(session, job.id, current_user.id)
+            try:
+                await process_bulk_outline_job(session, job.id, current_user.id)
+            except Exception as _bg_err:
+                # BULK-10: mark job failed if the background task crashes unexpectedly
+                logger.error("Bulk job %s crashed: %s", job.id, _bg_err, exc_info=True)
+                try:
+                    async with async_session_maker() as _fail_session:
+                        from sqlalchemy import update as _upd
+                        await _fail_session.execute(
+                            _upd(BulkJob)
+                            .where(BulkJob.id == job.id)
+                            .values(
+                                status="failed",
+                                error_summary=str(_bg_err)[:500],
+                                completed_at=datetime.now(timezone.utc),
+                            )
+                        )
+                        await _fail_session.commit()
+                except Exception:
+                    pass
 
     asyncio.create_task(_run())
 
@@ -460,7 +480,25 @@ async def retry_failed_items(
     # Process in background
     async def _run():
         async with async_session_maker() as session:
-            await process_bulk_outline_job(session, job.id, current_user.id)
+            try:
+                await process_bulk_outline_job(session, job.id, current_user.id)
+            except Exception as _bg_err:
+                logger.error("Bulk job %s retry crashed: %s", job.id, _bg_err, exc_info=True)
+                try:
+                    async with async_session_maker() as _fail_session:
+                        from sqlalchemy import update as _upd
+                        await _fail_session.execute(
+                            _upd(BulkJob)
+                            .where(BulkJob.id == job.id)
+                            .values(
+                                status="failed",
+                                error_summary=str(_bg_err)[:500],
+                                completed_at=datetime.now(timezone.utc),
+                            )
+                        )
+                        await _fail_session.commit()
+                except Exception:
+                    pass
 
     asyncio.create_task(_run())
 

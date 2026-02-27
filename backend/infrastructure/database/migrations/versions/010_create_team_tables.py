@@ -1,7 +1,7 @@
 """create team tables
 
 Revision ID: 010_create_team_tables
-Revises: 008
+Revises: 009
 Create Date: 2026-02-20 12:00:00.000000
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '010_create_team_tables'
-down_revision = '008'
+down_revision = '009'  # INFRA-06: points to 009 placeholder (was 008, gap fixed)
 branch_labels = None
 depends_on = None
 

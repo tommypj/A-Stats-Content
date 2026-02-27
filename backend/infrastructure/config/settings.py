@@ -185,6 +185,40 @@ class Settings(BaseSettings):
             if not self.lemonsqueezy_webhook_secret:
                 raise ValueError("LEMONSQUEEZY_WEBHOOK_SECRET is required in production!")
 
+        # INFRA-10: OAuth redirect URIs must be https:// non-localhost in production
+        if self.environment == "production":
+            from urllib.parse import urlparse as _urlparse
+            _localhost_hosts = {"localhost", "127.0.0.1", "0.0.0.0", "::1"}
+            for _uri_name, _uri_val in [
+                ("GOOGLE_REDIRECT_URI", self.google_redirect_uri),
+                ("TWITTER_REDIRECT_URI", self.twitter_redirect_uri),
+                ("LINKEDIN_REDIRECT_URI", self.linkedin_redirect_uri),
+                ("FACEBOOK_REDIRECT_URI", self.facebook_redirect_uri),
+            ]:
+                _parsed = _urlparse(_uri_val)
+                if _parsed.scheme != "https" or (_parsed.hostname or "") in _localhost_hosts:
+                    raise ValueError(
+                        f"{_uri_name} must be an https:// non-localhost URL in production "
+                        f"(got: {_uri_val!r})"
+                    )
+
+            # INFRA-15: Ensure database_echo is off in production to prevent SQL leaking into logs
+            if self.database_echo:
+                raise ValueError(
+                    "DATABASE_ECHO must be False in production to prevent SQL queries in logs"
+                )
+
+            # INFRA-12: Warn about potential connection pool exhaustion
+            import logging as _logging
+            _pool_total = self.db_pool_size * self.workers + self.db_max_overflow * self.workers
+            if _pool_total > 200:
+                _logging.getLogger(__name__).warning(
+                    "INFRA-12: Potential DB connection pool exhaustion — "
+                    "%d workers × pool_size=%d + max_overflow=%d = up to %d connections. "
+                    "Verify your DB allows this many connections.",
+                    self.workers, self.db_pool_size, self.db_max_overflow, _pool_total,
+                )
+
 
 @lru_cache
 def get_settings() -> Settings:
