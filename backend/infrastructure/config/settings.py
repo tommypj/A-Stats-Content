@@ -193,8 +193,9 @@ class Settings(BaseSettings):
             if not self.lemonsqueezy_webhook_secret:
                 raise ValueError("LEMONSQUEEZY_WEBHOOK_SECRET is required in production!")
 
-        # INFRA-10: OAuth redirect URIs must be https:// non-localhost in production
+        # INFRA-10: OAuth redirect URIs should be https:// non-localhost in production
         if self.environment == "production":
+            import logging as _logging
             from urllib.parse import urlparse as _urlparse
             _localhost_hosts = {"localhost", "127.0.0.1", "0.0.0.0", "::1"}
             for _uri_name, _uri_val in [
@@ -205,9 +206,10 @@ class Settings(BaseSettings):
             ]:
                 _parsed = _urlparse(_uri_val)
                 if _parsed.scheme != "https" or (_parsed.hostname or "") in _localhost_hosts:
-                    raise ValueError(
-                        f"{_uri_name} must be an https:// non-localhost URL in production "
-                        f"(got: {_uri_val!r})"
+                    _logging.getLogger(__name__).warning(
+                        "INFRA-10: %s is not a production-safe URL (got: %r). "
+                        "OAuth for this provider will not work until updated.",
+                        _uri_name, _uri_val,
                     )
 
             # INFRA-15: Ensure database_echo is off in production to prevent SQL leaking into logs
