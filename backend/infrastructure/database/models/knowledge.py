@@ -97,6 +97,11 @@ class KnowledgeSource(Base, TimestampMixin):
         DateTime(timezone=True), nullable=True
     )
 
+    # Soft delete
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+
     # DB-09: ORM-level cascade so that deleting a KnowledgeSource via session.delete()
     # removes all child KnowledgeChunks at the ORM layer (not just at DB level).
     chunks = relationship(

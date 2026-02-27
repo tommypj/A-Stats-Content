@@ -183,11 +183,15 @@ async def list_outlines(
     """
     # Base query
     if current_user.current_project_id:
-        query = select(Outline).where(Outline.project_id == current_user.current_project_id)
+        query = select(Outline).where(
+            Outline.project_id == current_user.current_project_id,
+            Outline.deleted_at.is_(None),
+        )
     else:
         query = select(Outline).where(
             Outline.user_id == current_user.id,
             Outline.project_id.is_(None),
+            Outline.deleted_at.is_(None),
         )
 
     # Apply filters
@@ -230,11 +234,15 @@ async def export_all_outlines(
     Export all outlines for the current project as CSV.
     """
     if current_user.current_project_id:
-        query = select(Outline).where(Outline.project_id == current_user.current_project_id)
+        query = select(Outline).where(
+            Outline.project_id == current_user.current_project_id,
+            Outline.deleted_at.is_(None),
+        )
     else:
         query = select(Outline).where(
             Outline.user_id == current_user.id,
             Outline.project_id.is_(None),
+            Outline.deleted_at.is_(None),
         )
     query = query.order_by(Outline.created_at.desc()).limit(1000)
     result = await db.execute(query)
@@ -335,11 +343,13 @@ async def export_outline(
         query = select(Outline).where(
             Outline.id == outline_id,
             Outline.project_id == current_user.current_project_id,
+            Outline.deleted_at.is_(None),
         )
     else:
         query = select(Outline).where(
             Outline.id == outline_id,
             Outline.user_id == current_user.id,
+            Outline.deleted_at.is_(None),
         )
     result = await db.execute(query)
     outline = result.scalar_one_or_none()
@@ -442,11 +452,13 @@ async def get_outline(
         query = select(Outline).where(
             Outline.id == outline_id,
             Outline.project_id == current_user.current_project_id,
+            Outline.deleted_at.is_(None),
         )
     else:
         query = select(Outline).where(
             Outline.id == outline_id,
             Outline.user_id == current_user.id,
+            Outline.deleted_at.is_(None),
         )
     result = await db.execute(query)
     outline = result.scalar_one_or_none()
@@ -474,11 +486,13 @@ async def update_outline(
         query = select(Outline).where(
             Outline.id == outline_id,
             Outline.project_id == current_user.current_project_id,
+            Outline.deleted_at.is_(None),
         )
     else:
         query = select(Outline).where(
             Outline.id == outline_id,
             Outline.user_id == current_user.id,
+            Outline.deleted_at.is_(None),
         )
     result = await db.execute(query)
     outline = result.scalar_one_or_none()
@@ -539,11 +553,13 @@ async def delete_outline(
         query = select(Outline).where(
             Outline.id == outline_id,
             Outline.project_id == current_user.current_project_id,
+            Outline.deleted_at.is_(None),
         )
     else:
         query = select(Outline).where(
             Outline.id == outline_id,
             Outline.user_id == current_user.id,
+            Outline.deleted_at.is_(None),
         )
     result = await db.execute(query)
     outline = result.scalar_one_or_none()
@@ -575,11 +591,13 @@ async def regenerate_outline(
         query = select(Outline).where(
             Outline.id == outline_id,
             Outline.project_id == current_user.current_project_id,
+            Outline.deleted_at.is_(None),
         )
     else:
         query = select(Outline).where(
             Outline.id == outline_id,
             Outline.user_id == current_user.id,
+            Outline.deleted_at.is_(None),
         )
     result = await db.execute(query)
     outline = result.scalar_one_or_none()

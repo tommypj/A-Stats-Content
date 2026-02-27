@@ -611,13 +611,17 @@ async def list_articles(
     if current_user.current_project_id:
         query = select(Article).options(
             defer(Article.content), defer(Article.content_html)
-        ).where(Article.project_id == current_user.current_project_id)
+        ).where(
+            Article.project_id == current_user.current_project_id,
+            Article.deleted_at.is_(None),
+        )
     else:
         query = select(Article).options(
             defer(Article.content), defer(Article.content_html)
         ).where(
             Article.user_id == current_user.id,
             Article.project_id.is_(None),
+            Article.deleted_at.is_(None),
         )
 
     if status:
@@ -655,11 +659,15 @@ async def get_content_health(
     """Get content health summary for the current user/project."""
     # Build base query with project scoping
     if current_user.current_project_id:
-        base = select(Article).where(Article.project_id == current_user.current_project_id)
+        base = select(Article).where(
+            Article.project_id == current_user.current_project_id,
+            Article.deleted_at.is_(None),
+        )
     else:
         base = select(Article).where(
             Article.user_id == current_user.id,
             Article.project_id.is_(None),
+            Article.deleted_at.is_(None),
         )
 
     # Only include completed/published articles (not drafts/generating)
@@ -784,11 +792,15 @@ async def export_all_articles(
     Export all articles for the current project as CSV.
     """
     if current_user.current_project_id:
-        query = select(Article).where(Article.project_id == current_user.current_project_id)
+        query = select(Article).where(
+            Article.project_id == current_user.current_project_id,
+            Article.deleted_at.is_(None),
+        )
     else:
         query = select(Article).where(
             Article.user_id == current_user.id,
             Article.project_id.is_(None),
+            Article.deleted_at.is_(None),
         )
     query = query.order_by(Article.created_at.desc())
     result = await db.execute(query)
@@ -830,11 +842,13 @@ async def export_article(
         query = select(Article).where(
             Article.id == article_id,
             Article.project_id == current_user.current_project_id,
+            Article.deleted_at.is_(None),
         )
     else:
         query = select(Article).where(
             Article.id == article_id,
             Article.user_id == current_user.id,
+            Article.deleted_at.is_(None),
         )
     result = await db.execute(query)
     article = result.scalar_one_or_none()
@@ -935,11 +949,13 @@ async def get_article(
         query = select(Article).where(
             Article.id == article_id,
             Article.project_id == current_user.current_project_id,
+            Article.deleted_at.is_(None),
         )
     else:
         query = select(Article).where(
             Article.id == article_id,
             Article.user_id == current_user.id,
+            Article.deleted_at.is_(None),
         )
     result = await db.execute(query)
     article = result.scalar_one_or_none()
@@ -967,11 +983,13 @@ async def update_article(
         query = select(Article).where(
             Article.id == article_id,
             Article.project_id == current_user.current_project_id,
+            Article.deleted_at.is_(None),
         )
     else:
         query = select(Article).where(
             Article.id == article_id,
             Article.user_id == current_user.id,
+            Article.deleted_at.is_(None),
         )
     result = await db.execute(query)
     article = result.scalar_one_or_none()
@@ -1050,11 +1068,13 @@ async def delete_article(
         query = select(Article).where(
             Article.id == article_id,
             Article.project_id == current_user.current_project_id,
+            Article.deleted_at.is_(None),
         )
     else:
         query = select(Article).where(
             Article.id == article_id,
             Article.user_id == current_user.id,
+            Article.deleted_at.is_(None),
         )
     result = await db.execute(query)
     article = result.scalar_one_or_none()
@@ -1085,11 +1105,13 @@ async def improve_article(
         query = select(Article).where(
             Article.id == article_id,
             Article.project_id == current_user.current_project_id,
+            Article.deleted_at.is_(None),
         )
     else:
         query = select(Article).where(
             Article.id == article_id,
             Article.user_id == current_user.id,
+            Article.deleted_at.is_(None),
         )
     result = await db.execute(query)
     article = result.scalar_one_or_none()
@@ -1187,11 +1209,13 @@ async def analyze_article_seo(
         query = select(Article).where(
             Article.id == article_id,
             Article.project_id == current_user.current_project_id,
+            Article.deleted_at.is_(None),
         )
     else:
         query = select(Article).where(
             Article.id == article_id,
             Article.user_id == current_user.id,
+            Article.deleted_at.is_(None),
         )
     result = await db.execute(query)
     article = result.scalar_one_or_none()
@@ -1238,11 +1262,13 @@ async def generate_article_image_prompt(
         query = select(Article).where(
             Article.id == article_id,
             Article.project_id == current_user.current_project_id,
+            Article.deleted_at.is_(None),
         )
     else:
         query = select(Article).where(
             Article.id == article_id,
             Article.user_id == current_user.id,
+            Article.deleted_at.is_(None),
         )
     result = await db.execute(query)
     article = result.scalar_one_or_none()
@@ -1289,11 +1315,13 @@ async def get_social_posts(
         query = select(Article).where(
             Article.id == article_id,
             Article.project_id == current_user.current_project_id,
+            Article.deleted_at.is_(None),
         )
     else:
         query = select(Article).where(
             Article.id == article_id,
             Article.user_id == current_user.id,
+            Article.deleted_at.is_(None),
         )
     result = await db.execute(query)
     article = result.scalar_one_or_none()
@@ -1326,11 +1354,13 @@ async def generate_social_posts(
         query = select(Article).where(
             Article.id == article_id,
             Article.project_id == current_user.current_project_id,
+            Article.deleted_at.is_(None),
         )
     else:
         query = select(Article).where(
             Article.id == article_id,
             Article.user_id == current_user.id,
+            Article.deleted_at.is_(None),
         )
     result = await db.execute(query)
     article = result.scalar_one_or_none()
@@ -1398,11 +1428,13 @@ async def update_social_post(
         query = select(Article).where(
             Article.id == article_id,
             Article.project_id == current_user.current_project_id,
+            Article.deleted_at.is_(None),
         )
     else:
         query = select(Article).where(
             Article.id == article_id,
             Article.user_id == current_user.id,
+            Article.deleted_at.is_(None),
         )
     result = await db.execute(query)
     article = result.scalar_one_or_none()
@@ -1442,10 +1474,12 @@ def _article_ownership_query(article_id: str, current_user: User):
         return select(Article).where(
             Article.id == article_id,
             Article.project_id == current_user.current_project_id,
+            Article.deleted_at.is_(None),
         )
     return select(Article).where(
         Article.id == article_id,
         Article.user_id == current_user.id,
+        Article.deleted_at.is_(None),
     )
 
 
@@ -1622,12 +1656,14 @@ async def get_link_suggestions(
     # Project scoping: mirror the same logic used in list_articles / get_article
     if current_user.current_project_id:
         candidate_query = candidate_query.where(
-            Article.project_id == current_user.current_project_id
+            Article.project_id == current_user.current_project_id,
+            Article.deleted_at.is_(None),
         )
     else:
         candidate_query = candidate_query.where(
             Article.user_id == current_user.id,
             Article.project_id.is_(None),
+            Article.deleted_at.is_(None),
         )
 
     candidate_result = await db.execute(candidate_query.limit(50))
@@ -1692,11 +1728,13 @@ async def get_aeo_score(
         ownership_query = select(Article).where(
             Article.id == article_id,
             Article.project_id == current_user.current_project_id,
+            Article.deleted_at.is_(None),
         )
     else:
         ownership_query = select(Article).where(
             Article.id == article_id,
             Article.user_id == current_user.id,
+            Article.deleted_at.is_(None),
         )
     ownership_result = await db.execute(ownership_query)
     if not ownership_result.scalar_one_or_none():
@@ -1752,11 +1790,13 @@ async def refresh_aeo_score(
         ownership_query = select(Article).where(
             Article.id == article_id,
             Article.project_id == current_user.current_project_id,
+            Article.deleted_at.is_(None),
         )
     else:
         ownership_query = select(Article).where(
             Article.id == article_id,
             Article.user_id == current_user.id,
+            Article.deleted_at.is_(None),
         )
     if not (await db.execute(ownership_query)).scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")

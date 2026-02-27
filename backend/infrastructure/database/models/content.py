@@ -102,6 +102,11 @@ class Outline(Base, TimestampMixin):
     generation_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     generation_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # Soft delete
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+
     # Relationships
     articles: Mapped[List["Article"]] = relationship(
         "Article",
@@ -201,6 +206,11 @@ class Article(Base, TimestampMixin):
     generation_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     generation_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     image_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Soft delete
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
 
     # Publishing
     published_at: Mapped[Optional[datetime]] = mapped_column(

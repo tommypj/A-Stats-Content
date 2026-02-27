@@ -69,12 +69,16 @@ def get_file_extension(filename: str) -> str:
 
 
 def _build_ownership_filter(current_user: User):
-    """Return the appropriate SQLAlchemy filter for ownership."""
+    """Return the appropriate SQLAlchemy filter for ownership (excludes soft-deleted rows)."""
     if current_user.current_project_id:
-        return KnowledgeSource.project_id == current_user.current_project_id
+        return and_(
+            KnowledgeSource.project_id == current_user.current_project_id,
+            KnowledgeSource.deleted_at.is_(None),
+        )
     return and_(
         KnowledgeSource.user_id == current_user.id,
         KnowledgeSource.project_id.is_(None),
+        KnowledgeSource.deleted_at.is_(None),
     )
 
 
