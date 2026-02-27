@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Plus,
@@ -45,9 +46,11 @@ const STATUS_OPTIONS = [
 ];
 
 export default function OutlinesPage() {
+  const searchParams = useSearchParams();
   const [outlines, setOutlines] = useState<Outline[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [initialKeyword, setInitialKeyword] = useState("");
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
   // Pagination & filter state
@@ -63,6 +66,15 @@ export default function OutlinesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string } | null>(null);
+
+  // Open create modal with pre-filled keyword when ?keyword= is in the URL
+  useEffect(() => {
+    const kw = searchParams.get("keyword");
+    if (kw) {
+      setInitialKeyword(kw);
+      setShowCreateModal(true);
+    }
+  }, [searchParams]);
 
   // Ctrl+N / Cmd+N: open create outline modal
   useKeyboardShortcuts([
@@ -512,7 +524,8 @@ export default function OutlinesPage() {
       {/* Create Modal */}
       {showCreateModal && (
         <CreateOutlineModal
-          onClose={() => setShowCreateModal(false)}
+          initialKeyword={initialKeyword}
+          onClose={() => { setShowCreateModal(false); setInitialKeyword(""); }}
           onCreate={(outline) => {
             setOutlines([outline, ...outlines]);
             setTotalItems((prev) => prev + 1);
@@ -525,13 +538,15 @@ export default function OutlinesPage() {
 }
 
 function CreateOutlineModal({
+  initialKeyword = "",
   onClose,
   onCreate,
 }: {
+  initialKeyword?: string;
   onClose: () => void;
   onCreate: (outline: Outline) => void;
 }) {
-  const [keyword, setKeyword] = useState("");
+  const [keyword, setKeyword] = useState(initialKeyword);
   const [targetAudience, setTargetAudience] = useState("");
   const [tone, setTone] = useState("professional");
   const [wordCount, setWordCount] = useState(1500);

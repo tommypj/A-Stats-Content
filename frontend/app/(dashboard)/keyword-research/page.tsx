@@ -196,7 +196,7 @@ export default function KeywordResearchPage() {
 
                 {/* Action */}
                 <Link
-                  href={`/outlines/new?keyword=${encodeURIComponent(item.keyword)}`}
+                  href={`/outlines?keyword=${encodeURIComponent(item.keyword)}`}
                   className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors self-start"
                 >
                   Create Outline

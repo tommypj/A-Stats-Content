@@ -27,7 +27,7 @@ const quickActions = [
     name: "Create Outline",
     description: "Start with AI-generated structure",
     icon: FileText,
-    href: "/outlines/new",
+    href: "/outlines",
     color: "bg-healing-sage",
   },
   {
@@ -104,7 +104,7 @@ function OnboardingChecklist({
       label: "Create your first outline",
       description: "Generate an AI-structured content plan for any keyword.",
       done: totalOutlines > 0,
-      href: "/outlines/new",
+      href: "/outlines",
     },
     {
       id: "article",
@@ -435,7 +435,7 @@ export default function DashboardPage() {
                 </div>
                 <p className="text-text-secondary text-sm">No outlines yet</p>
                 <Link
-                  href="/outlines/new"
+                  href="/outlines"
                   className="inline-flex items-center gap-1 mt-3 text-sm text-primary-500 hover:text-primary-600 font-medium"
                 >
                   <Plus className="h-4 w-4" />
