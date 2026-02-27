@@ -59,7 +59,18 @@ function QueryPageContent() {
     ].slice(0, 50); // Keep only last 50 unique queries
 
     setQueryHistory(newHistory);
-    localStorage.setItem("knowledge_query_history", JSON.stringify(newHistory));
+    try {
+      localStorage.setItem("knowledge_query_history", JSON.stringify(newHistory));
+    } catch {
+      // Storage quota exceeded — trim to 10 entries and retry once
+      const trimmed = newHistory.slice(0, 10);
+      try {
+        localStorage.setItem("knowledge_query_history", JSON.stringify(trimmed));
+        setQueryHistory(trimmed);
+      } catch {
+        // Still failing — silently ignore, history just won't persist
+      }
+    }
   };
 
   async function handleQuery(queryText: string) {

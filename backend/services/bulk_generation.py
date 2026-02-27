@@ -233,7 +233,9 @@ async def process_bulk_outline_job(
         await db.commit()
 
         # Rate limiting — pause between items to avoid overloading the AI API
-        await asyncio.sleep(2)
+        # BULK-31: configurable via settings.bulk_item_sleep_seconds (default 2)
+        _sleep_seconds = getattr(settings, "bulk_item_sleep_seconds", 2)
+        await asyncio.sleep(_sleep_seconds)
 
     # Finalize job
     if job.failed_items == 0:

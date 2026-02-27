@@ -104,7 +104,7 @@ async def list_all_articles(
     Admin-only endpoint for content moderation.
     """
     # Build query
-    query = select(Article).options(selectinload(Article.outline))
+    query = select(Article)  # ADM-24: Article.outline is not used in this response; removed unused selectinload
 
     # Apply filters
     if user_id:
@@ -157,7 +157,7 @@ async def list_all_articles(
     articles = result.scalars().all()
 
     # Get user info for each article
-    user_ids = list(set(article.user_id for article in articles))
+    user_ids = list(dict.fromkeys(article.user_id for article in articles))  # ADM-25: order-preserving dedup
     users_result = await db.execute(select(User).where(User.id.in_(user_ids)))
     users_dict = {user.id: user for user in users_result.scalars().all()}
 
@@ -354,7 +354,7 @@ async def list_all_outlines(
     outlines = result.scalars().all()
 
     # Get user info for each outline
-    user_ids = list(set(outline.user_id for outline in outlines))
+    user_ids = list(dict.fromkeys(outline.user_id for outline in outlines))  # ADM-25: order-preserving dedup
     users_result = await db.execute(select(User).where(User.id.in_(user_ids)))
     users_dict = {user.id: user for user in users_result.scalars().all()}
 

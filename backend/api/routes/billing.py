@@ -41,6 +41,29 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
+# BILL-34: single canonical variant_id → tier mapping used by both user and project webhook handlers
+# Built lazily at call time so settings values are resolved after app startup.
+def _build_variant_to_tier() -> dict:
+    return {
+        str(v): tier
+        for tier, keys in [
+            (SubscriptionTier.STARTER.value, [
+                settings.lemonsqueezy_variant_starter_monthly,
+                settings.lemonsqueezy_variant_starter_yearly,
+            ]),
+            (SubscriptionTier.PROFESSIONAL.value, [
+                settings.lemonsqueezy_variant_professional_monthly,
+                settings.lemonsqueezy_variant_professional_yearly,
+            ]),
+            (SubscriptionTier.ENTERPRISE.value, [
+                settings.lemonsqueezy_variant_enterprise_monthly,
+                settings.lemonsqueezy_variant_enterprise_yearly,
+            ]),
+        ]
+        for v in keys
+        if v is not None
+    }
+
 
 def _parse_iso_datetime(value: str) -> Optional[datetime]:
     """Parse ISO 8601 datetime string, handling Z suffix and invalid formats.
@@ -317,26 +340,12 @@ async def handle_project_subscription_webhook(
         logger.error(f"Project {project_id} not found for webhook")
         return {"status": "error", "message": "Project not found"}
 
-    # Determine subscription tier from variant_id
+    # BILL-34: Determine subscription tier from variant_id using shared mapping
     tier = SubscriptionTier.FREE.value
     if variant_id:
-        variant_str = str(variant_id)
-        if variant_str in [
-            settings.lemonsqueezy_variant_starter_monthly,
-            settings.lemonsqueezy_variant_starter_yearly,
-        ]:
-            tier = SubscriptionTier.STARTER.value
-        elif variant_str in [
-            settings.lemonsqueezy_variant_professional_monthly,
-            settings.lemonsqueezy_variant_professional_yearly,
-        ]:
-            tier = SubscriptionTier.PROFESSIONAL.value
-        elif variant_str in [
-            settings.lemonsqueezy_variant_enterprise_monthly,
-            settings.lemonsqueezy_variant_enterprise_yearly,
-        ]:
-            tier = SubscriptionTier.ENTERPRISE.value
-        else:
+        variant_to_tier = _build_variant_to_tier()
+        tier = variant_to_tier.get(str(variant_id), SubscriptionTier.FREE.value)
+        if tier == SubscriptionTier.FREE.value and str(variant_id) not in variant_to_tier:
             # BILL-22: variant_id didn't match any known tier — defaulting to free
             logger.warning(
                 "BILL-22: variant_id %s did not match any known tier — defaulting to free",
@@ -484,10 +493,10 @@ async def handle_webhook(
     # Parse webhook payload
     try:
         payload = json.loads(body)
-    except json.JSONDecodeError:
-        logger.error("Invalid JSON in webhook payload")
+    except (json.JSONDecodeError, ValueError) as e:
+        logger.error("Invalid JSON in webhook payload: %s", e)
         # BILL-05: Return 400 so LemonSqueezy stops retrying a malformed payload.
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON payload")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid webhook payload: {e}")
 
     # Idempotency: deduplicate webhook events using Redis (24h TTL covers LemonSqueezy retry window)
     meta = payload.get("meta", {})
@@ -571,26 +580,12 @@ async def handle_webhook(
         logger.error(f"User {user_id} not found for webhook")
         return {"status": "error", "message": "User not found"}
 
-    # Determine subscription tier from variant_id
+    # BILL-34: Determine subscription tier from variant_id using shared mapping
     tier = SubscriptionTier.FREE.value
     if variant_id:
-        variant_str = str(variant_id)
-        if variant_str in [
-            settings.lemonsqueezy_variant_starter_monthly,
-            settings.lemonsqueezy_variant_starter_yearly,
-        ]:
-            tier = SubscriptionTier.STARTER.value
-        elif variant_str in [
-            settings.lemonsqueezy_variant_professional_monthly,
-            settings.lemonsqueezy_variant_professional_yearly,
-        ]:
-            tier = SubscriptionTier.PROFESSIONAL.value
-        elif variant_str in [
-            settings.lemonsqueezy_variant_enterprise_monthly,
-            settings.lemonsqueezy_variant_enterprise_yearly,
-        ]:
-            tier = SubscriptionTier.ENTERPRISE.value
-        else:
+        variant_to_tier = _build_variant_to_tier()
+        tier = variant_to_tier.get(str(variant_id), SubscriptionTier.FREE.value)
+        if tier == SubscriptionTier.FREE.value and str(variant_id) not in variant_to_tier:
             # BILL-22: variant_id didn't match any known tier — defaulting to free
             logger.warning(
                 "BILL-22: variant_id %s did not match any known tier — defaulting to free",
@@ -607,6 +602,7 @@ async def handle_webhook(
             # BILL-28: only overwrite subscription_id when webhook provides one
             if subscription_id is not None:
                 user.lemonsqueezy_subscription_id = str(subscription_id)
+            user.lemonsqueezy_variant_id = str(variant_id) if variant_id else None  # BILL-36
 
             if renews_at:
                 user.subscription_expires = _parse_iso_datetime(renews_at)

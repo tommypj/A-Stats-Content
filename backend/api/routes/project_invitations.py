@@ -2,12 +2,15 @@
 Project invitation API routes.
 """
 
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from api.middleware.rate_limit import limiter
+
+logger = logging.getLogger(__name__)
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -95,8 +98,8 @@ async def require_project_admin(
 async def list_project_invitations(
     project_id: str,
     status_filter: Optional[str] = None,
-    page: int = 1,
-    page_size: int = 20,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     project: Project = Depends(require_project_admin),
     db: AsyncSession = Depends(get_db),
 ):
@@ -474,7 +477,7 @@ async def get_invitation_details(
 
 
 @router.post("/invitations/{token}/accept", response_model=ProjectInvitationAcceptResponse, tags=["public-invitations"])
-@limiter.limit("10/minute")  # AUTH-12
+@limiter.limit("5/minute")  # AUTH-12, PROJ-44: tightened from 10/minute to reduce brute-force window
 async def accept_invitation(
     request: Request,
     token: str,
@@ -497,6 +500,10 @@ async def accept_invitation(
     invitation = result.scalar_one_or_none()
 
     if not invitation:
+        logger.warning(
+            "Invalid or expired invitation token attempt from user %s: token=%s",
+            current_user.id, token[:8] + "..."  # truncate for safety
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Invitation not found",

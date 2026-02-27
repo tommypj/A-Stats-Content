@@ -344,6 +344,7 @@ export default function OutlinesPage() {
               onClick={clearSelection}
               className="p-1.5 rounded-lg hover:bg-primary-100 text-primary-600 transition-colors"
               title="Clear selection"
+              aria-label="Clear selection"
             >
               <X className="h-4 w-4" />
             </button>
@@ -422,6 +423,7 @@ export default function OutlinesPage() {
                     <div className="relative">
                       <button
                         onClick={() => setActiveMenu(activeMenu === outline.id ? null : outline.id)}
+                        aria-label="More actions"
                         className="p-1.5 rounded-lg hover:bg-surface-secondary"
                       >
                         <MoreVertical className="h-4 w-4 text-text-muted" />

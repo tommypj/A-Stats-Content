@@ -368,7 +368,11 @@ async def get_user_analytics(
     # Simplified: users who have last_login > created_at + 1 day
     one_day_ago = now - timedelta(days=1)
     users_created_1d_result = await db.execute(
-        select(func.count(User.id)).where(User.created_at <= one_day_ago)
+        select(func.count(User.id)).where(
+            User.created_at <= one_day_ago,
+            User.deleted_at.is_(None),  # ADM-28: exclude deleted users
+            User.status != "suspended",  # ADM-28: exclude suspended users
+        )
     )
     users_created_1d = users_created_1d_result.scalar() or 1  # Avoid division by zero
 
@@ -376,7 +380,9 @@ async def get_user_analytics(
         select(func.count(User.id)).where(
             and_(
                 User.created_at <= one_day_ago,
-                User.last_login >= User.created_at + timedelta(days=1)
+                User.last_login >= User.created_at + timedelta(days=1),
+                User.deleted_at.is_(None),  # ADM-28: exclude deleted users
+                User.status != "suspended",  # ADM-28: exclude suspended users
             )
         )
     )
@@ -386,7 +392,11 @@ async def get_user_analytics(
     # Day 7 retention
     seven_days_ago = now - timedelta(days=7)
     users_created_7d_result = await db.execute(
-        select(func.count(User.id)).where(User.created_at <= seven_days_ago)
+        select(func.count(User.id)).where(
+            User.created_at <= seven_days_ago,
+            User.deleted_at.is_(None),  # ADM-28: exclude deleted users
+            User.status != "suspended",  # ADM-28: exclude suspended users
+        )
     )
     users_created_7d = users_created_7d_result.scalar() or 1
 
@@ -394,7 +404,9 @@ async def get_user_analytics(
         select(func.count(User.id)).where(
             and_(
                 User.created_at <= seven_days_ago,
-                User.last_login >= User.created_at + timedelta(days=7)
+                User.last_login >= User.created_at + timedelta(days=7),
+                User.deleted_at.is_(None),  # ADM-28: exclude deleted users
+                User.status != "suspended",  # ADM-28: exclude suspended users
             )
         )
     )
@@ -403,7 +415,11 @@ async def get_user_analytics(
 
     # Day 30 retention
     users_created_30d_result = await db.execute(
-        select(func.count(User.id)).where(User.created_at <= thirty_days_ago)
+        select(func.count(User.id)).where(
+            User.created_at <= thirty_days_ago,
+            User.deleted_at.is_(None),  # ADM-28: exclude deleted users
+            User.status != "suspended",  # ADM-28: exclude suspended users
+        )
     )
     users_created_30d = users_created_30d_result.scalar() or 1
 
@@ -411,7 +427,9 @@ async def get_user_analytics(
         select(func.count(User.id)).where(
             and_(
                 User.created_at <= thirty_days_ago,
-                User.last_login >= User.created_at + timedelta(days=30)
+                User.last_login >= User.created_at + timedelta(days=30),
+                User.deleted_at.is_(None),  # ADM-28: exclude deleted users
+                User.status != "suspended",  # ADM-28: exclude suspended users
             )
         )
     )

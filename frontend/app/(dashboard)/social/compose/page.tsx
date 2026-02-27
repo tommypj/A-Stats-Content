@@ -102,6 +102,9 @@ export default function ComposePage() {
             const valid = draft.selectedAccountIds.filter((id: string) => connectedIds.includes(id));
             if (valid.length > 0) {
               setSelectedAccountIds(valid);
+              if (valid.length < draft.selectedAccountIds.length) {
+                toast.warning("Some accounts from your draft are no longer connected and were removed.");
+              }
               return;
             }
           }

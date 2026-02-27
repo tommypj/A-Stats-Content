@@ -1332,6 +1332,7 @@ export default function ArticleEditorPage() {
           <div className="flex rounded-lg border border-surface-tertiary overflow-hidden">
             <button
               onClick={() => setViewMode("edit")}
+              aria-label="Edit mode"
               className={clsx(
                 "px-3 py-1.5 text-sm font-medium transition-colors",
                 viewMode === "edit"
@@ -1343,6 +1344,7 @@ export default function ArticleEditorPage() {
             </button>
             <button
               onClick={() => setViewMode("preview")}
+              aria-label="Preview mode"
               className={clsx(
                 "px-3 py-1.5 text-sm font-medium transition-colors",
                 viewMode === "preview"
@@ -1895,6 +1897,7 @@ export default function ArticleEditorPage() {
                           <button
                             type="button"
                             title="Restore this version"
+                            aria-label="Restore this version"
                             onClick={() => handleRestoreRevision(rev.id)}
                             disabled={restoringRevisionId === rev.id}
                             className="flex-shrink-0 p-1 rounded hover:bg-surface-tertiary text-text-muted hover:text-text-primary transition-colors"

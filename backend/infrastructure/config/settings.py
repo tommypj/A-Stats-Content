@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        case_sensitive=False,
+        case_sensitive=False,  # CONFIG-02: env var names are case-insensitive; typos silently use defaults
         extra="ignore",
     )
 
@@ -99,6 +99,7 @@ class Settings(BaseSettings):
     anthropic_max_tokens: int = 4096
     anthropic_timeout: int = 300
     ai_request_timeout: int = 60  # GEN-31: timeout (seconds) for short AI requests (e.g. proofread)
+    bulk_item_sleep_seconds: int = 2  # BULK-31: seconds to sleep between bulk generation items
 
     # Replicate (Image Generation)
     replicate_api_token: Optional[str] = None

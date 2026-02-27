@@ -21,7 +21,12 @@ const passwordSchema = z
       .regex(/[A-Z]/, "Must contain at least one uppercase letter")
       .regex(/[a-z]/, "Must contain at least one lowercase letter")
       .regex(/[0-9]/, "Must contain at least one digit"),
-    confirmPassword: z.string().min(8),
+    confirmPassword: z
+      .string()
+      .min(8)
+      .regex(/[A-Z]/, "Must contain at least one uppercase letter")
+      .regex(/[a-z]/, "Must contain at least one lowercase letter")
+      .regex(/[0-9]/, "Must contain at least one digit"),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
     message: "Passwords do not match",
@@ -41,7 +46,7 @@ export default function PasswordSettingsPage() {
     register,
     handleSubmit,
     reset,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<PasswordFormData>({
     resolver: zodResolver(passwordSchema),
   });
@@ -145,7 +150,7 @@ export default function PasswordSettingsPage() {
 
         {/* Submit */}
         <div className="flex justify-end pt-4">
-          <Button type="submit" disabled={isLoading} isLoading={isLoading}>
+          <Button type="submit" disabled={!isDirty || isLoading} isLoading={isLoading}>
             {t("update")}
           </Button>
         </div>
