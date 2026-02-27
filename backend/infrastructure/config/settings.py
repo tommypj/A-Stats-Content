@@ -159,6 +159,9 @@ class Settings(BaseSettings):
     # Frontend URL (for email links)
     frontend_url: str = "http://localhost:3000"
 
+    # Cookie domain (optional — set to share cookies across subdomains, e.g. ".example.com")
+    cookie_domain: Optional[str] = None
+
     @property
     def is_production(self) -> bool:
         """Check if running in production."""

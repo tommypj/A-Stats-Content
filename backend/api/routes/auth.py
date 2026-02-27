@@ -5,9 +5,9 @@ Authentication API routes.
 import json
 import logging
 from datetime import datetime, timezone, timedelta
-from typing import Annotated
+from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Header, Request, UploadFile, File
+from fastapi import APIRouter, Body, Depends, HTTPException, status, Header, Request, UploadFile, File
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import select, delete, and_
@@ -45,12 +45,16 @@ logger = logging.getLogger(__name__)
 def _get_cookie_kwargs(settings_obj) -> dict:
     """Return cookie kwargs based on environment."""
     is_production = getattr(settings_obj, 'environment', 'development') == 'production'
-    return dict(
+    kwargs = dict(
         httponly=True,
         secure=is_production,
         samesite="none" if is_production else "lax",
         path="/",
     )
+    cookie_domain = getattr(settings_obj, 'cookie_domain', None)
+    if cookie_domain:
+        kwargs['domain'] = cookie_domain
+    return kwargs
 
 
 def _set_auth_cookies(response: JSONResponse, access_token: str, refresh_token: str, settings_obj) -> None:
@@ -374,7 +378,7 @@ async def login(
 @limiter.limit("5/minute")  # AUTH-14: tightened from 10/min to match login limit
 async def refresh_token(
     request: Request,
-    body: RefreshTokenRequest,
+    body: Optional[RefreshTokenRequest] = Body(None),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """
@@ -513,15 +517,17 @@ async def request_password_reset(
 
 
 @router.post("/password/reset", status_code=status.HTTP_200_OK)
+@limiter.limit("3/hour")
 async def reset_password(
-    request: PasswordResetConfirm,
+    request: Request,
+    body: PasswordResetConfirm,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """
     Reset password using reset token.
     """
     # Verify token
-    user_id = token_service.verify_password_reset_token(request.token)
+    user_id = token_service.verify_password_reset_token(body.token)
 
     if not user_id:
         raise HTTPException(
@@ -539,7 +545,7 @@ async def reset_password(
             detail="Invalid or expired reset token",
         )
 
-    if not user.password_reset_token or user.password_reset_token != request.token:
+    if not user.password_reset_token or user.password_reset_token != body.token:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or already used reset token",
@@ -552,7 +558,7 @@ async def reset_password(
         )
 
     # Update password and bump password_changed_at so existing tokens are invalidated
-    user.password_hash = password_hasher.hash(request.new_password)
+    user.password_hash = password_hasher.hash(body.new_password)
     user.password_reset_token = None
     user.password_reset_expires = None
     user.password_changed_at = datetime.now(timezone.utc)
@@ -562,8 +568,10 @@ async def reset_password(
 
 
 @router.post("/password/change", status_code=status.HTTP_200_OK)
+@limiter.limit("10/minute")
 async def change_password(
-    request: PasswordChangeRequest,
+    request: Request,
+    body: PasswordChangeRequest,
     current_user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db),
 ) -> dict:
@@ -571,14 +579,14 @@ async def change_password(
     Change password for authenticated user.
     """
     # Verify current password
-    if not password_hasher.verify(request.current_password, current_user.password_hash):
+    if not password_hasher.verify(body.current_password, current_user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect",
         )
 
     # Update password and bump password_changed_at so existing tokens are invalidated
-    current_user.password_hash = password_hasher.hash(request.new_password)
+    current_user.password_hash = password_hasher.hash(body.new_password)
     current_user.password_changed_at = datetime.now(timezone.utc)
     await db.commit()
 

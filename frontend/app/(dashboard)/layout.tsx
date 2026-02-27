@@ -40,6 +40,7 @@ import {
   Building2,
 } from "lucide-react";
 import { clsx } from "clsx";
+import { toast } from "sonner";
 import { ProjectProvider, useProject } from "@/contexts/ProjectContext";
 import { ProjectSwitcher } from "@/components/project/project-switcher";
 import { api, UserResponse, GenerationNotification } from "@/lib/api";
@@ -339,8 +340,13 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   const handleSignOut = async () => {
-    await api.auth.logout();
-    router.push("/login");
+    try {
+      await api.auth.logout();
+      useAuthStore.getState().logout();
+      router.push("/login");
+    } catch {
+      toast.error("Failed to sign out. Please try again.");
+    }
   };
 
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 import {
   LayoutDashboard,
   FileText,
@@ -24,6 +24,7 @@ import {
 import { clsx } from "clsx";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 const navigation = [
   { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
@@ -65,13 +66,14 @@ export default function AdminLayout({
 
   const handleSignOut = useCallback(async () => {
     // Call backend logout to clear HttpOnly cookies server-side.
+    // Only clear local state on success — surface failure to the user.
     try {
       await api.auth.logout();
+      useAuthStore.getState().logout();
+      router.push("/login");
     } catch {
-      // Best-effort; proceed with local logout regardless.
+      toast.error("Failed to sign out. Please try again.");
     }
-    useAuthStore.getState().logout();
-    router.push("/login");
   }, [router]);
 
   useEffect(() => {
@@ -93,7 +95,7 @@ export default function AdminLayout({
   const { user: zustandUser, isAuthenticated: zustandAuthenticated, isLoading: zustandLoading } = useAuthStore();
 
   useEffect(() => {
-    // Use Zustand persisted user state to check admin role.
+    // Fast path: Use Zustand persisted user state for immediate role check.
     // Actual endpoint-level access control is enforced by backend get_current_admin_user.
     if (zustandLoading) return; // Wait for Zustand hydration
 
@@ -110,6 +112,23 @@ export default function AdminLayout({
     setIsAdmin(true);
     setLoading(false);
   }, [zustandUser, zustandAuthenticated, zustandLoading, router]);
+
+  useEffect(() => {
+    // Server-side role verification: confirm the session cookie is still valid
+    // and the role has not been downgraded since the Zustand snapshot was saved.
+    const verifyRole = async () => {
+      try {
+        const freshUser = await api.auth.me();
+        if (!["admin", "super_admin"].includes(freshUser.role)) {
+          router.replace("/dashboard");
+        }
+      } catch {
+        // Cookie is invalid or expired — redirect to login.
+        router.replace("/login");
+      }
+    };
+    verifyRole();
+  }, [router]);
 
   if (loading) {
     return (
@@ -371,7 +390,9 @@ export default function AdminLayout({
         </header>
 
         {/* Page content */}
-        <main id="main-content" className="p-4 lg:p-8 overflow-x-hidden">{children}</main>
+        <main id="main-content" className="p-4 lg:p-8 overflow-x-hidden">
+          <ErrorBoundary>{children}</ErrorBoundary>
+        </main>
       </div>
       <Toaster richColors position="top-right" />
     </div>

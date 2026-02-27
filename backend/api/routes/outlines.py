@@ -192,9 +192,10 @@ async def list_outlines(
 
     # Apply filters
     if status:
+        status = status.lower()
         VALID_STATUSES = {s.value for s in ContentStatus}
         if status not in VALID_STATUSES:
-            raise HTTPException(status_code=400, detail=f"Invalid status value: {status}")
+            raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {', '.join(sorted(VALID_STATUSES))}")
         query = query.where(Outline.status == status)
     if keyword:
         query = query.where(Outline.keyword.ilike(f"%{escape_like(keyword)}%"))

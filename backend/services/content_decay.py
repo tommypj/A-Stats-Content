@@ -251,13 +251,16 @@ async def run_decay_detection(
         if (a.keyword, a.alert_type) not in existing_keys
     ]
 
-    # ANA-30: Catch IntegrityError per-alert to handle concurrent duplicate inserts
+    # ANA-30: Catch IntegrityError per-alert to handle concurrent duplicate inserts.
+    # Use nested savepoints so only the individual failing INSERT is rolled back,
+    # not the entire outer transaction.
     for alert in new_alerts:
         try:
+            savepoint = await db.begin_nested()
             db.add(alert)
-            await db.flush()
+            await savepoint.commit()
         except IntegrityError:
-            await db.rollback()
+            await savepoint.rollback()
             # Alert already exists (concurrent insert), skip it
             logger.debug("Skipping duplicate decay alert for keyword=%s type=%s", alert.keyword, alert.alert_type)
 
