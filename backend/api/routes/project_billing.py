@@ -7,6 +7,7 @@ subscription management, checkout, and usage tracking.
 
 import logging
 from typing import Annotated
+from urllib.parse import urlencode
 from uuid import UUID
 
 import httpx
@@ -205,12 +206,12 @@ async def create_project_checkout(
     # Build checkout URL with project context
     # Format: https://YOUR_STORE.lemonsqueezy.com/checkout/buy/{variant_id}
     store_url = f"https://{settings.lemonsqueezy_store_id}.lemonsqueezy.com"
-    checkout_url = (
-        f"{store_url}/checkout/buy/{request.variant_id}"
-        f"?checkout[email]={current_user.email}"
-        f"&checkout[custom][project_id]={project_id}"
-        f"&checkout[custom][user_id]={current_user.id}"
-    )
+    params = urlencode({
+        "checkout[email]": current_user.email,
+        "checkout[custom][project_id]": str(project_id),
+        "checkout[custom][user_id]": current_user.id,
+    })
+    checkout_url = f"{store_url}/checkout/buy/{request.variant_id}?{params}"
 
     logger.info(
         f"Created project checkout session: project_id={project_id}, "

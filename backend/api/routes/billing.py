@@ -8,6 +8,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from typing import Annotated, Optional
+from urllib.parse import urlencode
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Header
@@ -178,11 +179,11 @@ async def create_checkout(
     # LemonSqueezy checkout format:
     # https://YOUR_STORE.lemonsqueezy.com/checkout/buy/{variant_id}?checkout[email]=...&checkout[custom][user_id]=...
     store_url = f"https://{settings.lemonsqueezy_store_id}.lemonsqueezy.com"
-    checkout_url = (
-        f"{store_url}/checkout/buy/{variant_id}"
-        f"?checkout[email]={current_user.email}"
-        f"&checkout[custom][user_id]={current_user.id}"
-    )
+    params = urlencode({
+        "checkout[email]": current_user.email,
+        "checkout[custom][user_id]": current_user.id,
+    })
+    checkout_url = f"{store_url}/checkout/buy/{variant_id}?{params}"
 
     logger.info(
         f"Created checkout session for user {current_user.id}, "

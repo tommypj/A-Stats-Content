@@ -106,6 +106,7 @@ apiClient.interceptors.request.use(
  * Queues concurrent requests so only one refresh call is made at a time.
  */
 let isRefreshing = false;
+const MAX_QUEUE_SIZE = 50;
 let failedQueue: Array<{
   resolve: (token: string) => void;
   reject: (error: unknown) => void;
@@ -154,6 +155,11 @@ apiClient.interceptors.response.use(
 
       if (isRefreshing) {
         // Another refresh is in progress — queue this request
+        if (failedQueue.length >= MAX_QUEUE_SIZE) {
+          // Queue is full; reject immediately to avoid unbounded growth
+          forceLogout();
+          return Promise.reject(new Error("Auth refresh queue overflow"));
+        }
         return new Promise((resolve, reject) => {
           failedQueue.push({
             resolve: (token: string) => {
@@ -350,6 +356,14 @@ export const api = {
         data: { confirmation: "DELETE MY ACCOUNT" },
       }),
     uploadAvatar: async (file: File) => {
+      const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+      const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        throw new Error("Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.");
+      }
+      if (file.size > MAX_SIZE_BYTES) {
+        throw new Error("File too large. Maximum avatar size is 5MB.");
+      }
       const formData = new FormData();
       formData.append("file", file);
       const { data } = await apiClient.post<UserResponse>("/auth/me/avatar", formData, {

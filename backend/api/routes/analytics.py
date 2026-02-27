@@ -1927,6 +1927,7 @@ async def update_conversion_goal(
             and_(
                 ConversionGoal.id == goal_id,
                 ConversionGoal.user_id == current_user.id,
+                ConversionGoal.project_id == current_user.current_project_id,
             )
         )
     )
@@ -1960,6 +1961,7 @@ async def delete_conversion_goal(
             and_(
                 ConversionGoal.id == goal_id,
                 ConversionGoal.user_id == current_user.id,
+                ConversionGoal.project_id == current_user.current_project_id,
             )
         )
     )

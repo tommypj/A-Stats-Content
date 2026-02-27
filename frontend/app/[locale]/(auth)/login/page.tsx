@@ -49,12 +49,25 @@ export default function LoginPage() {
     try {
       const response = await api.auth.login(data.email, data.password);
 
-      // Get user info
+      // Temporarily store token only long enough to fetch user info.
+      // We write to localStorage here so the apiClient interceptor can
+      // attach the Authorization header for the /auth/me call that follows.
+      // The authoritative write (including Zustand state) happens in login()
+      // below. If me() fails the token is removed in the catch block.
       localStorage.setItem("auth_token", response.access_token);
       if (response.refresh_token) {
         localStorage.setItem("refresh_token", response.refresh_token);
       }
-      const user = await api.auth.me();
+      let user;
+      try {
+        user = await api.auth.me();
+      } catch (meError) {
+        // /me failed — remove the tokens we just stored so the user is not
+        // left in a half-authenticated state.
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("refresh_token");
+        throw meError;
+      }
 
       login(
         {

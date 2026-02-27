@@ -16,6 +16,10 @@ from infrastructure.config.settings import settings
 logger = logging.getLogger(__name__)
 
 
+class AIGenerationError(Exception):
+    """Raised when the AI model returns an unusable response."""
+
+
 async def _retry_with_backoff(coro_factory, max_retries=3, base_delay=1.0):
     """Retry an async operation with exponential backoff + jitter."""
     for attempt in range(max_retries + 1):

@@ -14,7 +14,7 @@ class ProjectRole(str):
 
     OWNER = "owner"
     ADMIN = "admin"
-    MEMBER = "member"
+    EDITOR = "editor"
     VIEWER = "viewer"
 
 
@@ -128,19 +128,19 @@ class ProjectMemberAdd(BaseModel):
     """Schema for adding a member to a project (used internally after invitation accepted)."""
 
     user_id: str
-    role: str = Field(default="member", description="Project role")
+    role: str = Field(default="editor", description="Project role")
 
 
 class ProjectMemberUpdate(BaseModel):
     """Schema for updating a project member's role."""
 
-    role: str = Field(..., description="New project role (owner, admin, member, viewer)")
+    role: str = Field(..., description="New project role (owner, admin, editor, viewer)")
 
     @field_validator("role")
     @classmethod
     def validate_role(cls, v: str) -> str:
         """Validate role is valid."""
-        valid_roles = ["owner", "admin", "member", "viewer"]
+        valid_roles = ["owner", "admin", "editor", "viewer"]
         if v not in valid_roles:
             raise ValueError(f"Role must be one of: {', '.join(valid_roles)}")
         return v
@@ -180,13 +180,13 @@ class ProjectInvitationCreate(BaseModel):
     """Schema for creating a project invitation."""
 
     email: EmailStr = Field(..., description="Email address to invite")
-    role: str = Field(default="member", description="Role to assign (owner, admin, member, viewer)")
+    role: str = Field(default="editor", description="Role to assign (owner, admin, editor, viewer)")
 
     @field_validator("role")
     @classmethod
     def validate_role(cls, v: str) -> str:
         """Validate role is valid."""
-        valid_roles = ["owner", "admin", "member", "viewer"]
+        valid_roles = ["owner", "admin", "editor", "viewer"]
         if v not in valid_roles:
             raise ValueError(f"Role must be one of: {', '.join(valid_roles)}")
         return v
