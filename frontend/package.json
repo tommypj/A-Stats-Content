@@ -7,7 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:api": "playwright test e2e/tests/12-api-health.spec.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",
@@ -32,6 +36,7 @@
     "zustand": "^4.5.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tanstack/react-query-devtools": "^5.17.0",
     "@types/dompurify": "^3.0.5",
     "@types/node": "^20.11.0",

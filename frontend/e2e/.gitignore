@@ -1,0 +1,6 @@
+# Auth state files — contain session cookies, never commit
+.auth/
+
+# Playwright artifacts
+test-results/
+playwright-report/
