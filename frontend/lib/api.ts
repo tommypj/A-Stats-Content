@@ -229,6 +229,7 @@ apiClient.interceptors.response.use(undefined, (error: AxiosError) => {
 export interface ApiError {
   message: string;
   code?: string;
+  field?: string;
   details?: Record<string, unknown>;
 }
 
