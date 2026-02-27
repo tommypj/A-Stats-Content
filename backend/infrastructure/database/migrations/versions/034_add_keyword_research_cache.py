@@ -14,20 +14,55 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        "keyword_research_cache",
-        sa.Column("id", sa.String(36), primary_key=True),
-        sa.Column("user_id", sa.String(36), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("seed_keyword_normalized", sa.String(200), nullable=False),
-        sa.Column("seed_keyword_original", sa.String(200), nullable=False),
-        sa.Column("result_json", sa.Text, nullable=False),
-        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), onupdate=sa.func.now(), nullable=False),
-    )
-    op.create_index("ix_keyword_research_cache_user_id", "keyword_research_cache", ["user_id"])
-    op.create_index("ix_keyword_research_cache_expires_at", "keyword_research_cache", ["expires_at"])
-    op.create_index("ix_kw_cache_user_keyword", "keyword_research_cache", ["user_id", "seed_keyword_normalized"])
+    # Idempotent — safe to run even if the table already exists
+    op.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.tables
+                WHERE table_name = 'keyword_research_cache'
+            ) THEN
+                CREATE TABLE keyword_research_cache (
+                    id                     UUID        NOT NULL DEFAULT gen_random_uuid(),
+                    user_id                UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    seed_keyword_normalized VARCHAR(200) NOT NULL,
+                    seed_keyword_original   VARCHAR(200) NOT NULL,
+                    result_json            TEXT        NOT NULL,
+                    expires_at             TIMESTAMPTZ NOT NULL,
+                    created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    updated_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    PRIMARY KEY (id)
+                );
+            END IF;
+
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_indexes
+                WHERE tablename = 'keyword_research_cache'
+                  AND indexname = 'ix_keyword_research_cache_user_id'
+            ) THEN
+                CREATE INDEX ix_keyword_research_cache_user_id
+                    ON keyword_research_cache (user_id);
+            END IF;
+
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_indexes
+                WHERE tablename = 'keyword_research_cache'
+                  AND indexname = 'ix_keyword_research_cache_expires_at'
+            ) THEN
+                CREATE INDEX ix_keyword_research_cache_expires_at
+                    ON keyword_research_cache (expires_at);
+            END IF;
+
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_indexes
+                WHERE tablename = 'keyword_research_cache'
+                  AND indexname = 'ix_kw_cache_user_keyword'
+            ) THEN
+                CREATE INDEX ix_kw_cache_user_keyword
+                    ON keyword_research_cache (user_id, seed_keyword_normalized);
+            END IF;
+        END $$;
+    """)
 
 
 def downgrade() -> None:

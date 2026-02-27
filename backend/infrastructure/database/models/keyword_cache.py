@@ -1,10 +1,10 @@
 """Keyword research cache model."""
 from __future__ import annotations
 from datetime import datetime
-from typing import Optional
 from uuid import uuid4
 
-from sqlalchemy import String, DateTime, Text, Index, ForeignKey
+from sqlalchemy import DateTime, Text, Index, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base, TimestampMixin
@@ -16,12 +16,12 @@ class KeywordResearchCache(Base, TimestampMixin):
     __tablename__ = "keyword_research_cache"
 
     id: Mapped[str] = mapped_column(
-        String(36),
+        UUID(as_uuid=False),
         primary_key=True,
         default=lambda: str(uuid4()),
     )
     user_id: Mapped[str] = mapped_column(
-        String(36),
+        UUID(as_uuid=False),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
