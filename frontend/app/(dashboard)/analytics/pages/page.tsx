@@ -377,7 +377,12 @@ export default function PagesPage() {
                       <td className="p-4 text-sm text-text-primary font-medium max-w-2xl">
                         <div className="flex items-center gap-2">
                           <a
-                            href={pageData.page_url}
+                            href={
+                              // FE-ANA-04: Validate URL to prevent XSS via javascript: or data: URIs
+                              pageData.page_url.startsWith("http://") || pageData.page_url.startsWith("https://")
+                                ? pageData.page_url
+                                : "#"
+                            }
                             target="_blank"
                             rel="noopener noreferrer"
                             className="hover:text-primary-600 transition-colors flex items-center gap-1 group"

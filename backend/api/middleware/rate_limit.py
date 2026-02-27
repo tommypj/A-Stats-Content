@@ -45,6 +45,19 @@ def _is_valid_ip(value: str) -> bool:
         return False
 
 
+def _is_private_ip(value: str) -> bool:
+    """Return True if *value* is a private, loopback, or link-local address.
+
+    RATE-LIMIT-02: Private IPs in X-Forwarded-For are untrustworthy — an attacker
+    can spoof them to bypass rate limiting by setting X-Forwarded-For: 127.0.0.1.
+    """
+    try:
+        addr = ipaddress.ip_address(value)
+        return addr.is_private or addr.is_loopback or addr.is_link_local
+    except ValueError:
+        return False
+
+
 def _get_real_ip(request: Request) -> str:
     """Extract real client IP from proxy headers, falling back to remote address.
 
@@ -54,17 +67,19 @@ def _get_real_ip(request: Request) -> str:
 
     The extracted IP is validated to prevent header injection attacks where
     an attacker injects crafted values to bypass rate limiting.
+    RATE-LIMIT-02: Private/loopback IPs from X-Forwarded-For are rejected and
+    fall back to the actual connection IP to prevent spoofed bypass attempts.
     """
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
         # X-Forwarded-For can be a comma-separated list; first entry is the client
         candidate = forwarded.split(",")[0].strip()
-        if _is_valid_ip(candidate):
+        if _is_valid_ip(candidate) and not _is_private_ip(candidate):
             return candidate
     real_ip = request.headers.get("x-real-ip")
     if real_ip:
         candidate = real_ip.strip()
-        if _is_valid_ip(candidate):
+        if _is_valid_ip(candidate) and not _is_private_ip(candidate):
             return candidate
     return get_remote_address(request)
 

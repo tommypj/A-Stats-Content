@@ -309,8 +309,8 @@ async def handle_project_subscription_webhook(
     """
     from infrastructure.database.models.project import Project
 
-    # Find project
-    result = await db.execute(select(Project).where(Project.id == project_id))
+    # Find project — BILL-18: row-level lock prevents concurrent webhook updates from racing
+    result = await db.execute(select(Project).where(Project.id == project_id).with_for_update())
     project = result.scalar_one_or_none()
 
     if not project:
@@ -441,6 +441,7 @@ async def handle_project_subscription_webhook(
 
 
 @router.post("/webhook")
+@limiter.limit("100/minute")  # BILL-26: webhooks can fire fast from LemonSqueezy
 async def handle_webhook(
     request: Request,
     x_signature: Annotated[str | None, Header(alias="X-Signature")] = None,
@@ -505,8 +506,8 @@ async def handle_webhook(
                 logger.info("Duplicate webhook event %s — skipping", event_id)
                 return {"status": "ok", "message": "already processed"}
         except Exception as redis_err:
-            logger.warning("Redis unavailable for webhook dedup (event %s): %s", event_id, redis_err)
-            # Acceptable degradation — proceed without idempotency guard
+            logger.warning("Webhook idempotency check unavailable (Redis error): %s", redis_err)
+            # BILL-19: Proceed without idempotency check — acceptable degradation
 
     # Extract event info
     event_name = meta.get("event_name")

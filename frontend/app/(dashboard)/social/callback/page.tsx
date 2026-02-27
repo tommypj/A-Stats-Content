@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, Suspense } from "react";
+import { useCallback, useEffect, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,8 +12,12 @@ function CallbackContent() {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
   const [platform, setPlatform] = useState<string>("social");
+  // FE-SM-03: Prevent double-firing if user refreshes during redirect
+  const hasFiredRef = useRef(false);
 
   const handleCallback = useCallback(async () => {
+    if (hasFiredRef.current) return;
+    hasFiredRef.current = true;
     try {
       const success = searchParams.get("success");
       const errorParam = searchParams.get("error");

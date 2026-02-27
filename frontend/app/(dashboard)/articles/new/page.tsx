@@ -8,7 +8,8 @@ import {
   Loader2,
   Sparkles,
 } from "lucide-react";
-import { api, Outline } from "@/lib/api";
+import { api, Outline, parseApiError } from "@/lib/api";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AIGenerationProgress } from "@/components/ui/ai-generation-progress";
@@ -45,10 +46,14 @@ function NewArticleContent() {
   const [listUsage, setListUsage] = useState("balanced");
   const [customInstructions, setCustomInstructions] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // FE-CONTENT-01: track mount status to prevent setState on unmounted component
+  const mountedRef = useRef(true);
 
-  // Cleanup polling on unmount
+  // FE-CONTENT-28: always clear interval on unmount
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, []);
@@ -96,9 +101,17 @@ function NewArticleContent() {
       let attempts = 0;
 
       pollRef.current = setInterval(async () => {
+        // FE-CONTENT-01: skip all state updates if component has unmounted
+        if (!mountedRef.current) {
+          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = null;
+          return;
+        }
         try {
           attempts++;
           const updated = await api.articles.get(article.id);
+
+          if (!mountedRef.current) return;
 
           if (updated.status === "completed" || updated.status === "published") {
             if (pollRef.current) clearInterval(pollRef.current);
@@ -118,6 +131,7 @@ function NewArticleContent() {
             setGenerating(false);
           }
         } catch (pollErr) {
+          if (!mountedRef.current) return;
           if (pollRef.current) clearInterval(pollRef.current);
           pollRef.current = null;
           setError("Lost connection while generating. Check your articles list.");
@@ -149,7 +163,13 @@ function NewArticleContent() {
 
       router.push(`/articles/${article.id}`);
     } catch (err) {
-      setError("Failed to create article. Please try again.");
+      // FE-CONTENT-27: Show field-specific error if API returns one
+      const apiError = parseApiError(err);
+      if (apiError.field) {
+        setError(`${apiError.field}: ${apiError.message}`);
+      } else {
+        toast.error(apiError.message || "Failed to create article");
+      }
     } finally {
       setGenerating(false);
     }
@@ -304,7 +324,7 @@ function NewArticleContent() {
                     maxLength={1000}
                     className="w-full px-3 py-2.5 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all resize-none text-sm"
                   />
-                  <p className="text-xs text-text-muted mt-1">
+                  <p className={`text-xs mt-1 ${customInstructions.length > 800 ? "text-amber-500" : "text-text-muted"}`}>
                     {customInstructions.length}/1000 characters
                   </p>
                 </div>

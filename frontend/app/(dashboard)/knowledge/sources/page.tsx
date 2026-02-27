@@ -92,6 +92,7 @@ export default function SourcesPage() {
             variant="outline"
             leftIcon={<RefreshCw className="h-4 w-4" />}
             onClick={handleRefresh}
+            disabled={isLoading}
           >
             Refresh
           </Button>

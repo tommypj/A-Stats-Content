@@ -357,9 +357,14 @@ Return as JSON array of objects with keys: action, description, category, estima
         if text.startswith("json"):
             text = text[4:].strip()
 
-        suggestions = json.loads(text)
-        if not isinstance(suggestions, list):
-            suggestions = suggestions.get("suggestions", []) if isinstance(suggestions, dict) else []
+        try:
+            suggestions = json.loads(text)
+            if not isinstance(suggestions, list):
+                suggestions = suggestions.get("suggestions", []) if isinstance(suggestions, dict) else []
+        except (ValueError, KeyError, IndexError) as e:
+            # ANA-38: Specific fallback for fragile JSON extraction from AI response
+            logger.warning("Failed to parse AEO suggestion JSON: %s", e)
+            return {"suggestions": []}
 
         # Save to score record
         if current_score:

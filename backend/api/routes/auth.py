@@ -600,7 +600,9 @@ async def resend_verification(
 
 
 @router.post("/logout", status_code=status.HTTP_200_OK)
+@limiter.limit("20/minute")  # INFRA-11: prevent logout endpoint abuse
 async def logout(
+    request: Request,
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> dict:
     """
@@ -651,68 +653,79 @@ async def delete_account(
 
     logger.info("Account deletion initiated for user_id=%s email=%s", user_id, current_user.email)
 
-    # ------------------------------------------------------------------
-    # Step 1: Find all projects where this user is the owner.
-    # ------------------------------------------------------------------
-    owned_projects_result = await db.execute(
-        select(Project).where(Project.owner_id == user_id, Project.deleted_at.is_(None))
-    )
-    owned_projects = owned_projects_result.scalars().all()
-
-    for project in owned_projects:
-        # Count *other* owners (members with role == "owner" who are not this user)
-        other_owners_result = await db.execute(
-            select(ProjectMember).where(
-                ProjectMember.project_id == project.id,
-                ProjectMember.user_id != user_id,
-                ProjectMember.role == "owner",
-                ProjectMember.deleted_at.is_(None),
-            )
+    # AUTH-25: All deletion steps wrapped in a single try/except — any partial failure
+    # triggers a full rollback so the DB is never left in an inconsistent state.
+    try:
+        # ------------------------------------------------------------------
+        # Step 1: Find all projects where this user is the owner.
+        # ------------------------------------------------------------------
+        owned_projects_result = await db.execute(
+            select(Project).where(Project.owner_id == user_id, Project.deleted_at.is_(None))
         )
-        other_owners = other_owners_result.scalars().all()
+        owned_projects = owned_projects_result.scalars().all()
 
-        if not other_owners:
-            # Sole owner — delete the project entirely.
-            # ON DELETE CASCADE on project_id will remove all content,
-            # memberships and invitations for this project.
-            await db.delete(project)
-            logger.info("Deleted project project_id=%s (sole owner)", project.id)
-        else:
-            # Other owners exist — just remove this user's membership row so
-            # the project survives.
-            await db.execute(
-                delete(ProjectMember).where(
+        for project in owned_projects:
+            # Count *other* owners (members with role == "owner" who are not this user)
+            other_owners_result = await db.execute(
+                select(ProjectMember).where(
                     ProjectMember.project_id == project.id,
-                    ProjectMember.user_id == user_id,
+                    ProjectMember.user_id != user_id,
+                    ProjectMember.role == "owner",
+                    ProjectMember.deleted_at.is_(None),
                 )
             )
-            logger.info(
-                "Removed ownership membership from project_id=%s (other owners remain)",
-                project.id,
-            )
+            other_owners = other_owners_result.scalars().all()
 
-    # ------------------------------------------------------------------
-    # Step 2: Remove this user from projects they do NOT own (member rows).
-    # ------------------------------------------------------------------
-    await db.execute(
-        delete(ProjectMember).where(ProjectMember.user_id == user_id)
-    )
+            if not other_owners:
+                # Sole owner — delete the project entirely.
+                # ON DELETE CASCADE on project_id will remove all content,
+                # memberships and invitations for this project.
+                await db.delete(project)
+                logger.info("Deleted project project_id=%s (sole owner)", project.id)
+            else:
+                # Other owners exist — just remove this user's membership row so
+                # the project survives.
+                await db.execute(
+                    delete(ProjectMember).where(
+                        ProjectMember.project_id == project.id,
+                        ProjectMember.user_id == user_id,
+                    )
+                )
+                logger.info(
+                    "Removed ownership membership from project_id=%s (other owners remain)",
+                    project.id,
+                )
 
-    # ------------------------------------------------------------------
-    # Step 3: Delete GSC connections.
-    # ------------------------------------------------------------------
-    await db.execute(
-        delete(GSCConnection).where(GSCConnection.user_id == user_id)
-    )
+        # ------------------------------------------------------------------
+        # Step 2: Remove this user from projects they do NOT own (member rows).
+        # ------------------------------------------------------------------
+        await db.execute(
+            delete(ProjectMember).where(ProjectMember.user_id == user_id)
+        )
 
-    # ------------------------------------------------------------------
-    # Step 4: Delete the user record itself.
-    #
-    # ON DELETE CASCADE on user_id in articles, outlines, generated_images,
-    # article_revisions etc. handles any remaining user-level content.
-    # ------------------------------------------------------------------
-    await db.delete(current_user)
-    await db.commit()
+        # ------------------------------------------------------------------
+        # Step 3: Delete GSC connections.
+        # ------------------------------------------------------------------
+        await db.execute(
+            delete(GSCConnection).where(GSCConnection.user_id == user_id)
+        )
+
+        # ------------------------------------------------------------------
+        # Step 4: Delete the user record itself.
+        #
+        # ON DELETE CASCADE on user_id in articles, outlines, generated_images,
+        # article_revisions etc. handles any remaining user-level content.
+        # ------------------------------------------------------------------
+        await db.delete(current_user)
+        await db.commit()
+
+    except Exception:
+        await db.rollback()
+        logger.error("Account deletion failed for user_id=%s", user_id, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Account deletion failed. Please contact support.",
+        )
 
     logger.info("Account deleted successfully for user_id=%s", user_id)
 

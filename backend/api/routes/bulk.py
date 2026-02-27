@@ -6,7 +6,7 @@ import asyncio
 import logging
 import math
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Literal, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
@@ -76,7 +76,7 @@ class BulkJobItemResponse(BaseModel):
     id: str
     keyword: Optional[str] = None
     title: Optional[str] = None
-    status: str
+    status: Literal["pending", "processing", "completed", "failed"] = "pending"  # GEN-48
     resource_type: Optional[str] = None
     resource_id: Optional[str] = None
     error_message: Optional[str] = None
@@ -189,6 +189,8 @@ async def create_template(
     await db.commit()
     await db.refresh(template)
 
+    logger.info("CROSS-02: Template created template_id=%s by user_id=%s", template.id, current_user.id)
+
     return TemplateResponse(
         id=template.id,
         name=template.name,
@@ -230,6 +232,8 @@ async def update_template(
     await db.commit()
     await db.refresh(template)
 
+    logger.info("CROSS-02: Template updated template_id=%s by user_id=%s", template.id, current_user.id)
+
     return TemplateResponse(
         id=template.id,
         name=template.name,
@@ -262,6 +266,9 @@ async def delete_template(
 
     await db.delete(template)
     await db.commit()
+
+    logger.info("CROSS-02: Template deleted template_id=%s by user_id=%s", template_id, current_user.id)
+
     return {"message": "Template deleted"}
 
 
@@ -433,8 +440,10 @@ async def create_bulk_outline_job(
 
 
 @router.post("/jobs/{job_id}/cancel")
+@limiter.limit("10/minute")  # CROSS-01: rate limit bulk operations
 async def cancel_job(
     job_id: str,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -449,8 +458,10 @@ async def cancel_job(
 
 
 @router.post("/jobs/{job_id}/retry-failed")
+@limiter.limit("10/minute")  # CROSS-01: rate limit bulk operations
 async def retry_failed_items(
     job_id: str,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

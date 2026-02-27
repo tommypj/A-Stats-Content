@@ -23,6 +23,7 @@ def upgrade() -> None:
         "knowledge_sources",
         sa.Column(
             "project_id",
+            # DB-01: NOTE — FK should use UUID(as_uuid=False) for consistency with other FK columns
             sa.String(36),
             sa.ForeignKey("projects.id", ondelete="CASCADE"),
             nullable=True,

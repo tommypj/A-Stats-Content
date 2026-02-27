@@ -36,8 +36,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/images", tags=["images"])
 
+# IMG-33: Named constant for image generation concurrency limit
+# In settings.py, add: image_generation_concurrency: int = 3 to make this configurable
+IMAGE_GENERATION_CONCURRENCY = 3
 # Limit concurrent AI image generation tasks to prevent resource exhaustion
-_image_generation_semaphore = asyncio.Semaphore(3)
+_image_generation_semaphore = asyncio.Semaphore(IMAGE_GENERATION_CONCURRENCY)
 
 
 # ---------------------------------------------------------------------------
@@ -135,6 +138,7 @@ async def _run_image_generation(
                     await db.commit()
                 except Exception:
                     # DB commit failed — delete the saved file to prevent orphan
+                    # IMG-24: TODO — add retry logic for orphaned file cleanup
                     try:
                         await storage_adapter.delete_image(local_path)
                     except Exception as cleanup_err:
@@ -464,6 +468,7 @@ async def set_featured_image(
     """
     Set an image as the featured image for an article.
     """
+    # IMG-27: By design — any project image can be set as featured for any project article
     # Verify image exists and belongs to user or project
     if current_user.current_project_id:
         image_query = select(GeneratedImage).where(

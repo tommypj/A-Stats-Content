@@ -71,14 +71,15 @@ export default function AdminDashboardPage() {
   };
 
   // Build subscription distribution for pie chart
-  const subscriptionDistribution = stats
+  // FE-ADMIN-02: Guard against null/undefined fields to prevent PieChart crash
+  const subscriptionDistribution = (stats
     ? [
-        { tier: "Free", count: stats.subscriptions.free_tier },
-        { tier: "Starter", count: stats.subscriptions.starter_tier },
-        { tier: "Professional", count: stats.subscriptions.professional_tier },
-        { tier: "Enterprise", count: stats.subscriptions.enterprise_tier },
+        { tier: "Free", count: stats.subscriptions?.free_tier ?? 0 },
+        { tier: "Starter", count: stats.subscriptions?.starter_tier ?? 0 },
+        { tier: "Professional", count: stats.subscriptions?.professional_tier ?? 0 },
+        { tier: "Enterprise", count: stats.subscriptions?.enterprise_tier ?? 0 },
       ].filter((d) => d.count > 0)
-    : [];
+    : []).filter(Boolean);
 
   const totalSubscribers = subscriptionDistribution.reduce((sum, d) => sum + d.count, 0);
 

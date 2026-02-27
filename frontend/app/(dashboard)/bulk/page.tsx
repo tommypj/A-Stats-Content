@@ -98,6 +98,8 @@ export default function BulkContentPage() {
   };
 
   const handleCreate = async () => {
+    // FE-CONTENT-08: guard against duplicate submission (also enforced by disabled button)
+    if (isCreating) return;
     const kws = parseKeywords();
     if (kws.length === 0) {
       toast.error("Enter at least one keyword");

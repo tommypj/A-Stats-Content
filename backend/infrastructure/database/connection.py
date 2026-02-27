@@ -56,7 +56,10 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 @asynccontextmanager
 async def get_db_context() -> AsyncGenerator[AsyncSession, None]:
-    """Context manager for database sessions."""
+    """Context manager for database sessions.
+
+    # INFRA-18: TODO — Add connection acquisition timeout to prevent pool exhaustion
+    """
     async with async_session_maker() as session:
         try:
             yield session

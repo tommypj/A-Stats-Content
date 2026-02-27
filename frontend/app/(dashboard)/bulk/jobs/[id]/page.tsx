@@ -29,6 +29,8 @@ const ITEM_STATUS: Record<string, { icon: typeof CheckCircle2; color: string }> 
   cancelled: { icon: Pause, color: "text-gray-400" },
 };
 
+const ITEMS_PER_PAGE = 50;
+
 export default function BulkJobDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -36,6 +38,8 @@ export default function BulkJobDetailPage() {
   const jobId = Array.isArray(rawId) ? rawId[0] : (rawId ?? "");
   const [job, setJob] = useState<BulkJobDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // FE-CONTENT-18: Client-side pagination to avoid rendering large item lists
+  const [itemsPage, setItemsPage] = useState(1);
 
   const loadJob = useCallback(async () => {
     try {
@@ -198,7 +202,7 @@ export default function BulkJobDetailPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            {job.items.map((item) => {
+            {job.items.slice(0, itemsPage * ITEMS_PER_PAGE).map((item) => {
               const cfg = ITEM_STATUS[item.status] || ITEM_STATUS.pending;
               const Icon = cfg.icon;
               return (
@@ -233,6 +237,17 @@ export default function BulkJobDetailPage() {
               );
             })}
           </div>
+          {job.items.length > itemsPage * ITEMS_PER_PAGE && (
+            <div className="mt-4 text-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setItemsPage((p) => p + 1)}
+              >
+                Load more ({job.items.length - itemsPage * ITEMS_PER_PAGE} remaining)
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

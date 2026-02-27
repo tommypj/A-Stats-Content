@@ -567,6 +567,8 @@ async def regenerate_outline(
 ):
     """
     Regenerate an outline using AI.
+
+    # GEN-43: Note — keyword can be changed on regeneration; this is intentional but may confuse users
     """
     if current_user.current_project_id:
         query = select(Outline).where(

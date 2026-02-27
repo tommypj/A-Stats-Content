@@ -24,7 +24,13 @@ const registerSchema = z
       .regex(/[A-Z]/, "Must contain at least one uppercase letter")
       .regex(/[a-z]/, "Must contain at least one lowercase letter")
       .regex(/[0-9]/, "Must contain at least one digit"),
-    confirmPassword: z.string().min(8),
+    // FE-AUTH-15: confirmPassword enforces the same rules as password so errors surface before cross-field check
+    confirmPassword: z
+      .string()
+      .min(8)
+      .regex(/[A-Z]/, "Must contain at least one uppercase letter")
+      .regex(/[a-z]/, "Must contain at least one lowercase letter")
+      .regex(/[0-9]/, "Must contain at least one digit"),
     terms: z.boolean().refine((val) => val === true, {
       message: "You must accept the terms and conditions",
     }),

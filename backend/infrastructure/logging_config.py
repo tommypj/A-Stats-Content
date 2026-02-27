@@ -26,7 +26,11 @@ class JSONFormatter(logging.Formatter):
             if hasattr(record, key):
                 log_entry[key] = getattr(record, key)
 
-        return json.dumps(log_entry, default=str)
+        # LOGGING-01: Wrap JSON serialization in try/except to handle non-serializable extra fields
+        try:
+            return json.dumps(log_entry, default=str)
+        except TypeError:
+            return str(log_entry)
 
 
 def setup_logging(json_output: bool = False, level: str = "INFO") -> None:
@@ -59,6 +63,6 @@ def setup_logging(json_output: bool = False, level: str = "INFO") -> None:
     root.addHandler(handler)
 
     # Quiet noisy libraries
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+    logging.getLogger("uvicorn.access").setLevel(logging.INFO)  # LOGGING-02: INFO for production visibility
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)

@@ -329,7 +329,9 @@ export default function ContentOpportunitiesPage() {
                           type="checkbox"
                           checked={selectedKeywords.has(item.keyword)}
                           onChange={() => toggleKeyword(item.keyword)}
-                          className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                          // FE-ANA-09: Disable when at max selection and this keyword is not selected
+                          disabled={selectedKeywords.size >= 20 && !selectedKeywords.has(item.keyword)}
+                          className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                       </td>
                       <td className="p-4 text-sm font-medium text-text-primary max-w-xs truncate">

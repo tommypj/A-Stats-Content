@@ -88,7 +88,9 @@ class Settings(BaseSettings):
                 origins = json.loads(v)
                 return [o.rstrip("/") for o in origins]
             except json.JSONDecodeError:
-                pass
+                # CONFIG-01: Warn when falling back from JSON to comma-split parsing
+                import logging
+                logging.getLogger(__name__).warning("CORS_ORIGINS is not valid JSON, falling back to comma-split")
         return [origin.strip().strip("'\"").rstrip("/") for origin in v.split(",") if origin.strip()]
 
     # Anthropic (AI Content Generation)

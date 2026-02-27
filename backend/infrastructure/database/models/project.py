@@ -8,7 +8,7 @@ from typing import Optional
 from uuid import uuid4
 import secrets
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, JSON, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, JSON, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -48,7 +48,7 @@ class Project(Base, TimestampMixin):
     # Basic info
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(
-        String(255), unique=True, nullable=False, index=True
+        String(255), nullable=False, index=True
     )
     avatar_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -122,10 +122,12 @@ class Project(Base, TimestampMixin):
         lazy="select",
     )
 
-    # Indexes
+    # Indexes and constraints
     # Note: slug and owner_id already have index=True on their column definitions
+    # DB-05: slug is unique per owner (not globally), so use composite unique constraint
     __table_args__ = (
         Index("ix_projects_subscription", "subscription_tier", "subscription_expires"),
+        UniqueConstraint("owner_id", "slug", name="uq_project_owner_slug"),
     )
 
     def __repr__(self) -> str:

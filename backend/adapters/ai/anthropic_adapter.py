@@ -207,7 +207,8 @@ CRITICAL RULES:
             return self._mock_outline(keyword, word_count_target)
 
         # GEN-02: Sanitize all user-supplied inputs before interpolation
-        keyword = self._sanitize_prompt_input(keyword, 200)
+        # GEN-34: Cap keyword at 100 chars to prevent oversized prompt interpolation
+        keyword = self._sanitize_prompt_input(keyword, 100)
         tone = self._sanitize_prompt_input(tone, 50)
         target_audience = self._sanitize_prompt_input(target_audience, 500) if target_audience else None
         custom_instructions = self._sanitize_prompt_input(custom_instructions, 1000) if custom_instructions else None
@@ -320,7 +321,8 @@ Respond in JSON format:
             return self._mock_article(title, keyword, sections)
 
         # GEN-02: Sanitize all user-supplied inputs before interpolation
-        keyword = self._sanitize_prompt_input(keyword, 200)
+        # GEN-34: Cap keyword at 100 chars to prevent oversized prompt interpolation
+        keyword = self._sanitize_prompt_input(keyword, 100)
         tone = self._sanitize_prompt_input(tone, 50)
         target_audience = self._sanitize_prompt_input(target_audience, 500) if target_audience else None
         custom_instructions = self._sanitize_prompt_input(custom_instructions, 1000) if custom_instructions else None

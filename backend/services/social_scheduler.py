@@ -11,6 +11,7 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 import logging
 
+import redis.asyncio as aioredis
 from sqlalchemy import select, update, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -66,6 +67,35 @@ class SocialSchedulerService:
 
     async def process_due_posts(self):
         """Find and publish posts that are due."""
+        # SM-29: Distributed mutex — prevent concurrent process_due_posts runs
+        # across multiple instances (e.g. multi-worker deployments).
+        redis_client = None
+        lock_acquired = False
+        lock_key = "scheduler:process_due_posts:lock"
+        try:
+            if settings.redis_url:
+                redis_client = aioredis.from_url(settings.redis_url, socket_timeout=2)
+                lock_acquired = await redis_client.set(lock_key, "1", nx=True, ex=60)
+                if not lock_acquired:
+                    logger.debug("process_due_posts already running in another instance, skipping")
+                    return
+        except Exception as redis_err:
+            logger.warning("SM-29: Redis lock unavailable (%s) — proceeding without distributed lock", redis_err)
+            # Proceed without lock — acceptable degradation in single-instance deployments
+
+        try:
+            await self._process_due_posts_inner()
+        finally:
+            if redis_client is not None:
+                try:
+                    if lock_acquired:
+                        await redis_client.delete(lock_key)
+                except Exception:
+                    pass
+                await redis_client.aclose()
+
+    async def _process_due_posts_inner(self):
+        """Internal implementation of process_due_posts (called after lock is acquired)."""
         async with async_session_maker() as db:
             try:
                 # SM-03: Atomically claim due posts by updating their status to PUBLISHING
@@ -235,9 +265,17 @@ class SocialSchedulerService:
                 )
             except Exception as decrypt_err:
                 logger.error(
-                    f"Failed to decrypt credentials for {account.platform} "
-                    f"({account.platform_username}): {decrypt_err}"
+                    "SM-31: Failed to decrypt credentials for account %s (%s/%s): %s",
+                    account.id,
+                    account.platform,
+                    account.platform_username,
+                    decrypt_err,
                 )
+                # SM-31: Disable the account so we stop attempting to publish on every tick.
+                # The user must reconnect their account to restore credentials.
+                account.is_active = False
+                account.error_message = "Credential decryption failed — please reconnect your account"
+                await db.commit()
                 return PostResult(
                     success=False,
                     error_message=f"Credential decryption failed — reconnect your {account.platform} account",
@@ -263,7 +301,7 @@ class SocialSchedulerService:
                         account.platform_username,
                         refresh_err,
                     )
-                    # TODO SM-05: send reconnect notification email to account owner
+                    # SM-32: TODO — send email notification to user when token refresh fails
                     return PostResult(
                         success=False,
                         error_message=f"Token expired — please reconnect your {account.platform} account",

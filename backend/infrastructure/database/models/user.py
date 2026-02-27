@@ -63,7 +63,9 @@ class User(Base, TimestampMixin):
     avatar_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
     # Authentication
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    # INFRA-01: Use Text instead of String(255) — bcrypt hashes can be 60+ chars and
+    # argon2/scrypt can be longer; Text avoids silent truncation.
+    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     role: Mapped[str] = mapped_column(
         String(50),
         default=UserRole.USER.value,

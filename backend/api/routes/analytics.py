@@ -79,6 +79,7 @@ from infrastructure.config.settings import settings
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
 # ANA-09: GSC data is typically delayed by this many days — use a named constant
+# ANA-35: TODO — expose data_lag_days in the GSC status response so the frontend can show "Data may be delayed by N days"
 GSC_DATA_LAG_DAYS = 3
 
 
@@ -1884,6 +1885,10 @@ async def create_conversion_goal(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new conversion goal."""
+    # ANA-36: Explicitly validate goal_config is a dict (Pydantic already rejects non-dicts,
+    # but this guard is here for defence-in-depth against unexpected type coercions)
+    if body.goal_config is not None and not isinstance(body.goal_config, dict):
+        raise HTTPException(status_code=422, detail="goal_config must be an object")
     goal = ConversionGoal(
         user_id=current_user.id,
         project_id=current_user.current_project_id,

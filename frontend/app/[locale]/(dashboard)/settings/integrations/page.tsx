@@ -87,6 +87,7 @@ export default function IntegrationsSettingsPage() {
       setWpUsername(result.username);
       setWpSiteName(result.site_name || "");
       setShowWpForm(false);
+      // FE-AUTH-11: clear app_password from component state immediately after successful save
       setWpFormData({ site_url: "", username: "", app_password: "" });
       toast.success("Successfully connected to WordPress!");
     } catch (error) {
@@ -264,6 +265,7 @@ export default function IntegrationsSettingsPage() {
                     label="Application Password"
                     type="password"
                     placeholder="xxxx xxxx xxxx xxxx xxxx xxxx"
+                    autoComplete="new-password"
                     value={wpFormData.app_password}
                     onChange={(e) =>
                       setWpFormData({ ...wpFormData, app_password: e.target.value })

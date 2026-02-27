@@ -133,6 +133,15 @@ export default function KeywordsPage() {
 
   function exportToCSV() {
     try {
+      // FE-ANA-03: Escape CSV values that contain commas, quotes, or newlines
+      const escapeCsv = (value: string) => {
+        const str = String(value);
+        if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
       const data = getSortedAndFilteredKeywords();
       const headers = ["Keyword", "Clicks", "Impressions", "CTR", "Position"];
       const rows = data.map((k) => [
@@ -145,7 +154,7 @@ export default function KeywordsPage() {
 
       const csvContent = [
         headers.join(","),
-        ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
+        ...rows.map((row) => row.map((cell) => escapeCsv(String(cell))).join(",")),
       ].join("\n");
 
       const blob = new Blob([csvContent], { type: "text/csv" });

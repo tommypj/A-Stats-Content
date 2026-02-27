@@ -134,12 +134,16 @@ export default function ClientPortalPage() {
     };
   }, [token]);
 
+  // FE-PORTAL-01: Validate hex colors before use in CSS to prevent injection
+  const isValidHex = (color: string) => /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(color);
+
   // Derive brand accent color (falls back to a neutral indigo)
-  const accentColor =
+  const rawAccentColor =
     data?.brand_colors?.primary ||
     data?.brand_colors?.accent ||
     Object.values(data?.brand_colors ?? {})[0] ||
     "#4f46e5";
+  const accentColor = isValidHex(rawAccentColor) ? rawAccentColor : "#4f46e5";
 
   const allowsAnalytics = data?.allowed_features?.analytics !== false;
   const allowsContent = data?.allowed_features?.content !== false;

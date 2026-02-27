@@ -80,6 +80,8 @@ export default function BillingSettingsPage() {
         }
       }, 3000);
 
+      // FE-AUTH-13: clear any existing stop-timeout before setting a new one to prevent duplicate callbacks
+      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
       // Stop polling after 5 minutes
       pollTimeoutRef.current = setTimeout(() => {
         if (pollRef.current) clearInterval(pollRef.current);

@@ -288,6 +288,8 @@ async def _generate_article_background(
     language: str = "en",
 ):
     """Background task that generates article content and updates the DB."""
+    # GEN-41: TODO — add per-user generation semaphore to limit concurrent AI calls per user
+    # (currently a global semaphore of 5 is used — 100 users x 5 concurrent = 500 AI API calls)
     async with _generation_semaphore:
         await _run_article_generation(
             article_id=article_id,

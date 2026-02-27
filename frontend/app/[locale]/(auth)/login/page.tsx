@@ -162,6 +162,7 @@ export default function LoginPage() {
           </Link>
         </div>
 
+        {/* FE-AUTH-09: isLoading prevents double-submit — set before any async work, cleared in finally */}
         <Button
           type="submit"
           className="w-full"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -17,6 +17,8 @@ export default function VerifyEmailPage() {
 
   const [status, setStatus] = useState<"pending" | "loading" | "success" | "error">("pending");
   const [errorMessage, setErrorMessage] = useState("");
+  // FE-AUTH-26: prevent infinite spinner — time out after 15 seconds
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   if (!token) {
     return (
@@ -41,10 +43,17 @@ export default function VerifyEmailPage() {
 
   const handleVerify = async () => {
     setStatus("loading");
+    // Start 15-second timeout so the spinner never runs indefinitely
+    timeoutRef.current = setTimeout(() => {
+      setStatus("error");
+      setErrorMessage("Verification timed out. Please try again.");
+    }, 15000);
     try {
       await api.auth.verifyEmail(token);
+      clearTimeout(timeoutRef.current);
       setStatus("success");
     } catch (error) {
+      clearTimeout(timeoutRef.current);
       setStatus("error");
       const apiError = parseApiError(error);
       setErrorMessage(apiError.message || "Verification failed");

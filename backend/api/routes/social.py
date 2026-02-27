@@ -399,6 +399,9 @@ async def _facebook_exchange_and_profile(code: str) -> tuple[dict, dict]:
         if not me_id:
             raise ValueError("Facebook profile response missing 'id'")
         picture_url = me_data.get("picture", {}).get("data", {}).get("url")
+        # SM-39: Only store profile picture URLs with https scheme
+        if picture_url and not picture_url.startswith("https://"):
+            picture_url = None
 
         expires_at = datetime.now(timezone.utc).timestamp() + expires_in
         tokens = {

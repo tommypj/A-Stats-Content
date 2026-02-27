@@ -43,6 +43,7 @@ export default function AccountsPage() {
   };
 
   const handleConnect = async (platform: SocialPlatform) => {
+    // FE-SM-07: TODO — check if account already connected before redirecting to OAuth
     try {
       setConnectingPlatform(platform);
       setError(null);

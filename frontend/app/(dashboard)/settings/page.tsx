@@ -158,7 +158,8 @@ function ProfileSection({
         <div>
           <label className="block text-sm font-medium text-text-secondary mb-1">Email</label>
           <div className="flex items-center gap-2">
-            <Input value={profile?.email || ""} disabled className="bg-surface-secondary" />
+            {/* FE-AUTH-10: readOnly prevents DevTools bypass; save payload never includes email */}
+            <Input value={profile?.email || ""} disabled readOnly className="bg-surface-secondary" />
             {profile?.email_verified ? (
               <span className="flex items-center gap-1 text-xs text-green-600">
                 <CheckCircle className="h-3.5 w-3.5" /> Verified

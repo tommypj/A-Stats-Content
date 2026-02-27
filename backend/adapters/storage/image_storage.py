@@ -262,6 +262,8 @@ class S3StorageAdapter(StorageAdapter):
         now = datetime.now()
         date_path = f"images/{now.year}/{now.month:02d}"
 
+        # IMG-28: Strip any path components to prevent path traversal in S3 key
+        filename = os.path.basename(filename)
         # Add timestamp to filename to avoid collisions
         name, ext = os.path.splitext(filename)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -338,16 +340,19 @@ class S3StorageAdapter(StorageAdapter):
 
         try:
             # IMG-30: Always use self.bucket, never parse bucket from URL.
-            # Extract only the S3 key from URL if a full URL is passed.
+            # IMG-29: Extract S3 key from URL using proper URL parsing (not fragile string split).
             s3_key = path
             if path.startswith('http'):
                 # Extract key from URL like https://bucket.s3.amazonaws.com/key/path
-                parts = path.split(f"{self.bucket}.s3")
-                if len(parts) > 1:
-                    # Remove leading domain portion (e.g. ".amazonaws.com/") to get the key
-                    remainder = parts[1]
-                    slash_parts = remainder.split('/', 2)
-                    s3_key = slash_parts[2] if len(slash_parts) > 2 else slash_parts[-1]
+                # or https://s3.amazonaws.com/bucket/key/path
+                parsed = urlparse(path)
+                # Key is the path component without the leading slash
+                s3_key = parsed.path.lstrip("/")
+                # For path-style URLs (s3.amazonaws.com/bucket/key) strip the bucket prefix
+                if s3_key.startswith(self.bucket + "/"):
+                    s3_key = s3_key[len(self.bucket) + 1:]
+                if not s3_key:
+                    raise ValueError(f"IMG-29: Could not extract S3 key from URL: {path}")
 
             bucket = self.bucket  # IMG-30: always use configured bucket, not parsed from URL
             # Delete from S3
@@ -434,7 +439,12 @@ async def download_image(url: str) -> bytes:
                         )
                     # Size limit: check Content-Length header first to fail fast
                     content_length = response.headers.get("content-length")
-                    if content_length and int(content_length) > MAX_IMAGE_SIZE:
+                    # IMG-23: Wrap int() conversion to handle malformed Content-Length header
+                    try:
+                        size = int(content_length) if content_length else None
+                    except (ValueError, TypeError):
+                        size = None
+                    if size is not None and size > MAX_IMAGE_SIZE:
                         raise ValueError(f"Image too large: {content_length} bytes")
                     image_data = await response.read()
                     if len(image_data) > MAX_IMAGE_SIZE:

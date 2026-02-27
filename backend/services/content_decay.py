@@ -381,6 +381,8 @@ async def get_content_health_score(
     """
     Calculate an overall content health score based on decay alerts.
     Returns health metrics.
+
+    # ANA-39: TODO — add Redis caching for content health scores (recomputed on every call)
     """
     # Count active (unresolved) alerts by severity
     alerts_q = (

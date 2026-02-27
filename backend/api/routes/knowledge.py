@@ -206,7 +206,7 @@ async def upload_document(
     if file_size > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File too large. Maximum size: {MAX_FILE_SIZE / 1024 / 1024:.0f} MB",
+            detail=f"File too large: {file_size // (1024 * 1024)}MB (max {MAX_FILE_SIZE // (1024 * 1024)}MB)",  # KV-14: integer arithmetic
         )
 
     if file_size == 0:
@@ -472,6 +472,7 @@ async def delete_source(
             resolved = Path(source.file_url).resolve()
             if resolved.is_relative_to(kp.KNOWLEDGE_STORAGE_DIR.resolve()):
                 kp.delete_file(source.file_url)
+                logger.info("Deleted knowledge source file: %s (source_id=%s)", source.file_url, source_id)  # KV-13
             else:
                 logger.warning("Skipping file deletion: path %s is outside storage dir", source.file_url)
         except Exception as path_err:

@@ -105,6 +105,8 @@ export default function ArticlesPage() {
     },
   ]);
 
+  // FE-CONTENT-30: TODO — persist search/filter/pagination state in URL params using useSearchParams
+
   // Debounce search keyword — reset to page 1 when keyword changes
   useEffect(() => {
     const timer = setTimeout(() => {

@@ -478,7 +478,7 @@ async def get_invitation_details(
 async def accept_invitation(
     request: Request,
     token: str,
-    current_user: Optional[User] = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """

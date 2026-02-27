@@ -10,11 +10,11 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { api } from "@/lib/api";
+import { api, parseApiError } from "@/lib/api";
 
 const passwordSchema = z
   .object({
-    currentPassword: z.string().min(1),
+    currentPassword: z.string().min(1).refine(s => s.trim().length > 0, "Password cannot be blank"),
     newPassword: z
       .string()
       .min(8)
@@ -54,7 +54,13 @@ export default function PasswordSettingsPage() {
       toast.success("Password changed successfully");
       reset();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to change password");
+      const msg = parseApiError(error).message;
+      // Only surface specific messages for recognisable validation errors; generic fallback otherwise.
+      toast.error(
+        msg.includes("incorrect") || msg.includes("Invalid") || msg.includes("wrong")
+          ? msg
+          : "Failed to change password. Please try again."
+      );
     } finally {
       setIsLoading(false);
     }

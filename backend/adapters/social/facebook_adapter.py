@@ -554,6 +554,10 @@ class FacebookAdapter(BaseSocialAdapter):
         if not page_id or not page_token:
             raise SocialValidationError("page_id and page_token are required for media upload")
 
+        # SM-27: Validate image size before attempting upload
+        if len(media_bytes) > 10 * 1024 * 1024:
+            raise ValueError("Image too large for Facebook upload (max 10MB)")
+
         if self.mock_mode:
             logger.info("Mock mode: Returning fake Facebook media ID")
             return MediaUploadResult(

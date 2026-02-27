@@ -143,7 +143,7 @@ class ArticleCreateRequest(BaseModel):
     title: str = Field(..., min_length=5, max_length=500)
     keyword: str = Field(..., min_length=2, max_length=255)
     content: Optional[str] = None
-    meta_description: Optional[str] = Field(None, max_length=320)
+    meta_description: Optional[str] = Field(None, max_length=160)  # GEN-39: SEO meta descriptions should not exceed 160 chars
     outline_id: Optional[str] = None
     project_id: Optional[str] = Field(None, description="Project ID for project content")
 
@@ -153,7 +153,7 @@ class ArticleUpdateRequest(BaseModel):
 
     title: Optional[str] = Field(None, min_length=5, max_length=500)
     keyword: Optional[str] = Field(None, min_length=2, max_length=255)
-    meta_description: Optional[str] = Field(None, max_length=320)
+    meta_description: Optional[str] = Field(None, max_length=160)  # GEN-39: SEO meta descriptions should not exceed 160 chars
     content: Optional[str] = None
     status: Optional[Literal["draft", "completed", "published"]] = None
 

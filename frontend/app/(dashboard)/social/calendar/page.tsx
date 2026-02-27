@@ -50,7 +50,7 @@ export default function SocialCalendarPage() {
       const response = await api.social.posts({
         start_date: format(startDate, "yyyy-MM-dd"),
         end_date: format(endDate, "yyyy-MM-dd"),
-        page_size: 1000, // Get all posts for the period
+        page_size: 200, // FE-SM-05: Request only what's needed for the visible period
       });
 
       setPosts(response.items);

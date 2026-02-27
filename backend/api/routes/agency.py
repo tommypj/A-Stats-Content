@@ -865,6 +865,9 @@ async def get_portal_data(
     )
     workspace = ws_result.scalar_one_or_none()
     if not workspace:
+        # AGY-14: Always perform similar work regardless of token validity to
+        # normalize response time and prevent workspace-existence timing leaks.
+        await asyncio.sleep(0)  # yield to event loop
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Portal not found",

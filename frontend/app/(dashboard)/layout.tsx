@@ -211,6 +211,7 @@ function NotificationBell() {
   }
 
   function handleNotificationClick(n: GenerationNotification) {
+    // FE-AUTH-28: close dropdown before navigating so it doesn't stay open on new page
     setOpen(false);
     router.push(getResourceHref(n));
   }

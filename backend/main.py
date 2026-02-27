@@ -251,6 +251,7 @@ async def add_request_id(request: Request, call_next):
         request_id = str(uuid.uuid4())
     # INFRA-04: Store in request.state so log handlers and dependencies can correlate logs.
     request.state.request_id = request_id
+    # INFRA-17: TODO — Propagate X-Request-ID header to outbound Anthropic/email API calls for tracing
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
     return response
@@ -258,7 +259,8 @@ async def add_request_id(request: Request, call_next):
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
-    # TODO: Add Content-Security-Policy once frontend inline scripts/styles are audited
+    # INFRA-03: TODO — Add Content-Security-Policy header once frontend inline styles/scripts are audited
+    # Suggested: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"

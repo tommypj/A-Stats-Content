@@ -56,7 +56,9 @@ class GSCConnection(Base, TimestampMixin):
     # Site being tracked
     site_url: Mapped[str] = mapped_column(String(500), nullable=False, index=True)
 
-    # OAuth tokens (encrypted in production)
+    # OAuth tokens
+    # DB-02: TODO — encrypt GSC tokens at rest using the same encryption as SocialAccount.access_token_encrypted
+    # DB-07: TODO — Add token_updated_at column and rotate GSC tokens on each use
     access_token: Mapped[str] = mapped_column(Text, nullable=False)
     refresh_token: Mapped[str] = mapped_column(Text, nullable=False)
     token_expiry: Mapped[datetime] = mapped_column(

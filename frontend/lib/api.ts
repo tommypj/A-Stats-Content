@@ -225,6 +225,7 @@ apiClient.interceptors.response.use(undefined, (error: AxiosError) => {
       ? "Network error — check your connection"
       : `Server error (${status})`;
 
+    // FE-CONTENT-26: Note — retry only works for idempotent requests; POST retries may create duplicates
     toast.error(message, {
       action: {
         label: "Retry",

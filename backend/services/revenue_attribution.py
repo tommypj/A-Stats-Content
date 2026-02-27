@@ -50,6 +50,7 @@ def _default_date_range(
 def _normalize_url(url: str) -> str:
     """ANA-06: Canonicalize a URL for matching against article published_url.
 
+    # ANA-37: Normalizes URL by stripping scheme, www prefix, trailing slash, and query params
     Normalizations applied:
     - Strip query string and fragment
     - Lower-case scheme and host

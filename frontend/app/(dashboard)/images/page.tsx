@@ -65,9 +65,13 @@ export default function ImagesPage() {
   const [totalCount, setTotalCount] = useState(0);
 
   // Search / filter state
+  // FE-IMAGES-03: Client-side filtering only applies to loaded page — full-text search requires server-side filtering
   const [searchPrompt, setSearchPrompt] = useState("");
   const [styleFilter, setStyleFilter] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // FE-IMAGES-04: Per-image loading state for copy/download/send operations
+  const [loadingImageId, setLoadingImageId] = useState<string | null>(null);
 
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -169,6 +173,7 @@ export default function ImagesPage() {
   }
 
   async function handleCopyUrl(url: string, id: string) {
+    setLoadingImageId(id);
     try {
       await navigator.clipboard.writeText(url);
       setCopiedId(id);
@@ -176,6 +181,8 @@ export default function ImagesPage() {
       copiedTimerRef.current = setTimeout(() => setCopiedId(null), 2000);
     } catch {
       toast.error("Failed to copy URL");
+    } finally {
+      setLoadingImageId(null);
     }
     setActiveMenu(null);
   }

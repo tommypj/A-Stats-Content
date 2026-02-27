@@ -134,7 +134,8 @@ class ProjectUsageService:
                 ProjectMember.deleted_at.is_(None),
             )
         )
-        active_members_count = count_result.scalar() or 0
+        _raw_count = count_result.scalar()
+        active_members_count = int(_raw_count) if _raw_count is not None else 0  # GEN-36: explicit int conversion
 
         return ProjectUsageStats(
             articles_used=project.articles_generated_this_month,
@@ -206,7 +207,8 @@ class ProjectUsageService:
                     ProjectMember.deleted_at.is_(None),
                 )
             )
-            current_members = count_result.scalar() or 0
+            _raw_members = count_result.scalar()
+            current_members = int(_raw_members) if _raw_members is not None else 0  # GEN-36: explicit int conversion
             resource_map["members"] = (current_members, limits.max_members)
 
         current_usage, limit = resource_map[resource]

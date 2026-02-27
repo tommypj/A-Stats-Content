@@ -96,6 +96,16 @@ export default function OutlineDetailPage() {
   }
 
   function updateSection(index: number, updates: Partial<OutlineSection>) {
+    if (updates.word_count_target !== undefined) {
+      if (updates.word_count_target < 50) {
+        toast.error("Target word count must be at least 50");
+        return;
+      }
+      if (updates.word_count_target > 50000) {
+        toast.error("Target word count cannot exceed 50,000");
+        return;
+      }
+    }
     setEditedSections(
       editedSections.map((section, i) =>
         i === index ? { ...section, ...updates } : section
@@ -366,7 +376,7 @@ export default function OutlineDetailPage() {
                       updateSection(index, { word_count_target: Number(e.target.value) })
                     }
                     min={50}
-                    max={2000}
+                    max={50000}
                     className="w-32 px-4 py-2.5 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all"
                   />
                 </div>

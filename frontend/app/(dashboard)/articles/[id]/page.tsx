@@ -84,6 +84,7 @@ function getProgressTextColor(pct: number): string {
 }
 
 function WordCountWidget({ content, target, onTargetChange }: WordCountWidgetProps) {
+  // FE-CONTENT-19: Word count also computed in lib/seo-score.ts — keep in sync
   const wordCount = getWordCount(content);
   const readingTime = Math.max(1, Math.round(wordCount / 200));
   const hasTarget = target !== "" && target > 0;
@@ -733,6 +734,8 @@ export default function ArticleEditorPage() {
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoSaveStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  // FE-CONTENT-13: prevent auto-save firing concurrently with a revision restore
+  const isRestoringRef = useRef(false);
 
   // Version history panel state
   const [showVersionHistory, setShowVersionHistory] = useState(false);
@@ -985,7 +988,13 @@ export default function ArticleEditorPage() {
   }, [content]);
 
   // Auto-save: debounce 3 s after last keystroke (tracks all editable fields)
-  const lastSavedSnapshotRef = useRef("");
+  const lastSavedSnapshotRef = useRef<string | null>("");
+  // FE-CONTENT-04: Reset snapshot ref on unmount to prevent stale comparisons
+  useEffect(() => {
+    return () => {
+      lastSavedSnapshotRef.current = null;
+    };
+  }, []);
   useEffect(() => {
     if (!article) return;
     const snapshot = JSON.stringify({ content, title, metaDescription, keyword });
@@ -996,6 +1005,8 @@ export default function ArticleEditorPage() {
     }
 
     autoSaveTimerRef.current = setTimeout(async () => {
+      // FE-CONTENT-13: skip auto-save if a revision restore is in progress
+      if (isRestoringRef.current) return;
       const currentSnapshot = JSON.stringify({ content, title, metaDescription, keyword });
       if (currentSnapshot === lastSavedSnapshotRef.current) return;
       setAutoSaveStatus("saving");
@@ -1087,6 +1098,7 @@ export default function ArticleEditorPage() {
     if (!article) return;
     setConfirmAction({
       action: async () => {
+        isRestoringRef.current = true;
         setRestoringRevisionId(revisionId);
         try {
           const updated = await api.articles.restoreRevision(article.id, revisionId);
@@ -1107,6 +1119,7 @@ export default function ArticleEditorPage() {
           toast.error("Failed to restore revision");
         } finally {
           setRestoringRevisionId(null);
+          isRestoringRef.current = false;
         }
       },
       title: "Restore Version",
