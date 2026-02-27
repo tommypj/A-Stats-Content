@@ -2573,7 +2573,8 @@ export interface AdminUserQueryParams {
   page?: number;
   page_size?: number;
   search?: string;
-  tier?: string;
+  role?: string;
+  subscription_tier?: string;
   status?: string;
   sort_by?: string;
   sort_order?: "asc" | "desc";

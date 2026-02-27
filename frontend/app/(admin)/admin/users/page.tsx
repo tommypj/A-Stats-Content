@@ -49,8 +49,8 @@ export default function AdminUsersPage() {
       };
 
       if (search) params.search = search;
-      if (roleFilter !== "all") params.tier = roleFilter;
-      if (tierFilter !== "all") params.tier = tierFilter;
+      if (roleFilter !== "all") params.role = roleFilter;
+      if (tierFilter !== "all") params.subscription_tier = tierFilter;
       if (statusFilter === "suspended") params.status = "suspended";
       if (statusFilter === "active") params.status = "active";
 
