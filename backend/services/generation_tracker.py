@@ -252,6 +252,8 @@ class GenerationTracker:
                 user.usage_reset_date = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc)
             # PROJ-13: commit immediately so concurrent requests see the updated reset_date
             await self.db.commit()
+            # Re-load expired attributes so check_limit can read them after commit
+            await self.db.refresh(user)
             logger.info("Initialized usage reset date and reset counters for user %s", user.id)
             return True
 
@@ -270,6 +272,8 @@ class GenerationTracker:
                 user.usage_reset_date = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc)
             # PROJ-13: commit immediately so concurrent requests see the updated reset_date
             await self.db.commit()
+            # Re-load expired attributes so check_limit can read them after commit
+            await self.db.refresh(user)
             logger.info("Reset monthly usage counters for user %s", user.id)
             return True
 
