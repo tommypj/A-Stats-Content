@@ -572,6 +572,14 @@ async def handle_webhook(
         logger.error("No user_id in webhook custom_data")
         return {"status": "error", "message": "Missing user_id"}
 
+    # BILL-11: Reject malformed user_id before hitting the DB
+    import uuid as _uuid
+    try:
+        _uuid.UUID(str(user_id))
+    except (ValueError, AttributeError):
+        logger.error("BILL-11: Invalid user_id format in webhook payload: %r", user_id)
+        return {"status": "error", "message": "Invalid user_id"}
+
     # BILL-09: row-level lock prevents concurrent webhook updates from racing
     result = await db.execute(select(User).where(User.id == user_id).with_for_update())
     user = result.scalar_one_or_none()
@@ -579,6 +587,17 @@ async def handle_webhook(
     if not user:
         logger.error(f"User {user_id} not found for webhook")
         return {"status": "error", "message": "User not found"}
+
+    # BILL-02: Validate customer_id in webhook matches the one stored on the user.
+    # Prevents an attacker who knows another user's user_id from spoofing events
+    # by crafting a webhook with their customer_id but a victim's user_id.
+    if customer_id and user.lemonsqueezy_customer_id:
+        if str(user.lemonsqueezy_customer_id) != str(customer_id):
+            logger.error(
+                "BILL-02: Webhook customer_id %s does not match stored customer_id %s for user %s — rejecting",
+                customer_id, user.lemonsqueezy_customer_id, user_id,
+            )
+            return {"status": "error", "message": "Customer ID mismatch"}
 
     # BILL-34: Determine subscription tier from variant_id using shared mapping
     tier = SubscriptionTier.FREE.value

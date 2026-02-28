@@ -41,13 +41,17 @@ def _prune_expired_states() -> None:
         del _oauth_states[k]
 
 
-async def store_oauth_state(state: str, user_id: str) -> None:
+async def store_oauth_state(state: str, user_id: str, platform: str = "") -> None:
     """Store OAuth state in Redis with a 10-minute TTL.
 
     Falls back to an in-memory dict when Redis is not reachable so that
     single-process development environments continue to work.
+
+    ``platform`` is stored alongside ``user_id`` so that the callback can
+    validate the redirect came back on the same platform it was initiated for
+    (SM-06: prevents cross-platform state reuse attacks).
     """
-    data = json.dumps({"user_id": str(user_id)})
+    data = json.dumps({"user_id": str(user_id), "platform": platform})
     try:
         import redis.asyncio as aioredis
         r = aioredis.from_url(settings.redis_url)
@@ -62,7 +66,7 @@ async def store_oauth_state(state: str, user_id: str) -> None:
                 oldest = sorted(_oauth_states, key=lambda k: _oauth_states[k]["created_at"])
                 for k in oldest[:len(_oauth_states) - _OAUTH_MAX_STATES + 1]:
                     del _oauth_states[k]
-            _oauth_states[state] = {"user_id": str(user_id), "created_at": time.time()}
+            _oauth_states[state] = {"user_id": str(user_id), "platform": platform, "created_at": time.time()}
 
 
 async def verify_oauth_state(state: str) -> Optional[str]:
@@ -89,6 +93,29 @@ async def verify_oauth_state(state: str) -> Optional[str]:
         if time.time() - entry["created_at"] > _OAUTH_STATE_TTL:
             return None
         return entry["user_id"]
+
+
+async def verify_oauth_state_full(state: str) -> Optional[dict]:
+    """Verify and consume an OAuth state. Returns the full stored dict or None.
+
+    Use this when you need ``platform`` in addition to ``user_id`` (SM-06).
+    """
+    try:
+        import redis.asyncio as aioredis
+        r = aioredis.from_url(settings.redis_url)
+        raw = await r.getdel(f"oauth_state:{state}")
+        await r.aclose()
+        if raw is None:
+            return None
+        return json.loads(raw)
+    except (ImportError, OSError, ConnectionError, TypeError, ValueError, json.JSONDecodeError, KeyError):
+        async with _oauth_states_lock:
+            entry = _oauth_states.pop(state, None)
+        if not entry:
+            return None
+        if time.time() - entry["created_at"] > _OAUTH_STATE_TTL:
+            return None
+        return {k: v for k, v in entry.items() if k != "created_at"}
 
 
 async def require_valid_oauth_state(state: str) -> str:

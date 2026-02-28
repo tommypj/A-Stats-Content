@@ -3,6 +3,7 @@ Outline API routes.
 """
 
 import csv
+import html
 import io
 import json
 import logging
@@ -301,29 +302,33 @@ def _outline_to_markdown(outline) -> str:
 
 
 def _outline_to_html(outline) -> str:
-    """Convert an Outline ORM object to an HTML string."""
+    """Convert an Outline ORM object to an HTML string.
+
+    All user-controlled fields are escaped with html.escape() to prevent XSS
+    when the exported HTML is opened in a browser (XSS-01, XSS-02).
+    """
     parts = []
     parts.append("<!DOCTYPE html>")
     parts.append('<html lang="en"><head><meta charset="UTF-8"><title>')
-    parts.append(outline.title or "Outline")
+    parts.append(html.escape(outline.title or "Outline"))
     parts.append("</title></head><body>")
-    parts.append(f"<h1>{outline.title}</h1>")
+    parts.append(f"<h1>{html.escape(outline.title or '')}</h1>")
     if outline.keyword:
-        parts.append(f"<p><strong>Keyword:</strong> {outline.keyword}</p>")
+        parts.append(f"<p><strong>Keyword:</strong> {html.escape(outline.keyword)}</p>")
     if outline.tone:
-        parts.append(f"<p><strong>Tone:</strong> {outline.tone}</p>")
+        parts.append(f"<p><strong>Tone:</strong> {html.escape(outline.tone)}</p>")
     if outline.target_audience:
-        parts.append(f"<p><strong>Target Audience:</strong> {outline.target_audience}</p>")
+        parts.append(f"<p><strong>Target Audience:</strong> {html.escape(outline.target_audience)}</p>")
     if outline.word_count_target:
-        parts.append(f"<p><strong>Word Count Target:</strong> {outline.word_count_target}</p>")
+        parts.append(f"<p><strong>Word Count Target:</strong> {html.escape(str(outline.word_count_target))}</p>")
 
     for section in (outline.sections or []):
-        heading = section.get("heading", "")
+        heading = html.escape(section.get("heading", ""))
         parts.append(f"<h2>{heading}</h2>")
         for sub in section.get("subheadings", []):
-            parts.append(f"<h3>{sub}</h3>")
+            parts.append(f"<h3>{html.escape(sub)}</h3>")
         if section.get("notes"):
-            parts.append(f"<p><em>Notes: {section['notes']}</em></p>")
+            parts.append(f"<p><em>Notes: {html.escape(section['notes'])}</em></p>")
 
     parts.append("</body></html>")
     return "".join(parts)
@@ -541,7 +546,9 @@ async def update_outline(
 
 
 @router.delete("/{outline_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("30/minute")  # OTL-01: rate-limit hard-delete to prevent mass deletion
 async def delete_outline(
+    request: Request,
     outline_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

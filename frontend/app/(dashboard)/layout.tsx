@@ -702,18 +702,24 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   // Use Zustand persisted state — avoids flash of "unauthenticated" on page refresh.
-  // Actual session validity is re-checked by DashboardContent via /auth/me.
-  const { isAuthenticated: zustandAuthenticated, isLoading: zustandLoading } = useAuthStore();
+  const { isAuthenticated: zustandAuthenticated, isLoading: zustandLoading, logout } = useAuthStore();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     if (zustandLoading) return; // Wait for Zustand hydration to complete
-    if (zustandAuthenticated) {
-      setIsAuthenticated(true);
-    } else {
+    if (!zustandAuthenticated) {
       router.push("/login");
+      return;
     }
-  }, [zustandAuthenticated, zustandLoading, router]);
+    // AUTH-16: Verify session against the backend before rendering protected content.
+    // Catches stale localStorage state (expired cookies) without requiring a full logout.
+    api.auth.me().then(() => {
+      setIsAuthenticated(true);
+    }).catch(() => {
+      logout();
+      router.push("/login");
+    });
+  }, [zustandAuthenticated, zustandLoading, router, logout]);
 
   // Safety timeout: if Zustand hydration never completes (edge case), redirect
   // to login after 10 seconds to avoid an infinite loading state.

@@ -57,7 +57,11 @@ from core.security.encryption import encrypt_credential, decrypt_credential
 router = APIRouter(prefix="/social", tags=["Social Media"])
 
 # OAuth state helpers delegated to shared module
-from api.oauth_helpers import store_oauth_state as _store_oauth_state, verify_oauth_state as _verify_oauth_state
+from api.oauth_helpers import (
+    store_oauth_state as _store_oauth_state,
+    verify_oauth_state as _verify_oauth_state,
+    verify_oauth_state_full as _verify_oauth_state_full,
+)
 
 
 # ============================================
@@ -139,9 +143,9 @@ async def initiate_connection(
             detail=f"Unsupported platform: {platform}. Supported: {', '.join([p.value for p in Platform])}",
         )
 
-    # Generate CSRF state token
+    # Generate CSRF state token — store platform alongside user_id (SM-06)
     state = secrets.token_urlsafe(32)
-    await _store_oauth_state(state, str(current_user.id))
+    await _store_oauth_state(state, str(current_user.id), platform=platform)
 
     if platform in ("facebook", "instagram"):
         if not settings.facebook_app_id or not settings.facebook_app_secret:
@@ -179,7 +183,9 @@ async def initiate_connection(
 
 
 @router.get("/{platform}/callback")
+@limiter.limit("20/minute")  # SM-06: rate-limit OAuth callbacks; browser-redirect endpoint
 async def oauth_callback(
+    request: Request,
     platform: str,
     code: Optional[str] = Query(None),
     state: Optional[str] = Query(None),
@@ -215,8 +221,26 @@ async def oauth_callback(
             url=f"{frontend_callback}?error=invalid_platform&platform={platform}"
         )
 
-    # Verify state and get user_id
-    user_id = await _verify_oauth_state(state)
+    # Verify state and extract user_id + stored platform (SM-06)
+    state_data = await _verify_oauth_state_full(state)
+    if not state_data:
+        return RedirectResponse(
+            url=f"{frontend_callback}?error=invalid_state&platform={platform}"
+        )
+
+    user_id = state_data.get("user_id")
+    stored_platform = state_data.get("platform", "")
+
+    # SM-06: Reject if the callback platform doesn't match the platform the flow was initiated for.
+    # Prevents cross-platform state reuse (e.g. using a twitter state on /facebook/callback).
+    if stored_platform and stored_platform != platform:
+        logger.warning(
+            "SM-06: OAuth state platform mismatch — stored=%r, callback=%r", stored_platform, platform
+        )
+        return RedirectResponse(
+            url=f"{frontend_callback}?error=platform_mismatch&platform={platform}"
+        )
+
     if not user_id:
         return RedirectResponse(
             url=f"{frontend_callback}?error=invalid_state&platform={platform}"

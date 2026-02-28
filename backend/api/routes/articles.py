@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from fastapi.responses import StreamingResponse
 from api.middleware.rate_limit import limiter
-from sqlalchemy import select, func, delete
+from sqlalchemy import select, func, delete, case, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import defer
 
@@ -660,58 +660,72 @@ async def get_content_health(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get content health summary for the current user/project."""
-    # Build base query with project scoping
+    """Get content health summary for the current user/project.
+
+    ART-02: Uses SQL aggregates instead of loading all articles into memory.
+    """
+    # Build base filter conditions
+    status_filter = Article.status.in_([ContentStatus.COMPLETED.value, ContentStatus.PUBLISHED.value])
     if current_user.current_project_id:
-        base = select(Article).where(
+        base_filter = and_(
             Article.project_id == current_user.current_project_id,
             Article.deleted_at.is_(None),
+            status_filter,
         )
     else:
-        base = select(Article).where(
+        base_filter = and_(
             Article.user_id == current_user.id,
             Article.project_id.is_(None),
             Article.deleted_at.is_(None),
+            status_filter,
         )
 
-    # Only include completed/published articles (not drafts/generating)
-    base = base.where(Article.status.in_([ContentStatus.COMPLETED.value, ContentStatus.PUBLISHED.value]))
+    # Single aggregate query — no full article load
+    agg_result = await db.execute(
+        select(
+            func.count().label("total"),
+            func.avg(Article.seo_score).label("avg_score"),
+            func.count(case((Article.seo_score >= 80, 1))).label("excellent_count"),
+            func.count(case((and_(Article.seo_score >= 60, Article.seo_score < 80), 1))).label("good_count"),
+            func.count(case((and_(Article.seo_score.is_not(None), Article.seo_score < 60), 1))).label("needs_work_count"),
+            func.count(case((Article.seo_score.is_(None), 1))).label("no_score_count"),
+        ).where(base_filter)
+    )
+    agg = agg_result.one()
 
-    result = await db.execute(base)
-    articles = result.scalars().all()
-
-    total = len(articles)
-    with_score = [a for a in articles if a.seo_score is not None]
-
-    avg_score = sum(a.seo_score for a in with_score) / len(with_score) if with_score else None
-
-    # Categorize by score
-    excellent = [
-        {"id": a.id, "title": a.title, "seo_score": a.seo_score, "keyword": a.keyword}
-        for a in with_score if a.seo_score >= 80
-    ]
-    good = [
-        {"id": a.id, "title": a.title, "seo_score": a.seo_score, "keyword": a.keyword}
-        for a in with_score if 60 <= a.seo_score < 80
-    ]
+    # Top 10 worst articles (needs_work) — targeted query, not full load
+    needs_work_rows = await db.execute(
+        select(Article.id, Article.title, Article.seo_score, Article.keyword)
+        .where(base_filter, Article.seo_score.is_not(None), Article.seo_score < 60)
+        .order_by(Article.seo_score.asc())
+        .limit(10)
+    )
     needs_work = [
-        {"id": a.id, "title": a.title, "seo_score": a.seo_score, "keyword": a.keyword}
-        for a in with_score if a.seo_score < 60
-    ]
-    no_score = [
-        {"id": a.id, "title": a.title, "keyword": a.keyword}
-        for a in articles if a.seo_score is None
+        {"id": str(r.id), "title": r.title, "seo_score": r.seo_score, "keyword": r.keyword}
+        for r in needs_work_rows
     ]
 
+    # Top 10 articles without a score
+    no_score_rows = await db.execute(
+        select(Article.id, Article.title, Article.keyword)
+        .where(base_filter, Article.seo_score.is_(None))
+        .limit(10)
+    )
+    no_score = [
+        {"id": str(r.id), "title": r.title, "keyword": r.keyword}
+        for r in no_score_rows
+    ]
+
+    avg_score = float(agg.avg_score) if agg.avg_score is not None else None
     return {
-        "total_articles": total,
-        "avg_seo_score": round(avg_score, 1) if avg_score else None,
-        "excellent_count": len(excellent),
-        "good_count": len(good),
-        "needs_work_count": len(needs_work),
-        "no_score_count": len(no_score),
-        "needs_work": sorted(needs_work, key=lambda x: x["seo_score"])[:10],  # worst 10
-        "no_score": no_score[:10],
+        "total_articles": agg.total,
+        "avg_seo_score": round(avg_score, 1) if avg_score is not None else None,
+        "excellent_count": agg.excellent_count,
+        "good_count": agg.good_count,
+        "needs_work_count": agg.needs_work_count,
+        "no_score_count": agg.no_score_count,
+        "needs_work": needs_work,
+        "no_score": no_score,
     }
 
 
@@ -905,7 +919,9 @@ async def get_keyword_history(
 
 
 @router.get("/export")
+@limiter.limit("10/hour")  # ART-01: bulk export is expensive; hard cap per hour
 async def export_all_articles(
+    request: Request,
     format: str = Query("csv", pattern="^(csv)$"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -924,7 +940,7 @@ async def export_all_articles(
             Article.project_id.is_(None),
             Article.deleted_at.is_(None),
         )
-    query = query.order_by(Article.created_at.desc())
+    query = query.order_by(Article.created_at.desc()).limit(5000)  # ART-01: cap at 5000 rows
     result = await db.execute(query)
     articles = result.scalars().all()
 
@@ -1178,7 +1194,9 @@ async def update_article(
 
 
 @router.delete("/{article_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("30/minute")  # ART-03: rate-limit hard-delete to prevent mass deletion
 async def delete_article(
+    request: Request,
     article_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

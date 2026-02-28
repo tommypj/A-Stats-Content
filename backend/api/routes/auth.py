@@ -578,7 +578,7 @@ async def reset_password(
 
 
 @router.post("/password/change", status_code=status.HTTP_200_OK)
-@limiter.limit("10/minute")
+@limiter.limit("5/minute")  # AUTH-15: tightened from 10/min (password changes should be rare)
 async def change_password(
     request: Request,
     body: PasswordChangeRequest,
