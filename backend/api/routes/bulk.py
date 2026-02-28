@@ -419,8 +419,9 @@ async def create_bulk_outline_job(
                             )
                         )
                         await _fail_session.commit()
-                except Exception:
-                    pass
+                except Exception as _mark_err:
+                    # BULK-25: log instead of silently swallowing — job may be stuck in "processing" state
+                    logger.warning("Failed to mark bulk job %s as failed: %s", job.id, _mark_err)
 
     asyncio.create_task(_run())
 

@@ -503,7 +503,7 @@ async def list_all_images(
     images = result.scalars().all()
 
     # Get user info for each image
-    user_ids = list(set(image.user_id for image in images))
+    user_ids = list(dict.fromkeys(image.user_id for image in images))  # ADM-25: order-preserving dedup
     users_result = await db.execute(select(User).where(User.id.in_(user_ids)))
     users_dict = {user.id: user for user in users_result.scalars().all()}
 
@@ -684,7 +684,7 @@ async def list_all_social_posts(
     posts = result.scalars().all() if not platform else result.unique().scalars().all()
 
     # Get user info for each post
-    user_ids = list(set(post.user_id for post in posts))
+    user_ids = list(dict.fromkeys(post.user_id for post in posts))  # ADM-25: order-preserving dedup
     users_result = await db.execute(select(User).where(User.id.in_(user_ids)))
     users_dict = {user.id: user for user in users_result.scalars().all()}
 

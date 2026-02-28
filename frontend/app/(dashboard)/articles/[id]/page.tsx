@@ -1300,32 +1300,45 @@ export default function ArticleEditorPage() {
               variant="outline"
               size="sm"
               onClick={() => setShowExportMenu((prev) => !prev)}
+              onKeyDown={(e) => { if (e.key === "Escape") setShowExportMenu(false); }}
+              aria-haspopup="menu"
+              aria-expanded={showExportMenu}
               leftIcon={<Download className="h-4 w-4" />}
             >
               Export
               <ChevronDown className="h-3 w-3 ml-1" />
             </Button>
             {showExportMenu && (
-              <div className="absolute right-0 top-full mt-1 z-50 w-40 rounded-xl border border-surface-tertiary bg-surface shadow-lg py-1">
-                <button
-                  onClick={() => handleExport("markdown")}
-                  className="w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-surface-secondary transition-colors"
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
+                <div
+                  role="menu"
+                  className="absolute right-0 top-full mt-1 z-50 w-40 rounded-xl border border-surface-tertiary bg-surface shadow-lg py-1"
+                  onKeyDown={(e) => { if (e.key === "Escape") setShowExportMenu(false); }}
                 >
-                  Markdown (.md)
-                </button>
-                <button
-                  onClick={() => handleExport("html")}
-                  className="w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-surface-secondary transition-colors"
-                >
-                  HTML (.html)
-                </button>
-                <button
-                  onClick={() => handleExport("csv")}
-                  className="w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-surface-secondary transition-colors"
-                >
-                  CSV (.csv)
-                </button>
-              </div>
+                  <button
+                    role="menuitem"
+                    onClick={() => { handleExport("markdown"); setShowExportMenu(false); }}
+                    className="w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-surface-secondary transition-colors"
+                  >
+                    Markdown (.md)
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => { handleExport("html"); setShowExportMenu(false); }}
+                    className="w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-surface-secondary transition-colors"
+                  >
+                    HTML (.html)
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => { handleExport("csv"); setShowExportMenu(false); }}
+                    className="w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-surface-secondary transition-colors"
+                  >
+                    CSV (.csv)
+                  </button>
+                </div>
+              </>
             )}
           </div>
 

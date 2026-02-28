@@ -637,6 +637,7 @@ async def handle_webhook(
             # Subscription updated (plan change, status change, etc.)
             user.subscription_tier = tier
             user.subscription_status = subscription_status or "active"  # BILL-08
+            user.lemonsqueezy_variant_id = str(variant_id) if variant_id else None  # BILL-36: keep variant_id in sync on plan changes
 
             if renews_at:
                 user.subscription_expires = _parse_iso_datetime(renews_at)

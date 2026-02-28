@@ -123,7 +123,8 @@ async def get_current_user(
     # Try Authorization header first (API clients, tests, backward compat)
     token = None
     if authorization and authorization.startswith("Bearer "):
-        token = authorization.split(" ", 1)[1]
+        parts = authorization.split(" ", 1)
+        token = parts[1] if len(parts) > 1 and parts[1] else None  # AUTH-20: guard empty/missing token
 
     # Fall back to HttpOnly cookie
     if not token:
