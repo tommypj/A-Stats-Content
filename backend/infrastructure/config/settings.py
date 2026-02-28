@@ -192,6 +192,8 @@ class Settings(BaseSettings):
                 raise ValueError("LEMONSQUEEZY_API_KEY is required in production!")
             if not self.lemonsqueezy_webhook_secret:
                 raise ValueError("LEMONSQUEEZY_WEBHOOK_SECRET is required in production!")
+            if not self.resend_api_key:
+                raise ValueError("RESEND_API_KEY is required in production!")
 
         # INFRA-10: OAuth redirect URIs should be https:// non-localhost in production
         if self.environment == "production":

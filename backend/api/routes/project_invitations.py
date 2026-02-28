@@ -276,15 +276,18 @@ async def create_project_invitation(
     )
     await db.refresh(new_invitation)
 
-    # Send invitation email
+    # Send invitation email (graceful degradation — invitation is already saved)
     invitation_url = f"{settings.frontend_url}/invitations/{token}"
-    await email_service.send_project_invitation_email(
-        to_email=invitation.email,
-        inviter_name=current_user.name,
-        project_name=project.name,
-        role=invitation.role,
-        invitation_url=invitation_url,
-    )
+    try:
+        await email_service.send_project_invitation_email(
+            to_email=invitation.email,
+            inviter_name=current_user.name,
+            project_name=project.name,
+            role=invitation.role,
+            invitation_url=invitation_url,
+        )
+    except Exception as e:
+        logger.error("Failed to send invitation email to %s: %s", invitation.email, e)
 
     return ProjectInvitationResponse(
         id=new_invitation.id,
@@ -394,15 +397,18 @@ async def resend_project_invitation(
     await db.commit()
     await db.refresh(invitation)
 
-    # Resend invitation email
+    # Resend invitation email (graceful degradation — expiry was already reset)
     invitation_url = f"{settings.frontend_url}/invitations/{invitation.token}"
-    await email_service.send_project_invitation_email(
-        to_email=invitation.email,
-        inviter_name=current_user.name,
-        project_name=project.name,
-        role=invitation.role,
-        invitation_url=invitation_url,
-    )
+    try:
+        await email_service.send_project_invitation_email(
+            to_email=invitation.email,
+            inviter_name=current_user.name,
+            project_name=project.name,
+            role=invitation.role,
+            invitation_url=invitation_url,
+        )
+    except Exception as e:
+        logger.error("Failed to resend invitation email to %s: %s", invitation.email, e)
 
     return ProjectInvitationResponse(
         id=invitation.id,
