@@ -234,7 +234,7 @@ export default function BillingSettingsPage() {
           {currentPlan && (
             <div className="mt-6 pt-6 border-t border-surface-tertiary">
               <p className="text-sm font-medium text-text-primary mb-3">Plan includes:</p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="flex items-center gap-2 text-sm text-text-secondary">
                   <div className="h-1.5 w-1.5 rounded-full bg-healing-sage" />
                   <span>
@@ -262,7 +262,19 @@ export default function BillingSettingsPage() {
                     images/month
                   </span>
                 </div>
+                <div className="flex items-center gap-2 text-sm text-text-secondary">
+                  <div className="h-1.5 w-1.5 rounded-full bg-healing-sage" />
+                  <span>
+                    {currentPlan.limits.social_posts_per_month === -1
+                      ? "Unlimited"
+                      : currentPlan.limits.social_posts_per_month}{" "}
+                    social post sets/month
+                  </span>
+                </div>
               </div>
+              <p className="text-xs text-text-muted mt-3">
+                Each article supports up to 3 AI improvement passes (all plans).
+              </p>
             </div>
           )}
         </div>
@@ -342,6 +354,43 @@ export default function BillingSettingsPage() {
                 max={currentPlan.limits.images_per_month === -1 ? 100 : currentPlan.limits.images_per_month}
               />
             </div>
+
+            {/* Social Posts Usage */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-text-primary">Social Post Sets</span>
+                <span className="text-sm text-text-secondary">
+                  {subscription.social_posts_generated_this_month} /{" "}
+                  {currentPlan.limits.social_posts_per_month === -1
+                    ? "Unlimited"
+                    : currentPlan.limits.social_posts_per_month}
+                </span>
+              </div>
+              <Progress
+                value={subscription.social_posts_generated_this_month}
+                max={currentPlan.limits.social_posts_per_month === -1 ? 100 : currentPlan.limits.social_posts_per_month}
+              />
+              {calculateUsagePercentage(
+                subscription.social_posts_generated_this_month,
+                currentPlan.limits.social_posts_per_month
+              ) >= 80 && currentPlan.limits.social_posts_per_month !== -1 && (
+                <p className="text-xs text-yellow-600 mt-1">
+                  You're approaching your social post limit. Consider upgrading for more.
+                </p>
+              )}
+            </div>
+
+            {/* Reset date note */}
+            {subscription.usage_reset_date && (
+              <p className="text-xs text-text-muted pt-2 border-t border-surface-tertiary">
+                Counters reset on{" "}
+                {new Date(subscription.usage_reset_date).toLocaleDateString("en-US", {
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -385,20 +434,27 @@ export default function BillingSettingsPage() {
                       {plan.limits.articles_per_month === -1
                         ? "Unlimited"
                         : plan.limits.articles_per_month}{" "}
-                      articles
+                      articles/mo
                     </p>
                     <p>
                       {plan.limits.outlines_per_month === -1
                         ? "Unlimited"
                         : plan.limits.outlines_per_month}{" "}
-                      outlines
+                      outlines/mo
                     </p>
                     <p>
                       {plan.limits.images_per_month === -1
                         ? "Unlimited"
                         : plan.limits.images_per_month}{" "}
-                      images
+                      images/mo
                     </p>
+                    <p>
+                      {plan.limits.social_posts_per_month === -1
+                        ? "Unlimited"
+                        : plan.limits.social_posts_per_month}{" "}
+                      social post sets/mo
+                    </p>
+                    <p className="text-text-muted">3 AI improvements/article</p>
                   </div>
                   {!isCurrent && canUpgrade && (
                     <Button

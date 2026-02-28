@@ -2316,6 +2316,7 @@ export interface PlanLimits {
   articles_per_month: number;
   outlines_per_month: number;
   images_per_month: number;
+  social_posts_per_month: number;
 }
 
 export interface PlanInfo {
@@ -2340,6 +2341,7 @@ export interface SubscriptionStatus {
   articles_generated_this_month: number;
   outlines_generated_this_month: number;
   images_generated_this_month: number;
+  social_posts_generated_this_month: number;
   usage_reset_date: string | null;
 }
 

@@ -168,6 +168,7 @@ async def get_subscription_status(
         articles_generated_this_month=current_user.articles_generated_this_month,
         outlines_generated_this_month=current_user.outlines_generated_this_month,
         images_generated_this_month=current_user.images_generated_this_month,
+        social_posts_generated_this_month=current_user.social_posts_generated_this_month,
         usage_reset_date=current_user.usage_reset_date,
     )
 

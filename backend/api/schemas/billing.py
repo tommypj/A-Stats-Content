@@ -15,6 +15,7 @@ class PlanLimits(BaseModel):
     articles_per_month: int = Field(..., description="Number of articles allowed per month (-1 for unlimited)")
     outlines_per_month: int = Field(..., description="Number of outlines allowed per month (-1 for unlimited)")
     images_per_month: int = Field(..., description="Number of images allowed per month (-1 for unlimited)")
+    social_posts_per_month: int = Field(..., description="Number of social post sets allowed per month (-1 for unlimited)")
 
 
 class PlanInfo(BaseModel):
@@ -48,6 +49,7 @@ class SubscriptionStatus(BaseModel):
     articles_generated_this_month: int = Field(0, description="Articles generated this month")
     outlines_generated_this_month: int = Field(0, description="Outlines generated this month")
     images_generated_this_month: int = Field(0, description="Images generated this month")
+    social_posts_generated_this_month: int = Field(0, description="Social post sets generated this month")
     usage_reset_date: Optional[datetime] = Field(None, description="When usage counters reset")
 
 
