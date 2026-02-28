@@ -588,7 +588,15 @@ async def delete_project(
     )
     owner_count = owner_count_result.scalar_one()
     if owner_count > 1:
-        logger.warning("delete_project: project %s has %d owners, proceeding with delete", project_id, owner_count)
+        # PROJ-41: Block unilateral deletion when multiple owners exist.
+        # All other owners must be removed or the project transferred first.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Cannot delete project with {owner_count} owners. "
+                "Remove or transfer other owners before deleting."
+            ),
+        )
 
     # Soft delete project
     project.deleted_at = datetime.now(timezone.utc)

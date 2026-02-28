@@ -38,12 +38,12 @@
 
 | ID | Sev | Status | Description | File | Line |
 |----|-----|--------|-------------|------|------|
-| AUTH-19 | 🟡 | [ ] | `resend_verification` crashes if email service fails — no try/catch | auth.py | 575-579 |
+| AUTH-19 | 🟡 | [x] | `resend_verification` crashes if email service fails — no try/catch | auth.py | 575-579 |
 | AUTH-20 | 🟢 | [ ] | `get_current_user()` — `IndexError` if header is exactly "Bearer" with no token | auth.py | 81 |
-| AUTH-21 | 🟡 | [ ] | Password invalidation comparison direction inconsistent (`>` vs `<`) between `get_current_user` and `refresh_token` | auth.py | 118, 343 |
+| AUTH-21 | 🟡 | [x] | Password invalidation comparison direction inconsistent (`>` vs `<`) between `get_current_user` and `refresh_token` | auth.py | 118, 343 |
 | AUTH-22 | 🟠 | [x] | If personal project not found during token validation, `current_project_id` set to None without creating one | auth.py | 140-150 |
-| AUTH-23 | 🟡 | [ ] | Avatar upload trusts `content_type` header; no file magic-byte validation | auth.py | 723-735 |
-| AUTH-24 | 🟡 | [ ] | Data export includes soft-deleted articles/outlines/images | auth.py | 797-870 |
+| AUTH-23 | 🟡 | [x] | Avatar upload trusts `content_type` header; no file magic-byte validation | auth.py | 723-735 |
+| AUTH-24 | 🟡 | [x] | Data export includes soft-deleted articles/outlines/images | auth.py | 797-870 |
 | AUTH-25 | 🟡 | [x] | Account deletion cascades are not atomic — partial failure leaves inconsistent state | auth.py | 636-698 |
 
 ### PROJECT Issues
@@ -55,7 +55,7 @@
 | PROJ-27 | 🟠 | [x] | Race condition in member-limit check — two simultaneous invitations can both pass | project_invitations.py | 190 |
 | PROJ-28 | 🟠 | [x] | `invitation.inviter.name` accessed without null check — AttributeError if inviter deleted | project_invitations.py | 451 |
 | PROJ-29 | 🟢 | [ ] | `page` / `page_size` params lack `Query(ge=1)` validation — negative values possible | project_invitations.py | 98-99 |
-| PROJ-30 | 🟡 | [ ] | `status_filter` string not validated against enum values | project_invitations.py | 97, 114-115 |
+| PROJ-30 | 🟡 | [x] | `status_filter` string not validated against enum values | project_invitations.py | 97, 114-115 |
 | PROJ-31 | 🟢 | [ ] | No logging/alerting for repeated invalid invitation token attempts | project_invitations.py | 410-456 |
 | PROJ-32 | 🟡 | [x] | `current_user: Optional[User]` is dead code — dependency never returns None | project_invitations.py | 464, 512 |
 | PROJ-33 | 🟢 | [ ] | `require_project_admin` defined locally AND imported from `deps_project` — duplicate | project_invitations.py | 43-91 |
@@ -66,9 +66,9 @@
 | PROJ-38 | 🟡 | [x] | `remove_member` doesn't verify project still exists/not-deleted | projects.py | 648-675 |
 | PROJ-39 | 🟠 | [x] | `invitation.inviter.name/email` accessed without null check in list/send flows | project_invitations.py | 155-156, 282-283 |
 | PROJ-40 | 🟡 | [x] | Removing a member doesn't clear their `current_project_id` if they were in that project | projects.py | 647-675 |
-| PROJ-41 | 🟡 | [ ] | Project delete doesn't verify only one owner exists before deletion | projects.py | 551-592 |
+| PROJ-41 | 🟡 | [x] | Project delete doesn't verify only one owner exists before deletion | projects.py | 551-592 |
 | PROJ-42 | 🟡 | [x] | `update_brand_voice` TOCTOU: re-queries project after permission check | projects.py | 341-383 |
-| PROJ-43 | 🟡 | [ ] | `UpdateMemberRoleRequest` has no role validator — invalid role can be stored | schemas/project.py | 393-396 |
+| PROJ-43 | 🟡 | [x] | `UpdateMemberRoleRequest` has no role validator — invalid role can be stored | schemas/project.py | 393-396 |
 | PROJ-44 | 🟢 | [ ] | `accept_invitation` rate limit (10/min) too high for token brute-force protection | project_invitations.py | 459 |
 | PROJ-45 | 🟢 | [ ] | Accept invitation auto-sets `current_project_id` without user's consent | project_invitations.py | 560-562 |
 | PROJ-46 | 🟡 | [x] | `get_content_filter()` uses Union type attribute access which will fail at runtime | deps_project.py | 36-84 |
@@ -85,17 +85,17 @@
 | GEN-22 | 🟠 | [x] | Inconsistent singular/plural resource_type keys between check and increment | generation_tracker.py | 74, 214 |
 | GEN-23 | 🟠 | [x] | `improve_article` counts against generation limit — likely unintended | articles.py | 1097-1107 |
 | GEN-24 | 🟠 | [x] | Race condition in monthly usage reset — no atomic CAS, two requests can both reset | project_usage.py | 278-316 |
-| GEN-25 | 🟡 | [ ] | `status` filter not validated against ContentStatus enum | outlines.py | 189-190 |
+| GEN-25 | 🟡 | [x] | `status` filter not validated against ContentStatus enum | outlines.py | 189-190 |
 | GEN-26 | 🟠 | [x] | Duplicate `ContentStatus` import inside function body (already imported at module level) | articles.py | 44, 985 |
 | GEN-27 | 🟡 | [x] | Outline section structure not validated before `generate_article()` | articles.py | 483-587 |
 | GEN-28 | 🔴 | [x] | Limit check and usage increment not atomic — race allows exceeding monthly quota | generation_tracker.py | 56-102 |
 | GEN-29 | 🟠 | [x] | `regenerate_outline` doesn't call `reset_project_usage_if_needed()` before limit check | outlines.py | 552-596 |
 | GEN-30 | 🟠 | [x] | TOCTOU in `improve_article` — concurrent requests both pass limit check | articles.py | 1097-1107 |
-| GEN-31 | 🟡 | [ ] | Hardcoded 60s timeout on `proofread_grammar` — not configurable | articles.py | 372-378 |
+| GEN-31 | 🟡 | [x] | Hardcoded 60s timeout on `proofread_grammar` — not configurable | articles.py | 372-378 |
 | GEN-32 | 🟠 | [x] | On generation failure, main session not explicitly rolled back before error session | articles.py | 450-465 |
 | GEN-33 | 🟡 | [x] | No max section count validation — AI can return 50+ sections unchecked | anthropic_adapter.py | 265-273 |
 | GEN-34 | 🟢 | [x] | Keyword length not enforced before interpolation into AI prompts | anthropic_adapter.py | 206 |
-| GEN-35 | 🟡 | [ ] | `log_start()` has no try/catch — DB error orphans generation task | generation_tracker.py | 27-48 |
+| GEN-35 | 🟡 | [x] | `log_start()` has no try/catch — DB error orphans generation task | generation_tracker.py | 27-48 |
 | GEN-36 | 🟢 | [x] | Usage counters use `or 0` — type mismatch (e.g., string) would cause silent failure | project_usage.py | 202 |
 | GEN-37 | 🟡 | [x] | Export endpoints load all records into memory — OOM risk for large datasets | outlines.py | 214-255 |
 | GEN-38 | 🟡 | [x] | `escape_like()` not audited — SQL injection risk if implementation is flawed | outlines.py | 192 |
@@ -104,10 +104,10 @@
 | GEN-41 | 🟠 | [x] | Per-user rate limiting missing — 100 users × 5 concurrent = 500 AI API calls | articles.py | 55 |
 | GEN-42 | 🟠 | [x] | `restore_article_revision` — lacks explicit check that revision belongs to this article | articles.py | 1527-1535 |
 | GEN-43 | 🟢 | [x] | Outline regeneration allows keyword change (can cause confusion) | outlines.py | 552-678 |
-| GEN-44 | 🟡 | [ ] | Session not wrapped in try/finally — potential session leak on outline creation error | outlines.py | 95-161 |
+| GEN-44 | 🟡 | [x] | Session not wrapped in try/finally — potential session leak on outline creation error | outlines.py | 95-161 |
 | GEN-45 | 🟢 | [x] | `tone` and `target_audience` lack max length validation — prompt injection risk | outlines.py | 68-70 |
 | GEN-46 | 🟡 | [x] | Atomic increment in `project_usage.py` doesn't set reset_date on first write | project_usage.py | 259-274 |
-| GEN-47 | 🟡 | [ ] | `writing_style`, `voice`, `list_usage` not validated against enum values | articles.py | 576-578 |
+| GEN-47 | 🟡 | [x] | `writing_style`, `voice`, `list_usage` not validated against enum values | articles.py | 576-578 |
 | GEN-48 | 🟢 | [x] | `BulkJobItem` status field not validated against allowed enum values at creation | bulk.py | 68-77 |
 | GEN-49 | 🟡 | [x] | Anthropic client timeout (300s) is hardcoded — not configurable | anthropic_adapter.py | 68-73 |
 | GEN-50 | 🟡 | [x] | Keyword suggestion endpoint can generate 1000 AI calls/min at 10 req/min × 100 users | articles.py | 698-761 |
@@ -124,13 +124,13 @@
 | BILL-20 | 🟠 | [x] | User webhook lacks SERIALIZABLE isolation — concurrent updates can lose changes | billing.py | 534-662 |
 | BILL-21 | 🟠 | [x] | `subscription_status` accepted from LemonSqueezy payload without validation vs enum | billing.py | 505, 566 |
 | BILL-22 | 🟠 | [x] | Unknown `variant_id` silently downgrades to free without alerting — masks errors | billing.py | 308-325, 542-559 |
-| BILL-23 | 🟡 | [ ] | User/project tier sync skipped silently if personal project missing | billing.py | 643-659 |
+| BILL-23 | 🟡 | [x] | User/project tier sync skipped silently if personal project missing | billing.py | 643-659 |
 | BILL-24 | 🟡 | [x] | Webhook doesn't require non-null `subscription_id` / `customer_id` for paid events | billing.py | 502-506 |
 | BILL-25 | 🟡 | [x] | `cancel_subscription` doesn't check subscription status before calling LS API | billing.py | 238-268 |
 | BILL-26 | 🟡 | [x] | Webhook endpoint has no rate limiting — DDoS vector | billing.py | 421-426 |
-| BILL-27 | 🟡 | [ ] | SUBSCRIPTION_CANCELLED doesn't set `project.subscription_status = "cancelled"` | billing.py | 356-361 |
+| BILL-27 | 🟡 | [x] | SUBSCRIPTION_CANCELLED doesn't set `project.subscription_status = "cancelled"` | billing.py | 356-361 |
 | BILL-28 | 🟡 | [x] | `lemonsqueezy_subscription_id` set to None if missing — corrupt paid records | billing.py | 334, 568 |
-| BILL-29 | 🟡 | [ ] | `renews_at` / `subscription_expires` not validated to be in the future | billing.py | Multiple |
+| BILL-29 | 🟡 | [x] | `renews_at` / `subscription_expires` not validated to be in the future | billing.py | Multiple |
 | BILL-30 | 🟡 | [x] | `create_project_checkout` accepts arbitrary `variant_id` without validation | project_billing.py | 169-220 |
 | BILL-31 | 🟡 | [x] | Malformed `renews_at` silently skips expiry update — subscription never expires | billing.py | 337-338 |
 | BILL-32 | 🟢 | [ ] | Free plan exclusion hardcoded — not derived from PLANS dict, brittle to additions | billing.py | 154-158 |
@@ -337,16 +337,16 @@
 | FE-AUTH-11 | 🟠 | [x] | WordPress `app_password` stays in component state until unmount — visible in React DevTools | integrations/page.tsx | 32-36 |
 | FE-AUTH-12 | 🟠 | [x] | WordPress `site_url` not scheme-validated — `javascript:` URL accepted | integrations/page.tsx | 237-240 |
 | FE-AUTH-13 | 🟠 | [x] | Billing poll race condition — two setTimeout callbacks can produce duplicate toasts | billing/page.tsx | 69-87 |
-| FE-AUTH-14 | 🟡 | [ ] | Network error treated as 401 — user needlessly logged out on connectivity issue | auth.ts | 19-35 |
+| FE-AUTH-14 | 🟡 | [x] | Network error treated as 401 — user needlessly logged out on connectivity issue | auth.ts | 19-35 |
 | FE-AUTH-15 | 🟡 | [x] | `confirmPassword` validation doesn't enforce same regex as `newPassword` | register/page.tsx | 21-35 |
-| FE-AUTH-16 | 🟡 | [ ] | Forgot password success shows full email — email enumeration risk | forgot-password/page.tsx | 64 |
+| FE-AUTH-16 | 🟡 | [x] | Forgot password success shows full email — email enumeration risk | forgot-password/page.tsx | 64 |
 | FE-AUTH-17 | 🟡 | [x] | "Remember Me" checkbox collected in schema but never used in submit handler | login/page.tsx | 21, 123-130 |
 | FE-AUTH-18 | 🟡 | [x] | Notification polling fires independently per browser tab — N× API load | layout.tsx | 189-196 |
-| FE-AUTH-19 | 🟡 | [ ] | `isLoading` can stay true forever if localStorage cleared mid-load | layout.tsx | 687-717 |
-| FE-AUTH-20 | 🟡 | [ ] | No client-side rate limiting on login attempts — full-speed brute force | login/page.tsx | 47-79 |
-| FE-AUTH-21 | 🟡 | [ ] | Email verification fires on mount with no user confirmation step | verify-email/page.tsx | 28-39 |
-| FE-AUTH-22 | 🟡 | [ ] | Reset password token not validated on mount — user fills form then gets "invalid token" | reset-password/page.tsx | 38-51 |
-| FE-AUTH-23 | 🟡 | [ ] | Admin role check `user?.role === "super_admin"` never matches — type only has "admin" | layout.tsx | 343 |
+| FE-AUTH-19 | 🟡 | [x] | `isLoading` can stay true forever if localStorage cleared mid-load | layout.tsx | 687-717 |
+| FE-AUTH-20 | 🟡 | [x] | No client-side rate limiting on login attempts — full-speed brute force | login/page.tsx | 47-79 |
+| FE-AUTH-21 | 🟡 | [x] | Email verification fires on mount with no user confirmation step | verify-email/page.tsx | 28-39 |
+| FE-AUTH-22 | 🟡 | [x] | Reset password token not validated on mount — user fills form then gets "invalid token" | reset-password/page.tsx | 38-51 |
+| FE-AUTH-23 | 🟡 | [x] | Admin role check `user?.role === "super_admin"` never matches — type only has "admin" | layout.tsx | 343 |
 | FE-AUTH-24 | 🟢 | [x] | WordPress password field missing `autoComplete="off"` | integrations/page.tsx | 257 |
 | FE-AUTH-25 | 🟢 | [ ] | Zustand persist serializes full user + token to localStorage JSON | auth.ts | 88-96 |
 | FE-AUTH-26 | 🟢 | [x] | No timeout on email verification — spinner hangs indefinitely on API failure | verify-email/page.tsx | 21-40 |
@@ -405,9 +405,9 @@
 | FE-ANA-03 | 🟢 | [x] | CSV export doesn't escape commas in keyword names — breaks CSV parsing | keywords/page.tsx | 145-147 |
 | FE-ANA-04 | 🟢 | [x] | Page URL rendered in `href` without XSS validation | pages/page.tsx | 375-384 |
 | FE-ANA-05 | 🟠 | [x] | `handleDetect/Suggest/Resolve` lack debounce — button mashing fires multiple requests | content-health/page.tsx | 130-177 |
-| FE-ANA-06 | 🟡 | [ ] | `overview.score_distribution` not null-checked — `Object.entries()` throws if missing | aeo/page.tsx | 185 |
+| FE-ANA-06 | 🟡 | [x] | `overview.score_distribution` not null-checked — `Object.entries()` throws if missing | aeo/page.tsx | 185 |
 | FE-ANA-07 | 🟢 | [x] | Pagination not reset when date range changes — user can be on stale page | articles/page.tsx | 52-56 |
-| FE-ANA-08 | 🟡 | [ ] | Analytics callback page doesn't validate CSRF state before `handleCallback` | callback/page.tsx | 33-41 |
+| FE-ANA-08 | 🟡 | [x] | Analytics callback page doesn't validate CSRF state before `handleCallback` | callback/page.tsx | 33-41 |
 | FE-ANA-09 | 🟢 | [x] | Max keyword selection limit reached — no disabled state with tooltip, just error toast | opportunities/page.tsx | 130-134 |
 | FE-ANA-10 | 🟡 | [x] | `goal_config` arbitrary JSON submitted without schema validation | revenue/page.tsx | 153-173 |
 
@@ -436,9 +436,9 @@
 
 | ID | Sev | Status | Description | File | Line |
 |----|-----|--------|-------------|------|------|
-| FE-KNOWLEDGE-01 | 🟡 | [ ] | Query history stored in localStorage without size limit — quota exceeded risk | knowledge/query/page.tsx | 55-62 |
+| FE-KNOWLEDGE-01 | 🟡 | [x] | Query history stored in localStorage without size limit — quota exceeded risk | knowledge/query/page.tsx | 55-62 |
 | FE-KNOWLEDGE-02 | 🟢 | [x] | Sources page Refresh button not disabled during loading | knowledge/sources/page.tsx | 71-74 |
-| FE-KNOWLEDGE-03 | 🟡 | [ ] | Markdown rendering of query responses not sanitized — XSS from malicious KB content | knowledge/query/page.tsx | 156-202 |
+| FE-KNOWLEDGE-03 | 🟡 | [x] | Markdown rendering of query responses not sanitized — XSS from malicious KB content | knowledge/query/page.tsx | 156-202 |
 
 ### Admin
 

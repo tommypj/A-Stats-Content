@@ -574,6 +574,24 @@ async def generate_article(
         if proj and isinstance(proj.brand_voice, dict):
             brand_voice = proj.brand_voice
 
+    # GEN-47: Validate generation style params against allowed enum values.
+    # Brand voice values come from user-editable JSON — sanitize to defaults on invalid input.
+    _VALID_WRITING_STYLES = {"editorial", "conversational", "formal", "technical", "simplified", "balanced"}
+    _VALID_VOICES = {"first_person", "second_person", "third_person"}
+    _VALID_LIST_USAGES = {"heavy", "light", "balanced"}
+
+    resolved_writing_style = body.writing_style or brand_voice.get("writing_style") or "balanced"
+    if resolved_writing_style not in _VALID_WRITING_STYLES:
+        resolved_writing_style = "balanced"
+
+    resolved_voice = body.voice or brand_voice.get("voice") or "second_person"
+    if resolved_voice not in _VALID_VOICES:
+        resolved_voice = "second_person"
+
+    resolved_list_usage = body.list_usage or brand_voice.get("list_usage") or "balanced"
+    if resolved_list_usage not in _VALID_LIST_USAGES:
+        resolved_list_usage = "balanced"
+
     # Kick off generation as an asyncio task on the event loop
     # (more reliable than BackgroundTasks for long-running async work)
     task = asyncio.create_task(
@@ -586,9 +604,9 @@ async def generate_article(
             outline_sections=outline.sections,
             outline_tone=body.tone or outline.tone,
             outline_target_audience=body.target_audience or outline.target_audience,
-            writing_style=body.writing_style or brand_voice.get("writing_style") or "balanced",
-            voice=body.voice or brand_voice.get("voice") or "second_person",
-            list_usage=body.list_usage or brand_voice.get("list_usage") or "balanced",
+            writing_style=resolved_writing_style,
+            voice=resolved_voice,
+            list_usage=resolved_list_usage,
             custom_instructions=body.custom_instructions or brand_voice.get("custom_instructions"),
             word_count_target=outline.word_count_target or 1500,
             language=body.language or brand_voice.get("language") or current_user.language or "en",

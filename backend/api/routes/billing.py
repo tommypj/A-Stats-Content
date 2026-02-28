@@ -6,7 +6,7 @@ import hashlib
 import hmac
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Annotated, Optional
 from urllib.parse import urlencode
 
@@ -73,8 +73,13 @@ def _parse_iso_datetime(value: str) -> Optional[datetime]:
     """
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        if parsed < datetime.now(timezone.utc):
-            logger.warning("Webhook subscription_expires %s is in the past", parsed)
+        # BILL-29: Reject past timestamps — setting subscription_expires to a past date
+        # would immediately revoke access. A 5-minute grace window absorbs clock skew.
+        if parsed < datetime.now(timezone.utc) - timedelta(minutes=5):
+            logger.warning(
+                "Webhook datetime %s is in the past — skipping to avoid immediate revocation", parsed
+            )
+            return None
         return parsed
     except (ValueError, AttributeError) as e:
         logger.warning("Failed to parse datetime '%s': %s — skipping expiry update", value, e)

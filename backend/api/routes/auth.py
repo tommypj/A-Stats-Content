@@ -433,7 +433,8 @@ async def refresh_token(
         pwd_changed = user.password_changed_at
         if pwd_changed.tzinfo is None:
             pwd_changed = pwd_changed.replace(tzinfo=timezone.utc)
-        if payload.iat < pwd_changed:
+        # AUTH-21: guard against payload.iat being None (malformed token)
+        if payload.iat and payload.iat < pwd_changed:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token invalidated due to password change. Please log in again.",
@@ -668,11 +669,16 @@ async def resend_verification(
     # Always return success to prevent email enumeration
     if user and not user.email_verified:
         # Create verification token
-        verification_token = token_service.create_email_verification_token(
-            user.id, user.email
-        )
-        user.email_verification_token = verification_token
-        await db.commit()
+        try:
+            verification_token = token_service.create_email_verification_token(
+                user.id, user.email
+            )
+            user.email_verification_token = verification_token
+            await db.commit()
+        except Exception as db_err:
+            # AUTH-19: DB failure is non-fatal — still return success to prevent enumeration
+            logger.error("Failed to save verification token for user %s: %s", user.id, db_err)
+            return {"message": "If the email exists and is not verified, a verification link has been sent"}
 
         try:
             await email_service.send_verification_email(
