@@ -372,7 +372,7 @@ async def _run_article_generation(
                     word_count_target=word_count_target,
                     language=language,
                 ),
-                timeout=270.0,  # 4.5 min hard limit
+                timeout=540.0,  # 9 min hard limit — non-English articles generate 7000+ tokens and can take 8+ min
             )
 
             # Grammar proofreading pass

@@ -97,7 +97,7 @@ class Settings(BaseSettings):
     anthropic_api_key: Optional[str] = None
     anthropic_model: str = "claude-sonnet-4-20250514"
     anthropic_max_tokens: int = 4096
-    anthropic_timeout: int = 300
+    anthropic_timeout: int = 600  # Non-English articles can request 7000+ tokens and need up to 10 min
     ai_request_timeout: int = 60  # GEN-31: timeout (seconds) for short AI requests (e.g. proofread)
     bulk_item_sleep_seconds: int = 2  # BULK-31: seconds to sleep between bulk generation items
 
