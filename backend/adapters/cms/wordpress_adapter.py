@@ -474,6 +474,51 @@ class WordPressAdapter:
             logger.error(f"Failed to update post {post_id}: {e}")
             raise WordPressAPIError(f"Post update failed: {e}")
 
+    async def list_posts(
+        self,
+        per_page: int = 50,
+        status: str = "publish",
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch published posts from WordPress for internal link suggestions.
+
+        Only retrieves the fields needed for scoring and link insertion
+        (id, title, link, slug) to keep the response lightweight.
+
+        Args:
+            per_page: Number of posts to fetch (max 100 per WP API)
+            status: Post status filter (default: publish)
+
+        Returns:
+            List of post objects with id, title, link, slug fields
+
+        Raises:
+            WordPressAPIError: If the request fails
+        """
+        try:
+            client = self._get_client()
+            url = self._build_url("posts")
+            params = {
+                "status": status,
+                "per_page": per_page,
+                "_fields": "id,title,link,slug",
+                "orderby": "date",
+                "order": "desc",
+            }
+
+            logger.info("Fetching WordPress posts for link suggestions")
+            response = await client.get(url, params=params)
+            posts = await self._handle_response(response)
+
+            logger.info(f"Retrieved {len(posts)} WordPress posts")
+            return posts
+
+        except (WordPressAuthError, WordPressAPIError):
+            raise
+        except Exception as e:
+            logger.error(f"Failed to fetch WordPress posts: {e}")
+            raise WordPressAPIError(f"Failed to fetch posts: {e}")
+
     async def get_post(self, post_id: int) -> Dict[str, Any]:
         """
         Get details of a specific WordPress post.

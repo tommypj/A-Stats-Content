@@ -1903,6 +1903,68 @@ async def get_link_suggestions(
                 }
             )
 
+    # Tag A-Stats suggestions with source
+    for s in suggestions:
+        s["source"] = "platform"
+        s["url"] = None
+
+    # Fetch WordPress posts if project has WP connected (graceful degradation)
+    if current_user.current_project_id:
+        proj_result = await db.execute(
+            select(Project).where(Project.id == current_user.current_project_id)
+        )
+        project = proj_result.scalar_one_or_none()
+        if project and project.wordpress_credentials:
+            try:
+                from adapters.cms.wordpress_adapter import WordPressAdapter
+                from core.security.encryption import decrypt_credential
+
+                creds = project.wordpress_credentials
+                site_url = creds.get("site_url", "")
+                username = creds.get("username", "")
+                app_password = decrypt_credential(
+                    creds.get("app_password_encrypted", ""), settings.secret_key
+                )
+
+                if site_url and username and app_password:
+                    async with WordPressAdapter(
+                        site_url=site_url,
+                        username=username,
+                        app_password=app_password,
+                        timeout=5,
+                    ) as wp:
+                        wp_posts = await wp.list_posts(per_page=50)
+
+                    for post in wp_posts:
+                        wp_title = (post.get("title") or {}).get("rendered") or ""
+                        wp_link = post.get("link") or ""
+                        wp_slug = post.get("slug") or ""
+                        if not wp_title or not wp_link:
+                            continue
+
+                        score = 0
+                        post_title_lower = wp_title.lower()
+                        if keyword and keyword in post_title_lower:
+                            score += 5
+                        for word in title_words:
+                            if word in post_title_lower:
+                                score += 1
+
+                        if score > 0:
+                            suggestions.append(
+                                {
+                                    "id": f"wp-{post.get('id')}",
+                                    "title": wp_title,
+                                    "keyword": None,
+                                    "slug": wp_slug,
+                                    "url": wp_link,
+                                    "source": "wordpress",
+                                    "relevance_score": score,
+                                }
+                            )
+            except Exception as e:
+                logger.warning("Failed to fetch WordPress posts for link suggestions: %s", e)
+
     # Sort by relevance descending, return top 10
     suggestions.sort(key=lambda x: x["relevance_score"], reverse=True)
     return {"suggestions": suggestions[:10]}

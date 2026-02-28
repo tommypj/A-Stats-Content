@@ -1148,8 +1148,9 @@ export default function ArticleEditorPage() {
   }
 
   function handleInsertLink(suggestion: LinkSuggestion) {
-    const slug = suggestion.slug || suggestion.id;
-    insertMarkdown(`[${suggestion.title}](/${slug})`, "");
+    // WordPress suggestions have a full absolute URL; platform articles use slug path
+    const href = suggestion.url || `/${suggestion.slug || suggestion.id}`;
+    insertMarkdown(`[${suggestion.title}](${href})`, "");
   }
 
   async function handleExport(format: "markdown" | "html" | "csv") {
@@ -2009,9 +2010,15 @@ export default function ArticleEditorPage() {
                           {suggestion.title}
                         </p>
                         <div className="flex items-center gap-1.5 mt-1">
-                          <span className="text-xs px-1.5 py-0.5 bg-primary-50 text-primary-700 rounded truncate max-w-[120px]">
-                            {suggestion.keyword}
-                          </span>
+                          {suggestion.source === "wordpress" ? (
+                            <span className="text-xs px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded flex-shrink-0">
+                              WP
+                            </span>
+                          ) : suggestion.keyword ? (
+                            <span className="text-xs px-1.5 py-0.5 bg-primary-50 text-primary-700 rounded truncate max-w-[120px]">
+                              {suggestion.keyword}
+                            </span>
+                          ) : null}
                           {/* Relevance dots: 1-3 filled based on score */}
                           <span className="flex items-center gap-0.5 flex-shrink-0" title={`Relevance: ${suggestion.relevance_score}`}>
                             {[1, 2, 3].map((dot) => (

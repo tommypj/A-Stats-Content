@@ -1595,8 +1595,10 @@ export interface ArticleRevisionListResponse {
 export interface LinkSuggestion {
   id: string;
   title: string;
-  keyword: string;
+  keyword: string | null;
   slug: string | null;
+  url: string | null;
+  source: "platform" | "wordpress";
   relevance_score: number;
 }
 
