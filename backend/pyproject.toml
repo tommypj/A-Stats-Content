@@ -62,6 +62,9 @@ dependencies = [
     # Background Tasks
     "arq>=0.25.0",
     "redis>=5.0.1",
+
+    # Error Tracking
+    "sentry-sdk[fastapi]>=2.0.0",
 ]
 
 [project.optional-dependencies]

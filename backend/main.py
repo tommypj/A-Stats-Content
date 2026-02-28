@@ -26,6 +26,30 @@ from services.task_queue import task_queue
 
 settings = get_settings()
 
+# Sentry error tracking — initialised at module level so startup errors are captured too
+if settings.sentry_dsn:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+    from sentry_sdk.integrations.redis import RedisIntegration
+    from sentry_sdk.integrations.logging import LoggingIntegration
+    import logging as _logging
+
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        environment=settings.environment,
+        integrations=[
+            FastApiIntegration(transaction_style="url"),
+            SqlalchemyIntegration(),
+            RedisIntegration(),
+            LoggingIntegration(level=_logging.INFO, event_level=_logging.ERROR),
+        ],
+        traces_sample_rate=0.1 if settings.is_production else 1.0,
+        profiles_sample_rate=0.05 if settings.is_production else 0.0,
+        send_default_pii=False,
+    )
+    logger.info("Sentry error tracking initialised (env=%s)", settings.environment)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

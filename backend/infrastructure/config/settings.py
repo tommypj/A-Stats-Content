@@ -109,6 +109,9 @@ class Settings(BaseSettings):
     resend_api_key: Optional[str] = None
     resend_from_email: str = "noreply@astats.app"
 
+    # Sentry (Error Tracking)
+    sentry_dsn: Optional[str] = None
+
     # LemonSqueezy (Payments)
     lemonsqueezy_api_key: Optional[str] = None
     lemonsqueezy_store_id: Optional[str] = None
