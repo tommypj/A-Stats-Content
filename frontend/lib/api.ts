@@ -61,6 +61,9 @@ export const apiClient: AxiosInstance = axios.create({
   withCredentials: true, // Send HttpOnly cookies with all requests
   headers: {
     "Content-Type": "application/json",
+    // FE-AUTH-05: Non-safelisted custom header forces a CORS preflight on every
+    // request, preventing simple-request CSRF attacks even with SameSite=None cookies.
+    "X-Requested-With": "XMLHttpRequest",
   },
   timeout: 30000, // 30 seconds default
 });

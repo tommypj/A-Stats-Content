@@ -259,7 +259,7 @@
 | BULK-24 | 🟡 | [x] | Project membership check happens AFTER usage limit check in `create_bulk_outline_job` | bulk.py | 342-352 |
 | BULK-25 | 🟢 | [ ] | Background task error handling swallows all exceptions in inner try/except | bulk.py | 384-401 |
 | BULK-26 | 🔴 | [x] | `generate_outline()` called without `user_id` — billing/usage tracking may fail | bulk_generation.py | 162-170 |
-| BULK-27 | 🟠 | [ ] | `ProjectUsageService.check_project_limit()` call — verify signature matches | bulk_generation.py | 133-142 |
+| BULK-27 | 🟠 | [x] | `ProjectUsageService.check_project_limit()` call — verify signature matches | bulk_generation.py | 133-142 |
 | BULK-28 | 🟠 | [x] | `scalar_one_or_none()` used on brand_voice fetch — returns scalar, not project object | bulk_generation.py | 105-110 |
 | BULK-29 | 🟡 | [x] | Race condition: job status update to "processing" is not atomic | bulk_generation.py | 87-90 |
 | BULK-30 | 🟡 | [x] | Outline language field not set on Outline model instance — only passed to AI | bulk_generation.py | 173-194 |
@@ -327,8 +327,8 @@
 | FE-AUTH-01 | 🔴 | [x] | Tokens written to localStorage BEFORE Zustand store update — inconsistent state on failure | login/page.tsx | 53-56 |
 | FE-AUTH-02 | 🔴 | [x] | Token refresh queue not bounded — if `isRefreshing` not reset, requests stuck forever | api.ts | 108-199 |
 | FE-AUTH-03 | 🔴 | [x] | `uploadAvatar` has no file type, size, or MIME validation — arbitrary file upload | api.ts | 352-360 |
-| FE-AUTH-04 | 🔴 | [ ] | Auth tokens stored in plain localStorage — XSS steals tokens (architecture issue) | auth.ts | 45, 54, 62 |
-| FE-AUTH-05 | 🟠 | [ ] | No CSRF token in request headers — forms vulnerable to cross-site request forgery | api.ts | 58-100 |
+| FE-AUTH-04 | 🔴 | [x] | Auth tokens stored in plain localStorage — XSS steals tokens (architecture issue) | auth.ts | 45, 54, 62 |
+| FE-AUTH-05 | 🟠 | [x] | No CSRF token in request headers — forms vulnerable to cross-site request forgery | api.ts | 58-100 |
 | FE-AUTH-06 | 🟠 | [x] | `forceLogout()` uses `window.location.href` — bypasses Zustand cleanup | api.ts | 126-132 |
 | FE-AUTH-07 | 🟠 | [x] | Password change `currentPassword` only requires min(1) — allows single space | password/page.tsx | 15-29 |
 | FE-AUTH-08 | 🟠 | [x] | Raw backend error messages shown to user — leaks internal details | password/page.tsx | 57 |
@@ -416,9 +416,9 @@
 | ID | Sev | Status | Description | File | Line |
 |----|-----|--------|-------------|------|------|
 | FE-SM-01 | 🟡 | [x] | Upload fail doesn't clearly warn user images weren't sent | social/compose/page.tsx | 139-150 |
-| FE-SM-02 | 🟠 | [ ] | Draft restoration references stale account IDs — validation error on deleted accounts | social/compose/page.tsx | 95-112 |
+| FE-SM-02 | 🟠 | [x] | Draft restoration references stale account IDs — validation error on deleted accounts | social/compose/page.tsx | 95-112 |
 | FE-SM-03 | 🟢 | [x] | Callback page could fire twice if user refreshes during redirect | social/callback/page.tsx | 40-46 |
-| FE-SM-04 | 🟠 | [ ] | Post history filters applied client-side — only first 20 posts are filterable | social/history/page.tsx | 34-53 |
+| FE-SM-04 | 🟠 | [x] | Post history filters applied client-side — only first 20 posts are filterable | social/history/page.tsx | 34-53 |
 | FE-SM-05 | 🟢 | [x] | Calendar requests 1000 posts regardless of period — could timeout | social/calendar/page.tsx | 53 |
 | FE-SM-06 | 🟡 | [x] | Post detail page doesn't validate `postId` before API call | social/posts/[id]/page.tsx | 42, 54-70 |
 | FE-SM-07 | 🟢 | [x] | No check for duplicate account before redirect to connect | social/accounts/page.tsx | 45-56 |
