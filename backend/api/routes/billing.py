@@ -210,14 +210,13 @@ async def create_checkout(
     variant_id = get_variant_id(body.plan, body.billing_cycle)
 
     # Build checkout URL with query parameters
-    # LemonSqueezy checkout format:
-    # https://YOUR_STORE.lemonsqueezy.com/checkout/buy/{variant_id}?checkout[email]=...&checkout[custom][user_id]=...
-    store_url = f"https://{settings.lemonsqueezy_store_id}.lemonsqueezy.com"
+    # LemonSqueezy universal checkout format (works with numeric store ID or slug):
+    # https://app.lemonsqueezy.com/checkout/buy/{variant_id}?checkout[email]=...
     params = urlencode({
         "checkout[email]": current_user.email,
-        "checkout[custom][user_id]": current_user.id,
+        "checkout[custom][user_id]": str(current_user.id),
     })
-    checkout_url = f"{store_url}/checkout/buy/{variant_id}?{params}"
+    checkout_url = f"https://app.lemonsqueezy.com/checkout/buy/{variant_id}?{params}"
 
     logger.info(
         f"Created checkout session for user {current_user.id}, "
