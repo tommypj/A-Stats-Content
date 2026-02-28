@@ -1234,7 +1234,6 @@ async def google_oauth_callback(
         await db.commit()
 
     # Issue tokens
-    token_service = TokenService(settings)
     access_token, refresh_token = token_service.create_token_pair(
         user_id=user.id,
         email=user.email,
