@@ -873,18 +873,20 @@ export default function HomePage() {
                 Legal
               </h4>
               <ul className="space-y-2.5">
-                {["Privacy Policy", "Terms of Service", "Cookie Policy"].map(
-                  (l) => (
-                    <li key={l}>
-                      <Link
-                        href="#"
-                        className="text-sm text-primary-200/60 hover:text-white transition-colors"
-                      >
-                        {l}
-                      </Link>
-                    </li>
-                  )
-                )}
+                {[
+                  { label: "Privacy Policy", href: "/legal/privacy" },
+                  { label: "Terms of Service", href: "/legal/terms" },
+                  { label: "Cookie Policy", href: "/legal/cookies" },
+                ].map(({ label, href }) => (
+                  <li key={label}>
+                    <Link
+                      href={href}
+                      className="text-sm text-primary-200/60 hover:text-white transition-colors"
+                    >
+                      {label}
+                    </Link>
+                  </li>
+                ))}
               </ul>
             </div>
           </div>

@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin
+Disallow: /api/
+Disallow: /*/dashboard
+Disallow: /*/settings
+Disallow: /*/articles
+Disallow: /*/outlines
+Disallow: /*/images
+Disallow: /*/social
+Disallow: /*/analytics
+Disallow: /*/knowledge
+Disallow: /*/projects
+Disallow: /*/billing
+Disallow: /*/bulk
+Disallow: /*/agency
+Disallow: /*/portal
