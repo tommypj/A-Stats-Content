@@ -174,14 +174,14 @@ export default function RegisterPage() {
           <span className="text-sm text-text-secondary">
             {t("terms")}{" "}
             <Link
-              href="/terms"
+              href="/legal/terms"
               className="text-primary-500 hover:text-primary-600"
             >
               {t("termsLink")}
             </Link>{" "}
             &{" "}
             <Link
-              href="/privacy"
+              href="/legal/privacy"
               className="text-primary-500 hover:text-primary-600"
             >
               {t("privacyLink")}

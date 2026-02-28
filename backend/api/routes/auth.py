@@ -9,6 +9,8 @@ from typing import Annotated, Optional
 from urllib.parse import urlencode
 from uuid import uuid4
 
+import httpx
+
 from fastapi import APIRouter, Body, Depends, HTTPException, status, Header, Request, UploadFile, File
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
