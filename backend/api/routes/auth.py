@@ -43,12 +43,22 @@ logger = logging.getLogger(__name__)
 
 
 def _get_cookie_kwargs(settings_obj) -> dict:
-    """Return cookie kwargs based on environment."""
+    """Return cookie kwargs based on environment.
+
+    Uses SameSite=None; Secure=True whenever the frontend is deployed to a
+    non-localhost domain — this handles Railway deployments where ENVIRONMENT
+    may not be explicitly set to 'production' but the frontend is on Vercel.
+    SameSite=Lax is kept for local development (same-origin, HTTP-safe).
+    """
     is_production = getattr(settings_obj, 'environment', 'development') == 'production'
+    # Also treat as cross-site when FRONTEND_URL is not localhost
+    frontend_url = getattr(settings_obj, 'frontend_url', 'http://localhost:3000')
+    is_deployed = not any(h in frontend_url for h in ('localhost', '127.0.0.1', '0.0.0.0'))
+    use_cross_site = is_production or is_deployed
     kwargs = dict(
         httponly=True,
-        secure=is_production,
-        samesite="none" if is_production else "lax",
+        secure=use_cross_site,
+        samesite="none" if use_cross_site else "lax",
         path="/",
     )
     cookie_domain = getattr(settings_obj, 'cookie_domain', None)
