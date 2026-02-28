@@ -1,6 +1,10 @@
 /**
  * Client-side SEO scoring — pure, no API calls.
  * All logic is deterministic so results can be memoised / debounced freely.
+ *
+ * Updated 2025-2026: checks now reflect GEO/AEO best practices —
+ * FAQ sections, external citations, structured lists, and content
+ * depth thresholds that align with AI answer engine citation criteria.
  */
 
 export interface SEOCheck {
@@ -52,6 +56,11 @@ function countKeyword(text: string, keyword: string): number {
   return (text.match(re) ?? []).length;
 }
 
+/** Count H2-level headings (## but not ###). */
+function countH2(content: string): number {
+  return (content.match(/^## /gm) ?? []).length;
+}
+
 // ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
@@ -65,39 +74,7 @@ export function calculateSEOScore(article: SEOArticleInput): SEOScore {
   const checks: SEOCheck[] = [];
 
   // ------------------------------------------------------------------
-  // 1. Title length — 30–60 chars
-  // ------------------------------------------------------------------
-  const titleLen = title.length;
-  checks.push({
-    label: "Title length (30–60 chars)",
-    passed: titleLen >= 30 && titleLen <= 60,
-    tip:
-      titleLen < 30
-        ? `Your title is only ${titleLen} characters. Aim for at least 30 to give Google enough context.`
-        : titleLen > 60
-        ? `Your title is ${titleLen} characters — Google truncates at ~60. Try to shorten it.`
-        : "",
-  });
-
-  // ------------------------------------------------------------------
-  // 2. Meta description length — 120–160 chars
-  // ------------------------------------------------------------------
-  const descLen = metaDesc.length;
-  checks.push({
-    label: "Meta description length (120–160 chars)",
-    passed: descLen >= 120 && descLen <= 160,
-    tip:
-      descLen === 0
-        ? "Add a meta description to improve click-through rate from search results."
-        : descLen < 120
-        ? `Your meta description is ${descLen} characters. Expand it to at least 120 for best results.`
-        : descLen > 160
-        ? `Your meta description is ${descLen} characters — Google truncates at ~160. Shorten it.`
-        : "",
-  });
-
-  // ------------------------------------------------------------------
-  // 3. Keyword in title
+  // 1. Keyword in title
   // ------------------------------------------------------------------
   const keywordInTitle =
     keyword.length > 0 && normalise(title).includes(normalise(keyword));
@@ -110,21 +87,21 @@ export function calculateSEOScore(article: SEOArticleInput): SEOScore {
   });
 
   // ------------------------------------------------------------------
-  // 4. Keyword in first paragraph (first 200 chars of content)
+  // 2. Keyword in opening (first 300 chars — covers HPPP hook + problem)
   // ------------------------------------------------------------------
-  const first200 = content.slice(0, 200);
+  const opening = content.slice(0, 300);
   const keywordInOpening =
-    keyword.length > 0 && normalise(first200).includes(normalise(keyword));
+    keyword.length > 0 && normalise(opening).includes(normalise(keyword));
   checks.push({
     label: "Keyword in opening paragraph",
     passed: keywordInOpening,
     tip: keyword
-      ? `Mention "${keyword}" early in your content (within the first paragraph) to establish relevance.`
+      ? `Mention "${keyword}" in the first paragraph. AI engines weight early keyword signals heavily.`
       : "Set a target keyword so this check can evaluate keyword placement.",
   });
 
   // ------------------------------------------------------------------
-  // 5. Keyword density — 1–3% of total words
+  // 3. Keyword density — 1–3% of total words
   // ------------------------------------------------------------------
   const totalWords = wordCount(content);
   const kwCount = keyword ? countKeyword(content, keyword) : 0;
@@ -133,78 +110,107 @@ export function calculateSEOScore(article: SEOArticleInput): SEOScore {
   checks.push({
     label: "Keyword density (1–3%)",
     passed: densityOk,
+    tip: !keyword
+      ? "Set a target keyword so this check can evaluate keyword density."
+      : density < 1
+      ? `Keyword density is ${density.toFixed(1)}% — too low. Aim for 1–3%.`
+      : density > 3
+      ? `Keyword density is ${density.toFixed(1)}% — too high. Reduce usage to avoid keyword stuffing penalties.`
+      : "",
+  });
+
+  // ------------------------------------------------------------------
+  // 4. Meta description — 120–160 chars and contains keyword
+  // ------------------------------------------------------------------
+  const descLen = metaDesc.length;
+  const kwInMeta =
+    keyword.length > 0 && normalise(metaDesc).includes(normalise(keyword));
+  const metaOk = descLen >= 120 && descLen <= 160 && kwInMeta;
+  checks.push({
+    label: "Meta description (120–160 chars, includes keyword)",
+    passed: metaOk,
     tip:
-      !keyword
-        ? "Set a target keyword so this check can evaluate keyword density."
-        : density < 1
-        ? `Keyword density is ${density.toFixed(1)}% — too low. Aim for 1–3% to reinforce relevance without over-optimising.`
-        : density > 3
-        ? `Keyword density is ${density.toFixed(1)}% — too high. Reduce usage to avoid keyword stuffing penalties.`
+      descLen === 0
+        ? "Add a meta description containing your keyword — it's both an SEO and AI citation signal."
+        : !kwInMeta
+        ? `Include "${keyword}" in your meta description to reinforce relevance in search snippets.`
+        : descLen < 120
+        ? `Meta description is ${descLen} chars — expand to at least 120.`
+        : descLen > 160
+        ? `Meta description is ${descLen} chars — Google truncates at ~160. Shorten it.`
         : "",
   });
 
   // ------------------------------------------------------------------
-  // 6. Content length — at least 800 words
+  // 5. Content length — 1500+ words (GEO/AEO threshold)
+  //    Research: articles 1500+ words average 5.1 AI citations vs 3.2 for <800
   // ------------------------------------------------------------------
-  const contentWords = totalWords;
   checks.push({
-    label: "Content length (800+ words)",
-    passed: contentWords >= 800,
+    label: "Content depth (1500+ words)",
+    passed: totalWords >= 1500,
     tip:
-      contentWords === 0
+      totalWords === 0
         ? "Add content to your article."
-        : `Your article has ${contentWords} words. Most top-ranking pages have at least 800 words.`,
+        : `Your article has ${totalWords} words. Articles with 1500+ words average significantly more AI citations and top-10 rankings.`,
   });
 
   // ------------------------------------------------------------------
-  // 7. Has headings — at least one ## or ###
+  // 6. H2 structure — at least 3 H2 headings
+  //    Optimal range for AI passage retrieval is 4-8 H2 sections
   // ------------------------------------------------------------------
-  const hasHeadings = /^#{2,3}\s/m.test(content);
+  const h2Count = countH2(content);
   checks.push({
-    label: "Has subheadings (## or ###)",
-    passed: hasHeadings,
-    tip: "Add H2 or H3 subheadings to structure your content and improve readability and SEO.",
-  });
-
-  // ------------------------------------------------------------------
-  // 8. Has internal links — at least one markdown link [text](url)
-  // ------------------------------------------------------------------
-  const hasLinks = /\[.+?\]\(.+?\)/.test(content);
-  checks.push({
-    label: "Has at least one link",
-    passed: hasLinks,
-    tip: "Include at least one internal or external link to provide context and improve crawlability.",
-  });
-
-  // ------------------------------------------------------------------
-  // 9. Meta description contains keyword
-  // ------------------------------------------------------------------
-  const kwInMeta =
-    keyword.length > 0 &&
-    normalise(metaDesc).includes(normalise(keyword));
-  checks.push({
-    label: "Keyword in meta description",
-    passed: kwInMeta,
-    tip: keyword
-      ? `Include "${keyword}" in your meta description to reinforce relevance in search snippets.`
-      : "Set a target keyword so this check can evaluate meta description relevance.",
-  });
-
-  // ------------------------------------------------------------------
-  // 10. Image alt text — if images exist, they all have alt text
-  //     Pattern: ![alt text](url) — alt must be non-empty
-  // ------------------------------------------------------------------
-  const allImages = Array.from(content.matchAll(/!\[(.*?)\]\(.+?\)/g));
-  const imagesWithoutAlt = allImages.filter((m) => m[1].trim() === "");
-  const imageAltOk =
-    allImages.length === 0 || imagesWithoutAlt.length === 0;
-  checks.push({
-    label: "Images have alt text",
-    passed: imageAltOk,
+    label: "Section structure (3+ H2 headings)",
+    passed: h2Count >= 3,
     tip:
-      allImages.length === 0
-        ? "No images found. Adding images with descriptive alt text improves SEO and accessibility."
-        : `${imagesWithoutAlt.length} image(s) are missing alt text. Add descriptions inside the square brackets: ![describe the image](url).`,
+      h2Count === 0
+        ? "Add H2 headings (## Heading) to structure your content. AI engines use headings as extraction anchors."
+        : `Your article has ${h2Count} H2 heading${h2Count === 1 ? "" : "s"}. Use at least 3 H2s to give AI engines enough modular sections to cite.`,
+  });
+
+  // ------------------------------------------------------------------
+  // 7. FAQ section — contains a Frequently Asked Questions H2
+  //    FAQPage schema + FAQ content = highest AI citation format
+  // ------------------------------------------------------------------
+  const hasFaq = /##\s+(frequently asked questions|faq)/i.test(content);
+  checks.push({
+    label: "FAQ section present",
+    passed: hasFaq,
+    tip: "Add a '## Frequently Asked Questions' section. FAQs are the #1 format cited by Google AI Overviews and Perplexity — even though FAQ rich results were removed from SERPs.",
+  });
+
+  // ------------------------------------------------------------------
+  // 8. External citation link — at least one https:// link
+  //    3–5 external links per 1000 words to authoritative sources
+  //    is the GEO best practice for citation readiness
+  // ------------------------------------------------------------------
+  const externalLinks = (content.match(/\[.+?\]\(https?:\/\//g) ?? []).length;
+  checks.push({
+    label: "External citation link (1+)",
+    passed: externalLinks >= 1,
+    tip: "Add at least one external link to an authoritative source (study, official docs, industry report). AI engines treat outbound citations as a trust signal and citation-readiness marker.",
+  });
+
+  // ------------------------------------------------------------------
+  // 9. Structured lists — at least one bullet or numbered list
+  //    Lists are among the most-cited formats by AI answer engines
+  // ------------------------------------------------------------------
+  const hasLists = /^(\s*[-*+]|\s*\d+\.)\s/m.test(content);
+  checks.push({
+    label: "Has structured lists (bullets or numbered)",
+    passed: hasLists,
+    tip: "Add bullet points or a numbered list. Lists are one of the highest-citation formats for Google AI Overviews, Perplexity, and ChatGPT Search.",
+  });
+
+  // ------------------------------------------------------------------
+  // 10. TL;DR / Quick Answer block — Answer Capsule at the top
+  //     Checks for the > **Quick Answer:** blockquote pattern
+  // ------------------------------------------------------------------
+  const hasTldr = />\s*\*\*(quick answer|tl;?dr|summary|key takeaway)/i.test(content);
+  checks.push({
+    label: "Quick Answer / TL;DR block",
+    passed: hasTldr,
+    tip: "Add a Quick Answer block near the top: > **Quick Answer:** [40-70 word standalone answer]. This is the most-extracted format by AI Overviews and is critical for zero-click visibility.",
   });
 
   // ------------------------------------------------------------------

@@ -165,8 +165,13 @@ CRITICAL RULES:
 5. Include specific examples, analogies, and scenarios rather than generic advice.
 6. Do NOT start multiple consecutive paragraphs with the same word or structure.
 7. Avoid filler phrases like "In conclusion", "It's important to note that", "As mentioned above".
-8. When citing research or studies, be specific — name the institution, year, or researcher when possible. Do not say "studies show" without attribution.
-9. GRAMMAR AND LANGUAGE QUALITY: Use impeccable grammar throughout. Ensure subject-verb agreement, correct tense consistency, proper use of articles (a/an/the), correct prepositions, and natural sentence flow. Every sentence must be grammatically correct and publication-ready."""
+8. When citing research or studies, be specific — name the institution, year, or researcher when possible. Do not say "studies show" without attribution. Format all statistics as "X% (Source, Year)" — e.g., "62% of marketers report better engagement from structured content (HubSpot, 2025)".
+9. GRAMMAR AND LANGUAGE QUALITY: Use impeccable grammar throughout. Ensure subject-verb agreement, correct tense consistency, proper use of articles (a/an/the), correct prepositions, and natural sentence flow. Every sentence must be grammatically correct and publication-ready.
+10. STRUCTURE FOR AI SEARCH VISIBILITY (non-negotiable):
+    - The FIRST 1-2 sentences under every H2 heading must be an "Answer Capsule" — a 20-25 word direct answer to that section's implied question that stands alone without surrounding context.
+    - Keep each sub-section between 120-180 words — the optimal range for AI retrieval engines (Google AI Overviews, Perplexity, ChatGPT) to extract and cite content.
+    - Every article MUST end with a "Frequently Asked Questions" H2 section containing 5-7 real user questions with 40-60 word self-contained answers.
+    - Format statistics as "X% (Source, Year)" — never use vague claims without attribution."""
 
     @staticmethod
     def _sanitize_prompt_input(text: Optional[str], max_length: int) -> str:
@@ -372,35 +377,79 @@ Respond in JSON format:
 6. Under each heading, write at least 2-3 substantive paragraphs BEFORE considering any list
 7. When you do use a list, introduce it with a paragraph and follow it with analysis or a connecting paragraph"""
 
-        prompt = f"""Write a complete, SEO-optimized article based on this outline:
+        prompt = f"""Write a complete, high-performance article optimised for both Google Search and AI answer engines (Google AI Overviews, Perplexity, ChatGPT). Follow ALL structural requirements below exactly.
 
 Title: {title}
 Keyword: {keyword}
 {audience_context}
 Tone: {tone}{language_context}
 
-**TARGET WORD COUNT: approximately {word_count_target} words (between {word_min} and {word_max} words). This is a strict requirement — do NOT exceed {word_max} words.**
+**TARGET WORD COUNT: approximately {word_count_target} words (between {word_min} and {word_max} words). Strict requirement — do NOT exceed {word_max} words.**
 
 Outline:
 {sections_text}
 
-IMPORTANT WRITING GUIDELINES:
-1. **WORD COUNT IS CRITICAL**: The article MUST be approximately {word_count_target} words. Distribute the word budget across sections proportionally to the per-section targets shown above. Do NOT write more than {word_max} words total.
-2. **COMPLETE ALL SECTIONS**: You MUST write content for EVERY section in the outline. Do not stop early. All {len(sections)} sections must be covered.
-3. Follow the outline structure exactly — use the provided H2 and H3 headings
-{format_guidelines}
-8. End with a conclusion that synthesizes key insights and includes a call-to-action
-9. Vary your paragraph openings — do not start consecutive paragraphs the same way
-10. Include specific examples, case studies, or scenarios to illustrate points
-11. Use transitional phrases to connect sections naturally
+═══════════════════════════════════════════
+MANDATORY ARTICLE STRUCTURE — FOLLOW EXACTLY
+═══════════════════════════════════════════
 
-SEO REQUIREMENTS (these are critical for ranking):
-12. **Keyword in introduction**: Naturally mention "{keyword}" within the first 1-2 sentences of the article
-13. **Internal/external links**: Include 2-3 contextual markdown links throughout the article — use descriptive anchor text. Examples: [relevant anchor text](https://example.com/relevant-page). Place them naturally within paragraphs where a source, tool, or related concept is mentioned
-14. **Keyword density**: Use "{keyword}" naturally throughout the article, aiming for roughly 1-2% density. Do NOT force it — only place it where it reads naturally
+━━━ SECTION 1: INTRODUCTION (HPPP Formula) ━━━
+Write the introduction using this exact 4-part sequence:
+• Hook: ONE striking sentence — a surprising statistic, counterintuitive fact, or a statement the reader immediately nods at
+• Problem: 1-2 sentences naming the specific challenge the reader faces related to "{keyword}"
+• Promise: 1 sentence stating this article provides the solution
+• Preview: 1-2 sentences summarising what the article covers
+
+Immediately after the HPPP intro, add this TL;DR callout on its own line:
+> **Quick Answer:** [30-50 word direct, standalone answer to the primary question about "{keyword}" — must be independently citable]
+
+━━━ SECTION 2: BODY SECTIONS (apply to EVERY H2) ━━━
+Under each H2 heading, follow this sequence:
+a) **Answer Capsule** (REQUIRED FIRST — no exceptions): 1-2 sentences, 20-25 words, that directly answer the section's implied question. Must stand alone without surrounding context.
+b) **Context Block**: Expand to 120-180 words total for the section, adding supporting data, examples, or evidence
+c) **Supporting element**: a list, table, or example as appropriate to the section content
+d) **Statistics**: format ALL data as "X% (Source, Year)" — e.g., "Pages with structured headings receive 70% more AI citations (Averi AI, 2026)"
+
+{format_guidelines}
+
+━━━ SECTION 3: COMPARISON TABLE (include when topic allows) ━━━
+If the topic involves comparing options, approaches, tools, or methods, include a markdown table:
+| Aspect | Option A | Option B |
+|--------|----------|----------|
+Use at least 3 columns and 4 rows. Place it inside the most relevant H2 section.
+
+━━━ SECTION 4: EXPERT INSIGHT (REQUIRED) ━━━
+Include at least one expert insight formatted as a blockquote:
+> **[Expert Name, Role/Organisation]:** "[Direct quote or insight that adds authority to a key point in the article]"
+
+Place it naturally within the body where it supports a claim.
+
+━━━ SECTION 5: FAQ SECTION (REQUIRED — DO NOT SKIP) ━━━
+After the main body and before the conclusion, add:
+
+## Frequently Asked Questions About {keyword}
+
+Write exactly 5-7 Q&As. Rules:
+- Question: Phrased exactly as a real user would type in Google or ask a voice assistant (question format, not a statement)
+- Answer: 40-60 words, completely self-contained — NO "as mentioned above", NO "as discussed", NO forward references
+
+━━━ SECTION 6: CONCLUSION ━━━
+Structure the conclusion as:
+a) Summary paragraph: 40-60 words restating the core answer in fresh language (do not repeat the intro)
+b) **Key Takeaways** list: 4-6 concrete, actionable bullet points from the article
+c) Call to action: 1-2 sentence next step for the reader
+
+═══════════════════════════════════════════
+SEO & COMPLETENESS REQUIREMENTS
+═══════════════════════════════════════════
+- **Word count**: MUST be between {word_min} and {word_max} words. Distribute proportionally across all {len(sections)} sections — do NOT stop early.
+- **Keyword in introduction**: Mention "{keyword}" naturally within the first 1-2 sentences
+- **Keyword density**: Use "{keyword}" naturally throughout, targeting 1-2% density. Do NOT force it.
+- **Links**: Include 2-3 contextual markdown links with descriptive anchor text: [descriptive text](https://example.com/page). At least 1 external link to an authoritative source.
+- **Complete ALL outline sections**: Every H2 and H3 in the outline must be covered.
 {custom_context}
 
-Write the article in markdown format. Start directly with the introduction — do NOT repeat the title as an H1.
+Write in markdown format. Start directly with the introduction — do NOT add an H1 title.
 
 At the very end, after the article, add:
 ---

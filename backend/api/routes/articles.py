@@ -132,7 +132,9 @@ def calculate_read_time(content: str) -> int:
 
 def analyze_seo(content: str, keyword: str, title: str, meta_description: str) -> dict:
     """
-    Analyze content for SEO metrics.
+    Analyse content for SEO and AEO (Answer Engine Optimisation) metrics.
+    Scoring updated 2025-2026 to reflect GEO/AEO best practices: FAQ sections,
+    external citations, structured lists, content depth, and Quick Answer blocks.
     """
     content_lower = content.lower()
     keyword_lower = keyword.lower()
@@ -144,77 +146,101 @@ def analyze_seo(content: str, keyword: str, title: str, meta_description: str) -
     keyword_count = len(re.findall(r'\b' + re.escape(keyword_lower) + r'\b', content_lower))
     keyword_density = (keyword_count / word_count * 100) if word_count > 0 else 0
 
-    # Check headings
-    h2_count = len(re.findall(r"^##\s", content, re.MULTILINE))
-    h3_count = len(re.findall(r"^###\s", content, re.MULTILINE))
-    # SEO-09: relax to H2 count only — valid flat articles without H3s were penalized
+    # Title keyword check
+    title_has_keyword = bool(re.search(r'\b' + re.escape(keyword_lower) + r'\b', title.lower()))
+
+    # Keyword in opening (first 300 chars — covers HPPP hook + problem)
+    keyword_in_opening = bool(re.search(r'\b' + re.escape(keyword_lower) + r'\b', content_lower[:300]))
+
+    # Headings: H2 count (## but not ###)
+    h2_count = len(re.findall(r"^## ", content, re.MULTILINE))
+    h3_count = len(re.findall(r"^### ", content, re.MULTILINE))
     headings_structure = "good" if h2_count >= 3 else "needs_improvement"
 
     # Links
     internal_links = len(re.findall(r"\[.*?\]\(/", content))
     external_links = len(re.findall(r"\[.*?\]\(https?://", content))
 
-    # Image alt texts — SEO-05: articles with zero images should NOT receive full marks
+    # FAQ section (H2 titled "Frequently Asked Questions" or "FAQ")
+    has_faq = bool(re.search(r"^## .*(frequently asked questions|faq)", content, re.MULTILINE | re.IGNORECASE))
+
+    # Structured lists (bullet or numbered)
+    has_lists = bool(re.search(r"^(\s*[-*+]|\s*\d+\.)\s", content, re.MULTILINE))
+
+    # Quick Answer / TL;DR block (> **Quick Answer:** or similar blockquote pattern)
+    has_quick_answer = bool(re.search(r">\s*\*\*(quick answer|tl;?dr|summary|key takeaway)", content, re.IGNORECASE))
+
+    # Image alt texts
     images = re.findall(r"!\[(.*?)\]\(", content)
     image_alt_texts = bool(images) and all(alt.strip() for alt in images)
 
     # Basic readability (average sentence length)
-    # SEO-13: filter empty strings to avoid inflated sentence count
     sentences = [s for s in re.split(r"[.!?]+", content) if s.strip()]
     avg_sentence_length = word_count / len(sentences) if sentences else 0
     readability_score = min(100, max(0, 100 - (avg_sentence_length - 15) * 2))
 
-    # Generate suggestions
+    # ----------------------------------------------------------------
+    # Generate actionable suggestions
+    # ----------------------------------------------------------------
     suggestions = []
     if keyword_density < 1:
         suggestions.append(f"Increase keyword '{keyword}' usage (currently {keyword_density:.1f}%)")
     elif keyword_density > 3:
         suggestions.append(f"Reduce keyword stuffing (currently {keyword_density:.1f}%)")
-
-    title_has_keyword = bool(re.search(r'\b' + re.escape(keyword_lower) + r'\b', title.lower()))
     if not title_has_keyword:
         suggestions.append("Add target keyword to the title")
-
+    if not keyword_in_opening:
+        suggestions.append(f"Mention '{keyword}' in the opening paragraph (first 300 characters)")
     if not meta_description:
-        suggestions.append("Add a meta description")
+        suggestions.append("Add a meta description (150-160 characters including the keyword)")
     elif len(meta_description) < 120:
-        suggestions.append("Make meta description longer (aim for 150-160 characters)")
+        suggestions.append("Expand meta description to at least 120 characters")
     elif len(meta_description) > 160:
         suggestions.append("Shorten meta description to under 160 characters")
-
     if h2_count < 3:
-        suggestions.append("Add more H2 headings for better structure")
-
-    if internal_links < 2:
-        suggestions.append("Add more internal links")
-
+        suggestions.append("Add more H2 headings (## Section) — aim for at least 3 modular sections")
+    if word_count < 1500:
+        suggestions.append(f"Expand content to 1500+ words (currently {word_count}) — articles 1500+ words average significantly more AI citations")
+    if not has_faq:
+        suggestions.append("Add a '## Frequently Asked Questions' section — the highest-citation format for Google AI Overviews and Perplexity")
     if external_links < 1:
-        suggestions.append("Consider adding external links to authoritative sources")
+        suggestions.append("Add at least one external link to an authoritative source (study, official docs, industry report)")
+    if not has_lists:
+        suggestions.append("Add bullet points or a numbered list — structured lists are among the most-cited formats by AI answer engines")
+    if not has_quick_answer:
+        suggestions.append("Add a Quick Answer block near the top: > **Quick Answer:** [40-70 word standalone answer]")
 
-    # Calculate overall score
-    # SEO-11: start from 0 (not 50) so un-optimised articles don't score 50% automatically
+    # ----------------------------------------------------------------
+    # Score (0-100) — updated weights for GEO/AEO 2025-2026
+    # ----------------------------------------------------------------
     score = 0
-    score += 20 if 1 <= keyword_density <= 3 else 0
-    score += 20 if title_has_keyword else 0
-    score += 15 if meta_description and 120 <= len(meta_description) <= 160 else 0
-    score += 15 if headings_structure == "good" else 0
-    score += 15 if internal_links >= 2 else 0
-    score += 10 if external_links >= 1 else 0
-    # SEO-05: only award image alt text points when images exist AND they all have alt text
-    score += 5 if image_alt_texts else 0
+    score += 15 if 1 <= keyword_density <= 3 else 0          # Keyword density
+    score += 15 if title_has_keyword else 0                    # Keyword in title
+    score += 10 if meta_description and 120 <= len(meta_description) <= 160 else 0  # Meta desc
+    score += 15 if headings_structure == "good" else 0         # 3+ H2s
+    score += 15 if has_faq else 0                              # FAQ section (AEO signal)
+    score += 10 if external_links >= 1 else 0                  # External citation
+    score += 10 if has_lists else 0                            # Structured lists
+    score += 5 if has_quick_answer else 0                      # Quick Answer / TL;DR block
+    score += 5 if image_alt_texts else 0                       # Image alt texts (when images exist)
 
     return {
         "score": min(100, score),
         "keyword_density": round(keyword_density, 2),
         "title_has_keyword": title_has_keyword,
+        "keyword_in_opening": keyword_in_opening,
         "meta_description_length": len(meta_description) if meta_description else 0,
         "headings_structure": headings_structure,
         "h2_count": h2_count,
         "h3_count": h3_count,
         "internal_links": internal_links,
         "external_links": external_links,
+        "has_faq": has_faq,
+        "has_lists": has_lists,
+        "has_quick_answer": has_quick_answer,
         "image_alt_texts": image_alt_texts,
         "readability_score": round(readability_score, 1),
+        "word_count": word_count,
         "suggestions": suggestions,
     }
 
