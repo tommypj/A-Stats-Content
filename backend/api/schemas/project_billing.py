@@ -18,6 +18,7 @@ class ProjectLimits(BaseModel):
     articles_per_month: int = Field(..., description="Articles limit per month (-1 = unlimited)")
     outlines_per_month: int = Field(..., description="Outlines limit per month (-1 = unlimited)")
     images_per_month: int = Field(..., description="Images limit per month (-1 = unlimited)")
+    social_posts_per_month: int = Field(..., description="Social post sets limit per month (-1 = unlimited)")
     max_members: int = Field(..., description="Maximum project members allowed")
 
     model_config = ConfigDict(from_attributes=True)
@@ -32,6 +33,8 @@ class ProjectUsageStats(BaseModel):
     outlines_limit: int = Field(..., description="Outlines limit per month")
     images_used: int = Field(..., description="Images generated this month")
     images_limit: int = Field(..., description="Images limit per month")
+    social_posts_used: int = Field(..., description="Social post sets generated this month")
+    social_posts_limit: int = Field(..., description="Social post sets limit per month")
     members_count: int = Field(..., description="Current number of project members")
     members_limit: int = Field(..., description="Maximum members allowed")
     usage_reset_date: Optional[datetime] = Field(None, description="Date when usage resets")

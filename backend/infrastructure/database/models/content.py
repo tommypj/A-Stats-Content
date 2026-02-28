@@ -182,6 +182,7 @@ class Article(Base, TimestampMixin):
     )
     word_count: Mapped[int] = mapped_column(default=0, nullable=False)
     read_time: Mapped[Optional[int]] = mapped_column(nullable=True)  # minutes
+    improve_count: Mapped[int] = mapped_column(default=0, nullable=False)  # AI improvement passes used (max = ARTICLE_IMPROVE_LIMIT)
 
     # SEO
     seo_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)

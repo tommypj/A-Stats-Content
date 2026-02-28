@@ -25,26 +25,30 @@ logger = logging.getLogger(__name__)
 PROJECT_TIER_LIMITS: Dict[str, Dict[str, int]] = {
     SubscriptionTier.FREE.value: {
         "articles_per_month": 10,
-        "outlines_per_month": 20,
+        "outlines_per_month": 10,
         "images_per_month": 5,
+        "social_posts_per_month": 5,
         "max_members": 3,
     },
     SubscriptionTier.STARTER.value: {
-        "articles_per_month": 50,
-        "outlines_per_month": 100,
-        "images_per_month": 25,
+        "articles_per_month": 10,
+        "outlines_per_month": 10,
+        "images_per_month": 10,
+        "social_posts_per_month": 10,
         "max_members": 5,
     },
     SubscriptionTier.PROFESSIONAL.value: {
-        "articles_per_month": 200,
-        "outlines_per_month": 400,
-        "images_per_month": 100,
+        "articles_per_month": 50,
+        "outlines_per_month": 50,
+        "images_per_month": 50,
+        "social_posts_per_month": 50,
         "max_members": 15,
     },
     SubscriptionTier.ENTERPRISE.value: {
-        "articles_per_month": -1,  # -1 = unlimited
-        "outlines_per_month": -1,
-        "images_per_month": -1,
+        "articles_per_month": 200,
+        "outlines_per_month": 200,
+        "images_per_month": 200,
+        "social_posts_per_month": 200,
         "max_members": -1,  # unlimited members
     },
 }
@@ -111,6 +115,7 @@ class ProjectUsageService:
             articles_per_month=limits["articles_per_month"],
             outlines_per_month=limits["outlines_per_month"],
             images_per_month=limits["images_per_month"],
+            social_posts_per_month=limits["social_posts_per_month"],
             max_members=limits["max_members"],
         )
 
@@ -144,6 +149,8 @@ class ProjectUsageService:
             outlines_limit=limits.outlines_per_month,
             images_used=project.images_generated_this_month,
             images_limit=limits.images_per_month,
+            social_posts_used=project.social_posts_generated_this_month,
+            social_posts_limit=limits.social_posts_per_month,
             members_count=active_members_count,
             members_limit=limits.max_members,
             usage_reset_date=project.usage_reset_date,
@@ -190,6 +197,10 @@ class ProjectUsageService:
             "images": (
                 project.images_generated_this_month,
                 limits.images_per_month,
+            ),
+            "social_posts": (
+                project.social_posts_generated_this_month,
+                limits.social_posts_per_month,
             ),
         }
 
@@ -249,12 +260,13 @@ class ProjectUsageService:
             "articles": Project.articles_generated_this_month,
             "outlines": Project.outlines_generated_this_month,
             "images": Project.images_generated_this_month,
+            "social_posts": Project.social_posts_generated_this_month,
         }
         column = column_map.get(resource)
         if column is None:
             raise ValueError(
                 f"Invalid resource type: {resource}. "
-                f"Must be one of: articles, outlines, images"
+                f"Must be one of: articles, outlines, images, social_posts"
             )
 
         # Atomic SQL increment — no read-modify-write race
@@ -323,6 +335,7 @@ class ProjectUsageService:
         project.articles_generated_this_month = 0
         project.outlines_generated_this_month = 0
         project.images_generated_this_month = 0
+        project.social_posts_generated_this_month = 0
 
         # Calculate next reset date (first day of next month)
         if now.month == 12:

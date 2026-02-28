@@ -92,6 +92,7 @@ class Project(Base, TimestampMixin):
         default=0, nullable=False
     )
     images_generated_this_month: Mapped[int] = mapped_column(default=0, nullable=False)
+    social_posts_generated_this_month: Mapped[int] = mapped_column(default=0, nullable=False)
     usage_reset_date: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

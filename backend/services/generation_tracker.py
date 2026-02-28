@@ -102,6 +102,7 @@ class GenerationTracker:
                         "article": "articles_generated_this_month",
                         "outline": "outlines_generated_this_month",
                         "image": "images_generated_this_month",
+                        "social_post": "social_posts_generated_this_month",
                     }
                     usage_field = ALLOWED_USAGE_FIELDS.get(log.resource_type)
                     if usage_field:
@@ -208,6 +209,7 @@ class GenerationTracker:
                     "article": "articles_generated_this_month",
                     "outline": "outlines_generated_this_month",
                     "image": "images_generated_this_month",
+                    "social_post": "social_posts_generated_this_month",
                 }
                 usage_field = ALLOWED_USAGE_FIELDS.get(resource_type)
                 if not usage_field:
@@ -246,6 +248,7 @@ class GenerationTracker:
             user.articles_generated_this_month = 0
             user.outlines_generated_this_month = 0
             user.images_generated_this_month = 0
+            user.social_posts_generated_this_month = 0
             if now.month == 12:
                 user.usage_reset_date = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc)
             else:
@@ -265,6 +268,7 @@ class GenerationTracker:
             user.articles_generated_this_month = 0
             user.outlines_generated_this_month = 0
             user.images_generated_this_month = 0
+            user.social_posts_generated_this_month = 0
             # Set next reset to the first of the month after the current date
             if now.month == 12:
                 user.usage_reset_date = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc)

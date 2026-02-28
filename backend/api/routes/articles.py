@@ -49,6 +49,7 @@ from infrastructure.database.models.keyword_cache import KeywordResearchCache
 from adapters.ai.anthropic_adapter import content_ai_service, GeneratedArticle
 from infrastructure.config.settings import settings
 from services.generation_tracker import GenerationTracker
+from core.plans import ARTICLE_IMPROVE_LIMIT
 
 logger = logging.getLogger(__name__)
 
@@ -1312,20 +1313,12 @@ async def improve_article(
             detail="Article has no content to improve",
         )
 
-    # GEN-23: improve_article currently counts against the full article generation quota
-    # which is likely unintended — AI improvement is a lighter operation than full generation.
-    # TODO: improve_article should use a separate quota (e.g., resource_type="proofread")
-    #       with a higher limit (e.g., 3× the article limit) once a dedicated quota exists.
-    # For now it reuses the article check to avoid completely bypassing limits.
-    tracker = GenerationTracker(db)
-    if not await tracker.check_limit(
-        project_id=current_user.current_project_id,
-        resource_type="article",
-        user_id=current_user.id,
-    ):
+    # Each article may be improved at most ARTICLE_IMPROVE_LIMIT times (all tiers).
+    # This is a per-article cap, not a monthly quota — it does not consume generation credits.
+    if (article.improve_count or 0) >= ARTICLE_IMPROVE_LIMIT:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Monthly article generation limit reached. Upgrade your plan to continue.",
+            detail=f"This article has already used all {ARTICLE_IMPROVE_LIMIT} AI improvement passes.",
         )
 
     # Save current content as a revision so the user can revert after AI changes it
@@ -1347,6 +1340,7 @@ async def improve_article(
         article.content_html = markdown.markdown(improved_content)
         article.word_count = len(improved_content.split())
         article.read_time = calculate_read_time(improved_content)
+        article.improve_count = (article.improve_count or 0) + 1
 
         # Re-run SEO analysis
         try:
@@ -1567,6 +1561,25 @@ async def generate_social_posts(
             detail="Article must be published to WordPress first to generate social posts",
         )
 
+    # Check monthly social post quota
+    tracker = GenerationTracker(db)
+    if not await tracker.check_limit(
+        project_id=current_user.current_project_id,
+        resource_type="social_post",
+        user_id=current_user.id,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Monthly social post generation limit reached. Upgrade your plan to continue.",
+        )
+
+    log = await tracker.log_start(
+        user_id=current_user.id,
+        project_id=current_user.current_project_id,
+        resource_type="social_post",
+        resource_id=article_id,
+    )
+
     summary = article.meta_description or (article.content[:300] if article.content else article.title)
 
     try:
@@ -1577,10 +1590,13 @@ async def generate_social_posts(
             keywords=[article.keyword],
         )
     except Exception as e:
+        await tracker.log_failure(log_id=log.id, error_message=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate social posts: {str(e)}",
         )
+
+    await tracker.log_success(log_id=log.id, ai_model=settings.anthropic_model)
 
     now = datetime.now(timezone.utc).isoformat()
     social_posts = {
