@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/stores/auth";
 import { api, parseApiError } from "@/lib/api";
+import { OAuthButtons, OAuthDivider } from "@/components/auth/oauth-buttons";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -99,6 +100,9 @@ export default function LoginPage() {
         </h1>
         <p className="mt-2 text-text-secondary">{t("description")}</p>
       </div>
+
+      <OAuthButtons />
+      <OAuthDivider />
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <Input

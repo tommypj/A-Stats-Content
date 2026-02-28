@@ -6,6 +6,8 @@ import json
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Annotated, Optional
+from urllib.parse import urlencode
+from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status, Header, Request, UploadFile, File
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -1070,3 +1072,181 @@ async def export_my_data(
             "Content-Disposition": f'attachment; filename="user_data_export_{user_id}.json"',
         },
     )
+
+
+# ============================================================================
+# Google OAuth — login / signup
+# ============================================================================
+
+_GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+_GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+
+
+@router.get("/google")
+@limiter.limit("20/minute")
+async def google_oauth_redirect(request: Request):
+    """
+    Initiate Google OAuth login/signup flow.
+
+    Redirects the browser to Google's consent screen.  The callback URL is
+    the backend endpoint below, which sets auth cookies and then redirects
+    to the frontend /auth/callback page.
+    """
+    from api.oauth_helpers import store_oauth_state
+    from fastapi.responses import RedirectResponse as RR
+
+    if not settings.google_client_id or not settings.google_auth_redirect_uri:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Google OAuth is not configured on this server",
+        )
+
+    state = str(uuid4())
+    # Store state without a real user_id (pre-auth); platform tag prevents reuse by other flows
+    await store_oauth_state(state, "pre-auth", "google_auth")
+
+    params = {
+        "client_id": settings.google_client_id,
+        "redirect_uri": settings.google_auth_redirect_uri,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": state,
+        "access_type": "offline",
+        "prompt": "select_account",
+    }
+    return RR(f"{_GOOGLE_AUTH_URL}?{urlencode(params)}")
+
+
+@router.get("/google/callback")
+async def google_oauth_callback(
+    request: Request,
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Handle Google OAuth callback.
+
+    Exchanges the auth code for tokens, finds or creates the user account,
+    sets HttpOnly auth cookies, and redirects to the frontend /auth/callback.
+    """
+    import base64 as _b64
+    import json as _json
+    from api.oauth_helpers import verify_oauth_state_full
+    from fastapi.responses import RedirectResponse as RR
+
+    frontend_url = settings.frontend_url
+
+    def _fail(reason: str):
+        return RR(f"{frontend_url}/login?error={reason}")
+
+    # User denied / OAuth provider error
+    if error:
+        logger.warning("Google OAuth denied: %s", error)
+        return _fail("google_denied")
+
+    if not code or not state:
+        return _fail("google_invalid")
+
+    # Verify CSRF state — must match what we stored and be tagged "google_auth"
+    stored = await verify_oauth_state_full(state)
+    if not stored or stored.get("platform") != "google_auth":
+        logger.warning("Google OAuth state mismatch or expired")
+        return _fail("google_state_invalid")
+
+    # Exchange code for tokens
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            token_resp = await client.post(
+                _GOOGLE_TOKEN_URL,
+                data={
+                    "code": code,
+                    "client_id": settings.google_client_id,
+                    "client_secret": settings.google_client_secret,
+                    "redirect_uri": settings.google_auth_redirect_uri,
+                    "grant_type": "authorization_code",
+                },
+            )
+            token_data = token_resp.json()
+
+        if "error" in token_data:
+            logger.error("Google token exchange error: %s", token_data.get("error_description"))
+            return _fail("google_token_failed")
+
+        # Decode the id_token JWT payload (we trust Google's signature implicitly here;
+        # for full verification install google-auth and call verify_oauth2_token)
+        id_token_raw = token_data.get("id_token", "")
+        parts = id_token_raw.split(".")
+        if len(parts) < 2:
+            return _fail("google_token_invalid")
+        padding = 4 - len(parts[1]) % 4
+        google_user = _json.loads(_b64.urlsafe_b64decode(parts[1] + "=" * padding))
+
+        google_email = google_user.get("email", "").lower().strip()
+        google_name = google_user.get("name", "") or ""
+        google_picture = google_user.get("picture", "") or ""
+        email_verified = google_user.get("email_verified", False)
+
+        if not google_email or not email_verified:
+            return _fail("google_email_unverified")
+
+    except Exception as e:
+        logger.error("Google OAuth exchange failed: %s", e)
+        return _fail("google_failed")
+
+    # Find or create user by email
+    result = await db.execute(select(User).where(User.email == google_email))
+    user = result.scalar_one_or_none()
+    is_new_user = False
+
+    if not user:
+        is_new_user = True
+        user = User(
+            email=google_email,
+            name=google_name or google_email,
+            avatar_url=google_picture or None,
+            password_hash="",  # No password for OAuth-only accounts
+            email_verified=True,
+            status=UserStatus.ACTIVE.value,
+        )
+        db.add(user)
+        await db.flush()
+        await create_personal_project(db, user)
+        await db.commit()
+        await db.refresh(user)
+
+        try:
+            await email_service.send_welcome_email(
+                to_email=user.email,
+                user_name=user.name or user.email,
+            )
+        except Exception as e:
+            logger.error("Failed to send welcome email after Google signup: %s", e)
+    else:
+        # Update profile picture if not already set
+        if google_picture and not user.avatar_url:
+            user.avatar_url = google_picture
+        user.last_login = datetime.now(timezone.utc)
+        user.login_count += 1
+        await db.commit()
+
+    # Issue tokens
+    token_service = TokenService(settings)
+    access_token, refresh_token = token_service.create_token_pair(
+        user_id=user.id,
+        email=user.email,
+        role=user.role,
+    )
+
+    # Set cookies and redirect to frontend callback page
+    redirect_target = f"{frontend_url}/auth/callback?provider=google"
+    if is_new_user:
+        redirect_target += "&new=1"
+    response = RR(redirect_target)
+    kwargs = _get_cookie_kwargs(settings)
+    access_max_age = settings.jwt_access_token_expire_minutes * 60
+    refresh_max_age = settings.jwt_refresh_token_expire_days * 86400
+    response.set_cookie("access_token", access_token, max_age=access_max_age, **kwargs)
+    response.set_cookie("refresh_token", refresh_token, max_age=refresh_max_age, **kwargs)
+    return response

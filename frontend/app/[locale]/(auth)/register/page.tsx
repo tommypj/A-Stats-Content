@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, parseApiError } from "@/lib/api";
+import { OAuthButtons, OAuthDivider } from "@/components/auth/oauth-buttons";
 
 const registerSchema = z
   .object({
@@ -96,6 +97,9 @@ export default function RegisterPage() {
         </h1>
         <p className="mt-2 text-text-secondary">{t("description")}</p>
       </div>
+
+      <OAuthButtons />
+      <OAuthDivider />
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <Input

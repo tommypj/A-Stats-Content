@@ -127,6 +127,8 @@ class Settings(BaseSettings):
     google_client_id: Optional[str] = None
     google_client_secret: Optional[str] = None
     google_redirect_uri: str = "http://localhost:3000/analytics/callback"
+    # Separate redirect URI for Google login/signup OAuth (backend callback)
+    google_auth_redirect_uri: str = "http://localhost:8000/api/v1/auth/google/callback"
 
     # Twitter/X OAuth 2.0
     twitter_client_id: Optional[str] = None
