@@ -53,7 +53,11 @@ export default function AuthCallbackPage() {
           toast.success("Welcome back!");
         }
 
-        router.replace("/dashboard");
+        // Yield to the event loop so Zustand's persist middleware can flush
+        // the updated auth state to localStorage before the dashboard layout
+        // reads it on mount. Without this tick the dashboard guard sees
+        // isAuthenticated=false and bounces back to /login.
+        setTimeout(() => router.replace("/dashboard"), 0);
       } catch (err) {
         toast.error(parseApiError(err).message || "Sign-in failed. Please try again.");
         router.replace("/login");
