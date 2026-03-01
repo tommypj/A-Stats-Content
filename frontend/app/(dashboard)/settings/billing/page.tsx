@@ -34,6 +34,13 @@ const TIER_COLORS: Record<string, string> = {
   enterprise: "bg-purple-100 text-purple-700",
 };
 
+const TIER_ORDER: Record<string, number> = {
+  free: 0,
+  starter: 1,
+  professional: 2,
+  enterprise: 3,
+};
+
 interface UsageBarProps {
   label: string;
   icon: React.ElementType;
@@ -305,7 +312,12 @@ export default function BillingPage() {
         {plans.map((plan) => {
           const isCurrent = currentTier === plan.id;
           const PlanIcon = tierIcons[plan.id] || Zap;
-          const isPopular = plan.id === "professional";
+          const currentLevel = TIER_ORDER[currentTier] ?? 0;
+          const planLevel = TIER_ORDER[plan.id] ?? 0;
+          const isUpgrade = planLevel > currentLevel;
+          const isDowngrade = planLevel < currentLevel;
+          // Only show "Most Popular" on Professional when it's above the user's current tier
+          const isPopular = plan.id === "professional" && isUpgrade;
           const displayPrice =
             billingPeriod === "monthly"
               ? plan.price_monthly
@@ -368,10 +380,10 @@ export default function BillingPage() {
               ) : (
                 <Button
                   className="w-full"
-                  variant={isPopular ? "primary" : "outline"}
+                  variant={isUpgrade && isPopular ? "primary" : "outline"}
                   onClick={() => handleUpgrade(plan.id)}
                 >
-                  {plan.id === "free" ? "Downgrade" : "Upgrade"}
+                  {isDowngrade ? "Downgrade" : "Upgrade"}
                 </Button>
               )}
             </Card>
