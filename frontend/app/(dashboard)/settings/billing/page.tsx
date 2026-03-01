@@ -377,15 +377,15 @@ export default function BillingPage() {
                 <Button disabled className="w-full" variant="outline">
                   Current Plan
                 </Button>
-              ) : (
+              ) : isUpgrade ? (
                 <Button
                   className="w-full"
-                  variant={isUpgrade && isPopular ? "primary" : "outline"}
+                  variant={isPopular ? "primary" : "outline"}
                   onClick={() => handleUpgrade(plan.id)}
                 >
-                  {isDowngrade ? "Downgrade" : "Upgrade"}
+                  Upgrade
                 </Button>
-              )}
+              ) : null}
             </Card>
           );
         })}
