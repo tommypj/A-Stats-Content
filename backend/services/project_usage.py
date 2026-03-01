@@ -24,31 +24,31 @@ logger = logging.getLogger(__name__)
 # Project plans have higher limits than individual plans
 PROJECT_TIER_LIMITS: Dict[str, Dict[str, int]] = {
     SubscriptionTier.FREE.value: {
-        "articles_per_month": 10,
-        "outlines_per_month": 10,
-        "images_per_month": 5,
+        "articles_per_month": 3,
+        "outlines_per_month": 3,
+        "images_per_month": 3,
         "social_posts_per_month": 5,
-        "max_members": 3,
+        "max_members": 1,
     },
     SubscriptionTier.STARTER.value: {
-        "articles_per_month": 10,
-        "outlines_per_month": 10,
+        "articles_per_month": 30,
+        "outlines_per_month": 30,
         "images_per_month": 10,
-        "social_posts_per_month": 10,
-        "max_members": 5,
+        "social_posts_per_month": 20,
+        "max_members": 3,
     },
     SubscriptionTier.PROFESSIONAL.value: {
-        "articles_per_month": 50,
-        "outlines_per_month": 50,
+        "articles_per_month": 100,
+        "outlines_per_month": 100,
         "images_per_month": 50,
-        "social_posts_per_month": 50,
-        "max_members": 15,
+        "social_posts_per_month": 100,
+        "max_members": 10,
     },
     SubscriptionTier.ENTERPRISE.value: {
-        "articles_per_month": 200,
-        "outlines_per_month": 200,
+        "articles_per_month": 300,
+        "outlines_per_month": 300,
         "images_per_month": 200,
-        "social_posts_per_month": 200,
+        "social_posts_per_month": 300,
         "max_members": -1,  # unlimited members
     },
 }

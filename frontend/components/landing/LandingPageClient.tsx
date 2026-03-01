@@ -190,18 +190,37 @@ const testimonials = [
 
 const plans = [
   {
+    name: "Free",
+    monthlyPrice: 0,
+    yearlyPrice: 0,
+    description: "Try it out, no credit card needed",
+    features: [
+      "3 articles per month",
+      "3 AI images per month",
+      "5 social posts per month",
+      "Basic SEO analysis",
+      "1 project",
+      "Community support",
+    ],
+    cta: "Get Started Free",
+    href: "/register",
+  },
+  {
     name: "Starter",
     monthlyPrice: 29,
     yearlyPrice: 24,
-    description: "For creators getting started",
+    description: "For solo creators & bloggers",
     features: [
       "30 articles per month",
       "10 AI images per month",
-      "Basic SEO analytics",
+      "20 social posts per month",
+      "Advanced SEO analysis",
       "WordPress integration",
-      "1 project",
-      "Email support",
+      "3 project members",
+      "Priority email support",
     ],
+    cta: "Start Starter",
+    href: "/register",
   },
   {
     name: "Professional",
@@ -211,14 +230,17 @@ const plans = [
     features: [
       "100 articles per month",
       "50 AI images per month",
+      "100 social posts per month",
       "Google Search Console integration",
       "Social media scheduling",
       "Knowledge Vault",
-      "5 projects",
       "Bulk content generation",
+      "10 project members",
       "Priority support",
     ],
     popular: true,
+    cta: "Start Professional",
+    href: "/register",
   },
   {
     name: "Enterprise",
@@ -226,15 +248,18 @@ const plans = [
     yearlyPrice: 166,
     description: "For agencies & large teams",
     features: [
-      "Unlimited articles",
-      "Unlimited AI images",
+      "300 articles per month",
+      "200 AI images per month",
+      "300 social posts per month",
       "Full analytics suite + AEO tracking",
       "White-label agency mode",
       "Client portals & branding",
-      "Unlimited projects",
+      "Unlimited project members",
       "API access",
-      "Dedicated support",
+      "Dedicated support & SLA",
     ],
+    cta: "Start Enterprise",
+    href: "/register",
   },
 ];
 
@@ -780,13 +805,13 @@ export default function LandingPageClient() {
           </RevealSection>
 
           <RevealSection>
-            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
               {plans.map((plan) => (
                 <div
                   key={plan.name}
                   className={`stagger-child card p-8 relative flex flex-col ${
                     plan.popular
-                      ? "border-2 border-primary-500 shadow-soft-lg scale-[1.03]"
+                      ? "border-2 border-primary-500 shadow-soft-lg"
                       : "border-surface-tertiary"
                   }`}
                 >
@@ -803,12 +828,18 @@ export default function LandingPageClient() {
                       {plan.description}
                     </p>
                     <div className="mt-4">
-                      <span className="text-4xl font-display font-bold text-text-primary">
-                        ${yearlyBilling ? plan.yearlyPrice : plan.monthlyPrice}
-                      </span>
-                      <span className="text-text-muted">/month</span>
+                      {plan.monthlyPrice === 0 ? (
+                        <span className="text-4xl font-display font-bold text-text-primary">Free</span>
+                      ) : (
+                        <>
+                          <span className="text-4xl font-display font-bold text-text-primary">
+                            ${yearlyBilling ? plan.yearlyPrice : plan.monthlyPrice}
+                          </span>
+                          <span className="text-text-muted">/month</span>
+                        </>
+                      )}
                     </div>
-                    {yearlyBilling && (
+                    {yearlyBilling && plan.monthlyPrice > 0 && (
                       <p className="text-xs text-primary-600 mt-1">
                         Billed annually
                       </p>
@@ -826,12 +857,12 @@ export default function LandingPageClient() {
                     ))}
                   </ul>
                   <Link
-                    href="/register"
+                    href={plan.href}
                     className={`w-full text-center ${
                       plan.popular ? "btn-primary" : "btn-secondary"
                     }`}
                   >
-                    Get Started
+                    {plan.cta}
                   </Link>
                 </div>
               ))}
