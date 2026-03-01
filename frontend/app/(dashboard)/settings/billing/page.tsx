@@ -158,7 +158,10 @@ export default function BillingPage() {
         {plans.map((plan) => {
           const isCurrent = currentTier === plan.id;
           const PlanIcon = tierIcons[plan.id] || Zap;
-          const isPopular = plan.id === "starter";
+          const isPopular = plan.id === "professional";
+          const displayPrice = billingPeriod === "monthly"
+            ? plan.price_monthly
+            : Math.round(plan.price_yearly / 12);
           return (
             <Card
               key={plan.id}
@@ -173,14 +176,20 @@ export default function BillingPage() {
                 <PlanIcon className="h-5 w-5 text-primary-500" />
               </div>
               <h3 className="text-lg font-display font-bold text-text-primary">{plan.name}</h3>
-              <div className="mt-4 mb-6">
-                <span className="text-3xl font-bold text-text-primary">
-                  ${billingPeriod === "monthly" ? plan.price_monthly : plan.price_yearly}
-                </span>
-                <span className="text-text-muted text-sm">
-                  /{billingPeriod === "monthly" ? "mo" : "yr"}
-                </span>
+              <div className="mt-4 mb-1">
+                {plan.price_monthly === 0 ? (
+                  <span className="text-3xl font-bold text-text-primary">Free</span>
+                ) : (
+                  <>
+                    <span className="text-3xl font-bold text-text-primary">${displayPrice}</span>
+                    <span className="text-text-muted text-sm">/mo</span>
+                  </>
+                )}
               </div>
+              {billingPeriod === "yearly" && plan.price_monthly > 0 && (
+                <p className="text-xs text-primary-600 mb-5">Billed annually (${plan.price_yearly}/yr)</p>
+              )}
+              {(billingPeriod === "monthly" || plan.price_monthly === 0) && <div className="mb-6" />}
               <ul className="space-y-2 mb-6">
                 {plan.features.map((feature) => (
                   <li key={feature} className="flex items-start gap-2 text-sm">
