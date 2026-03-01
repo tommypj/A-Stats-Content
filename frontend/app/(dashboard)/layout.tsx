@@ -81,6 +81,7 @@ interface NavItem {
   href?: string;
   icon: React.ElementType;
   minTier?: TierKey;
+  comingSoon?: boolean;
   submenu?: NavSubItem[];
 }
 
@@ -129,7 +130,7 @@ const navigation: NavItem[] = [
   {
     name: "Agency",
     icon: Building2,
-    minTier: "professional",
+    comingSoon: true,
     submenu: [
       { name: "Dashboard", href: "/agency", icon: LayoutDashboard },
       { name: "Clients", href: "/agency/clients", icon: Users },
@@ -455,7 +456,23 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
               // Item with submenu
               if ("submenu" in item) {
-                // Entire submenu locked (e.g. Agency requires Professional)
+                // Entire submenu coming soon (e.g. Agency)
+                if (item.comingSoon) {
+                  return (
+                    <div
+                      key={item.name}
+                      className="flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium opacity-40 cursor-default text-cream-300"
+                    >
+                      <item.icon className="h-5 w-5" />
+                      <span className="flex-1 text-left">{item.name}</span>
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary-500/20 text-primary-300 whitespace-nowrap">
+                        Soon
+                      </span>
+                    </div>
+                  );
+                }
+
+                // Entire submenu locked (e.g. requires higher tier)
                 if (itemLocked) {
                   return (
                     <button
