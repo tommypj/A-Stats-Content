@@ -2319,6 +2319,7 @@ export interface PlanLimits {
   outlines_per_month: number;
   images_per_month: number;
   social_posts_per_month: number;
+  keyword_researches_per_month: number;
 }
 
 export interface PlanInfo {
