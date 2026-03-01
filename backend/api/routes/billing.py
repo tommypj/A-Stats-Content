@@ -220,6 +220,7 @@ async def create_checkout(
     params = urlencode({
         "checkout[email]": current_user.email,
         "checkout[custom][user_id]": str(current_user.id),
+        "checkout[custom][plan]": body.plan,
         "checkout[redirect_url]": f"{frontend_url}/billing/success",
     })
     checkout_url = f"https://{store_slug}.lemonsqueezy.com/checkout/buy/{variant_id}?{params}"
@@ -610,17 +611,21 @@ async def handle_webhook(
             )
             return {"status": "error", "message": "Customer ID mismatch"}
 
-    # BILL-34: Determine subscription tier from variant_id using shared mapping
-    tier = SubscriptionTier.FREE.value
-    if variant_id:
+    # Determine tier: prefer custom_data.plan (set at checkout), fall back to variant_id mapping.
+    plan_from_custom = (custom_data.get("plan") or "").lower()
+    valid_paid_tiers = {t.value for t in SubscriptionTier} - {SubscriptionTier.FREE.value}
+    if plan_from_custom in valid_paid_tiers:
+        tier = plan_from_custom
+    elif variant_id:
         variant_to_tier = _build_variant_to_tier()
         tier = variant_to_tier.get(str(variant_id), SubscriptionTier.FREE.value)
         if tier == SubscriptionTier.FREE.value and str(variant_id) not in variant_to_tier:
-            # BILL-22: variant_id didn't match any known tier — defaulting to free
             logger.warning(
                 "BILL-22: variant_id %s did not match any known tier — defaulting to free",
                 variant_id,
             )
+    else:
+        tier = SubscriptionTier.FREE.value
 
     # Handle different event types
     try:
@@ -628,7 +633,9 @@ async def handle_webhook(
             # New subscription
             user.subscription_tier = tier
             user.subscription_status = subscription_status or "active"  # BILL-08
-            user.lemonsqueezy_customer_id = str(customer_id) if customer_id else None
+            # Only set customer_id if not already stored to avoid unique constraint violation
+            if customer_id and not user.lemonsqueezy_customer_id:
+                user.lemonsqueezy_customer_id = str(customer_id)
             # BILL-28: only overwrite subscription_id when webhook provides one
             if subscription_id is not None:
                 user.lemonsqueezy_subscription_id = str(subscription_id)
