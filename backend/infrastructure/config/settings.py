@@ -115,6 +115,7 @@ class Settings(BaseSettings):
     # LemonSqueezy (Payments)
     lemonsqueezy_api_key: Optional[str] = None
     lemonsqueezy_store_id: Optional[str] = None
+    lemonsqueezy_store_slug: Optional[str] = None
     lemonsqueezy_webhook_secret: Optional[str] = None
     lemonsqueezy_variant_starter_monthly: Optional[str] = None
     lemonsqueezy_variant_starter_yearly: Optional[str] = None
