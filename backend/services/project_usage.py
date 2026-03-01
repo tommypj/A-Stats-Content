@@ -28,6 +28,7 @@ PROJECT_TIER_LIMITS: Dict[str, Dict[str, int]] = {
         "outlines_per_month": 3,
         "images_per_month": 3,
         "social_posts_per_month": 5,
+        "keyword_researches_per_month": 3,
         "max_members": 1,
     },
     SubscriptionTier.STARTER.value: {
@@ -35,6 +36,7 @@ PROJECT_TIER_LIMITS: Dict[str, Dict[str, int]] = {
         "outlines_per_month": 30,
         "images_per_month": 10,
         "social_posts_per_month": 20,
+        "keyword_researches_per_month": 30,
         "max_members": 3,
     },
     SubscriptionTier.PROFESSIONAL.value: {
@@ -42,6 +44,7 @@ PROJECT_TIER_LIMITS: Dict[str, Dict[str, int]] = {
         "outlines_per_month": 100,
         "images_per_month": 50,
         "social_posts_per_month": 100,
+        "keyword_researches_per_month": 100,
         "max_members": 10,
     },
     SubscriptionTier.ENTERPRISE.value: {
@@ -49,6 +52,7 @@ PROJECT_TIER_LIMITS: Dict[str, Dict[str, int]] = {
         "outlines_per_month": 300,
         "images_per_month": 200,
         "social_posts_per_month": 300,
+        "keyword_researches_per_month": 300,
         "max_members": -1,  # unlimited members
     },
 }

@@ -838,7 +838,32 @@ async def get_keyword_suggestions(
                 await redis_client.aclose()
         return result
 
-    # 3. Call AI (existing logic)
+    # 3. Check monthly keyword research limit (only real AI calls count; cache hits above are free)
+    from core.plans import PLANS as _PLANS
+    _now = datetime.now(timezone.utc)
+    _tier = current_user.subscription_tier or "free"
+    if current_user.subscription_expires and current_user.subscription_expires < _now:
+        _tier = "free"
+    _monthly_limit = _PLANS.get(_tier, _PLANS["free"])["limits"].get("keyword_researches_per_month", 3)
+    _count_key = f"kw_count:{current_user.id}:{_now.year}:{_now.month}"
+    redis_client = None
+    try:
+        redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
+        _current_count = int(await redis_client.get(_count_key) or 0)
+        if _current_count >= _monthly_limit:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Monthly keyword research limit reached ({_monthly_limit}/month). Upgrade your plan for more.",
+            )
+    except HTTPException:
+        raise
+    except Exception as _limit_err:
+        logger.warning("Keyword research limit check failed (fail open): %s", _limit_err)
+    finally:
+        if redis_client:
+            await redis_client.aclose()
+
+    # 4. Call AI (existing logic)
     prompt = f"""Given the seed keyword "{body.seed_keyword}", suggest {body.count} related keywords for SEO content creation.
 
 For each keyword, provide:
@@ -892,6 +917,19 @@ Only return the JSON array, no other text."""
         result = {"seed_keyword": body.seed_keyword, "suggestions": suggestions}
         result_str = json.dumps(result)
         expires_at = now + timedelta(days=KEYWORD_CACHE_TTL_DAYS)
+
+        # Increment monthly usage counter (TTL = 35 days, safely covers any month)
+        redis_client = None
+        try:
+            redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
+            _count_key = f"kw_count:{current_user.id}:{now.year}:{now.month}"
+            await redis_client.incr(_count_key)
+            await redis_client.expire(_count_key, 35 * 86400)
+        except Exception as _inc_err:
+            logger.warning("Failed to increment keyword research counter: %s", _inc_err)
+        finally:
+            if redis_client:
+                await redis_client.aclose()
 
         # Store in DB
         try:
