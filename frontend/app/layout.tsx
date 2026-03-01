@@ -12,18 +12,20 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "A-Stats Content | AI-Powered SEO Content Platform",
-    template: "%s | A-Stats Content",
+    default: "A-Stats | AI-Powered SEO & Content Platform",
+    template: "%s | A-Stats",
   },
   description:
-    "Create SEO-optimized therapeutic content with AI. Generate articles, outlines, and images for your wellness business.",
+    "Generate SEO-optimized articles, track keyword rankings, and scale your content production with AI. From keyword to published article in minutes.",
   keywords: [
-    "AI content",
-    "SEO optimization",
-    "therapeutic content",
-    "wellness blog",
-    "content generation",
-    "article writing",
+    "AI content generation",
+    "SEO platform",
+    "AI SEO tool",
+    "content marketing",
+    "bulk content generation",
+    "AI article writer",
+    "SEO analytics",
+    "Answer Engine Optimization",
   ],
   authors: [{ name: "A-Stats" }],
   icons: {
@@ -34,7 +36,8 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    siteName: "A-Stats Content",
+    siteName: "A-Stats",
+    url: "https://a-stats.app",
   },
   robots: {
     index: true,
@@ -55,15 +58,15 @@ export default function RootLayout({
             {children}
           </ErrorBoundary>
           <Toaster
-          position="bottom-right"
-          toastOptions={{
-            style: {
-              background: "white",
-              border: "1px solid #f3ece0",
-              borderRadius: "12px",
-            },
-          }}
-        />
+            position="bottom-right"
+            toastOptions={{
+              style: {
+                background: "white",
+                border: "1px solid #f3ece0",
+                borderRadius: "12px",
+              },
+            }}
+          />
         </Providers>
       </body>
     </html>
