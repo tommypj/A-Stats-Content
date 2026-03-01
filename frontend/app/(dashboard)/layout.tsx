@@ -38,6 +38,7 @@ import {
   Layers,
   DollarSign,
   Building2,
+  Lock,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { toast } from "sonner";
@@ -49,14 +50,48 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { KeyboardShortcutsDialog } from "@/components/ui/keyboard-shortcuts-dialog";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 
-const navigation = [
+// Tier hierarchy: higher number = higher plan
+const TIER_ORDER: Record<string, number> = {
+  free: 0,
+  starter: 1,
+  professional: 2,
+  enterprise: 3,
+};
+
+type TierKey = "free" | "starter" | "professional" | "enterprise";
+
+function isLocked(minTier: TierKey | undefined, userTier: string | undefined): boolean {
+  if (!minTier) return false;
+  return (TIER_ORDER[minTier] ?? 0) > (TIER_ORDER[userTier ?? "free"] ?? 0);
+}
+
+function tierLabel(minTier: TierKey): string {
+  return minTier === "professional" ? "Pro" : minTier.charAt(0).toUpperCase() + minTier.slice(1);
+}
+
+interface NavSubItem {
+  name: string;
+  href: string;
+  icon: React.ElementType;
+  minTier?: TierKey;
+}
+
+interface NavItem {
+  name: string;
+  href?: string;
+  icon: React.ElementType;
+  minTier?: TierKey;
+  submenu?: NavSubItem[];
+}
+
+const navigation: NavItem[] = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Outlines", href: "/outlines", icon: FileText },
   { name: "Articles", href: "/articles", icon: Sparkles },
   { name: "Content Calendar", href: "/content-calendar", icon: Calendar },
   { name: "Keyword Research", href: "/keyword-research", icon: Search },
   { name: "Images", href: "/images", icon: ImageIcon },
-  { name: "Bulk Content", href: "/bulk", icon: Layers },
+  { name: "Bulk Content", href: "/bulk", icon: Layers, minTier: "starter" },
   {
     name: "Social",
     icon: Share2,
@@ -78,8 +113,8 @@ const navigation = [
       { name: "Article Performance", href: "/analytics/articles", icon: TrendingUp },
       { name: "Content Opportunities", href: "/analytics/opportunities", icon: Lightbulb },
       { name: "Content Health", href: "/analytics/content-health", icon: Activity },
-      { name: "AEO Scores", href: "/analytics/aeo", icon: Zap },
-      { name: "Revenue", href: "/analytics/revenue", icon: DollarSign },
+      { name: "AEO Scores", href: "/analytics/aeo", icon: Zap, minTier: "starter" },
+      { name: "Revenue", href: "/analytics/revenue", icon: DollarSign, minTier: "starter" },
     ],
   },
   { name: "Knowledge", href: "/knowledge", icon: BookOpen },
@@ -94,6 +129,7 @@ const navigation = [
   {
     name: "Agency",
     icon: Building2,
+    minTier: "professional",
     submenu: [
       { name: "Dashboard", href: "/agency", icon: LayoutDashboard },
       { name: "Clients", href: "/agency/clients", icon: Users },
@@ -414,8 +450,29 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           {/* Navigation */}
           <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto scrollbar-sidebar">
             {navigation.map((item) => {
+              const userTier = user?.subscription_tier ?? "free";
+              const itemLocked = isLocked(item.minTier, userTier);
+
               // Item with submenu
               if ("submenu" in item) {
+                // Entire submenu locked (e.g. Agency requires Professional)
+                if (itemLocked) {
+                  return (
+                    <button
+                      key={item.name}
+                      onClick={() => router.push("/settings/billing")}
+                      className="flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium opacity-50 hover:opacity-70 text-cream-300 hover:bg-primary-900 transition-all"
+                    >
+                      <item.icon className="h-5 w-5" />
+                      <span className="flex-1 text-left">{item.name}</span>
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
+                        {tierLabel(item.minTier!)}
+                      </span>
+                      <Lock className="h-3.5 w-3.5 text-amber-400" />
+                    </button>
+                  );
+                }
+
                 const isExpanded = expandedMenus.has(item.name);
                 const hasActiveChild = item.submenu?.some((subItem) =>
                   pathname.startsWith(subItem.href)
@@ -453,6 +510,23 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                     {isExpanded && (
                       <div className="mt-1 ml-3 pl-3 border-l-2 border-primary-700 space-y-1">
                         {item.submenu?.map((subItem) => {
+                          const subLocked = isLocked(subItem.minTier, userTier);
+                          if (subLocked) {
+                            return (
+                              <button
+                                key={subItem.name}
+                                onClick={() => router.push("/settings/billing")}
+                                className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium opacity-50 hover:opacity-70 text-cream-300 hover:bg-primary-900 transition-all"
+                              >
+                                <subItem.icon className="h-4 w-4" />
+                                <span className="flex-1 text-left">{subItem.name}</span>
+                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
+                                  {tierLabel(subItem.minTier!)}
+                                </span>
+                                <Lock className="h-3 w-3 text-amber-400" />
+                              </button>
+                            );
+                          }
                           const isActive = pathname === subItem.href;
                           return (
                             <Link
@@ -477,12 +551,30 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                 );
               }
 
-              // Regular item
+              // Regular item — locked
+              if (itemLocked) {
+                return (
+                  <button
+                    key={item.name}
+                    onClick={() => router.push("/settings/billing")}
+                    className="flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium opacity-50 hover:opacity-70 text-cream-300 hover:bg-primary-900 transition-all"
+                  >
+                    <item.icon className="h-5 w-5" />
+                    <span className="flex-1 text-left">{item.name}</span>
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
+                      {tierLabel(item.minTier!)}
+                    </span>
+                    <Lock className="h-3.5 w-3.5 text-amber-400" />
+                  </button>
+                );
+              }
+
+              // Regular item — unlocked
               const isActive = pathname === item.href;
               return (
                 <Link
                   key={item.name}
-                  href={item.href}
+                  href={item.href!}
                   onClick={() => setSidebarOpen(false)}
                   className={clsx(
                     "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
