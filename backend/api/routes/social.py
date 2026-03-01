@@ -1373,3 +1373,106 @@ async def get_best_posting_times(
         time_slots=time_slots,
         timezone="UTC",
     )
+
+
+# ============================================
+# Facebook Data Deletion Callback (no auth)
+# ============================================
+
+import base64
+import hashlib
+import hmac as _hmac
+
+
+@router.post("/facebook/data-deletion")
+@limiter.limit("20/minute")
+async def facebook_data_deletion(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Facebook Data Deletion Request Callback.
+
+    Facebook calls this endpoint (as a signed POST) when a user requests
+    deletion of their data through Facebook's privacy settings. We verify
+    the signature, delete all Facebook/Instagram social accounts linked to
+    that Facebook user ID, and return a confirmation code.
+
+    Reference: https://developers.facebook.com/docs/development/create-an-app/app-dashboard/data-deletion-callback
+    """
+    # Parse form body
+    form = await request.form()
+    signed_request = form.get("signed_request")
+    if not signed_request:
+        raise HTTPException(status_code=400, detail="Missing signed_request")
+
+    if not settings.facebook_app_secret:
+        logger.error("FACEBOOK_APP_SECRET not configured — cannot verify data deletion request")
+        raise HTTPException(status_code=501, detail="Facebook integration not configured")
+
+    # Decode and verify the signed request
+    try:
+        encoded_sig, payload = signed_request.split(".", 1)
+
+        # Pad base64url strings if needed
+        def _b64_decode(s: str) -> bytes:
+            s = s.replace("-", "+").replace("_", "/")
+            s += "=" * (-len(s) % 4)
+            return base64.b64decode(s)
+
+        signature = _b64_decode(encoded_sig)
+        payload_bytes = payload.encode("utf-8")
+
+        expected = _hmac.new(
+            settings.facebook_app_secret.encode("utf-8"),
+            payload_bytes,
+            hashlib.sha256,
+        ).digest()
+
+        if not _hmac.compare_digest(expected, signature):
+            raise HTTPException(status_code=400, detail="Invalid signed_request signature")
+
+        data = json.loads(_b64_decode(payload))
+    except (ValueError, json.JSONDecodeError) as e:
+        logger.warning("Facebook data deletion: failed to parse signed_request: %s", e)
+        raise HTTPException(status_code=400, detail="Malformed signed_request")
+
+    facebook_user_id = data.get("user_id")
+    if not facebook_user_id:
+        raise HTTPException(status_code=400, detail="No user_id in signed_request")
+
+    # Delete all Facebook/Instagram social accounts linked to this FB user ID
+    result = await db.execute(
+        select(SocialAccount).where(
+            and_(
+                SocialAccount.platform.in_(["facebook", "instagram"]),
+                SocialAccount.platform_user_id == str(facebook_user_id),
+            )
+        )
+    )
+    accounts = result.scalars().all()
+    deleted_count = len(accounts)
+    for account in accounts:
+        await db.delete(account)
+
+    if deleted_count:
+        await db.commit()
+        logger.info(
+            "Facebook data deletion: removed %d account(s) for fb_user_id=%s",
+            deleted_count,
+            facebook_user_id,
+        )
+    else:
+        logger.info(
+            "Facebook data deletion: no accounts found for fb_user_id=%s",
+            facebook_user_id,
+        )
+
+    # Generate a confirmation code and return the required response
+    confirmation_code = secrets.token_urlsafe(16)
+    frontend_url = settings.frontend_url.rstrip("/")
+
+    return {
+        "url": f"{frontend_url}/legal/data-deletion?code={confirmation_code}",
+        "confirmation_code": confirmation_code,
+    }
