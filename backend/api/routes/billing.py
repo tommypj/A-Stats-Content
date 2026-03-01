@@ -216,9 +216,11 @@ async def create_checkout(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Payment system not configured",
         )
+    frontend_url = settings.frontend_url.rstrip("/")
     params = urlencode({
         "checkout[email]": current_user.email,
         "checkout[custom][user_id]": str(current_user.id),
+        "checkout[redirect_url]": f"{frontend_url}/billing/success",
     })
     checkout_url = f"https://{store_slug}.lemonsqueezy.com/checkout/buy/{variant_id}?{params}"
 
