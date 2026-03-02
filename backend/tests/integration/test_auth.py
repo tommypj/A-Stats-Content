@@ -221,7 +221,7 @@ class TestCurrentUser:
         """Test getting current user without auth fails."""
         response = await async_client.get("/api/v1/auth/me")
         assert response.status_code == 401
-        assert "authorization" in response.json()["detail"].lower()
+        assert "authenticated" in response.json()["detail"].lower()
 
     async def test_get_me_invalid_token(self, async_client: AsyncClient):
         """Test getting current user with invalid token."""
