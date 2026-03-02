@@ -32,6 +32,7 @@ from core.security.tokens import TokenService
 from infrastructure.config.settings import settings
 from infrastructure.database.connection import get_db
 from infrastructure.database.models.admin import AdminAuditLog, AuditAction, AuditTargetType
+from infrastructure.database.models.project import Project
 from infrastructure.database.models.user import User, UserRole, UserStatus
 
 logger = logging.getLogger(__name__)
@@ -854,3 +855,44 @@ async def reset_user_usage(
         message=f"Usage counters reset for {user.email}",
         user=build_user_detail_response(user),
     )
+
+
+@router.post("/projects/{project_id}/reset-usage")
+async def reset_project_usage(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+    admin_user: User = Depends(get_current_admin_user),
+    http_request: Request = None,
+    user_agent: str | None = Header(None),
+):
+    """Reset a project's monthly generation usage counters to zero."""
+    result = await db.execute(
+        select(Project).where(Project.id == project_id, Project.deleted_at.is_(None))
+    )
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    old_articles = project.articles_generated_this_month
+    old_outlines = project.outlines_generated_this_month
+    old_images = project.images_generated_this_month
+
+    project.articles_generated_this_month = 0
+    project.outlines_generated_this_month = 0
+    project.images_generated_this_month = 0
+
+    await db.commit()
+
+    await create_audit_log(
+        db=db,
+        admin_user=admin_user,
+        action=AuditAction.USER_UPDATED,
+        target_type=AuditTargetType.USER,
+        target_id=project_id,
+        description=f"Reset usage counters for project {project.name}",
+        metadata={"old_articles": old_articles, "old_outlines": old_outlines, "old_images": old_images},
+        ip_address=get_client_ip(http_request),
+        user_agent=user_agent,
+    )
+
+    return {"success": True, "message": f"Usage counters reset for project {project.name}", "project_id": project_id}
