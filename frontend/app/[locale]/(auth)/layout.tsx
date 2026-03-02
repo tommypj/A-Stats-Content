@@ -48,9 +48,7 @@ export default function AuthLayout({
         <header className="lg:hidden w-full py-4 px-4">
           <div className="max-w-7xl mx-auto">
             <Link href="/" className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-primary-700 flex items-center justify-center">
-                <Sparkles className="h-4 w-4 text-cream-200" />
-              </div>
+              <Image src="/icon.png" alt="A-Stats" width={32} height={32} className="rounded-lg" />
               <span className="font-display text-xl font-semibold text-text-primary">
                 {t("appName")}
               </span>
