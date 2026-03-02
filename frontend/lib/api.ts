@@ -1311,31 +1311,6 @@ export const api = {
         }),
     },
 
-    billing: {
-      subscription: (projectId: string) =>
-        apiRequest<ProjectSubscription>({
-          url: `/projects/${projectId}/billing/subscription`,
-        }),
-      checkout: (projectId: string, variantId: string) =>
-        apiRequest<{ checkout_url: string }>({
-          method: "POST",
-          url: `/projects/${projectId}/billing/checkout`,
-          data: { variant_id: variantId },
-        }),
-      portal: (projectId: string) =>
-        apiRequest<{ portal_url: string }>({
-          url: `/projects/${projectId}/billing/portal`,
-        }),
-      cancel: (projectId: string) =>
-        apiRequest<void>({
-          method: "POST",
-          url: `/projects/${projectId}/billing/cancel`,
-        }),
-      usage: (projectId: string) =>
-        apiRequest<ProjectUsage>({
-          url: `/projects/${projectId}/billing/usage`,
-        }),
-    },
   },
 
   // Notifications
@@ -2845,7 +2820,6 @@ export interface AdminAlertCount {
 
 // Projects (Multi-tenancy) types
 export type ProjectRole = "owner" | "admin" | "member" | "viewer";
-export type ProjectSubscriptionTier = "free" | "starter" | "professional" | "enterprise";
 
 export interface Project {
   id: string;
@@ -2854,7 +2828,6 @@ export interface Project {
   description?: string;
   logo_url?: string;
   is_personal?: boolean;
-  subscription_tier: ProjectSubscriptionTier;
   my_role: ProjectRole;
   member_count: number;
   created_at: string;
@@ -2928,33 +2901,6 @@ export interface ProjectInvitationCreateRequest {
   role: ProjectRole;
 }
 
-export interface ProjectSubscription {
-  subscription_tier: ProjectSubscriptionTier;
-  subscription_status: string;
-  subscription_expires: string | null;
-  can_manage: boolean;
-  usage: {
-    articles_used: number;
-    outlines_used: number;
-    images_used: number;
-  };
-  limits: {
-    articles_per_month: number;
-    outlines_per_month: number;
-    images_per_month: number;
-  };
-}
-
-export interface ProjectUsage {
-  period_start: string;
-  period_end: string;
-  articles_used: number;
-  outlines_used: number;
-  images_used: number;
-  articles_limit: number;
-  outlines_limit: number;
-  images_limit: number;
-}
 
 // Notification types
 export interface GenerationNotification {

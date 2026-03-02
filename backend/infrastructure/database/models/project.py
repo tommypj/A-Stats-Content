@@ -69,28 +69,8 @@ class Project(Base, TimestampMixin):
         index=True,
     )
 
-    # Billing
-    subscription_tier: Mapped[str] = mapped_column(String(50), default="free", nullable=False)
-    subscription_status: Mapped[str] = mapped_column(String(50), default="active", nullable=False)
-    subscription_expires: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    lemonsqueezy_customer_id: Mapped[str | None] = mapped_column(
-        String(255), nullable=True, unique=True
-    )
-    lemonsqueezy_subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    # BILL-07: Store variant_id separately so the frontend can determine the current plan variant.
-    lemonsqueezy_variant_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-
-    # Project limits (shared across all members)
+    # Reserved for future agency tier (not enforced yet)
     max_members: Mapped[int] = mapped_column(default=5, nullable=False)
-    articles_generated_this_month: Mapped[int] = mapped_column(default=0, nullable=False)
-    outlines_generated_this_month: Mapped[int] = mapped_column(default=0, nullable=False)
-    images_generated_this_month: Mapped[int] = mapped_column(default=0, nullable=False)
-    social_posts_generated_this_month: Mapped[int] = mapped_column(default=0, nullable=False)
-    usage_reset_date: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
 
     # WordPress integration
     wordpress_credentials: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -120,7 +100,6 @@ class Project(Base, TimestampMixin):
     # Note: slug and owner_id already have index=True on their column definitions
     # DB-05: slug is unique per owner (not globally), so use composite unique constraint
     __table_args__ = (
-        Index("ix_projects_subscription", "subscription_tier", "subscription_expires"),
         UniqueConstraint("owner_id", "slug", name="uq_project_owner_slug"),
     )
 
@@ -131,11 +110,6 @@ class Project(Base, TimestampMixin):
     def is_active(self) -> bool:
         """Check if project is active (not deleted)."""
         return self.deleted_at is None
-
-    def can_add_member(self) -> bool:
-        """Check if project can add more members."""
-        current_count = len([m for m in self.members if m.deleted_at is None])
-        return current_count < self.max_members
 
 
 class ProjectMember(Base, TimestampMixin):

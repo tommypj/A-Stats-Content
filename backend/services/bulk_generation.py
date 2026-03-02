@@ -131,10 +131,10 @@ async def process_bulk_outline_job(
 
         try:
             # Check usage limits
-            from services.project_usage import ProjectUsageService
-
-            usage_svc = ProjectUsageService(db)
-            can_generate = await usage_svc.check_project_limit(job.project_id, "outlines")
+            tracker = GenerationTracker(db)
+            can_generate = await tracker.check_limit(
+                project_id=None, resource_type="outline", user_id=user_id
+            )
             if not can_generate:
                 item.status = "failed"
                 item.error_message = "Usage limit reached for outlines this month"

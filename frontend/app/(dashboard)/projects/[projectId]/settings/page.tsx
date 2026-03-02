@@ -8,7 +8,6 @@ import {
   Project,
   ProjectMember,
   ProjectInvitation,
-  ProjectSubscription,
   ProjectUpdateRequest,
   ProjectInvitationCreateRequest,
   ProjectRole,
@@ -25,7 +24,6 @@ import { ProjectSettingsGeneral } from "@/components/project/project-settings-ge
 import { ProjectMembersList } from "@/components/project/project-members-list";
 import { ProjectInvitationsList } from "@/components/project/project-invitations-list";
 import { InviteMemberForm } from "@/components/project/invite-member-form";
-import { ProjectBillingCard } from "@/components/project/project-billing-card";
 import { TransferOwnershipModal } from "@/components/project/transfer-ownership-modal";
 import { DeleteProjectModal } from "@/components/project/delete-project-modal";
 import {
@@ -33,7 +31,6 @@ import {
   Settings,
   Users,
   Mail,
-  CreditCard,
   AlertTriangle,
   Crown,
   LogOut,
@@ -46,13 +43,12 @@ import {
   Loader2,
 } from "lucide-react";
 
-type Tab = "general" | "members" | "invitations" | "billing" | "integrations" | "danger";
+type Tab = "general" | "members" | "invitations" | "integrations" | "danger";
 
 const tabs = [
   { id: "general" as Tab, label: "General", icon: Settings },
   { id: "members" as Tab, label: "Members", icon: Users },
   { id: "invitations" as Tab, label: "Invitations", icon: Mail },
-  { id: "billing" as Tab, label: "Billing", icon: CreditCard },
   { id: "integrations" as Tab, label: "Integrations", icon: Plug },
   { id: "danger" as Tab, label: "Danger Zone", icon: AlertTriangle },
 ];
@@ -70,7 +66,6 @@ export default function ProjectSettingsPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [invitations, setInvitations] = useState<ProjectInvitation[]>([]);
-  const [subscription, setSubscription] = useState<ProjectSubscription | null>(null);
 
   // Modal state
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -128,17 +123,15 @@ export default function ProjectSettingsPage() {
       setError("");
       setIsLoading(true);
 
-      const [projectData, membersData, invitationsData, subscriptionData] = await Promise.all([
+      const [projectData, membersData, invitationsData] = await Promise.all([
         api.projects.get(projectId),
         api.projects.members.list(projectId),
         api.projects.invitations.list(projectId),
-        api.projects.billing.subscription(projectId),
       ]);
 
       setProject(projectData);
       setMembers(membersData);
       setInvitations(invitationsData);
-      setSubscription(subscriptionData);
     } catch (err) {
       setError(parseApiError(err).message);
     } finally {
@@ -213,42 +206,6 @@ export default function ProjectSettingsPage() {
     } catch (err) {
       toast.error(parseApiError(err).message);
     }
-  };
-
-  const handleUpgrade = async () => {
-    try {
-      const response = await api.projects.billing.checkout(projectId, "starter_monthly");
-      window.location.href = response.checkout_url;
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    }
-  };
-
-  const handleManageBilling = async () => {
-    try {
-      const response = await api.projects.billing.portal(projectId);
-      window.open(response.portal_url, "_blank", "noopener,noreferrer");
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    }
-  };
-
-  const handleCancelSubscription = () => {
-    setConfirmAction({
-      action: async () => {
-        try {
-          await api.projects.billing.cancel(projectId);
-          await loadProjectData();
-          toast.success("Subscription cancelled successfully");
-        } catch (err) {
-          toast.error(parseApiError(err).message);
-        }
-      },
-      title: "Cancel Subscription",
-      message: "Are you sure you want to cancel your subscription? You will lose access to premium features at the end of your billing period.",
-      confirmLabel: "Cancel Subscription",
-      variant: "warning",
-    });
   };
 
   const handleTransferOwnership = async (newOwnerId: string) => {
@@ -527,15 +484,6 @@ export default function ProjectSettingsPage() {
               onResend={handleResendInvitation}
             />
           </div>
-        )}
-
-        {activeTab === "billing" && subscription && (
-          <ProjectBillingCard
-            subscription={subscription}
-            onUpgrade={handleUpgrade}
-            onManageBilling={handleManageBilling}
-            onCancel={handleCancelSubscription}
-          />
         )}
 
         {activeTab === "integrations" && (

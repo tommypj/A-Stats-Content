@@ -120,9 +120,7 @@ async def create_project(
         description=data.description,
         avatar_url=getattr(data, "logo_url", None),
         owner_id=current_user.id,
-        subscription_tier="free",
-        subscription_status="active",
-        max_members=5,  # Free tier default
+        max_members=5,
     )
 
     db.add(project)
@@ -224,8 +222,6 @@ async def list_projects(
                 "logo_url": project.avatar_url,
                 "owner_id": project.owner_id,
                 "is_personal": getattr(project, "is_personal", False),
-                "subscription_tier": project.subscription_tier,
-                "subscription_status": project.subscription_status,
                 "member_count": member_count,
                 "current_user_role": membership.role,
                 "my_role": membership.role,
@@ -507,9 +503,6 @@ async def get_project(
         "description": project.description,
         "avatar_url": project.avatar_url,
         "owner_id": project.owner_id,
-        "subscription_tier": project.subscription_tier,
-        "subscription_status": project.subscription_status,
-        "subscription_expires": project.subscription_expires,
         "max_members": project.max_members,
         "member_count": member_count,
         "members": members_info,

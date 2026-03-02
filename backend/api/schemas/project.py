@@ -83,18 +83,6 @@ class ProjectResponse(BaseModel):
     logo_url: str | None = None  # Alias for avatar_url (frontend compatibility)
 
     is_personal: bool = False
-
-    # Billing
-    subscription_tier: str
-    subscription_status: str
-    lemonsqueezy_customer_id: str | None = None
-    lemonsqueezy_subscription_id: str | None = None
-
-    # Usage tracking
-    articles_generated_this_month: int = 0
-    outlines_generated_this_month: int = 0
-    images_generated_this_month: int = 0
-    usage_reset_date: datetime | None = None
     max_members: int = 5
 
     # Metadata
@@ -258,24 +246,6 @@ class ProjectInvitationAcceptResponse(BaseModel):
 # =============================================================================
 
 
-class ProjectStats(BaseModel):
-    """Project usage statistics."""
-
-    articles_generated: int
-    outlines_generated: int
-    images_generated: int
-    usage_reset_date: datetime | None = None
-
-    # Limits based on subscription tier
-    articles_limit: int
-    outlines_limit: int
-    images_limit: int
-
-    # Calculated percentages
-    articles_used_percent: float
-    outlines_used_percent: float
-    images_used_percent: float
-
 
 class ProjectSettings(BaseModel):
     """Project settings schema."""
@@ -332,7 +302,6 @@ class ProjectWithMemberRoleResponse(BaseModel):
     avatar_url: str | None = None
     description: str | None = None
     created_at: datetime
-    subscription_tier: str = "free"
     user_role: str  # Current user's role in this project
 
 
@@ -348,9 +317,6 @@ class ProjectDetailResponse(BaseModel):
     created_at: datetime
     updated_at: datetime | None = None
     is_personal: bool = False
-    subscription_tier: str = "free"
-    subscription_status: str = "active"
-    subscription_expires: datetime | None = None
     max_members: int = 5
     member_count: int = 0
     current_user_role: str | None = None  # Current user's role

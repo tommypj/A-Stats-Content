@@ -1,7 +1,7 @@
 """
 Generation tracking service.
 Logs all generation events, creates admin alerts on failure,
-and increments project usage counters only on success.
+and increments user-level usage counters only on success.
 """
 
 import logging
@@ -12,7 +12,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from infrastructure.database.models.generation import AdminAlert, GenerationLog
-from services.project_usage import ProjectUsageService
 
 logger = logging.getLogger(__name__)
 
@@ -77,41 +76,31 @@ class GenerationTracker:
         log.duration_ms = duration_ms
         log.cost_credits = 1
 
-        # Increment usage counters
-        if log.project_id:
-            try:
-                usage_service = ProjectUsageService(self.db)
-                # GEN-22: resource_type is stored singular ("article") — add "s" to match
-                # ProjectUsageService which uses plural keys ("articles", "outlines", "images")
-                await usage_service.increment_usage(log.project_id, log.resource_type + "s")
-            except Exception as e:
-                logger.warning("Failed to increment usage for project %s: %s", log.project_id, e)
-        else:
-            # Increment user-level counters for personal workspace
-            try:
-                from infrastructure.database.models.user import User
+        # Increment user-level usage counters
+        try:
+            from infrastructure.database.models.user import User
 
-                user_result = await self.db.execute(select(User).where(User.id == log.user_id))
-                user = user_result.scalar_one_or_none()
-                if user:
-                    ALLOWED_USAGE_FIELDS = {
-                        "article": "articles_generated_this_month",
-                        "outline": "outlines_generated_this_month",
-                        "image": "images_generated_this_month",
-                        "social_post": "social_posts_generated_this_month",
-                    }
-                    usage_field = ALLOWED_USAGE_FIELDS.get(log.resource_type)
-                    if usage_field:
-                        current = getattr(user, usage_field, 0) or 0
-                        setattr(user, usage_field, current + 1)
-                    else:
-                        logger.warning(
-                            "Unknown resource_type '%s' for usage increment", log.resource_type
-                        )
+            user_result = await self.db.execute(select(User).where(User.id == log.user_id))
+            user = user_result.scalar_one_or_none()
+            if user:
+                ALLOWED_USAGE_FIELDS = {
+                    "article": "articles_generated_this_month",
+                    "outline": "outlines_generated_this_month",
+                    "image": "images_generated_this_month",
+                    "social_post": "social_posts_generated_this_month",
+                }
+                usage_field = ALLOWED_USAGE_FIELDS.get(log.resource_type)
+                if usage_field:
+                    current = getattr(user, usage_field, 0) or 0
+                    setattr(user, usage_field, current + 1)
                 else:
-                    logger.warning("User %s not found for usage increment", log.user_id)
-            except Exception as e:
-                logger.warning("Failed to increment user usage for %s: %s", log.user_id, e)
+                    logger.warning(
+                        "Unknown resource_type '%s' for usage increment", log.resource_type
+                    )
+            else:
+                logger.warning("User %s not found for usage increment", log.user_id)
+        except Exception as e:
+            logger.warning("Failed to increment user usage for %s: %s", log.user_id, e)
 
         await self.db.flush()
 
@@ -161,80 +150,67 @@ class GenerationTracker:
         resource_type: str,
         user_id: str | None = None,
     ) -> bool:
-        """Check if the project (or user) can generate more of this resource type.
+        """Check if the user can generate more of this resource type.
         Returns True if allowed, False if limit reached.
 
         Uses DB-based checks only. Fails CLOSED on error (returns False) to
         protect billing — a transient DB error should not silently grant unlimited
-        generation.  Both the user-level and project-level paths deny on exception.
+        generation. project_id is accepted for call-site compatibility but ignored;
+        all quota enforcement is user-level only.
         """
-        if not project_id:
-            # Check user-level limits for personal workspace
-            if not user_id:
-                return True  # No user context — fail open
-
-            try:
-                from infrastructure.database.models.user import User
-
-                user_result = await self.db.execute(select(User).where(User.id == user_id))
-                user = user_result.scalar_one_or_none()
-                if not user:
-                    # User row not found — this is an invalid auth state;
-                    # deny generation rather than silently allowing it.
-                    logger.warning("User %s not found during limit check — denying", user_id)
-                    return False
-
-                # Reset monthly counters if we've crossed into a new month
-                await self._reset_user_usage_if_needed(user)
-
-                # Get plan limits — treat expired subscriptions as free tier
-                from core.plans import PLANS
-
-                now = datetime.now(UTC)
-                tier = user.subscription_tier or "free"
-                if user.subscription_expires and user.subscription_expires < now:
-                    tier = "free"
-                plan = PLANS.get(tier, PLANS["free"])
-                limits = plan.get("limits", {})
-
-                # Map resource_type to limit key
-                limit_key = f"{resource_type}s_per_month"
-                limit = limits.get(limit_key, 0)
-
-                if limit == -1:
-                    return True  # unlimited
-
-                # Get current month's usage count for this user
-                ALLOWED_USAGE_FIELDS = {
-                    "article": "articles_generated_this_month",
-                    "outline": "outlines_generated_this_month",
-                    "image": "images_generated_this_month",
-                    "social_post": "social_posts_generated_this_month",
-                }
-                usage_field = ALLOWED_USAGE_FIELDS.get(resource_type)
-                if not usage_field:
-                    logger.warning(
-                        "Unknown resource_type '%s' for limit check — denying", resource_type
-                    )
-                    return False  # API-M1: deny unknown resource types (fail closed)
-                current_usage = getattr(user, usage_field, 0) or 0
-
-                return current_usage < limit
-            except Exception as e:
-                logger.error("Failed to check user-level limit for user %s: %s", user_id, e)
-                # PROJ-14: fail closed for consistency with project-level check
-                return False
+        if not user_id:
+            return True  # No user context — fail open
 
         try:
-            usage_service = ProjectUsageService(self.db)
-            # Reset usage if needed
-            await usage_service.reset_project_usage_if_needed(project_id)
-            # GEN-22: resource_type arrives singular ("article") — add "s" to match
-            # ProjectUsageService which expects plural keys ("articles", "outlines", "images")
-            return await usage_service.check_project_limit(project_id, resource_type + "s")
+            from infrastructure.database.models.user import User
+
+            user_result = await self.db.execute(select(User).where(User.id == user_id))
+            user = user_result.scalar_one_or_none()
+            if not user:
+                # User row not found — this is an invalid auth state;
+                # deny generation rather than silently allowing it.
+                logger.warning("User %s not found during limit check — denying", user_id)
+                return False
+
+            # Reset monthly counters if we've crossed into a new month
+            await self._reset_user_usage_if_needed(user)
+
+            # Get plan limits — treat expired subscriptions as free tier
+            from core.plans import PLANS
+
+            now = datetime.now(UTC)
+            tier = user.subscription_tier or "free"
+            if user.subscription_expires and user.subscription_expires < now:
+                tier = "free"
+            plan = PLANS.get(tier, PLANS["free"])
+            limits = plan.get("limits", {})
+
+            # Map resource_type to limit key
+            limit_key = f"{resource_type}s_per_month"
+            limit = limits.get(limit_key, 0)
+
+            if limit == -1:
+                return True  # unlimited
+
+            # Get current month's usage count for this user
+            ALLOWED_USAGE_FIELDS = {
+                "article": "articles_generated_this_month",
+                "outline": "outlines_generated_this_month",
+                "image": "images_generated_this_month",
+                "social_post": "social_posts_generated_this_month",
+            }
+            usage_field = ALLOWED_USAGE_FIELDS.get(resource_type)
+            if not usage_field:
+                logger.warning(
+                    "Unknown resource_type '%s' for limit check — denying", resource_type
+                )
+                return False  # API-M1: deny unknown resource types (fail closed)
+            current_usage = getattr(user, usage_field, 0) or 0
+
+            return current_usage < limit
         except Exception as e:
-            logger.error("Failed to check project usage limit: %s", str(e))
-            return False  # Fail closed — projects have explicit billing
+            logger.error("Failed to check user-level limit for user %s: %s", user_id, e)
+            return False  # Fail closed
 
     async def _reset_user_usage_if_needed(self, user) -> bool:
         """Reset user-level monthly usage counters if the billing period has elapsed.

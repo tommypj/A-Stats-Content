@@ -18,7 +18,6 @@ from .images import router as images_router
 from .knowledge import router as knowledge_router
 from .notifications import router as notifications_router
 from .outlines import router as outlines_router
-from .project_billing import router as project_billing_router
 from .project_invitations import router as project_invitations_router
 from .projects import router as projects_router
 from .social import router as social_router
@@ -36,7 +35,6 @@ api_router.include_router(images_router)
 api_router.include_router(wordpress_router)
 api_router.include_router(analytics_router)
 api_router.include_router(billing_router)
-api_router.include_router(project_billing_router)
 api_router.include_router(knowledge_router)
 api_router.include_router(social_router)
 api_router.include_router(admin_analytics_router)

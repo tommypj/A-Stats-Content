@@ -29,25 +29,6 @@ def _make_db_session() -> AsyncMock:
     return session
 
 
-def _make_project(
-    project_id: str,
-    tier: str = "free",
-    articles_used: int = 0,
-    outlines_used: int = 0,
-    images_used: int = 0,
-) -> MagicMock:
-    """Build a mock Project with the usage fields needed by GenerationTracker."""
-    project = MagicMock()
-    project.id = project_id
-    project.subscription_tier = tier
-    project.articles_generated_this_month = articles_used
-    project.outlines_generated_this_month = outlines_used
-    project.images_generated_this_month = images_used
-    project.usage_reset_date = None
-    project.members = []
-    return project
-
-
 def _make_user(
     user_id: str,
     tier: str = "free",
@@ -104,42 +85,45 @@ class TestGenerationLog:
         assert log.resource_type == "article"
         assert log.cost_credits == 0  # not charged yet
 
-    async def test_log_success_marks_log_and_increments_usage(self):
-        """log_success sets status to 'success' and triggers usage increment."""
+    async def test_log_success_marks_log_and_increments_user_usage(self):
+        """log_success sets status to 'success' and increments user-level usage."""
         db = _make_db_session()
         tracker = GenerationTracker(db)
 
+        user_id = str(uuid4())
         log_id = str(uuid4())
         project_id = str(uuid4())
 
-        # Build a fake log record
+        # Build a fake log record (with project_id — usage should still go to user)
         fake_log = MagicMock()
         fake_log.id = log_id
+        fake_log.user_id = user_id
         fake_log.project_id = project_id
         fake_log.resource_type = "article"
 
-        # Patch DB execute to return the fake log
-        execute_result = MagicMock()
-        execute_result.scalar_one_or_none.return_value = fake_log
-        db.execute = AsyncMock(return_value=execute_result)
+        fake_user = MagicMock()
+        fake_user.id = user_id
+        fake_user.articles_generated_this_month = 2
 
-        with patch("services.generation_tracker.ProjectUsageService") as MockUsageService:
-            mock_usage = AsyncMock()
-            MockUsageService.return_value = mock_usage
+        log_result = MagicMock()
+        log_result.scalar_one_or_none.return_value = fake_log
+        user_result = MagicMock()
+        user_result.scalar_one_or_none.return_value = fake_user
 
-            await tracker.log_success(
-                log_id=log_id,
-                ai_model="claude-3-5-sonnet",
-                duration_ms=1500,
-            )
+        db.execute = AsyncMock(side_effect=[log_result, user_result])
+
+        await tracker.log_success(
+            log_id=log_id,
+            ai_model="claude-3-5-sonnet",
+            duration_ms=1500,
+        )
 
         assert fake_log.status == "success"
         assert fake_log.ai_model == "claude-3-5-sonnet"
         assert fake_log.duration_ms == 1500
         assert fake_log.cost_credits == 1
-
-        # Usage should be incremented for the project
-        mock_usage.increment_usage.assert_called_once_with(project_id, "articles")
+        # User-level counter should be incremented
+        assert fake_user.articles_generated_this_month == 3
 
     async def test_log_success_no_project_increments_user_usage(self):
         """When project_id is None, log_success increments user-level counters."""
@@ -166,11 +150,8 @@ class TestGenerationLog:
 
         db.execute = AsyncMock(side_effect=[log_result, user_result])
 
-        with patch("services.generation_tracker.ProjectUsageService") as MockUsage:
-            await tracker.log_success(log_id=log_id)
+        await tracker.log_success(log_id=log_id)
 
-        # ProjectUsageService should NOT be called for personal workspace
-        MockUsage.assert_not_called()
         # User-level counter should be incremented
         assert fake_user.articles_generated_this_month == 4
         assert fake_log.status == "success"
@@ -234,101 +215,54 @@ class TestGenerationLog:
 
 
 # ---------------------------------------------------------------------------
-# Tests: check_limit — project-level (fail-closed)
+# Tests: check_limit — project_id is now ignored, user-level only
 # ---------------------------------------------------------------------------
 
 
-class TestCheckLimitProjectLevel:
-    """Tests for check_limit when a project_id is supplied."""
+class TestCheckLimitProjectIdIgnored:
+    """check_limit now ignores project_id; all quota comes from the user."""
 
-    async def test_check_limit_within_limit_returns_true(self):
-        """Project has used fewer articles than its monthly cap."""
+    async def test_check_limit_with_project_id_uses_user_limits(self):
+        """Supplying a project_id does NOT bypass user-level quota checks."""
+        user_id = str(uuid4())
         project_id = str(uuid4())
-        # free tier: 10 articles/month; 5 used -> should be allowed
-        _make_project(project_id, tier="free", articles_used=5)
+        # free tier — 0 articles used → should be allowed
+        mock_user = _make_user(user_id, tier="free", articles_used=0)
 
         db = _make_db_session()
+        execute_result = MagicMock()
+        execute_result.scalar_one_or_none.return_value = mock_user
+        db.execute = AsyncMock(return_value=execute_result)
 
-        with patch("services.generation_tracker.ProjectUsageService") as MockUsage:
-            mock_usage_instance = AsyncMock()
-            mock_usage_instance.reset_project_usage_if_needed = AsyncMock(return_value=False)
-            mock_usage_instance.check_project_limit = AsyncMock(return_value=True)
-            MockUsage.return_value = mock_usage_instance
-
-            tracker = GenerationTracker(db)
-            result = await tracker.check_limit(
-                project_id=project_id,
-                resource_type="article",
-            )
+        tracker = GenerationTracker(db)
+        result = await tracker.check_limit(
+            project_id=project_id,
+            resource_type="article",
+            user_id=user_id,
+        )
 
         assert result is True
-        mock_usage_instance.check_project_limit.assert_called_once_with(project_id, "articles")
 
-    async def test_check_limit_exceeded_returns_false(self):
-        """Project has reached its monthly article limit."""
+    async def test_check_limit_with_project_id_enforces_user_cap(self):
+        """User cap is enforced even when project_id is provided."""
+        user_id = str(uuid4())
         project_id = str(uuid4())
+        # free tier limit = 10; user already used 10 → blocked
+        mock_user = _make_user(user_id, tier="free", articles_used=10)
 
         db = _make_db_session()
+        execute_result = MagicMock()
+        execute_result.scalar_one_or_none.return_value = mock_user
+        db.execute = AsyncMock(return_value=execute_result)
 
-        with patch("services.generation_tracker.ProjectUsageService") as MockUsage:
-            mock_usage_instance = AsyncMock()
-            mock_usage_instance.reset_project_usage_if_needed = AsyncMock(return_value=False)
-            mock_usage_instance.check_project_limit = AsyncMock(return_value=False)
-            MockUsage.return_value = mock_usage_instance
-
-            tracker = GenerationTracker(db)
-            result = await tracker.check_limit(
-                project_id=project_id,
-                resource_type="article",
-            )
+        tracker = GenerationTracker(db)
+        result = await tracker.check_limit(
+            project_id=project_id,
+            resource_type="article",
+            user_id=user_id,
+        )
 
         assert result is False
-
-    async def test_check_limit_project_error_fails_closed(self):
-        """
-        If ProjectUsageService raises an exception the method must return False
-        (fail-closed behavior — deny generation when limits can't be verified).
-        """
-        project_id = str(uuid4())
-        db = _make_db_session()
-
-        with patch("services.generation_tracker.ProjectUsageService") as MockUsage:
-            mock_usage_instance = AsyncMock()
-            mock_usage_instance.reset_project_usage_if_needed = AsyncMock(
-                side_effect=Exception("DB is down")
-            )
-            MockUsage.return_value = mock_usage_instance
-
-            tracker = GenerationTracker(db)
-            result = await tracker.check_limit(
-                project_id=project_id,
-                resource_type="article",
-            )
-
-        assert result is False
-
-    async def test_check_limit_resets_usage_before_checking(self):
-        """check_limit calls reset_project_usage_if_needed before checking."""
-        project_id = str(uuid4())
-        db = _make_db_session()
-
-        reset_called = []
-
-        with patch("services.generation_tracker.ProjectUsageService") as MockUsage:
-            mock_usage_instance = AsyncMock()
-
-            async def _fake_reset(pid):
-                reset_called.append(pid)
-                return False
-
-            mock_usage_instance.reset_project_usage_if_needed = _fake_reset
-            mock_usage_instance.check_project_limit = AsyncMock(return_value=True)
-            MockUsage.return_value = mock_usage_instance
-
-            tracker = GenerationTracker(db)
-            await tracker.check_limit(project_id=project_id, resource_type="article")
-
-        assert project_id in reset_called
 
 
 # ---------------------------------------------------------------------------

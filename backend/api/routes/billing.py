@@ -31,7 +31,6 @@ from api.schemas.billing import (
 from core.plans import PLANS
 from infrastructure.config.settings import settings
 from infrastructure.database.connection import get_db
-from infrastructure.database.models.project import Project
 from infrastructure.database.models.user import SubscriptionTier, User
 
 # Configure logging
@@ -329,162 +328,6 @@ async def cancel_subscription(
     )
 
 
-async def handle_project_subscription_webhook(
-    db: AsyncSession,
-    project_id: str,
-    event_name: str,
-    subscription_id: str,
-    customer_id: str,
-    variant_id: str,
-    subscription_status: str,
-    renews_at: str,
-):
-    """
-    Handle LemonSqueezy webhook events for project subscriptions.
-
-    Args:
-        db: Database session
-        project_id: Project ID from custom_data
-        event_name: Webhook event type
-        subscription_id: LemonSqueezy subscription ID
-        customer_id: LemonSqueezy customer ID
-        variant_id: LemonSqueezy variant ID
-        subscription_status: Subscription status
-        renews_at: Renewal date
-
-    Returns:
-        Response dictionary
-    """
-    from infrastructure.database.models.project import Project
-
-    # Find project — BILL-18: row-level lock prevents concurrent webhook updates from racing
-    result = await db.execute(select(Project).where(Project.id == project_id).with_for_update())
-    project = result.scalar_one_or_none()
-
-    if not project:
-        logger.error(f"Project {project_id} not found for webhook")
-        return {"status": "error", "message": "Project not found"}
-
-    # BILL-34: Determine subscription tier from variant_id using shared mapping
-    tier = SubscriptionTier.FREE.value
-    if variant_id:
-        variant_to_tier = _build_variant_to_tier()
-        tier = variant_to_tier.get(str(variant_id), SubscriptionTier.FREE.value)
-        if tier == SubscriptionTier.FREE.value and str(variant_id) not in variant_to_tier:
-            # BILL-22: variant_id didn't match any known tier — defaulting to free
-            logger.warning(
-                "BILL-22: variant_id %s did not match any known tier — defaulting to free",
-                variant_id,
-            )
-
-    # Handle different event types
-    try:
-        if event_name == WebhookEventType.SUBSCRIPTION_CREATED.value:
-            # New project subscription
-            project.subscription_tier = tier
-            project.subscription_status = subscription_status or "active"  # BILL-08
-            project.lemonsqueezy_customer_id = str(customer_id) if customer_id else None
-            # BILL-28: only overwrite subscription_id when webhook provides one
-            if subscription_id is not None:
-                project.lemonsqueezy_subscription_id = str(subscription_id)
-            project.lemonsqueezy_variant_id = str(variant_id) if variant_id else None  # BILL-07
-
-            if renews_at:
-                project.subscription_expires = _parse_iso_datetime(renews_at)
-
-            logger.info(f"Project subscription created: project_id={project_id}, tier={tier}")
-
-        elif event_name == WebhookEventType.SUBSCRIPTION_UPDATED.value:
-            # Project subscription updated
-            project.subscription_tier = tier
-            project.subscription_status = subscription_status or "active"  # BILL-08
-            project.lemonsqueezy_variant_id = str(variant_id) if variant_id else None  # BILL-07
-
-            if renews_at:
-                project.subscription_expires = _parse_iso_datetime(renews_at)
-
-            if subscription_status in ["cancelled", "paused", "expired"]:
-                logger.info(
-                    f"Project subscription {subscription_status}: project_id={project_id}, expires={renews_at}"
-                )
-            else:
-                logger.info(
-                    f"Project subscription updated: project_id={project_id}, tier={tier}, status={subscription_status}"
-                )
-
-        elif event_name == WebhookEventType.SUBSCRIPTION_CANCELLED.value:
-            # BILL-04: Revoke features immediately on cancellation rather than waiting
-            # for the billing period to end. subscription_expires = now() means
-            # BILL-01's expiry check in check_limit() will immediately treat them as free.
-            project.subscription_expires = datetime.now(UTC)
-            project.subscription_status = "cancelled"  # BILL-27
-            logger.info(
-                f"Project subscription cancelled: project_id={project_id}, access revoked immediately"
-            )
-
-        elif event_name == WebhookEventType.SUBSCRIPTION_EXPIRED.value:
-            # Project subscription expired - downgrade to free
-            project.subscription_tier = SubscriptionTier.FREE.value
-            project.subscription_status = "expired"  # BILL-08
-            project.subscription_expires = None
-            project.lemonsqueezy_subscription_id = None
-            project.lemonsqueezy_variant_id = None  # BILL-07
-
-            logger.info(
-                f"Project subscription expired: project_id={project_id}, downgraded to free"
-            )
-
-        elif event_name == WebhookEventType.SUBSCRIPTION_PAYMENT_SUCCESS.value:
-            # Payment successful - update renewal date
-            if renews_at:
-                project.subscription_expires = _parse_iso_datetime(renews_at)
-
-            logger.info(f"Project payment successful: project_id={project_id}, renews={renews_at}")
-
-        elif event_name == WebhookEventType.SUBSCRIPTION_PAYMENT_FAILED.value:
-            # Payment failed
-            logger.warning(f"Project payment failed: project_id={project_id}")
-
-        elif event_name == WebhookEventType.SUBSCRIPTION_RESUMED.value:
-            # Project subscription resumed
-            project.subscription_tier = tier
-
-            if renews_at:
-                project.subscription_expires = _parse_iso_datetime(renews_at)
-
-            logger.info(f"Project subscription resumed: project_id={project_id}")
-
-        elif event_name == WebhookEventType.SUBSCRIPTION_PAUSED.value:
-            # Project subscription paused
-            logger.info(f"Project subscription paused: project_id={project_id}")
-
-        elif event_name == WebhookEventType.SUBSCRIPTION_UNPAUSED.value:
-            # Project subscription unpaused
-            project.subscription_tier = tier
-
-            if renews_at:
-                project.subscription_expires = _parse_iso_datetime(renews_at)
-
-            logger.info(f"Project subscription unpaused: project_id={project_id}")
-
-        else:
-            logger.warning(f"Unknown webhook event type: {event_name}")
-
-        # Commit changes
-        await db.commit()
-        await db.refresh(project)
-
-        logger.info(f"Project webhook processed successfully: project_id={project_id}")
-
-    except Exception as e:
-        logger.error(
-            "Webhook processing failed for project %s: %s", project_id, str(e), exc_info=True
-        )
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Webhook processing failed"
-        )
-
 
 @router.post("/webhook")
 @limiter.limit("100/minute")  # BILL-26: webhooks can fire fast from LemonSqueezy
@@ -565,7 +408,6 @@ async def handle_webhook(
     event_name = meta.get("event_name")
     custom_data = meta.get("custom_data", {}) or {}
     user_id = custom_data.get("user_id")
-    project_id = custom_data.get("project_id")  # Project subscription support
 
     if not event_name:
         logger.error("Webhook payload missing event_name in meta")
@@ -592,24 +434,9 @@ async def handle_webhook(
 
     logger.info(
         f"Webhook received: event={event_name}, user_id={user_id}, "
-        f"project_id={project_id}, subscription_id={subscription_id}, status={subscription_status}"
+        f"subscription_id={subscription_id}, status={subscription_status}"
     )
 
-    # Handle project subscription vs user subscription
-    if project_id:
-        # Project subscription - delegate to project webhook handler
-        return await handle_project_subscription_webhook(
-            db=db,
-            project_id=project_id,
-            event_name=event_name,
-            subscription_id=subscription_id,
-            customer_id=customer_id,
-            variant_id=variant_id,
-            subscription_status=subscription_status,
-            renews_at=renews_at,
-        )
-
-    # User subscription (original behavior)
     # Find user
     if not user_id:
         logger.error("No user_id in webhook custom_data")
@@ -763,30 +590,6 @@ async def handle_webhook(
 
         else:
             logger.warning(f"Unknown webhook event type: {event_name}")
-
-        # Sync subscription tier to user's personal project
-        personal_project_result = await db.execute(
-            select(Project).where(
-                Project.owner_id == user.id,
-                Project.is_personal,
-            )
-        )
-        personal_project = personal_project_result.scalar_one_or_none()
-        if personal_project:
-            personal_project.subscription_tier = user.subscription_tier
-            # BILL-27: propagate subscription_status so personal project stays in sync
-            if hasattr(personal_project, "subscription_status"):
-                personal_project.subscription_status = user.subscription_status
-            # BILL-37: always mirror subscription_expires (including None) to avoid stale values
-            personal_project.subscription_expires = user.subscription_expires
-        else:
-            # BILL-13/BILL-23: warn if personal project is missing so ops can investigate
-            logger.warning(
-                "BILL-23: Personal project not found for user %s (tier=%s) — subscription sync skipped. "
-                "User and project tiers may diverge.",
-                user_id,
-                tier,
-            )
 
         # Commit changes
         await db.commit()
