@@ -785,8 +785,8 @@ async def delete_social_post(
 @router.post("/bulk-delete", response_model=BulkDeleteResponse)
 @limiter.limit("10/minute")  # ADM-23: Rate limit bulk admin operations
 async def bulk_delete_content(
-    http_request: Request,
-    request: BulkDeleteRequest,
+    request: Request,
+    body: BulkDeleteRequest,
     admin_user: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -796,7 +796,7 @@ async def bulk_delete_content(
     Supports: articles, outlines, images, social posts.
     All deletions are logged to audit trail.
     """
-    if not request.ids:
+    if not body.ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No IDs provided for deletion",
@@ -814,20 +814,20 @@ async def bulk_delete_content(
         ),
     }
 
-    if request.content_type not in content_mapping:
+    if body.content_type not in content_mapping:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid content type: {request.content_type}",
+            detail=f"Invalid content type: {body.content_type}",
         )
 
-    model, audit_action, target_type = content_mapping[request.content_type]
+    model, audit_action, target_type = content_mapping[body.content_type]
 
     # Track results
     deleted_count = 0
     failed_ids = []
 
     # ADM-03: Delete each item in its own savepoint so one failure doesn't abort all others
-    for item_id in request.ids:
+    for item_id in body.ids:
         try:
             async with db.begin_nested():
                 # Get item to verify existence
@@ -858,7 +858,7 @@ async def bulk_delete_content(
             deleted_count += 1
 
         except Exception as e:
-            logger.error(f"Failed to delete {request.content_type} {item_id}: {e}")
+            logger.error(f"Failed to delete {body.content_type} {item_id}: {e}")
             failed_ids.append(item_id)
 
     # Commit all successful savepoints
@@ -872,8 +872,8 @@ async def bulk_delete_content(
         target_type=target_type,
         target_id=None,
         details={
-            "content_type": request.content_type,
-            "total_requested": len(request.ids),
+            "content_type": body.content_type,
+            "total_requested": len(body.ids),
             "deleted_count": deleted_count,
             "failed_count": len(failed_ids),
             # ADM-09: include failed IDs for a complete audit trail
@@ -883,7 +883,7 @@ async def bulk_delete_content(
     )
 
     logger.info(
-        f"Admin {admin_user.email} bulk deleted {deleted_count} {request.content_type}(s), "
+        f"Admin {admin_user.email} bulk deleted {deleted_count} {body.content_type}(s), "
         f"{len(failed_ids)} failed"
     )
 
@@ -892,5 +892,5 @@ async def bulk_delete_content(
         deleted_count=deleted_count,
         failed_count=len(failed_ids),
         failed_ids=failed_ids,
-        message=f"Deleted {deleted_count} {request.content_type}(s). {len(failed_ids)} failed.",
+        message=f"Deleted {deleted_count} {body.content_type}(s). {len(failed_ids)} failed.",
     )

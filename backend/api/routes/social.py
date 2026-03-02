@@ -707,8 +707,8 @@ async def verify_account(
 @router.post("/posts", response_model=ScheduledPostResponse, status_code=201)
 @limiter.limit("30/minute")
 async def create_scheduled_post(
-    http_request: Request,
-    request: CreatePostRequest,
+    request: Request,
+    body: CreatePostRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -717,21 +717,21 @@ async def create_scheduled_post(
     result = await db.execute(
         select(SocialAccount).where(
             and_(
-                SocialAccount.id.in_(request.account_ids),
+                SocialAccount.id.in_(body.account_ids),
                 SocialAccount.user_id == current_user.id,
             )
         )
     )
     accounts = result.scalars().all()
 
-    if len(accounts) != len(request.account_ids):
+    if len(accounts) != len(body.account_ids):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="One or more social accounts not found or not owned by user",
         )
 
     # Validate scheduled_at is in the future
-    if request.scheduled_at and request.scheduled_at < datetime.now(UTC):
+    if body.scheduled_at and body.scheduled_at < datetime.now(UTC):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Scheduled time must be in the future",
@@ -739,7 +739,7 @@ async def create_scheduled_post(
 
     # Validate content length for each platform
     for account in accounts:
-        is_valid, error_msg = validate_content_length(request.content, account.platform)
+        is_valid, error_msg = validate_content_length(body.content, account.platform)
         if not is_valid:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -747,17 +747,17 @@ async def create_scheduled_post(
             )
 
     # Determine status
-    post_status = PostStatus.SCHEDULED.value if request.scheduled_at else PostStatus.DRAFT.value
+    post_status = PostStatus.SCHEDULED.value if body.scheduled_at else PostStatus.DRAFT.value
 
     # Create scheduled post
     scheduled_post = ScheduledPost(
         user_id=current_user.id,
-        content=request.content,
-        media_urls=request.media_urls,
-        link_url=request.link_url,
-        scheduled_at=request.scheduled_at,
+        content=body.content,
+        media_urls=body.media_urls,
+        link_url=body.link_url,
+        scheduled_at=body.scheduled_at,
         status=post_status,
-        article_id=request.article_id,
+        article_id=body.article_id,
     )
     db.add(scheduled_post)
     await db.flush()  # Get the ID
@@ -766,9 +766,9 @@ async def create_scheduled_post(
     for account in accounts:
         # Check if there's a custom target config
         target_config = None
-        if request.targets:
+        if body.targets:
             target_config = next(
-                (t for t in request.targets if t.account_id == str(account.id)),
+                (t for t in body.targets if t.account_id == str(account.id)),
                 None,
             )
 

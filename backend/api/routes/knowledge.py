@@ -519,8 +519,8 @@ async def delete_source(
 @router.post("/query", response_model=QueryResponse)
 @limiter.limit("30/minute")  # KV-02: rate limit knowledge queries
 async def query_knowledge(
-    http_request: Request,
-    request: QueryRequest,
+    request: Request,
+    body: QueryRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -535,16 +535,16 @@ async def query_knowledge(
     ownership_filter = _build_ownership_filter(current_user)
 
     # Determine which sources to search
-    if request.source_ids:
+    if body.source_ids:
         src_result = await db.execute(
             select(KnowledgeSource).where(
-                KnowledgeSource.id.in_(request.source_ids),
+                KnowledgeSource.id.in_(body.source_ids),
                 ownership_filter,
             )
         )
         sources = src_result.scalars().all()
 
-        if len(sources) != len(request.source_ids):
+        if len(sources) != len(body.source_ids):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied or source not found",
@@ -596,12 +596,12 @@ async def query_knowledge(
     ]
 
     # Run keyword search
-    top_chunks = kp.search_chunks(chunk_tuples, request.query, top_k=request.max_results)
-    answer = kp.build_answer(request.query, top_chunks)
+    top_chunks = kp.search_chunks(chunk_tuples, body.query, top_k=body.max_results)
+    answer = kp.build_answer(body.query, top_chunks)
 
     # Build source snippets
     source_snippets = []
-    if request.include_sources:
+    if body.include_sources:
         for chunk in top_chunks:
             # Normalise score to [0, 1] range for the response
             normalised_score = min(chunk["score"] / 10.0, 1.0)
@@ -624,7 +624,7 @@ async def query_knowledge(
     query_log = KnowledgeQuery(
         id=str(uuid4()),
         user_id=current_user.id,
-        query_text=request.query,
+        query_text=body.query,
         response_text=answer,
         sources_used=[
             {
@@ -644,7 +644,7 @@ async def query_knowledge(
     await db.commit()
 
     return QueryResponse(
-        query=request.query,
+        query=body.query,
         answer=answer,
         sources=source_snippets,
         query_time_ms=query_time_ms,
