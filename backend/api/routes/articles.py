@@ -748,8 +748,8 @@ async def stream_article_status(
             while asyncio.get_event_loop().time() < deadline:
                 try:
                     msg = await asyncio.wait_for(
-                        pubsub.get_message(ignore_subscribe_messages=True, timeout=30),
-                        timeout=31,
+                        pubsub.get_message(ignore_subscribe_messages=True, timeout=15),
+                        timeout=16,
                     )
                 except asyncio.TimeoutError:
                     msg = None
