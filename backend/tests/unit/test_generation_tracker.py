@@ -397,8 +397,8 @@ class TestCheckLimitUserLevel:
 
         assert result is True
 
-    async def test_check_limit_user_not_found_fails_open(self):
-        """If the user record doesn't exist, fail open (return True)."""
+    async def test_check_limit_user_not_found_fails_closed(self):
+        """If the user record doesn't exist, fail closed (return False) — invalid auth state."""
         user_id = str(uuid4())
 
         db = _make_db_session()
@@ -413,7 +413,7 @@ class TestCheckLimitUserLevel:
             user_id=user_id,
         )
 
-        assert result is True
+        assert result is False
 
     async def test_check_limit_no_context_fails_open(self):
         """No project_id and no user_id — fail open (return True)."""
@@ -428,10 +428,10 @@ class TestCheckLimitUserLevel:
 
         assert result is True
 
-    async def test_check_limit_user_db_exception_fails_open(self):
+    async def test_check_limit_user_db_exception_fails_closed(self):
         """
         If user-level limit check raises an unexpected exception,
-        the method should fail open (return True).
+        the method fails closed (return False) per PROJ-14.
         """
         user_id = str(uuid4())
         db = _make_db_session()
@@ -444,4 +444,4 @@ class TestCheckLimitUserLevel:
             user_id=user_id,
         )
 
-        assert result is True
+        assert result is False
