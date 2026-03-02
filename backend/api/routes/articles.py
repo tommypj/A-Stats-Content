@@ -498,6 +498,17 @@ async def _run_article_generation(
             await db.commit()
             logger.info("Article %s generated successfully", article_id)
 
+            # Notify any waiting SSE stream of completion
+            try:
+                _rc = aioredis.from_url(settings.redis_url, decode_responses=True)
+                await _rc.publish(
+                    f"article:{article_id}:status",
+                    json.dumps({"status": "completed", "article_id": article_id}),
+                )
+                await _rc.aclose()
+            except Exception as _pub_err:
+                logger.warning("Redis publish failed for article %s: %s", article_id, _pub_err)
+
         except Exception as e:
             logger.error(
                 "Background generation failed for article %s: %s", article_id, e, exc_info=True
@@ -516,6 +527,16 @@ async def _run_article_generation(
                         article.generation_error = str(e)[:500]
                         await err_db.commit()
                         logger.info("Marked article %s as failed", article_id)
+                        # Notify any waiting SSE stream of failure
+                        try:
+                            _rc = aioredis.from_url(settings.redis_url, decode_responses=True)
+                            await _rc.publish(
+                                f"article:{article_id}:status",
+                                json.dumps({"status": "failed", "article_id": article_id, "error": str(e)[:200]}),
+                            )
+                            await _rc.aclose()
+                        except Exception as _pub_err:
+                            logger.warning("Redis publish failed for article %s: %s", article_id, _pub_err)
             except Exception:
                 logger.error("Failed to mark article %s as failed", article_id, exc_info=True)
 
@@ -671,6 +692,90 @@ async def generate_article(
     task.add_done_callback(lambda t: _active_generation_tasks.pop(article_id, None))
 
     return article
+
+
+@router.get("/{article_id}/stream")
+async def stream_article_status(
+    article_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """SSE stream — sends one event when generation completes/fails, then closes."""
+    if current_user.current_project_id:
+        article_query = select(Article).where(
+            Article.id == article_id,
+            Article.project_id == current_user.current_project_id,
+            Article.deleted_at.is_(None),
+        )
+    else:
+        article_query = select(Article).where(
+            Article.id == article_id,
+            Article.user_id == current_user.id,
+            Article.deleted_at.is_(None),
+        )
+    result = await db.execute(article_query)
+    article = result.scalar_one_or_none()
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    async def event_stream():
+        # Fast path: already done before stream opened
+        if article.status in (ContentStatus.COMPLETED.value, ContentStatus.PUBLISHED.value):
+            yield f"event: completed\ndata: {json.dumps({'status': 'completed', 'article_id': article_id})}\n\n"
+            return
+        if article.status == ContentStatus.FAILED.value:
+            yield f"event: failed\ndata: {json.dumps({'status': 'failed', 'article_id': article_id})}\n\n"
+            return
+
+        _rc = aioredis.from_url(settings.redis_url, decode_responses=True)
+        pubsub = _rc.pubsub()
+        try:
+            await pubsub.subscribe(f"article:{article_id}:status")
+
+            # Re-check after subscribing to close the race window
+            await db.refresh(article)
+            if article.status in (ContentStatus.COMPLETED.value, ContentStatus.PUBLISHED.value):
+                yield f"event: completed\ndata: {json.dumps({'status': 'completed', 'article_id': article_id})}\n\n"
+                return
+            if article.status == ContentStatus.FAILED.value:
+                yield f"event: failed\ndata: {json.dumps({'status': 'failed', 'article_id': article_id})}\n\n"
+                return
+
+            yield ": keepalive\n\n"  # Initial ping so client knows stream is open
+
+            deadline = asyncio.get_event_loop().time() + 660  # 11 minutes
+
+            while asyncio.get_event_loop().time() < deadline:
+                try:
+                    msg = await asyncio.wait_for(
+                        pubsub.get_message(ignore_subscribe_messages=True, timeout=30),
+                        timeout=31,
+                    )
+                except asyncio.TimeoutError:
+                    msg = None
+
+                if msg and msg["type"] == "message":
+                    data = json.loads(msg["data"])
+                    event = data.get("status", "update")
+                    yield f"event: {event}\ndata: {json.dumps(data)}\n\n"
+                    return
+                else:
+                    yield ": keepalive\n\n"  # Keep connection alive through proxies
+
+            yield f"event: timeout\ndata: {json.dumps({'status': 'timeout', 'article_id': article_id})}\n\n"
+        except Exception as exc:
+            logger.warning("SSE stream error for article %s: %s", article_id, exc)
+            yield f"event: error\ndata: {json.dumps({'status': 'error', 'article_id': article_id})}\n\n"
+        finally:
+            await pubsub.unsubscribe()
+            await pubsub.aclose()
+            await _rc.aclose()
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("", response_model=ArticleListResponse)
