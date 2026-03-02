@@ -10,20 +10,16 @@ Tests admin analytics endpoints:
 - Authorization checks
 """
 
-import pytest
-from datetime import datetime, date, timedelta
-from uuid import uuid4
+from datetime import date, timedelta
 
+import pytest
 from fastapi import status
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from infrastructure.database.models import User
-from infrastructure.database.models.user import UserRole, UserStatus, SubscriptionTier
 
 # Skip all tests if admin routes are not available
 try:
     from api.routes import admin
+
     ADMIN_ROUTES_AVAILABLE = True
 except (ImportError, AttributeError):
     ADMIN_ROUTES_AVAILABLE = False

@@ -10,22 +10,24 @@ Tests the post queue logic including:
 - Queue pagination and filtering
 """
 
-import pytest
-from datetime import datetime, timedelta, timezone
-from unittest.mock import Mock, AsyncMock
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
+
+import pytest
 
 # These imports will work once the queue service is created
 try:
+    from infrastructure.database.models.social import (
+        PostStatus,
+        PostTarget,
+        ScheduledPost,
+    )
     from services.post_queue import (
         PostQueueService,
         QueueError,
     )
-    from infrastructure.database.models.social import (
-        ScheduledPost,
-        PostStatus,
-        PostTarget,
-    )
+
     SERVICE_AVAILABLE = True
 except ImportError:
     SERVICE_AVAILABLE = False
@@ -57,7 +59,7 @@ def sample_post_data():
     return {
         "user_id": str(uuid4()),
         "content": "Test scheduled post",
-        "scheduled_time": datetime.now(timezone.utc) + timedelta(hours=1),
+        "scheduled_time": datetime.now(UTC) + timedelta(hours=1),
         "timezone": "UTC",
         "account_ids": [str(uuid4())],
         "media_urls": [],
@@ -129,15 +131,15 @@ class TestPostQueueService:
             id=str(uuid4()),
             user_id=str(uuid4()),
             content="Due post",
-            scheduled_time=datetime.now(timezone.utc) - timedelta(minutes=5),
+            scheduled_time=datetime.now(UTC) - timedelta(minutes=5),
             status=PostStatus.PENDING,
         )
 
-        future_post = ScheduledPost(
+        ScheduledPost(
             id=str(uuid4()),
             user_id=str(uuid4()),
             content="Future post",
-            scheduled_time=datetime.now(timezone.utc) + timedelta(hours=2),
+            scheduled_time=datetime.now(UTC) + timedelta(hours=2),
             status=PostStatus.PENDING,
         )
 
@@ -154,7 +156,7 @@ class TestPostQueueService:
         assert len(posts) >= 0
         # All returned posts should be due
         for post in posts:
-            assert post.scheduled_time <= datetime.now(timezone.utc)
+            assert post.scheduled_time <= datetime.now(UTC)
 
     @pytest.mark.asyncio
     async def test_mark_published_removes_from_queue(
@@ -170,7 +172,7 @@ class TestPostQueueService:
             id=str(uuid4()),
             user_id=str(uuid4()),
             content="Test post",
-            scheduled_time=datetime.now(timezone.utc),
+            scheduled_time=datetime.now(UTC),
             status=PostStatus.PENDING,
         )
 
@@ -213,7 +215,7 @@ class TestPostQueueService:
             id=str(uuid4()),
             user_id=str(uuid4()),
             content="Test post",
-            scheduled_time=datetime.now(timezone.utc) + timedelta(hours=1),
+            scheduled_time=datetime.now(UTC) + timedelta(hours=1),
             status=PostStatus.PENDING,
         )
 
@@ -246,7 +248,7 @@ class TestPostQueueService:
             id=str(uuid4()),
             user_id=str(uuid4()),
             content="Published post",
-            scheduled_time=datetime.now(timezone.utc) - timedelta(hours=1),
+            scheduled_time=datetime.now(UTC) - timedelta(hours=1),
             status=PostStatus.PUBLISHED,
         )
 
@@ -274,8 +276,8 @@ class TestPostQueueService:
         if not SERVICE_AVAILABLE:
             pytest.skip("Service not available")
 
-        original_time = datetime.now(timezone.utc) + timedelta(hours=1)
-        new_time = datetime.now(timezone.utc) + timedelta(hours=3)
+        original_time = datetime.now(UTC) + timedelta(hours=1)
+        new_time = datetime.now(UTC) + timedelta(hours=3)
 
         post = ScheduledPost(
             id=str(uuid4()),
@@ -315,7 +317,7 @@ class TestPostQueueService:
             id=str(uuid4()),
             user_id=str(uuid4()),
             content="Published post",
-            scheduled_time=datetime.now(timezone.utc) - timedelta(hours=1),
+            scheduled_time=datetime.now(UTC) - timedelta(hours=1),
             status=PostStatus.PUBLISHED,
         )
 
@@ -329,7 +331,7 @@ class TestPostQueueService:
                 session=mock_db_session,
                 post_id=post.id,
                 user_id=post.user_id,
-                new_scheduled_time=datetime.now(timezone.utc) + timedelta(hours=2),
+                new_scheduled_time=datetime.now(UTC) + timedelta(hours=2),
             )
 
         assert "cannot be rescheduled" in str(exc_info.value).lower()
@@ -352,7 +354,7 @@ class TestPostQueueService:
                 id=str(uuid4()),
                 user_id=user_id,
                 content=f"Post {i}",
-                scheduled_time=datetime.now(timezone.utc) + timedelta(hours=i),
+                scheduled_time=datetime.now(UTC) + timedelta(hours=i),
                 status=PostStatus.PENDING,
             )
             for i in range(5)
@@ -389,15 +391,15 @@ class TestPostQueueService:
             id=str(uuid4()),
             user_id=user_id,
             content="Pending",
-            scheduled_time=datetime.now(timezone.utc) + timedelta(hours=1),
+            scheduled_time=datetime.now(UTC) + timedelta(hours=1),
             status=PostStatus.PENDING,
         )
 
-        published_post = ScheduledPost(
+        ScheduledPost(
             id=str(uuid4()),
             user_id=user_id,
             content="Published",
-            scheduled_time=datetime.now(timezone.utc) - timedelta(hours=1),
+            scheduled_time=datetime.now(UTC) - timedelta(hours=1),
             status=PostStatus.PUBLISHED,
         )
 
@@ -433,7 +435,7 @@ class TestPostQueueService:
             id=post_id,
             user_id=user_id,
             content="Test post",
-            scheduled_time=datetime.now(timezone.utc) + timedelta(hours=1),
+            scheduled_time=datetime.now(UTC) + timedelta(hours=1),
             status=PostStatus.PENDING,
         )
 
@@ -465,11 +467,11 @@ class TestPostQueueService:
         owner_id = str(uuid4())
         other_user_id = str(uuid4())
 
-        post = ScheduledPost(
+        ScheduledPost(
             id=post_id,
             user_id=owner_id,
             content="Test post",
-            scheduled_time=datetime.now(timezone.utc) + timedelta(hours=1),
+            scheduled_time=datetime.now(UTC) + timedelta(hours=1),
             status=PostStatus.PENDING,
         )
 
@@ -500,7 +502,7 @@ class TestPostQueueService:
             id=str(uuid4()),
             user_id=str(uuid4()),
             content="Original content",
-            scheduled_time=datetime.now(timezone.utc) + timedelta(hours=1),
+            scheduled_time=datetime.now(UTC) + timedelta(hours=1),
             status=PostStatus.PENDING,
         )
 
@@ -570,7 +572,7 @@ class TestPostQueueService:
             pytest.skip("Service not available")
 
         user_id = str(uuid4())
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=30)
+        cutoff_date = datetime.now(UTC) - timedelta(days=30)
 
         # Mock deletion query
         mock_result = AsyncMock()

@@ -3,8 +3,7 @@ Billing and subscription request/response schemas.
 """
 
 from datetime import datetime
-from enum import Enum
-from typing import List, Optional
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
@@ -12,10 +11,18 @@ from pydantic import BaseModel, Field
 class PlanLimits(BaseModel):
     """Usage limits for a subscription plan."""
 
-    articles_per_month: int = Field(..., description="Number of articles allowed per month (-1 for unlimited)")
-    outlines_per_month: int = Field(..., description="Number of outlines allowed per month (-1 for unlimited)")
-    images_per_month: int = Field(..., description="Number of images allowed per month (-1 for unlimited)")
-    social_posts_per_month: int = Field(..., description="Number of social post sets allowed per month (-1 for unlimited)")
+    articles_per_month: int = Field(
+        ..., description="Number of articles allowed per month (-1 for unlimited)"
+    )
+    outlines_per_month: int = Field(
+        ..., description="Number of outlines allowed per month (-1 for unlimited)"
+    )
+    images_per_month: int = Field(
+        ..., description="Number of images allowed per month (-1 for unlimited)"
+    )
+    social_posts_per_month: int = Field(
+        ..., description="Number of social post sets allowed per month (-1 for unlimited)"
+    )
 
 
 class PlanInfo(BaseModel):
@@ -25,32 +32,36 @@ class PlanInfo(BaseModel):
     name: str = Field(..., description="Display name of the plan")
     price_monthly: float = Field(..., description="Monthly price in USD")
     price_yearly: float = Field(..., description="Yearly price in USD")
-    features: List[str] = Field(..., description="List of features included in the plan")
+    features: list[str] = Field(..., description="List of features included in the plan")
     limits: PlanLimits = Field(..., description="Usage limits for the plan")
 
 
 class PricingResponse(BaseModel):
     """Response containing all available pricing plans."""
 
-    plans: List[PlanInfo] = Field(..., description="List of all available plans")
+    plans: list[PlanInfo] = Field(..., description="List of all available plans")
 
 
 class SubscriptionStatus(BaseModel):
     """Current subscription status for a user."""
 
     subscription_tier: str = Field(..., description="Current subscription tier")
-    subscription_status: str = Field(..., description="Subscription status (active, cancelled, paused, past_due, expired, none)")
-    subscription_expires: Optional[datetime] = Field(None, description="When the subscription expires")
-    customer_id: Optional[str] = Field(None, description="LemonSqueezy customer ID")
-    subscription_id: Optional[str] = Field(None, description="LemonSqueezy subscription ID")
+    subscription_status: str = Field(
+        ..., description="Subscription status (active, cancelled, paused, past_due, expired, none)"
+    )
+    subscription_expires: datetime | None = Field(None, description="When the subscription expires")
+    customer_id: str | None = Field(None, description="LemonSqueezy customer ID")
+    subscription_id: str | None = Field(None, description="LemonSqueezy subscription ID")
     can_manage: bool = Field(..., description="Whether user can access customer portal")
 
     # Usage tracking
     articles_generated_this_month: int = Field(0, description="Articles generated this month")
     outlines_generated_this_month: int = Field(0, description="Outlines generated this month")
     images_generated_this_month: int = Field(0, description="Images generated this month")
-    social_posts_generated_this_month: int = Field(0, description="Social post sets generated this month")
-    usage_reset_date: Optional[datetime] = Field(None, description="When usage counters reset")
+    social_posts_generated_this_month: int = Field(
+        0, description="Social post sets generated this month"
+    )
+    usage_reset_date: datetime | None = Field(None, description="When usage counters reset")
 
 
 class CheckoutRequest(BaseModel):
@@ -60,12 +71,7 @@ class CheckoutRequest(BaseModel):
     billing_cycle: str = Field(..., description="Billing cycle (monthly, yearly)")
 
     model_config = {
-        "json_schema_extra": {
-            "example": {
-                "plan": "starter",
-                "billing_cycle": "monthly"
-            }
-        }
+        "json_schema_extra": {"example": {"plan": "starter", "billing_cycle": "monthly"}}
     }
 
 
@@ -81,7 +87,7 @@ class CustomerPortalResponse(BaseModel):
     portal_url: str = Field(..., description="URL to LemonSqueezy customer portal")
 
 
-class WebhookEventType(str, Enum):
+class WebhookEventType(StrEnum):
     """LemonSqueezy webhook event types."""
 
     SUBSCRIPTION_CREATED = "subscription_created"

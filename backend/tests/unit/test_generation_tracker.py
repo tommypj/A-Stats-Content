@@ -5,9 +5,11 @@ All database and Redis interactions are mocked so the tests run without any
 real infrastructure.  Each test is fully independent.
 """
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+from datetime import UTC
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
+
+import pytest
 
 from services.generation_tracker import GenerationTracker
 
@@ -17,6 +19,7 @@ pytestmark = pytest.mark.asyncio
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_db_session() -> AsyncMock:
     """Return a minimal mock that satisfies AsyncSession usage."""
@@ -51,7 +54,7 @@ def _make_user(
     articles_used: int = 0,
 ) -> MagicMock:
     """Build a mock User with the usage fields needed by GenerationTracker."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     user = MagicMock()
     user.id = user_id
@@ -60,13 +63,14 @@ def _make_user(
     user.outlines_generated_this_month = 0
     user.images_generated_this_month = 0
     # Set a future reset date so _reset_user_usage_if_needed is a no-op
-    user.usage_reset_date = datetime(2099, 1, 1, tzinfo=timezone.utc)
+    user.usage_reset_date = datetime(2099, 1, 1, tzinfo=UTC)
     return user
 
 
 # ---------------------------------------------------------------------------
 # Tests: log_start / log_success / log_failure lifecycle
 # ---------------------------------------------------------------------------
+
 
 class TestGenerationLog:
     """Tests for the generation logging lifecycle methods."""
@@ -117,9 +121,7 @@ class TestGenerationLog:
         execute_result.scalar_one_or_none.return_value = fake_log
         db.execute = AsyncMock(return_value=execute_result)
 
-        with patch(
-            "services.generation_tracker.ProjectUsageService"
-        ) as MockUsageService:
+        with patch("services.generation_tracker.ProjectUsageService") as MockUsageService:
             mock_usage = AsyncMock()
             MockUsageService.return_value = mock_usage
 
@@ -233,6 +235,7 @@ class TestGenerationLog:
 # Tests: check_limit — project-level (fail-closed)
 # ---------------------------------------------------------------------------
 
+
 class TestCheckLimitProjectLevel:
     """Tests for check_limit when a project_id is supplied."""
 
@@ -240,13 +243,11 @@ class TestCheckLimitProjectLevel:
         """Project has used fewer articles than its monthly cap."""
         project_id = str(uuid4())
         # free tier: 10 articles/month; 5 used -> should be allowed
-        mock_project = _make_project(project_id, tier="free", articles_used=5)
+        _make_project(project_id, tier="free", articles_used=5)
 
         db = _make_db_session()
 
-        with patch(
-            "services.generation_tracker.ProjectUsageService"
-        ) as MockUsage:
+        with patch("services.generation_tracker.ProjectUsageService") as MockUsage:
             mock_usage_instance = AsyncMock()
             mock_usage_instance.reset_project_usage_if_needed = AsyncMock(return_value=False)
             mock_usage_instance.check_project_limit = AsyncMock(return_value=True)
@@ -259,9 +260,7 @@ class TestCheckLimitProjectLevel:
             )
 
         assert result is True
-        mock_usage_instance.check_project_limit.assert_called_once_with(
-            project_id, "articles"
-        )
+        mock_usage_instance.check_project_limit.assert_called_once_with(project_id, "articles")
 
     async def test_check_limit_exceeded_returns_false(self):
         """Project has reached its monthly article limit."""
@@ -269,9 +268,7 @@ class TestCheckLimitProjectLevel:
 
         db = _make_db_session()
 
-        with patch(
-            "services.generation_tracker.ProjectUsageService"
-        ) as MockUsage:
+        with patch("services.generation_tracker.ProjectUsageService") as MockUsage:
             mock_usage_instance = AsyncMock()
             mock_usage_instance.reset_project_usage_if_needed = AsyncMock(return_value=False)
             mock_usage_instance.check_project_limit = AsyncMock(return_value=False)
@@ -293,9 +290,7 @@ class TestCheckLimitProjectLevel:
         project_id = str(uuid4())
         db = _make_db_session()
 
-        with patch(
-            "services.generation_tracker.ProjectUsageService"
-        ) as MockUsage:
+        with patch("services.generation_tracker.ProjectUsageService") as MockUsage:
             mock_usage_instance = AsyncMock()
             mock_usage_instance.reset_project_usage_if_needed = AsyncMock(
                 side_effect=Exception("DB is down")
@@ -317,9 +312,7 @@ class TestCheckLimitProjectLevel:
 
         reset_called = []
 
-        with patch(
-            "services.generation_tracker.ProjectUsageService"
-        ) as MockUsage:
+        with patch("services.generation_tracker.ProjectUsageService") as MockUsage:
             mock_usage_instance = AsyncMock()
 
             async def _fake_reset(pid):
@@ -339,6 +332,7 @@ class TestCheckLimitProjectLevel:
 # ---------------------------------------------------------------------------
 # Tests: check_limit — user-level (fail-open)
 # ---------------------------------------------------------------------------
+
 
 class TestCheckLimitUserLevel:
     """Tests for check_limit when project_id is None (personal workspace)."""
@@ -449,5 +443,3 @@ class TestCheckLimitUserLevel:
         )
 
         assert result is True
-
-

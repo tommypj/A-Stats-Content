@@ -2,22 +2,20 @@
 Revenue attribution database models for Phase 4: Content-to-Revenue Attribution.
 """
 
-from datetime import date as date_type, datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
+from datetime import date as date_type
 from uuid import uuid4
 
 from sqlalchemy import (
+    JSON,
     Boolean,
+    Date,
     DateTime,
+    Float,
     ForeignKey,
+    Index,
     Integer,
     String,
-    Text,
-    Float,
-    Date,
-    Index,
-    JSON,
-    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -46,7 +44,7 @@ class ConversionGoal(Base, TimestampMixin):
     )
 
     # Optional project scope
-    project_id: Mapped[Optional[str]] = mapped_column(
+    project_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=True,
@@ -56,14 +54,12 @@ class ConversionGoal(Base, TimestampMixin):
     # Goal definition
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     goal_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    goal_config: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    goal_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Status
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    __table_args__ = (
-        Index("ix_conversion_goals_user_active", "user_id", "is_active"),
-    )
+    __table_args__ = (Index("ix_conversion_goals_user_active", "user_id", "is_active"),)
 
     def __repr__(self) -> str:
         return f"<ConversionGoal(name={self.name!r}, goal_type={self.goal_type!r}, is_active={self.is_active})>"
@@ -90,7 +86,7 @@ class ContentConversion(Base, TimestampMixin):
     )
 
     # Optional project scope
-    project_id: Mapped[Optional[str]] = mapped_column(
+    project_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=True,
@@ -98,7 +94,7 @@ class ContentConversion(Base, TimestampMixin):
     )
 
     # Content reference (nullable: row survives article deletion)
-    article_id: Mapped[Optional[str]] = mapped_column(
+    article_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("articles.id", ondelete="SET NULL"),
         nullable=True,
@@ -114,8 +110,8 @@ class ContentConversion(Base, TimestampMixin):
     )
 
     # Traffic source detail
-    page_url: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
-    keyword: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    page_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    keyword: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Aggregation period
     date: Mapped[date_type] = mapped_column(Date, nullable=False, index=True)
@@ -127,9 +123,7 @@ class ContentConversion(Base, TimestampMixin):
     revenue: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
 
     # Attribution model used to assign credit
-    attribution_model: Mapped[str] = mapped_column(
-        String(50), default="last_touch", nullable=False
-    )
+    attribution_model: Mapped[str] = mapped_column(String(50), default="last_touch", nullable=False)
 
     __table_args__ = (
         Index("ix_content_conversions_user_date", "user_id", "date"),
@@ -169,7 +163,7 @@ class RevenueReport(Base, TimestampMixin):
     )
 
     # Optional project scope
-    project_id: Mapped[Optional[str]] = mapped_column(
+    project_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=True,
@@ -187,14 +181,14 @@ class RevenueReport(Base, TimestampMixin):
     total_revenue: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
 
     # Ranked breakdowns (stored as ordered JSON arrays)
-    top_articles: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    top_keywords: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    top_articles: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    top_keywords: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Generation timestamp
     generated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
     )
 
     __table_args__ = (

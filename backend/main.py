@@ -1,10 +1,13 @@
 """A-Stats Engine - Main FastAPI Application."""
+
 import asyncio
 import logging
 import os
 import time
 import uuid
 from contextlib import asynccontextmanager
+from datetime import UTC
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -13,22 +16,22 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-logger = logging.getLogger(__name__)
-
-from infrastructure.config import get_settings
-from infrastructure.logging_config import setup_logging
-from infrastructure.database import init_db, close_db
-from api.routes import api_router
 from api.middleware.rate_limit import limiter
-from services.social_scheduler import scheduler_service
+from api.routes import api_router
+from infrastructure.config import get_settings
+from infrastructure.database import close_db, init_db
+from infrastructure.logging_config import setup_logging
 from services.post_queue import post_queue
+from services.social_scheduler import scheduler_service
 from services.task_queue import task_queue
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 # Sentry error tracking — initialised at module level so startup errors are captured too
 if settings.sentry_dsn:
     import logging as _logging
+
     # LOW-12: Validate DSN format before initializing to surface misconfiguration early
     _dsn = settings.sentry_dsn
     if not _dsn.startswith("https://") or "@sentry.io" not in _dsn:
@@ -39,9 +42,9 @@ if settings.sentry_dsn:
     else:
         import sentry_sdk
         from sentry_sdk.integrations.fastapi import FastApiIntegration
-        from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
-        from sentry_sdk.integrations.redis import RedisIntegration
         from sentry_sdk.integrations.logging import LoggingIntegration
+        from sentry_sdk.integrations.redis import RedisIntegration
+        from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
         sentry_sdk.init(
             dsn=_dsn,
@@ -78,9 +81,15 @@ async def lifespan(app: FastAPI):
     settings.validate_production_secrets()
 
     # Recover articles, outlines, and images stuck in "generating" status from previous shutdown
-    from infrastructure.database.connection import async_session_maker
-    from infrastructure.database.models.content import Article, Outline, GeneratedImage, ContentStatus
     from sqlalchemy import update
+
+    from infrastructure.database.connection import async_session_maker
+    from infrastructure.database.models.content import (
+        Article,
+        ContentStatus,
+        GeneratedImage,
+        Outline,
+    )
 
     async with async_session_maker() as recovery_db:
         stale_articles = await recovery_db.execute(
@@ -114,9 +123,7 @@ async def lifespan(app: FastAPI):
                 "Recovered %d outlines stuck in generating status", stale_outlines.rowcount
             )
         if stale_images.rowcount > 0:
-            logger.warning(
-                "Recovered %d images stuck in generating status", stale_images.rowcount
-            )
+            logger.warning("Recovered %d images stuck in generating status", stale_images.rowcount)
 
     if settings.is_development:
         logger.info("Development mode - initializing database...")
@@ -127,6 +134,7 @@ async def lifespan(app: FastAPI):
     if settings.environment == "production":
         try:
             import redis.asyncio as aioredis
+
             # INFRA-02: Configure connection pool to cap max connections and prevent exhaustion
             _redis_check = aioredis.from_url(
                 settings.redis_url,
@@ -146,15 +154,21 @@ async def lifespan(app: FastAPI):
 
     # INFRA-C2: Validate CORS origins match FRONTEND_URL to prevent credential leakage
     from urllib.parse import urlparse as _urlparse
+
     _frontend_host = _urlparse(settings.frontend_url).netloc if settings.frontend_url else None
     if _frontend_host and settings.environment == "production":
         for _origin in settings.cors_origins_list:
             _origin_host = _urlparse(_origin).netloc
-            if _origin_host and _origin_host != _frontend_host and not _origin_host.endswith("." + _frontend_host):
+            if (
+                _origin_host
+                and _origin_host != _frontend_host
+                and not _origin_host.endswith("." + _frontend_host)
+            ):
                 logger.warning(
                     "INFRA-C2: CORS origin '%s' does not match FRONTEND_URL host '%s'. "
                     "This may allow credential leakage to unintended origins.",
-                    _origin, _frontend_host,
+                    _origin,
+                    _frontend_host,
                 )
 
     # Initialize Redis post queue (optional)
@@ -178,18 +192,18 @@ async def lifespan(app: FastAPI):
     # LOW-08: Start daily cleanup of ContentDecayAlert records older than 90 days.
     # Runs once at startup (to clear any backlog), then every 24 hours thereafter.
     async def _decay_alert_cleanup_loop():
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta
+
         from sqlalchemy import delete as _sa_delete
+
         from infrastructure.database.models.analytics import ContentDecayAlert
 
         async def _run_cleanup():
             try:
                 async with async_session_maker() as _db:
-                    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+                    cutoff = datetime.now(UTC) - timedelta(days=90)
                     result = await _db.execute(
-                        _sa_delete(ContentDecayAlert).where(
-                            ContentDecayAlert.created_at < cutoff
-                        )
+                        _sa_delete(ContentDecayAlert).where(ContentDecayAlert.created_at < cutoff)
                     )
                     await _db.commit()
                     deleted = result.rowcount
@@ -240,7 +254,7 @@ async def lifespan(app: FastAPI):
 
     try:
         await asyncio.wait_for(asyncio.shield(scheduler_task), timeout=30.0)
-    except (asyncio.CancelledError, asyncio.TimeoutError):
+    except (TimeoutError, asyncio.CancelledError):
         pass
 
     # Disconnect Redis

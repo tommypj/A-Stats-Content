@@ -5,7 +5,6 @@ Resend email service adapter.
 import asyncio
 import logging
 from html import escape as html_escape
-from typing import Optional
 
 import resend
 
@@ -41,18 +40,26 @@ class ResendEmailService:
             True if sent successfully, False otherwise
         """
         if not settings.resend_api_key:
-            logger.info("[DEV] Verification email for %s: %s/verify-email?token=%s", to_email, self._frontend_url, verification_token)
+            logger.info(
+                "[DEV] Verification email for %s: %s/verify-email?token=%s",
+                to_email,
+                self._frontend_url,
+                verification_token,
+            )
             return True
 
         verification_url = f"{self._frontend_url}/verify-email?token={verification_token}"
 
         try:
-            await asyncio.to_thread(resend.Emails.send, {
-                "from": self._from_email,
-                "to": to_email,
-                "subject": "Verify your A-Stats Content account",
-                "html": self._get_verification_email_html(user_name, verification_url),
-            })
+            await asyncio.to_thread(
+                resend.Emails.send,
+                {
+                    "from": self._from_email,
+                    "to": to_email,
+                    "subject": "Verify your A-Stats Content account",
+                    "html": self._get_verification_email_html(user_name, verification_url),
+                },
+            )
             return True
         except Exception as e:
             logger.error("Failed to send verification email: %s", e)
@@ -76,18 +83,26 @@ class ResendEmailService:
             True if sent successfully, False otherwise
         """
         if not settings.resend_api_key:
-            logger.info("[DEV] Password reset email for %s: %s/reset-password?token=%s", to_email, self._frontend_url, reset_token)
+            logger.info(
+                "[DEV] Password reset email for %s: %s/reset-password?token=%s",
+                to_email,
+                self._frontend_url,
+                reset_token,
+            )
             return True
 
         reset_url = f"{self._frontend_url}/reset-password?token={reset_token}"
 
         try:
-            await asyncio.to_thread(resend.Emails.send, {
-                "from": self._from_email,
-                "to": to_email,
-                "subject": "Reset your A-Stats Content password",
-                "html": self._get_password_reset_email_html(user_name, reset_url),
-            })
+            await asyncio.to_thread(
+                resend.Emails.send,
+                {
+                    "from": self._from_email,
+                    "to": to_email,
+                    "subject": "Reset your A-Stats Content password",
+                    "html": self._get_password_reset_email_html(user_name, reset_url),
+                },
+            )
             return True
         except Exception as e:
             logger.error("Failed to send password reset email: %s", e)
@@ -113,12 +128,15 @@ class ResendEmailService:
             return True
 
         try:
-            await asyncio.to_thread(resend.Emails.send, {
-                "from": self._from_email,
-                "to": to_email,
-                "subject": "Welcome to A-Stats Content!",
-                "html": self._get_welcome_email_html(user_name),
-            })
+            await asyncio.to_thread(
+                resend.Emails.send,
+                {
+                    "from": self._from_email,
+                    "to": to_email,
+                    "subject": "Welcome to A-Stats Content!",
+                    "html": self._get_welcome_email_html(user_name),
+                },
+            )
             return True
         except Exception as e:
             logger.error("Failed to send welcome email: %s", e)
@@ -146,12 +164,15 @@ class ResendEmailService:
             return True
 
         try:
-            await asyncio.to_thread(resend.Emails.send, {
-                "from": self._from_email,
-                "to": to_email,
-                "subject": "Confirm your new email address – A-Stats",
-                "html": self._get_email_change_html(user_name, verification_url),
-            })
+            await asyncio.to_thread(
+                resend.Emails.send,
+                {
+                    "from": self._from_email,
+                    "to": to_email,
+                    "subject": "Confirm your new email address – A-Stats",
+                    "html": self._get_email_change_html(user_name, verification_url),
+                },
+            )
             return True
         except Exception as e:
             logger.error("Failed to send email change verification email: %s", e)
@@ -183,14 +204,17 @@ class ResendEmailService:
             return True
 
         try:
-            await asyncio.to_thread(resend.Emails.send, {
-                "from": self._from_email,
-                "to": to_email,
-                "subject": f"You've been invited to join {project_name} on A-Stats",
-                "html": self._get_project_invitation_email_html(
-                    inviter_name, project_name, role, invitation_url
-                ),
-            })
+            await asyncio.to_thread(
+                resend.Emails.send,
+                {
+                    "from": self._from_email,
+                    "to": to_email,
+                    "subject": f"You've been invited to join {project_name} on A-Stats",
+                    "html": self._get_project_invitation_email_html(
+                        inviter_name, project_name, role, invitation_url
+                    ),
+                },
+            )
             return True
         except Exception as e:
             logger.error("Failed to send project invitation email: %s", e)
@@ -400,7 +424,6 @@ class ResendEmailService:
         </body>
         </html>
         """
-
 
     def _get_email_change_html(self, user_name: str, verification_url: str) -> str:
         """Generate email change verification HTML."""

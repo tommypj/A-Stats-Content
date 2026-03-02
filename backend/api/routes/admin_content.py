@@ -5,39 +5,38 @@ Provides administrative endpoints for content management across all users.
 """
 
 import logging
-from typing import Annotated, Optional, List
 from datetime import datetime
 from math import ceil
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from api.middleware.rate_limit import limiter
-from sqlalchemy import select, func, delete, or_, desc
+from sqlalchemy import delete, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from infrastructure.database.connection import get_db
-from infrastructure.database.models.user import User, UserRole
-from infrastructure.database.models.content import Article, Outline, GeneratedImage
-from infrastructure.database.models.social import ScheduledPost, PostTarget
-from infrastructure.database.models.admin import AdminAuditLog, AuditAction, AuditTargetType
-from api.deps_admin import get_current_admin_user
-from api.utils import escape_like
 from adapters.storage.image_storage import storage_adapter
+from api.deps_admin import get_current_admin_user
+from api.middleware.rate_limit import limiter
 from api.schemas.admin_content import (
-    AdminArticleListResponse,
-    AdminArticleListItem,
-    AdminArticleDetail,
     AdminArticleAuthorInfo,
-    AdminOutlineListResponse,
-    AdminOutlineListItem,
-    AdminImageListResponse,
+    AdminArticleDetail,
+    AdminArticleListItem,
+    AdminArticleListResponse,
     AdminImageListItem,
-    AdminSocialPostListResponse,
+    AdminImageListResponse,
+    AdminOutlineListItem,
+    AdminOutlineListResponse,
     AdminSocialPostListItem,
+    AdminSocialPostListResponse,
     BulkDeleteRequest,
     BulkDeleteResponse,
     DeleteResponse,
 )
+from api.utils import escape_like
+from infrastructure.database.connection import get_db
+from infrastructure.database.models.admin import AdminAuditLog, AuditAction, AuditTargetType
+from infrastructure.database.models.content import Article, GeneratedImage, Outline
+from infrastructure.database.models.social import PostTarget, ScheduledPost
+from infrastructure.database.models.user import User, UserRole
 
 logger = logging.getLogger(__name__)
 
@@ -62,9 +61,9 @@ async def log_audit(
     admin_user: User,
     action: AuditAction,
     target_type: AuditTargetType,
-    target_id: Optional[str],
-    target_user_id: Optional[str] = None,
-    details: Optional[dict] = None,
+    target_id: str | None,
+    target_user_id: str | None = None,
+    details: dict | None = None,
 ) -> None:
     """Log an admin action to the audit log."""
     try:
@@ -90,9 +89,9 @@ async def log_audit(
 async def list_all_articles(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
-    user_id: Optional[str] = Query(None, description="Filter by user ID"),
-    status: Optional[str] = Query(None, description="Filter by status"),
-    search: Optional[str] = Query(None, description="Search in title and content"),
+    user_id: str | None = Query(None, description="Filter by user ID"),
+    status: str | None = Query(None, description="Filter by status"),
+    search: str | None = Query(None, description="Search in title and content"),
     sort_by: str = Query("created_at", description="Sort field: created_at, updated_at, seo_score"),
     sort_order: str = Query("desc", description="Sort order: asc or desc"),
     admin_user: User = Depends(get_current_admin_user),
@@ -104,7 +103,9 @@ async def list_all_articles(
     Admin-only endpoint for content moderation.
     """
     # Build query
-    query = select(Article)  # ADM-24: Article.outline is not used in this response; removed unused selectinload
+    query = select(
+        Article
+    )  # ADM-24: Article.outline is not used in this response; removed unused selectinload
 
     # Apply filters
     if user_id:
@@ -157,7 +158,9 @@ async def list_all_articles(
     articles = result.scalars().all()
 
     # Get user info for each article
-    user_ids = list(dict.fromkeys(article.user_id for article in articles))  # ADM-25: order-preserving dedup
+    user_ids = list(
+        dict.fromkeys(article.user_id for article in articles)
+    )  # ADM-25: order-preserving dedup
     users_result = await db.execute(select(User).where(User.id.in_(user_ids)))
     users_dict = {user.id: user for user in users_result.scalars().all()}
 
@@ -306,9 +309,9 @@ async def delete_article(
 async def list_all_outlines(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
-    user_id: Optional[str] = Query(None, description="Filter by user ID"),
-    status: Optional[str] = Query(None, description="Filter by status"),
-    search: Optional[str] = Query(None, description="Search in title"),
+    user_id: str | None = Query(None, description="Filter by user ID"),
+    status: str | None = Query(None, description="Filter by status"),
+    search: str | None = Query(None, description="Search in title"),
     admin_user: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -354,7 +357,9 @@ async def list_all_outlines(
     outlines = result.scalars().all()
 
     # Get user info for each outline
-    user_ids = list(dict.fromkeys(outline.user_id for outline in outlines))  # ADM-25: order-preserving dedup
+    user_ids = list(
+        dict.fromkeys(outline.user_id for outline in outlines)
+    )  # ADM-25: order-preserving dedup
     users_result = await db.execute(select(User).where(User.id.in_(user_ids)))
     users_dict = {user.id: user for user in users_result.scalars().all()}
 
@@ -445,10 +450,10 @@ async def delete_outline(
 async def list_all_images(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
-    user_id: Optional[str] = Query(None, description="Filter by user ID"),
-    status: Optional[str] = Query(None, description="Filter by status"),
-    start_date: Optional[datetime] = Query(None, description="Filter by start date"),
-    end_date: Optional[datetime] = Query(None, description="Filter by end date"),
+    user_id: str | None = Query(None, description="Filter by user ID"),
+    status: str | None = Query(None, description="Filter by status"),
+    start_date: datetime | None = Query(None, description="Filter by start date"),
+    end_date: datetime | None = Query(None, description="Filter by end date"),
     admin_user: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -503,7 +508,9 @@ async def list_all_images(
     images = result.scalars().all()
 
     # Get user info for each image
-    user_ids = list(dict.fromkeys(image.user_id for image in images))  # ADM-25: order-preserving dedup
+    user_ids = list(
+        dict.fromkeys(image.user_id for image in images)
+    )  # ADM-25: order-preserving dedup
     users_result = await db.execute(select(User).where(User.id.in_(user_ids)))
     users_dict = {user.id: user for user in users_result.scalars().all()}
 
@@ -566,7 +573,7 @@ async def delete_image(
             )
     elif admin_user.role != UserRole.SUPER_ADMIN.value:
         from infrastructure.database.models.project import ProjectMember
-        from infrastructure.database.models.project import ProjectMemberRole
+
         member_result = await db.execute(
             select(ProjectMember).where(
                 ProjectMember.project_id == image.project_id,
@@ -615,7 +622,7 @@ async def delete_image(
 
     return DeleteResponse(
         success=True,
-        message=f"Image deleted successfully",
+        message="Image deleted successfully",
         deleted_id=image_id,
     )
 
@@ -627,9 +634,9 @@ async def delete_image(
 async def list_all_social_posts(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
-    user_id: Optional[str] = Query(None, description="Filter by user ID"),
-    status: Optional[str] = Query(None, description="Filter by status"),
-    platform: Optional[str] = Query(None, description="Filter by platform"),
+    user_id: str | None = Query(None, description="Filter by user ID"),
+    status: str | None = Query(None, description="Filter by status"),
+    platform: str | None = Query(None, description="Filter by platform"),
     admin_user: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -641,9 +648,8 @@ async def list_all_social_posts(
     # Build query with platform filter via join if needed
     if platform:
         # Need to join with post_targets and social_accounts to filter by platform
-        query = (
-            select(ScheduledPost)
-            .join(PostTarget, ScheduledPost.id == PostTarget.scheduled_post_id)
+        query = select(ScheduledPost).join(
+            PostTarget, ScheduledPost.id == PostTarget.scheduled_post_id
         )
     else:
         query = select(ScheduledPost)
@@ -801,7 +807,11 @@ async def bulk_delete_content(
         "article": (Article, AuditAction.ARTICLE_DELETED, AuditTargetType.ARTICLE),
         "outline": (Outline, AuditAction.OUTLINE_DELETED, AuditTargetType.OUTLINE),
         "image": (GeneratedImage, AuditAction.IMAGE_DELETED, AuditTargetType.IMAGE),
-        "social_post": (ScheduledPost, AuditAction.SOCIAL_POST_DELETED, AuditTargetType.SOCIAL_POST),
+        "social_post": (
+            ScheduledPost,
+            AuditAction.SOCIAL_POST_DELETED,
+            AuditTargetType.SOCIAL_POST,
+        ),
     }
 
     if request.content_type not in content_mapping:

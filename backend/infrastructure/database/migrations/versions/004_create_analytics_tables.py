@@ -6,17 +6,17 @@ Create Date: 2026-02-20
 
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "004"
-down_revision: Union[str, None] = "003"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "003"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -31,11 +31,26 @@ def upgrade() -> None:
         sa.Column("access_token", sa.Text(), nullable=False),
         sa.Column("refresh_token", sa.Text(), nullable=False),
         sa.Column("token_expiry", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("connected_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "connected_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.Column("last_sync", sa.DateTime(timezone=True), nullable=True),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.UniqueConstraint("user_id", name="uq_gsc_connection_user"),
     )
@@ -54,10 +69,26 @@ def upgrade() -> None:
         sa.Column("impressions", sa.Integer(), nullable=False, server_default=sa.text("0")),
         sa.Column("ctr", sa.Float(), nullable=False, server_default=sa.text("0.0")),
         sa.Column("position", sa.Float(), nullable=False, server_default=sa.text("0.0")),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
-        sa.UniqueConstraint("user_id", "site_url", "keyword", "date", name="uq_keyword_ranking_user_site_keyword_date"),
+        sa.UniqueConstraint(
+            "user_id",
+            "site_url",
+            "keyword",
+            "date",
+            name="uq_keyword_ranking_user_site_keyword_date",
+        ),
     )
     op.create_index("ix_keyword_rankings_user_id", "keyword_rankings", ["user_id"])
     op.create_index("ix_keyword_rankings_site_url", "keyword_rankings", ["site_url"])
@@ -79,10 +110,26 @@ def upgrade() -> None:
         sa.Column("impressions", sa.Integer(), nullable=False, server_default=sa.text("0")),
         sa.Column("ctr", sa.Float(), nullable=False, server_default=sa.text("0.0")),
         sa.Column("position", sa.Float(), nullable=False, server_default=sa.text("0.0")),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
-        sa.UniqueConstraint("user_id", "site_url", "page_url", "date", name="uq_page_performance_user_site_page_date"),
+        sa.UniqueConstraint(
+            "user_id",
+            "site_url",
+            "page_url",
+            "date",
+            name="uq_page_performance_user_site_page_date",
+        ),
     )
     op.create_index("ix_page_performances_user_id", "page_performances", ["user_id"])
     op.create_index("ix_page_performances_site_url", "page_performances", ["site_url"])
@@ -103,10 +150,22 @@ def upgrade() -> None:
         sa.Column("total_impressions", sa.Integer(), nullable=False, server_default=sa.text("0")),
         sa.Column("avg_ctr", sa.Float(), nullable=False, server_default=sa.text("0.0")),
         sa.Column("avg_position", sa.Float(), nullable=False, server_default=sa.text("0.0")),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
-        sa.UniqueConstraint("user_id", "site_url", "date", name="uq_daily_analytics_user_site_date"),
+        sa.UniqueConstraint(
+            "user_id", "site_url", "date", name="uq_daily_analytics_user_site_date"
+        ),
     )
     op.create_index("ix_daily_analytics_user_id", "daily_analytics", ["user_id"])
     op.create_index("ix_daily_analytics_site_url", "daily_analytics", ["site_url"])

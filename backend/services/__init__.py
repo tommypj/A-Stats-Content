@@ -3,10 +3,9 @@ Service layer for business logic.
 """
 
 from functools import lru_cache
-from typing import Optional
 
-from adapters.knowledge import ChromaAdapter, EmbeddingService, DocumentProcessor
 from adapters.ai.anthropic_adapter import AnthropicContentService
+from adapters.knowledge import ChromaAdapter, DocumentProcessor, EmbeddingService
 from infrastructure.config.settings import settings
 from services.knowledge_service import KnowledgeService
 

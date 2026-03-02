@@ -5,35 +5,33 @@ WordPress integration API routes.
 import base64
 import io
 import ipaddress
-import json
 import logging
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import UTC, datetime
 from urllib.parse import urlparse
 
 import httpx
-from PIL import Image as PILImage
 from fastapi import APIRouter, Depends, HTTPException, status
+from PIL import Image as PILImage
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.routes.auth import get_current_user
 from api.schemas.wordpress import (
-    WordPressConnectRequest,
-    WordPressConnectionResponse,
-    WordPressPublishRequest,
-    WordPressPublishResponse,
     WordPressCategoryResponse,
-    WordPressTagResponse,
+    WordPressConnectionResponse,
+    WordPressConnectRequest,
     WordPressDisconnectResponse,
     WordPressMediaUploadRequest,
     WordPressMediaUploadResponse,
+    WordPressPublishRequest,
+    WordPressPublishResponse,
+    WordPressTagResponse,
 )
-from api.routes.auth import get_current_user
-from infrastructure.database.connection import get_db
-from infrastructure.database.models import User, Article, GeneratedImage, ContentStatus
-from infrastructure.database.models.project import Project
+from core.security.encryption import decrypt_credential, encrypt_credential
 from infrastructure.config.settings import settings
-from core.security.encryption import encrypt_credential, decrypt_credential
+from infrastructure.database.connection import get_db
+from infrastructure.database.models import Article, ContentStatus, GeneratedImage, User
+from infrastructure.database.models.project import Project
 
 router = APIRouter(prefix="/wordpress", tags=["WordPress"])
 
@@ -58,7 +56,9 @@ def _validate_wp_url(url: str) -> str:
     try:
         ip = ipaddress.ip_address(hostname)
         if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
-            raise HTTPException(status_code=400, detail="WordPress URL cannot point to a private network")
+            raise HTTPException(
+                status_code=400, detail="WordPress URL cannot point to a private network"
+            )
     except ValueError:
         pass  # hostname is not an IP, that's fine
 
@@ -74,7 +74,7 @@ def _wp_client(timeout: float = 15.0) -> httpx.AsyncClient:
     )
 
 
-def get_wp_credentials(project: Project) -> Optional[dict]:
+def get_wp_credentials(project: Project) -> dict | None:
     """
     Extract and decrypt WordPress credentials from project.
 
@@ -216,8 +216,8 @@ async def connect_wordpress(
         "site_url": site_url,
         "username": request.username,
         "app_password_encrypted": encrypted_password,
-        "connected_at": datetime.now(timezone.utc).isoformat(),
-        "last_tested_at": datetime.now(timezone.utc).isoformat(),
+        "connected_at": datetime.now(UTC).isoformat(),
+        "last_tested_at": datetime.now(UTC).isoformat(),
     }
 
     await db.commit()
@@ -227,8 +227,8 @@ async def connect_wordpress(
         site_url=site_url,
         username=request.username,
         is_connected=True,
-        connected_at=datetime.now(timezone.utc),
-        last_tested_at=datetime.now(timezone.utc),
+        connected_at=datetime.now(UTC),
+        last_tested_at=datetime.now(UTC),
         connection_valid=True,
     )
 
@@ -260,7 +260,7 @@ async def disconnect_wordpress(
     await db.commit()
 
     return WordPressDisconnectResponse(
-        disconnected_at=datetime.now(timezone.utc),
+        disconnected_at=datetime.now(UTC),
     )
 
 
@@ -317,7 +317,7 @@ async def get_wordpress_status(
             )
             connection_valid = test_result["success"]
             error_message = test_result["error"]
-            last_tested_at = datetime.now(timezone.utc)
+            last_tested_at = datetime.now(UTC)
 
     return WordPressConnectionResponse(
         site_url=site_url,
@@ -330,7 +330,7 @@ async def get_wordpress_status(
     )
 
 
-@router.get("/categories", response_model=List[WordPressCategoryResponse])
+@router.get("/categories", response_model=list[WordPressCategoryResponse])
 async def get_wordpress_categories(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -389,7 +389,7 @@ async def get_wordpress_categories(
         )
 
 
-@router.get("/tags", response_model=List[WordPressTagResponse])
+@router.get("/tags", response_model=list[WordPressTagResponse])
 async def get_wordpress_tags(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -501,7 +501,7 @@ async def publish_to_wordpress(
     auth_header = create_wp_auth_header(wp_creds["username"], wp_creds["app_password"])
 
     # Attempt to upload the article's featured image to WordPress before creating the post
-    featured_media_id: Optional[int] = None
+    featured_media_id: int | None = None
     if article.featured_image_id:
         try:
             img_result = await db.execute(
@@ -560,7 +560,9 @@ async def publish_to_wordpress(
             # If article was already published and update_existing is True, update it
             if article.wordpress_post_id and request.update_existing:
                 # Update existing post
-                update_url = f"{wp_creds['site_url']}/wp-json/wp/v2/posts/{article.wordpress_post_id}"
+                update_url = (
+                    f"{wp_creds['site_url']}/wp-json/wp/v2/posts/{article.wordpress_post_id}"
+                )
                 response = await client.post(
                     update_url,
                     headers={
@@ -582,7 +584,9 @@ async def publish_to_wordpress(
                 )
 
             if response.status_code not in (200, 201):
-                logger.error("WordPress publish failed: %s - %s", response.status_code, response.text)
+                logger.error(
+                    "WordPress publish failed: %s - %s", response.status_code, response.text
+                )
                 raise HTTPException(
                     status_code=status.HTTP_502_BAD_GATEWAY,
                     detail="Failed to publish to WordPress. Check your connection settings and try again.",
@@ -593,7 +597,7 @@ async def publish_to_wordpress(
             # Update article with WordPress post info
             article.wordpress_post_id = wp_post["id"]
             article.published_url = wp_post["link"]
-            article.published_at = datetime.now(timezone.utc)
+            article.published_at = datetime.now(UTC)
             # GEN-06: Mark article as published so it's distinguishable from drafts.
             article.status = ContentStatus.PUBLISHED.value
 
@@ -659,8 +663,8 @@ async def _upload_image_to_wp(
     image: GeneratedImage,
     wp_creds: dict,
     auth_header: str,
-    title: Optional[str] = None,
-    alt_text: Optional[str] = None,
+    title: str | None = None,
+    alt_text: str | None = None,
 ) -> dict:
     """
     Download an image from its source URL and upload it to the WordPress media library.
@@ -757,9 +761,7 @@ async def _upload_image_to_wp(
         },
     )
 
-    source_url = wp_media.get(
-        "source_url", wp_media.get("guid", {}).get("rendered", "")
-    )
+    source_url = wp_media.get("source_url", wp_media.get("guid", {}).get("rendered", ""))
     return {"wordpress_media_id": media_id, "source_url": source_url}
 
 

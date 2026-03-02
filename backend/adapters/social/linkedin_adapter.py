@@ -6,10 +6,25 @@ for posting updates, uploading media, and managing content.
 """
 
 import logging
-from typing import List, Optional, Dict, Any
-from urllib.parse import urlencode, urlparse as _urlparse
+from typing import Any
+from urllib.parse import urlencode
+from urllib.parse import urlparse as _urlparse
 
 import httpx
+
+from infrastructure.config.settings import settings
+
+from .base import (
+    BaseSocialAdapter,
+    MediaUploadResult,
+    PostResult,
+    SocialAPIError,
+    SocialAuthError,
+    SocialCredentials,
+    SocialPlatform,
+    SocialRateLimitError,
+    SocialValidationError,
+)
 
 # SM-21: SSRF protection — only allow media downloads from trusted domains
 _ALLOWED_MEDIA_DOMAINS = {
@@ -26,23 +41,10 @@ def _validate_media_url(url: str) -> None:
     if parsed.scheme != "https":
         raise ValueError(f"Media URL must use HTTPS: {url}")
     if not any(
-        parsed.netloc == d or parsed.netloc.endswith("." + d)
-        for d in _ALLOWED_MEDIA_DOMAINS
+        parsed.netloc == d or parsed.netloc.endswith("." + d) for d in _ALLOWED_MEDIA_DOMAINS
     ):
         raise ValueError(f"Media URL domain not allowed: {parsed.netloc}")
 
-from infrastructure.config.settings import settings
-from .base import (
-    BaseSocialAdapter,
-    SocialPlatform,
-    SocialCredentials,
-    PostResult,
-    MediaUploadResult,
-    SocialAuthError,
-    SocialAPIError,
-    SocialRateLimitError,
-    SocialValidationError,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -67,8 +69,8 @@ class LinkedInAdapter(BaseSocialAdapter):
     # OAuth scopes
     SCOPES = [
         "w_member_social",  # Post on behalf of user
-        "r_liteprofile",    # Read basic profile
-        "r_emailaddress",   # Read email
+        "r_liteprofile",  # Read basic profile
+        "r_emailaddress",  # Read email
     ]
 
     # Character limit
@@ -76,9 +78,9 @@ class LinkedInAdapter(BaseSocialAdapter):
 
     def __init__(
         self,
-        client_id: Optional[str] = None,
-        client_secret: Optional[str] = None,
-        redirect_uri: Optional[str] = None,
+        client_id: str | None = None,
+        client_secret: str | None = None,
+        redirect_uri: str | None = None,
         timeout: int = 30,
         mock_mode: bool = False,
     ):
@@ -191,9 +193,10 @@ class LinkedInAdapter(BaseSocialAdapter):
 
             # Safely extract profile image URL from deeply nested LinkedIn response
             profile_image_url = None
-            elements = (user_profile.get("profilePicture", {})
-                        .get("displayImage~", {})
-                        .get("elements") or [])
+            elements = (
+                user_profile.get("profilePicture", {}).get("displayImage~", {}).get("elements")
+                or []
+            )
             if elements and isinstance(elements[0], dict):
                 identifiers = elements[0].get("identifiers") or []
                 if identifiers and isinstance(identifiers[0], dict):
@@ -222,7 +225,7 @@ class LinkedInAdapter(BaseSocialAdapter):
             logger.error(f"Unexpected error during LinkedIn token exchange: {e}")
             raise SocialAuthError(f"Token exchange failed: {e}")
 
-    async def _get_user_profile(self, access_token: str) -> Dict[str, Any]:
+    async def _get_user_profile(self, access_token: str) -> dict[str, Any]:
         """
         Get authenticated user's profile information.
 
@@ -262,8 +265,7 @@ class LinkedInAdapter(BaseSocialAdapter):
             SocialAuthError: Always raises since refresh not supported
         """
         raise SocialAuthError(
-            "LinkedIn does not support token refresh. "
-            "User must re-authenticate when token expires."
+            "LinkedIn does not support token refresh. User must re-authenticate when token expires."
         )
 
     async def verify_credentials(self, credentials: SocialCredentials) -> bool:
@@ -318,15 +320,11 @@ class LinkedInAdapter(BaseSocialAdapter):
                 "lifecycleState": "PUBLISHED",
                 "specificContent": {
                     "com.linkedin.ugc.ShareContent": {
-                        "shareCommentary": {
-                            "text": text
-                        },
-                        "shareMediaCategory": "NONE"
+                        "shareCommentary": {"text": text},
+                        "shareMediaCategory": "NONE",
                     }
                 },
-                "visibility": {
-                    "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
-                }
+                "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"},
             }
 
             async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -355,10 +353,7 @@ class LinkedInAdapter(BaseSocialAdapter):
                 result = response.json()
                 # SM-12: LinkedIn v2 API returns post URN at result["value"]["id"];
                 # fall back to root-level "id" for older response formats
-                post_id = (
-                    result.get("value", {}).get("id")
-                    or result.get("id", "")
-                )
+                post_id = result.get("value", {}).get("id") or result.get("id", "")
                 post_url = f"https://www.linkedin.com/feed/update/{post_id}"
 
                 logger.info(f"LinkedIn post created successfully: {post_url}")
@@ -378,10 +373,7 @@ class LinkedInAdapter(BaseSocialAdapter):
             return PostResult(success=False, error_message=str(e))
 
     async def post_with_media(
-        self,
-        credentials: SocialCredentials,
-        text: str,
-        media_urls: List[str]
+        self, credentials: SocialCredentials, text: str, media_urls: list[str]
     ) -> PostResult:
         """
         Post a LinkedIn update with media.
@@ -434,10 +426,7 @@ class LinkedInAdapter(BaseSocialAdapter):
                     media_bytes,
                     content_type,
                 )
-                media_assets.append({
-                    "status": "READY",
-                    "media": upload_result.media_id
-                })
+                media_assets.append({"status": "READY", "media": upload_result.media_id})
 
             # Create UGC post with media
             post_data = {
@@ -445,16 +434,12 @@ class LinkedInAdapter(BaseSocialAdapter):
                 "lifecycleState": "PUBLISHED",
                 "specificContent": {
                     "com.linkedin.ugc.ShareContent": {
-                        "shareCommentary": {
-                            "text": text
-                        },
+                        "shareCommentary": {"text": text},
                         "shareMediaCategory": "IMAGE",
-                        "media": media_assets
+                        "media": media_assets,
                     }
                 },
-                "visibility": {
-                    "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
-                }
+                "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"},
             }
 
             async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -500,7 +485,7 @@ class LinkedInAdapter(BaseSocialAdapter):
         credentials: SocialCredentials,
         media_bytes: bytes,
         media_type: str,
-        filename: Optional[str] = None
+        filename: str | None = None,
     ) -> MediaUploadResult:
         """
         Upload media to LinkedIn.
@@ -531,11 +516,8 @@ class LinkedInAdapter(BaseSocialAdapter):
                     "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
                     "owner": f"urn:li:person:{credentials.account_id}",
                     "serviceRelationships": [
-                        {
-                            "relationshipType": "OWNER",
-                            "identifier": "urn:li:userGeneratedContent"
-                        }
-                    ]
+                        {"relationshipType": "OWNER", "identifier": "urn:li:userGeneratedContent"}
+                    ],
                 }
             }
 
@@ -557,16 +539,26 @@ class LinkedInAdapter(BaseSocialAdapter):
 
                 register_result = response.json()
                 try:
-                    upload_url = register_result["value"]["uploadMechanism"]["com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"]["uploadUrl"]
+                    upload_url = register_result["value"]["uploadMechanism"][
+                        "com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"
+                    ]["uploadUrl"]
                     asset_id = register_result["value"]["asset"]
                 except (KeyError, TypeError) as e:
-                    raise SocialAPIError(f"Unexpected LinkedIn upload registration response structure: {e}")
+                    raise SocialAPIError(
+                        f"Unexpected LinkedIn upload registration response structure: {e}"
+                    )
 
                 # SM-28: Validate that the presigned upload URL is a LinkedIn-controlled domain
                 from urllib.parse import urlparse as _parse_upload_url
+
                 _parsed_upload = _parse_upload_url(upload_url)
-                if not (_parsed_upload.scheme == "https" and _parsed_upload.netloc.endswith(".linkedin.com")):
-                    raise ValueError(f"Unexpected LinkedIn upload URL domain: {_parsed_upload.netloc}")
+                if not (
+                    _parsed_upload.scheme == "https"
+                    and _parsed_upload.netloc.endswith(".linkedin.com")
+                ):
+                    raise ValueError(
+                        f"Unexpected LinkedIn upload URL domain: {_parsed_upload.netloc}"
+                    )
 
                 # Step 2: Upload binary data
                 logger.info("Uploading media binary to LinkedIn")

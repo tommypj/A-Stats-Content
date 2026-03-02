@@ -5,14 +5,29 @@ Provides integration with Twitter API v2 using OAuth 2.0 with PKCE
 for posting tweets, uploading media, and managing content.
 """
 
-import logging
-import hashlib
 import base64
+import hashlib
+import logging
 import secrets
-from typing import List, Optional, Dict, Any
-from urllib.parse import urlencode, urlparse as _urlparse
+from typing import Any
+from urllib.parse import urlencode
+from urllib.parse import urlparse as _urlparse
 
 import httpx
+
+from infrastructure.config.settings import settings
+
+from .base import (
+    BaseSocialAdapter,
+    MediaUploadResult,
+    PostResult,
+    SocialAPIError,
+    SocialAuthError,
+    SocialCredentials,
+    SocialPlatform,
+    SocialRateLimitError,
+    SocialValidationError,
+)
 
 # SM-22: SSRF protection — only allow media downloads from trusted domains
 _ALLOWED_MEDIA_DOMAINS = {
@@ -29,23 +44,10 @@ def _validate_media_url(url: str) -> None:
     if parsed.scheme != "https":
         raise ValueError(f"Media URL must use HTTPS: {url}")
     if not any(
-        parsed.netloc == d or parsed.netloc.endswith("." + d)
-        for d in _ALLOWED_MEDIA_DOMAINS
+        parsed.netloc == d or parsed.netloc.endswith("." + d) for d in _ALLOWED_MEDIA_DOMAINS
     ):
         raise ValueError(f"Media URL domain not allowed: {parsed.netloc}")
 
-from infrastructure.config.settings import settings
-from .base import (
-    BaseSocialAdapter,
-    SocialPlatform,
-    SocialCredentials,
-    PostResult,
-    MediaUploadResult,
-    SocialAuthError,
-    SocialAPIError,
-    SocialRateLimitError,
-    SocialValidationError,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -82,9 +84,9 @@ class TwitterAdapter(BaseSocialAdapter):
 
     def __init__(
         self,
-        client_id: Optional[str] = None,
-        client_secret: Optional[str] = None,
-        redirect_uri: Optional[str] = None,
+        client_id: str | None = None,
+        client_secret: str | None = None,
+        redirect_uri: str | None = None,
         timeout: int = 30,
         mock_mode: bool = False,
     ):
@@ -118,17 +120,19 @@ class TwitterAdapter(BaseSocialAdapter):
             Tuple of (code_verifier, code_challenge)
         """
         # Generate random code verifier
-        code_verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode('utf-8')
-        code_verifier = code_verifier.rstrip('=')
+        code_verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode("utf-8")
+        code_verifier = code_verifier.rstrip("=")
 
         # Generate code challenge (SHA256 hash of verifier)
         challenge_bytes = hashlib.sha256(code_verifier.encode()).digest()
-        code_challenge = base64.urlsafe_b64encode(challenge_bytes).decode('utf-8')
-        code_challenge = code_challenge.rstrip('=')
+        code_challenge = base64.urlsafe_b64encode(challenge_bytes).decode("utf-8")
+        code_challenge = code_challenge.rstrip("=")
 
         return code_verifier, code_challenge
 
-    def get_authorization_url(self, state: str, code_verifier: Optional[str] = None) -> tuple[str, str]:
+    def get_authorization_url(
+        self, state: str, code_verifier: str | None = None
+    ) -> tuple[str, str]:
         """
         Generate OAuth 2.0 authorization URL with PKCE.
 
@@ -154,8 +158,8 @@ class TwitterAdapter(BaseSocialAdapter):
         else:
             # Regenerate challenge from provided verifier
             challenge_bytes = hashlib.sha256(code_verifier.encode()).digest()
-            code_challenge = base64.urlsafe_b64encode(challenge_bytes).decode('utf-8')
-            code_challenge = code_challenge.rstrip('=')
+            code_challenge = base64.urlsafe_b64encode(challenge_bytes).decode("utf-8")
+            code_challenge = code_challenge.rstrip("=")
 
         params = {
             "client_id": self.client_id,
@@ -171,11 +175,7 @@ class TwitterAdapter(BaseSocialAdapter):
         logger.info("Generated Twitter OAuth authorization URL")
         return authorization_url, code_verifier
 
-    async def exchange_code(
-        self,
-        code: str,
-        code_verifier: Optional[str] = None
-    ) -> SocialCredentials:
+    async def exchange_code(self, code: str, code_verifier: str | None = None) -> SocialCredentials:
         """
         Exchange authorization code for access tokens.
 
@@ -261,7 +261,7 @@ class TwitterAdapter(BaseSocialAdapter):
             logger.error(f"Unexpected error during Twitter token exchange: {e}")
             raise SocialAuthError(f"Token exchange failed: {e}")
 
-    async def _get_user_profile(self, access_token: str) -> Dict[str, Any]:
+    async def _get_user_profile(self, access_token: str) -> dict[str, Any]:
         """
         Get authenticated user's profile information.
 
@@ -442,10 +442,7 @@ class TwitterAdapter(BaseSocialAdapter):
             return PostResult(success=False, error_message=str(e))
 
     async def post_with_media(
-        self,
-        credentials: SocialCredentials,
-        text: str,
-        media_urls: List[str]
+        self, credentials: SocialCredentials, text: str, media_urls: list[str]
     ) -> PostResult:
         """
         Post a tweet with media attachments.
@@ -553,7 +550,7 @@ class TwitterAdapter(BaseSocialAdapter):
         credentials: SocialCredentials,
         media_bytes: bytes,
         media_type: str,
-        filename: Optional[str] = None
+        filename: str | None = None,
     ) -> MediaUploadResult:
         """
         Upload media to Twitter.
@@ -592,7 +589,9 @@ class TwitterAdapter(BaseSocialAdapter):
 
                 if response.status_code != 200:
                     errors = response.json().get("errors") or []
-                    error_msg = errors[0].get("message", "Upload failed") if errors else "Upload failed"
+                    error_msg = (
+                        errors[0].get("message", "Upload failed") if errors else "Upload failed"
+                    )
                     raise SocialAPIError(f"Media upload failed: {error_msg}")
 
                 result = response.json()

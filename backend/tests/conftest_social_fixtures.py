@@ -1,20 +1,24 @@
 # Social Media Test Fixtures - To be merged into conftest.py
 # This file contains all fixtures needed for Phase 8 Social Media Scheduling tests
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
+
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from infrastructure.database.models import User
 
 # ============================================================================
 # Social Media Test Fixtures
 # ============================================================================
 
+
 def _encrypt_token(value: str) -> str:
     """Encrypt a token using the app settings secret key."""
-    from infrastructure.config import get_settings
     from core.security.encryption import encrypt_credential
+    from infrastructure.config import get_settings
+
     settings = get_settings()
     return encrypt_credential(value, settings.secret_key)
 
@@ -36,7 +40,7 @@ async def connected_twitter_account(db_session: AsyncSession, test_user: User):
         platform_user_id="123456",
         access_token_encrypted=_encrypt_token("test_twitter_token"),
         refresh_token_encrypted=_encrypt_token("test_twitter_refresh"),
-        token_expires_at=datetime.now(timezone.utc) + timedelta(hours=2),
+        token_expires_at=datetime.now(UTC) + timedelta(hours=2),
         is_active=True,
     )
     db_session.add(account)
@@ -61,7 +65,7 @@ async def connected_linkedin_account(db_session: AsyncSession, test_user: User):
         platform_username="Test User",
         platform_user_id="urn:li:person:123456",
         access_token_encrypted=_encrypt_token("test_linkedin_token"),
-        token_expires_at=datetime.now(timezone.utc) + timedelta(days=60),
+        token_expires_at=datetime.now(UTC) + timedelta(days=60),
         is_active=True,
     )
     db_session.add(account)
@@ -86,7 +90,7 @@ async def connected_facebook_account(db_session: AsyncSession, test_user: User):
         platform_username="Test Page",
         platform_user_id="123456789",
         access_token_encrypted=_encrypt_token("test_facebook_token"),
-        token_expires_at=datetime.now(timezone.utc) + timedelta(days=60),
+        token_expires_at=datetime.now(UTC) + timedelta(days=60),
         is_active=True,
         account_metadata={"page_id": "123456789"},
     )
@@ -122,13 +126,13 @@ async def pending_post(
 
     Used for testing post retrieval, updates, and publishing.
     """
-    from infrastructure.database.models.social import ScheduledPost, PostTarget, PostStatus
+    from infrastructure.database.models.social import PostStatus, PostTarget, ScheduledPost
 
     post = ScheduledPost(
         id=str(uuid4()),
         user_id=test_user.id,
         content="Test pending post",
-        scheduled_at=datetime.now(timezone.utc) + timedelta(hours=2),
+        scheduled_at=datetime.now(UTC) + timedelta(hours=2),
         status=PostStatus.SCHEDULED,
     )
     db_session.add(post)
@@ -159,15 +163,15 @@ async def posted_post(
 
     Used for testing operations that should fail on published posts.
     """
-    from infrastructure.database.models.social import ScheduledPost, PostTarget, PostStatus
+    from infrastructure.database.models.social import PostStatus, PostTarget, ScheduledPost
 
     post = ScheduledPost(
         id=str(uuid4()),
         user_id=test_user.id,
         content="Test published post",
-        scheduled_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        scheduled_at=datetime.now(UTC) - timedelta(hours=1),
         status=PostStatus.PUBLISHED,
-        published_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        published_at=datetime.now(UTC) - timedelta(hours=1),
     )
     db_session.add(post)
     await db_session.flush()
@@ -179,7 +183,7 @@ async def posted_post(
         social_account_id=connected_twitter_account.id,
         is_published=True,
         platform_post_id="1234567890",
-        published_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        published_at=datetime.now(UTC) - timedelta(hours=1),
     )
     db_session.add(target)
 
@@ -199,13 +203,13 @@ async def failed_post(
 
     Used for testing retry operations and error handling.
     """
-    from infrastructure.database.models.social import ScheduledPost, PostTarget, PostStatus
+    from infrastructure.database.models.social import PostStatus, PostTarget, ScheduledPost
 
     post = ScheduledPost(
         id=str(uuid4()),
         user_id=test_user.id,
         content="Test failed post",
-        scheduled_at=datetime.now(timezone.utc) - timedelta(minutes=30),
+        scheduled_at=datetime.now(UTC) - timedelta(minutes=30),
         status=PostStatus.FAILED,
         publish_error="API Error: Rate limit exceeded",
     )
@@ -238,7 +242,7 @@ async def multiple_scheduled_posts(
 
     Used for testing pagination, filtering, and calendar views.
     """
-    from infrastructure.database.models.social import ScheduledPost, PostTarget, PostStatus
+    from infrastructure.database.models.social import PostStatus, PostTarget, ScheduledPost
 
     posts = []
 
@@ -251,9 +255,9 @@ async def multiple_scheduled_posts(
     ]
 
     for i, post_status in enumerate(statuses):
-        scheduled_at = datetime.now(timezone.utc) + timedelta(hours=(i + 1))
+        scheduled_at = datetime.now(UTC) + timedelta(hours=(i + 1))
         if post_status == PostStatus.PUBLISHED:
-            scheduled_at = datetime.now(timezone.utc) - timedelta(hours=1)
+            scheduled_at = datetime.now(UTC) - timedelta(hours=1)
 
         post = ScheduledPost(
             id=str(uuid4()),
@@ -261,7 +265,9 @@ async def multiple_scheduled_posts(
             content=f"Test post {i + 1}",
             scheduled_at=scheduled_at,
             status=post_status,
-            published_at=datetime.now(timezone.utc) - timedelta(hours=1) if post_status == PostStatus.PUBLISHED else None,
+            published_at=datetime.now(UTC) - timedelta(hours=1)
+            if post_status == PostStatus.PUBLISHED
+            else None,
         )
         db_session.add(post)
         await db_session.flush()
@@ -275,7 +281,7 @@ async def multiple_scheduled_posts(
                 social_account_id=account.id,
                 is_published=is_published,
                 platform_post_id=f"post_{i}_{account.platform}" if is_published else None,
-                published_at=datetime.now(timezone.utc) - timedelta(hours=1) if is_published else None,
+                published_at=datetime.now(UTC) - timedelta(hours=1) if is_published else None,
             )
             db_session.add(target)
 
@@ -299,7 +305,7 @@ def mock_twitter_api():
             # Mock responses are pre-configured
             # Test code here
     """
-    from unittest.mock import patch, AsyncMock
+    from unittest.mock import AsyncMock, patch
 
     with patch("httpx.AsyncClient") as mock_client:
         mock_instance = AsyncMock()
@@ -341,7 +347,7 @@ def mock_linkedin_api():
             # Mock responses are pre-configured
             # Test code here
     """
-    from unittest.mock import patch, AsyncMock
+    from unittest.mock import AsyncMock, patch
 
     with patch("httpx.AsyncClient") as mock_client:
         mock_instance = AsyncMock()
@@ -379,7 +385,7 @@ def mock_facebook_api():
             # Mock responses are pre-configured
             # Test code here
     """
-    from unittest.mock import patch, AsyncMock
+    from unittest.mock import AsyncMock, patch
 
     with patch("httpx.AsyncClient") as mock_client:
         mock_instance = AsyncMock()

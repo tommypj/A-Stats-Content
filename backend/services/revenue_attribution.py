@@ -8,22 +8,17 @@ the service never blocks the event loop.
 
 import logging
 import math
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from urllib.parse import urlparse, urlunparse
 from uuid import uuid4
 
-from sqlalchemy import select, func, and_, desc
+from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from infrastructure.database.models.analytics import (
-    PagePerformance,
-    KeywordRanking,
-    DailyAnalytics,
-)
 from infrastructure.database.models.content import Article
 from infrastructure.database.models.revenue import (
-    ConversionGoal,
     ContentConversion,
+    ConversionGoal,
     RevenueReport,
 )
 
@@ -33,6 +28,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
 
 def _default_date_range(
     start_date: date | None,
@@ -61,7 +57,8 @@ def _normalize_url(url: str) -> str:
     try:
         p = urlparse(url.strip())
         scheme = "https"
-        host = (p.netloc or "").lower().lstrip("www.").lstrip(".")
+        netloc = (p.netloc or "").lower()
+        host = netloc[4:] if netloc.startswith("www.") else netloc
         path = p.path.rstrip("/")
         return urlunparse((scheme, host, path, "", "", ""))
     except Exception:
@@ -110,18 +107,15 @@ async def get_revenue_overview(
     prev_start = prev_end - timedelta(days=period_days - 1)
 
     # --- Current period totals -------------------------------------------------
-    totals_q = (
-        select(
-            func.sum(ContentConversion.visits).label("total_visits"),
-            func.sum(ContentConversion.conversions).label("total_conversions"),
-            func.sum(ContentConversion.revenue).label("total_revenue"),
-        )
-        .where(
-            and_(
-                ContentConversion.user_id == user_id,
-                ContentConversion.date >= start_date,
-                ContentConversion.date <= end_date,
-            )
+    totals_q = select(
+        func.sum(ContentConversion.visits).label("total_visits"),
+        func.sum(ContentConversion.conversions).label("total_conversions"),
+        func.sum(ContentConversion.revenue).label("total_revenue"),
+    ).where(
+        and_(
+            ContentConversion.user_id == user_id,
+            ContentConversion.date >= start_date,
+            ContentConversion.date <= end_date,
         )
     )
     totals_row = (await db.execute(totals_q)).one()
@@ -132,18 +126,15 @@ async def get_revenue_overview(
     conversion_rate = _safe_rate(total_conversions, total_visits)
 
     # --- Previous period totals for comparison ---------------------------------
-    prev_totals_q = (
-        select(
-            func.sum(ContentConversion.visits).label("total_visits"),
-            func.sum(ContentConversion.conversions).label("total_conversions"),
-            func.sum(ContentConversion.revenue).label("total_revenue"),
-        )
-        .where(
-            and_(
-                ContentConversion.user_id == user_id,
-                ContentConversion.date >= prev_start,
-                ContentConversion.date <= prev_end,
-            )
+    prev_totals_q = select(
+        func.sum(ContentConversion.visits).label("total_visits"),
+        func.sum(ContentConversion.conversions).label("total_conversions"),
+        func.sum(ContentConversion.revenue).label("total_revenue"),
+    ).where(
+        and_(
+            ContentConversion.user_id == user_id,
+            ContentConversion.date >= prev_start,
+            ContentConversion.date <= prev_end,
         )
     )
     prev_row = (await db.execute(prev_totals_q)).one()
@@ -201,9 +192,7 @@ async def get_revenue_overview(
             "visits": int(row.visits or 0),
             "conversions": int(row.conversions or 0),
             "revenue": float(row.revenue or 0.0),
-            "conversion_rate": _safe_rate(
-                int(row.conversions or 0), int(row.visits or 0)
-            ),
+            "conversion_rate": _safe_rate(int(row.conversions or 0), int(row.visits or 0)),
         }
         for row in top_articles_rows
     ]
@@ -236,9 +225,7 @@ async def get_revenue_overview(
             "visits": int(row.visits or 0),
             "conversions": int(row.conversions or 0),
             "revenue": float(row.revenue or 0.0),
-            "conversion_rate": _safe_rate(
-                int(row.conversions or 0), int(row.visits or 0)
-            ),
+            "conversion_rate": _safe_rate(int(row.conversions or 0), int(row.visits or 0)),
         }
         for row in top_kw_rows
     ]
@@ -294,10 +281,7 @@ async def get_revenue_by_article(
     )
 
     # --- Total distinct articles for pagination --------------------------------
-    count_q = (
-        select(func.count(func.distinct(ContentConversion.article_id)))
-        .where(base_where)
-    )
+    count_q = select(func.count(func.distinct(ContentConversion.article_id))).where(base_where)
     total_items = (await db.execute(count_q)).scalar() or 0
     total_pages = math.ceil(total_items / page_size) if total_items else 1
     offset = (page - 1) * page_size
@@ -336,9 +320,7 @@ async def get_revenue_by_article(
             "visits": int(row.visits or 0),
             "conversions": int(row.conversions or 0),
             "revenue": round(float(row.revenue or 0.0), 2),
-            "conversion_rate": _safe_rate(
-                int(row.conversions or 0), int(row.visits or 0)
-            ),
+            "conversion_rate": _safe_rate(int(row.conversions or 0), int(row.visits or 0)),
             # ROI requires cost data not yet captured in the schema.
             # None signals the frontend to hide the column until cost
             # tracking is introduced.
@@ -385,10 +367,7 @@ async def get_revenue_by_keyword(
     )
 
     # --- Total distinct keywords for pagination --------------------------------
-    count_q = (
-        select(func.count(func.distinct(ContentConversion.keyword)))
-        .where(base_where)
-    )
+    count_q = select(func.count(func.distinct(ContentConversion.keyword))).where(base_where)
     total_items = (await db.execute(count_q)).scalar() or 0
     total_pages = math.ceil(total_items / page_size) if total_items else 1
     offset = (page - 1) * page_size
@@ -415,9 +394,7 @@ async def get_revenue_by_keyword(
             "visits": int(row.visits or 0),
             "conversions": int(row.conversions or 0),
             "revenue": round(float(row.revenue or 0.0), 2),
-            "conversion_rate": _safe_rate(
-                int(row.conversions or 0), int(row.visits or 0)
-            ),
+            "conversion_rate": _safe_rate(int(row.conversions or 0), int(row.visits or 0)),
         }
         for row in rows
     ]
@@ -468,9 +445,7 @@ async def import_conversions(
     )
     goal_exists = (await db.execute(goal_q)).scalar()
     if not goal_exists:
-        logger.warning(
-            "import_conversions: goal %s not found for user %s", goal_id, user_id
-        )
+        logger.warning("import_conversions: goal %s not found for user %s", goal_id, user_id)
         return {"imported_count": 0, "matched_articles": 0, "error": "goal_not_found"}
 
     # Build a normalised URL -> article_id lookup
@@ -482,9 +457,7 @@ async def import_conversions(
     )
     article_rows = (await db.execute(articles_q)).all()
     url_to_article: dict[str, str] = {
-        _normalize_url(row.published_url): row.id
-        for row in article_rows
-        if row.published_url
+        _normalize_url(row.published_url): row.id for row in article_rows if row.published_url
     }
 
     imported_count = 0
@@ -506,9 +479,7 @@ async def import_conversions(
             try:
                 conv_date = date.fromisoformat(raw_date[:10])
             except ValueError:
-                logger.warning(
-                    "import_conversions: unparseable date %r – skipping", raw_date
-                )
+                logger.warning("import_conversions: unparseable date %r – skipping", raw_date)
                 continue
         else:
             logger.warning("import_conversions: missing date field – skipping")
@@ -573,18 +544,15 @@ async def generate_revenue_report(
     start_date = today - timedelta(days=period_days - 1)
 
     # --- Aggregate totals ------------------------------------------------------
-    totals_q = (
-        select(
-            func.sum(ContentConversion.visits).label("total_visits"),
-            func.sum(ContentConversion.conversions).label("total_conversions"),
-            func.sum(ContentConversion.revenue).label("total_revenue"),
-        )
-        .where(
-            and_(
-                ContentConversion.user_id == user_id,
-                ContentConversion.date >= start_date,
-                ContentConversion.date <= end_date,
-            )
+    totals_q = select(
+        func.sum(ContentConversion.visits).label("total_visits"),
+        func.sum(ContentConversion.conversions).label("total_conversions"),
+        func.sum(ContentConversion.revenue).label("total_revenue"),
+    ).where(
+        and_(
+            ContentConversion.user_id == user_id,
+            ContentConversion.date >= start_date,
+            ContentConversion.date <= end_date,
         )
     )
     totals_row = (await db.execute(totals_q)).one()
@@ -634,9 +602,7 @@ async def generate_revenue_report(
             "visits": int(row.visits or 0),
             "conversions": int(row.conversions or 0),
             "revenue": round(float(row.revenue or 0.0), 2),
-            "conversion_rate": _safe_rate(
-                int(row.conversions or 0), int(row.visits or 0)
-            ),
+            "conversion_rate": _safe_rate(int(row.conversions or 0), int(row.visits or 0)),
         }
         for row in top_articles_rows
     ]
@@ -669,9 +635,7 @@ async def generate_revenue_report(
             "visits": int(row.visits or 0),
             "conversions": int(row.conversions or 0),
             "revenue": round(float(row.revenue or 0.0), 2),
-            "conversion_rate": _safe_rate(
-                int(row.conversions or 0), int(row.visits or 0)
-            ),
+            "conversion_rate": _safe_rate(int(row.conversions or 0), int(row.visits or 0)),
         }
         for row in top_kw_rows
     ]
@@ -688,7 +652,7 @@ async def generate_revenue_report(
         total_revenue=round(total_revenue, 2),
         top_articles=top_articles,
         top_keywords=top_keywords,
-        generated_at=datetime.now(timezone.utc),
+        generated_at=datetime.now(UTC),
     )
     db.add(report)
     await db.flush()

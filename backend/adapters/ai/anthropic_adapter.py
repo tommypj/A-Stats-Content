@@ -6,8 +6,8 @@ import asyncio
 import json
 import logging
 import random
-from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
+from typing import Any
 
 import anthropic
 
@@ -27,11 +27,30 @@ async def _retry_with_backoff(coro_factory, max_retries=3, base_delay=1.0):
             return await coro_factory()
         except Exception as e:
             error_str = str(e).lower()
-            is_transient = any(k in error_str for k in ["rate_limit", "429", "500", "502", "503", "504", "overloaded", "connection", "timeout"])
+            is_transient = any(
+                k in error_str
+                for k in [
+                    "rate_limit",
+                    "429",
+                    "500",
+                    "502",
+                    "503",
+                    "504",
+                    "overloaded",
+                    "connection",
+                    "timeout",
+                ]
+            )
             if not is_transient or attempt == max_retries:
                 raise
-            delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
-            logger.warning("Transient API error (attempt %d/%d), retrying in %.1fs: %s", attempt + 1, max_retries, delay, str(e))
+            delay = base_delay * (2**attempt) + random.uniform(0, 1)
+            logger.warning(
+                "Transient API error (attempt %d/%d), retrying in %.1fs: %s",
+                attempt + 1,
+                max_retries,
+                delay,
+                str(e),
+            )
             await asyncio.sleep(delay)
 
 
@@ -40,7 +59,7 @@ class OutlineSection:
     """Outline section structure."""
 
     heading: str
-    subheadings: List[str]
+    subheadings: list[str]
     notes: str
     word_count_target: int
 
@@ -50,7 +69,7 @@ class GeneratedOutline:
     """Generated outline result."""
 
     title: str
-    sections: List[OutlineSection]
+    sections: list[OutlineSection]
     meta_description: str
     estimated_word_count: int
     estimated_read_time: int
@@ -110,7 +129,13 @@ class AnthropicContentService:
         """Get the full language name from a language code."""
         return self.LANGUAGE_NAMES.get(language_code, language_code)
 
-    def _get_system_prompt(self, writing_style: str = "balanced", voice: str = "second_person", list_usage: str = "balanced", language: str = "en") -> str:
+    def _get_system_prompt(
+        self,
+        writing_style: str = "balanced",
+        voice: str = "second_person",
+        list_usage: str = "balanced",
+        language: str = "en",
+    ) -> str:
         """Get the system prompt for content generation."""
 
         style_instructions = {
@@ -149,13 +174,13 @@ Before finalizing each paragraph, mentally verify grammar: correct gender agreem
         return f"""You are an expert SEO content writer who produces high-quality, human-sounding articles.
 {language_instruction}
 WRITING APPROACH:
-{style_instructions.get(writing_style, style_instructions['balanced'])}
+{style_instructions.get(writing_style, style_instructions["balanced"])}
 
 VOICE:
-{voice_instructions.get(voice, voice_instructions['second_person'])}
+{voice_instructions.get(voice, voice_instructions["second_person"])}
 
 LIST USAGE:
-{list_instructions.get(list_usage, list_instructions['balanced'])}
+{list_instructions.get(list_usage, list_instructions["balanced"])}
 
 CRITICAL RULES:
 1. Write like a skilled human journalist, not an AI. Vary sentence length. Use transitional phrases between ideas.
@@ -174,26 +199,27 @@ CRITICAL RULES:
     - Format statistics as "X% (Source, Year)" — never use vague claims without attribution."""
 
     @staticmethod
-    def _sanitize_prompt_input(text: Optional[str], max_length: int) -> str:
+    def _sanitize_prompt_input(text: str | None, max_length: int) -> str:
         """Strip control characters and limit length to prevent prompt injection."""
         if not text:
             return ""
         import re as _re
-        text = _re.sub(r'[\r\n\t\x00-\x1f\x7f]', ' ', text)
-        text = _re.sub(r' +', ' ', text).strip()
+
+        text = _re.sub(r"[\r\n\t\x00-\x1f\x7f]", " ", text)
+        text = _re.sub(r" +", " ", text).strip()
         return text[:max_length]
 
     async def generate_outline(
         self,
         keyword: str,
-        target_audience: Optional[str] = None,
+        target_audience: str | None = None,
         tone: str = "professional",
         word_count_target: int = 1500,
         language: str = "en",
         writing_style: str = "balanced",
         voice: str = "second_person",
         list_usage: str = "balanced",
-        custom_instructions: Optional[str] = None,
+        custom_instructions: str | None = None,
     ) -> GeneratedOutline:
         """
         Generate an article outline based on keyword and parameters.
@@ -215,13 +241,23 @@ CRITICAL RULES:
         # GEN-34: Cap keyword at 100 chars to prevent oversized prompt interpolation
         keyword = self._sanitize_prompt_input(keyword, 100)
         tone = self._sanitize_prompt_input(tone, 50)
-        target_audience = self._sanitize_prompt_input(target_audience, 500) if target_audience else None
-        custom_instructions = self._sanitize_prompt_input(custom_instructions, 1000) if custom_instructions else None
+        target_audience = (
+            self._sanitize_prompt_input(target_audience, 500) if target_audience else None
+        )
+        custom_instructions = (
+            self._sanitize_prompt_input(custom_instructions, 1000) if custom_instructions else None
+        )
 
         audience_context = f"Target audience: {target_audience}" if target_audience else ""
-        custom_context = f"\nAdditional instructions: {custom_instructions}" if custom_instructions else ""
+        custom_context = (
+            f"\nAdditional instructions: {custom_instructions}" if custom_instructions else ""
+        )
         language_name = self._get_language_name(language)
-        language_context = f"\nLanguage: Write ALL content (title, headings, notes, meta description) in {language_name}." if language != "en" else ""
+        language_context = (
+            f"\nLanguage: Write ALL content (title, headings, notes, meta description) in {language_name}."
+            if language != "en"
+            else ""
+        )
 
         prompt = f"""Create a comprehensive article outline for the following:
 
@@ -231,12 +267,12 @@ Tone: {tone}
 Target word count: {word_count_target} words{language_context}{custom_context}
 
 Generate a detailed outline with:
-1. A compelling, SEO-optimized title that is 30-60 characters long and includes the keyword "{keyword}"{f' (in {language_name})' if language != 'en' else ''}
-2. 5-7 main sections with H2 headings{f' (in {language_name})' if language != 'en' else ''}
+1. A compelling, SEO-optimized title that is 30-60 characters long and includes the keyword "{keyword}"{f" (in {language_name})" if language != "en" else ""}
+2. 5-7 main sections with H2 headings{f" (in {language_name})" if language != "en" else ""}
 3. 2-4 subheadings (H3) per section
 4. Brief notes for each section describing the content
 5. Estimated word count per section
-6. A meta description (150-160 characters) that includes the keyword "{keyword}"{f' (in {language_name})' if language != 'en' else ''}
+6. A meta description (150-160 characters) that includes the keyword "{keyword}"{f" (in {language_name})" if language != "en" else ""}
 
 Respond in JSON format:
 {{
@@ -254,12 +290,19 @@ Respond in JSON format:
     "estimated_read_time": 7
 }}"""
 
-        message = await _retry_with_backoff(lambda: self._client.messages.create(
-            model=self._model,
-            max_tokens=self._max_tokens,
-            system=self._get_system_prompt(writing_style=writing_style, voice=voice, list_usage=list_usage, language=language),
-            messages=[{"role": "user", "content": prompt}],
-        ))
+        message = await _retry_with_backoff(
+            lambda: self._client.messages.create(
+                model=self._model,
+                max_tokens=self._max_tokens,
+                system=self._get_system_prompt(
+                    writing_style=writing_style,
+                    voice=voice,
+                    list_usage=list_usage,
+                    language=language,
+                ),
+                messages=[{"role": "user", "content": prompt}],
+            )
+        )
 
         # Parse the response
         response_text = message.content[0].text
@@ -298,13 +341,13 @@ Respond in JSON format:
         self,
         title: str,
         keyword: str,
-        sections: List[Dict[str, Any]],
+        sections: list[dict[str, Any]],
         tone: str = "professional",
-        target_audience: Optional[str] = None,
+        target_audience: str | None = None,
         writing_style: str = "balanced",
         voice: str = "second_person",
         list_usage: str = "balanced",
-        custom_instructions: Optional[str] = None,
+        custom_instructions: str | None = None,
         word_count_target: int = 1500,
         language: str = "en",
     ) -> GeneratedArticle:
@@ -329,22 +372,36 @@ Respond in JSON format:
         # GEN-34: Cap keyword at 100 chars to prevent oversized prompt interpolation
         keyword = self._sanitize_prompt_input(keyword, 100)
         tone = self._sanitize_prompt_input(tone, 50)
-        target_audience = self._sanitize_prompt_input(target_audience, 500) if target_audience else None
-        custom_instructions = self._sanitize_prompt_input(custom_instructions, 1000) if custom_instructions else None
+        target_audience = (
+            self._sanitize_prompt_input(target_audience, 500) if target_audience else None
+        )
+        custom_instructions = (
+            self._sanitize_prompt_input(custom_instructions, 1000) if custom_instructions else None
+        )
         title = self._sanitize_prompt_input(title, 300)
 
         audience_context = f"Target audience: {target_audience}" if target_audience else ""
-        custom_context = f"\nAdditional instructions from the user:\n{custom_instructions}" if custom_instructions else ""
+        custom_context = (
+            f"\nAdditional instructions from the user:\n{custom_instructions}"
+            if custom_instructions
+            else ""
+        )
         language_name = self._get_language_name(language)
-        language_context = f"\n**LANGUAGE: Write the ENTIRE article in {language_name}. All headings, paragraphs, and meta description must be in {language_name} with correct grammar, gender agreements, and natural phrasing.**" if language != "en" else ""
+        language_context = (
+            f"\n**LANGUAGE: Write the ENTIRE article in {language_name}. All headings, paragraphs, and meta description must be in {language_name} with correct grammar, gender agreements, and natural phrasing.**"
+            if language != "en"
+            else ""
+        )
 
         # Format sections for the prompt
-        sections_text = "\n".join([
-            f"## {s['heading']}\n" +
-            "\n".join([f"### {sub}" for sub in s.get('subheadings', [])]) +
-            f"\nNotes: {s.get('notes', '')}\nTarget: {s.get('word_count_target', 200)} words"
-            for s in sections
-        ])
+        sections_text = "\n".join(
+            [
+                f"## {s['heading']}\n"
+                + "\n".join([f"### {sub}" for sub in s.get("subheadings", [])])
+                + f"\nNotes: {s.get('notes', '')}\nTarget: {s.get('word_count_target', 200)} words"
+                for s in sections
+            ]
+        )
 
         # Calculate max_tokens based on word count target
         # Non-English languages (Romanian, German, etc.) use significantly more tokens
@@ -459,19 +516,28 @@ META_DESCRIPTION: [A compelling 150-160 character meta description that MUST inc
         max_attempts = 2
         for attempt in range(max_attempts):
             _max_tokens_capture = max_tokens
-            message = await _retry_with_backoff(lambda: self._client.messages.create(
-                model=self._model,
-                max_tokens=_max_tokens_capture,
-                system=self._get_system_prompt(writing_style=writing_style, voice=voice, list_usage=list_usage, language=language),
-                messages=[{"role": "user", "content": prompt}],
-            ))
+            message = await _retry_with_backoff(
+                lambda: self._client.messages.create(
+                    model=self._model,
+                    max_tokens=_max_tokens_capture,  # noqa: B023
+                    system=self._get_system_prompt(
+                        writing_style=writing_style,
+                        voice=voice,
+                        list_usage=list_usage,
+                        language=language,
+                    ),
+                    messages=[{"role": "user", "content": prompt}],
+                )
+            )
 
             if message.stop_reason == "max_tokens" and attempt < max_attempts - 1:
                 # Response was truncated — retry with 50% more tokens
                 logger.warning(
                     "Article generation truncated (stop_reason=max_tokens, "
                     "max_tokens=%d, word_target=%d, language=%s). Retrying with more tokens.",
-                    max_tokens, word_count_target, language,
+                    max_tokens,
+                    word_count_target,
+                    language,
                 )
                 max_tokens = min(int(max_tokens * 1.5), 16000)
                 continue
@@ -480,7 +546,9 @@ META_DESCRIPTION: [A compelling 150-160 character meta description that MUST inc
                 logger.error(
                     "Article generation still truncated after retry "
                     "(max_tokens=%d, word_target=%d, language=%s)",
-                    max_tokens, word_count_target, language,
+                    max_tokens,
+                    word_count_target,
+                    language,
                 )
             break
 
@@ -544,11 +612,13 @@ ARTICLE:
 {content}"""
 
         _proofread_max_tokens = max(len(content.split()) * 3, 4000)
-        message = await _retry_with_backoff(lambda: self._client.messages.create(
-            model=self._model,
-            max_tokens=_proofread_max_tokens,
-            messages=[{"role": "user", "content": prompt}],
-        ))
+        message = await _retry_with_backoff(
+            lambda: self._client.messages.create(
+                model=self._model,
+                max_tokens=_proofread_max_tokens,
+                messages=[{"role": "user", "content": prompt}],
+            )
+        )
 
         return message.content[0].text
 
@@ -556,7 +626,7 @@ ARTICLE:
         self,
         content: str,
         improvement_type: str = "seo",
-        keyword: Optional[str] = None,
+        keyword: str | None = None,
     ) -> str:
         """
         Improve existing content.
@@ -579,19 +649,23 @@ ARTICLE:
             "grammar": "Proofread and fix all grammar mistakes in this content. Fix subject-verb agreement, tense consistency, articles, prepositions, punctuation, and sentence fragments. Do NOT change the meaning, structure, or tone. Do NOT add or remove sections.",
         }
 
-        prompt = f"""{improvement_instructions.get(improvement_type, improvement_instructions['seo'])}
+        prompt = f"""{improvement_instructions.get(improvement_type, improvement_instructions["seo"])}
 
 Original content:
 {content}
 
 Provide the improved version in markdown format."""
 
-        message = await _retry_with_backoff(lambda: self._client.messages.create(
-            model=self._model,
-            max_tokens=8000,
-            system=self._get_system_prompt(writing_style="balanced", voice="second_person", list_usage="balanced"),
-            messages=[{"role": "user", "content": prompt}],
-        ))
+        message = await _retry_with_backoff(
+            lambda: self._client.messages.create(
+                model=self._model,
+                max_tokens=8000,
+                system=self._get_system_prompt(
+                    writing_style="balanced", voice="second_person", list_usage="balanced"
+                ),
+                messages=[{"role": "user", "content": prompt}],
+            )
+        )
 
         return message.content[0].text
 
@@ -619,11 +693,13 @@ Requirements:
 
 Respond with ONLY the meta description, nothing else."""
 
-        message = await _retry_with_backoff(lambda: self._client.messages.create(
-            model=self._model,
-            max_tokens=200,
-            messages=[{"role": "user", "content": prompt}],
-        ))
+        message = await _retry_with_backoff(
+            lambda: self._client.messages.create(
+                model=self._model,
+                max_tokens=200,
+                messages=[{"role": "user", "content": prompt}],
+            )
+        )
 
         return message.content[0].text.strip()[:160]
 
@@ -669,7 +745,7 @@ Respond with ONLY the meta description, nothing else."""
         )
 
     def _mock_article(
-        self, title: str, keyword: str, sections: List[Dict[str, Any]]
+        self, title: str, keyword: str, sections: list[dict[str, Any]]
     ) -> GeneratedArticle:
         """Generate mock article for development."""
         content_parts = [f"# {title}\n"]
@@ -677,7 +753,7 @@ Respond with ONLY the meta description, nothing else."""
         for section in sections:
             content_parts.append(f"\n## {section['heading']}\n")
             content_parts.append(f"This section covers {section.get('notes', keyword)}.\n")
-            for sub in section.get('subheadings', []):
+            for sub in section.get("subheadings", []):
                 content_parts.append(f"\n### {sub}\n")
                 content_parts.append(f"Detailed content about {sub.lower()}.\n")
 
@@ -695,8 +771,8 @@ Respond with ONLY the meta description, nothing else."""
         article_title: str,
         article_summary: str,
         article_url: str,
-        keywords: Optional[List[str]] = None,
-    ) -> Dict[str, str]:
+        keywords: list[str] | None = None,
+    ) -> dict[str, str]:
         """
         Generate platform-specific social media posts for an article.
 
@@ -738,11 +814,13 @@ Respond in JSON format:
     "instagram": "instagram caption here"
 }}"""
 
-        message = await _retry_with_backoff(lambda: self._client.messages.create(
-            model=self._model,
-            max_tokens=2000,
-            messages=[{"role": "user", "content": prompt}],
-        ))
+        message = await _retry_with_backoff(
+            lambda: self._client.messages.create(
+                model=self._model,
+                max_tokens=2000,
+                messages=[{"role": "user", "content": prompt}],
+            )
+        )
 
         response_text = message.content[0].text
 
@@ -796,20 +874,22 @@ Requirements:
 
 Respond with ONLY the image prompt, nothing else."""
 
-        message = await _retry_with_backoff(lambda: self._client.messages.create(
-            model=self._model,
-            max_tokens=200,
-            messages=[{"role": "user", "content": prompt}],
-        ))
+        message = await _retry_with_backoff(
+            lambda: self._client.messages.create(
+                model=self._model,
+                max_tokens=200,
+                messages=[{"role": "user", "content": prompt}],
+            )
+        )
 
         return message.content[0].text.strip()
 
     async def generate_content_suggestions(
         self,
-        keywords: List[Dict[str, Any]],
-        existing_articles: List[str],
+        keywords: list[dict[str, Any]],
+        existing_articles: list[str],
         language: str = "en",
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Generate content suggestions based on keyword opportunity data.
 
@@ -835,16 +915,26 @@ Respond with ONLY the image prompt, nothing else."""
             ]
 
         language_name = self._get_language_name(language)
-        language_instruction = f"\nGenerate all titles and content angles in {language_name}." if language != "en" else ""
+        language_instruction = (
+            f"\nGenerate all titles and content angles in {language_name}."
+            if language != "en"
+            else ""
+        )
 
-        keywords_text = "\n".join([
-            f"- \"{kw['keyword']}\" — {kw.get('impressions', 0)} impressions, "
-            f"{kw.get('clicks', 0)} clicks, CTR: {kw.get('ctr', 0):.2%}, "
-            f"Avg Position: {kw.get('position', 0):.1f}"
-            for kw in keywords
-        ])
+        keywords_text = "\n".join(
+            [
+                f'- "{kw["keyword"]}" — {kw.get("impressions", 0)} impressions, '
+                f"{kw.get('clicks', 0)} clicks, CTR: {kw.get('ctr', 0):.2%}, "
+                f"Avg Position: {kw.get('position', 0):.1f}"
+                for kw in keywords
+            ]
+        )
 
-        existing_text = "\n".join([f"- {title}" for title in existing_articles]) if existing_articles else "None"
+        existing_text = (
+            "\n".join([f"- {title}" for title in existing_articles])
+            if existing_articles
+            else "None"
+        )
 
         prompt = f"""Analyze these keyword opportunities from Google Search Console and suggest article topics.
 
@@ -881,11 +971,13 @@ Respond in JSON format:
 }}"""
 
         try:
-            message = await _retry_with_backoff(lambda: self._client.messages.create(
-                model=self._model,
-                max_tokens=2000,
-                messages=[{"role": "user", "content": prompt}],
-            ))
+            message = await _retry_with_backoff(
+                lambda: self._client.messages.create(
+                    model=self._model,
+                    max_tokens=2000,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+            )
 
             response_text = message.content[0].text
 
@@ -928,12 +1020,14 @@ Respond in JSON format:
             _gt_max_tokens = max_tokens
             _gt_temperature = temperature
             _gt_prompt = prompt
-            message = await _retry_with_backoff(lambda: self._client.messages.create(
-                model=self._model,
-                max_tokens=_gt_max_tokens,
-                temperature=_gt_temperature,
-                messages=[{"role": "user", "content": _gt_prompt}],
-            ))
+            message = await _retry_with_backoff(
+                lambda: self._client.messages.create(
+                    model=self._model,
+                    max_tokens=_gt_max_tokens,
+                    temperature=_gt_temperature,
+                    messages=[{"role": "user", "content": _gt_prompt}],
+                )
+            )
 
             response_text = message.content[0].text
             logger.debug(f"Generated text response ({len(response_text)} chars)")

@@ -9,8 +9,8 @@ import hashlib
 import hmac
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Dict, Any, Optional, List
+from datetime import UTC, datetime
+from typing import Any
 from urllib.parse import urlencode
 
 import httpx
@@ -23,21 +23,25 @@ logger = logging.getLogger(__name__)
 # Custom Exceptions
 class LemonSqueezyError(Exception):
     """Base exception for LemonSqueezy adapter errors."""
+
     pass
 
 
 class LemonSqueezyAPIError(LemonSqueezyError):
     """Raised when LemonSqueezy API returns an error."""
+
     pass
 
 
 class LemonSqueezyWebhookError(LemonSqueezyError):
     """Raised when webhook verification or processing fails."""
+
     pass
 
 
 class LemonSqueezyAuthError(LemonSqueezyError):
     """Raised when API authentication fails."""
+
     pass
 
 
@@ -54,7 +58,7 @@ class LemonSqueezyCustomer:
     updated_at: datetime
 
     @classmethod
-    def from_api_response(cls, data: Dict[str, Any]) -> "LemonSqueezyCustomer":
+    def from_api_response(cls, data: dict[str, Any]) -> "LemonSqueezyCustomer":
         """Create customer from API response data."""
         attributes = data.get("attributes", {})
         return cls(
@@ -70,7 +74,7 @@ class LemonSqueezyCustomer:
             ),
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert customer to dictionary format."""
         return {
             "id": self.id,
@@ -91,16 +95,16 @@ class LemonSqueezySubscription:
     variant_id: str
     status: str  # active, cancelled, paused, past_due, expired
     current_period_end: datetime
-    renews_at: Optional[datetime]
-    ends_at: Optional[datetime]
-    trial_ends_at: Optional[datetime]
+    renews_at: datetime | None
+    ends_at: datetime | None
+    trial_ends_at: datetime | None
     created_at: datetime
     updated_at: datetime
-    card_brand: Optional[str]
-    card_last_four: Optional[str]
+    card_brand: str | None
+    card_last_four: str | None
 
     @classmethod
-    def from_api_response(cls, data: Dict[str, Any]) -> "LemonSqueezySubscription":
+    def from_api_response(cls, data: dict[str, Any]) -> "LemonSqueezySubscription":
         """Create subscription from API response data."""
         attributes = data.get("attributes", {})
         relationships = data.get("relationships", {})
@@ -120,16 +124,20 @@ class LemonSqueezySubscription:
             status=attributes.get("status", ""),
             current_period_end=datetime.fromisoformat(
                 attributes.get("renews_at", "").replace("Z", "+00:00")
-            ) if attributes.get("renews_at") else datetime.now(timezone.utc),
-            renews_at=datetime.fromisoformat(
-                attributes.get("renews_at", "").replace("Z", "+00:00")
-            ) if attributes.get("renews_at") else None,
-            ends_at=datetime.fromisoformat(
-                attributes.get("ends_at", "").replace("Z", "+00:00")
-            ) if attributes.get("ends_at") else None,
+            )
+            if attributes.get("renews_at")
+            else datetime.now(UTC),
+            renews_at=datetime.fromisoformat(attributes.get("renews_at", "").replace("Z", "+00:00"))
+            if attributes.get("renews_at")
+            else None,
+            ends_at=datetime.fromisoformat(attributes.get("ends_at", "").replace("Z", "+00:00"))
+            if attributes.get("ends_at")
+            else None,
             trial_ends_at=datetime.fromisoformat(
                 attributes.get("trial_ends_at", "").replace("Z", "+00:00")
-            ) if attributes.get("trial_ends_at") else None,
+            )
+            if attributes.get("trial_ends_at")
+            else None,
             created_at=datetime.fromisoformat(
                 attributes.get("created_at", "").replace("Z", "+00:00")
             ),
@@ -140,7 +148,7 @@ class LemonSqueezySubscription:
             card_last_four=attributes.get("card_last_four"),
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert subscription to dictionary format."""
         return {
             "id": self.id,
@@ -163,14 +171,14 @@ class WebhookEvent:
     """LemonSqueezy webhook event data."""
 
     event_name: str  # subscription_created, subscription_updated, etc.
-    subscription_id: Optional[str]
-    customer_id: Optional[str]
-    variant_id: Optional[str]
-    status: Optional[str]
-    data: Dict[str, Any]
+    subscription_id: str | None
+    customer_id: str | None
+    variant_id: str | None
+    status: str | None
+    data: dict[str, Any]
 
     @classmethod
-    def from_webhook_payload(cls, payload: Dict[str, Any]) -> "WebhookEvent":
+    def from_webhook_payload(cls, payload: dict[str, Any]) -> "WebhookEvent":
         """Create webhook event from payload."""
         meta = payload.get("meta", {})
         event_name = meta.get("event_name", "")
@@ -214,9 +222,9 @@ class LemonSqueezyAdapter:
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
-        store_id: Optional[str] = None,
-        webhook_secret: Optional[str] = None,
+        api_key: str | None = None,
+        store_id: str | None = None,
+        webhook_secret: str | None = None,
     ):
         """
         Initialize LemonSqueezy adapter.
@@ -232,16 +240,14 @@ class LemonSqueezyAdapter:
 
         if not self.api_key:
             logger.warning(
-                "LemonSqueezy API key not configured. "
-                "Set lemonsqueezy_api_key in settings."
+                "LemonSqueezy API key not configured. Set lemonsqueezy_api_key in settings."
             )
 
-    def _get_headers(self) -> Dict[str, str]:
+    def _get_headers(self) -> dict[str, str]:
         """Get HTTP headers for API requests."""
         if not self.api_key:
             raise LemonSqueezyAuthError(
-                "LemonSqueezy API key not configured. "
-                "Set lemonsqueezy_api_key in settings."
+                "LemonSqueezy API key not configured. Set lemonsqueezy_api_key in settings."
             )
 
         return {
@@ -254,8 +260,8 @@ class LemonSqueezyAdapter:
         self,
         method: str,
         endpoint: str,
-        data: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Make HTTP request to LemonSqueezy API.
 
@@ -355,9 +361,9 @@ class LemonSqueezyAdapter:
 
     async def list_subscriptions(
         self,
-        customer_id: Optional[str] = None,
-        status: Optional[str] = None,
-    ) -> List[LemonSqueezySubscription]:
+        customer_id: str | None = None,
+        status: str | None = None,
+    ) -> list[LemonSqueezySubscription]:
         """
         List subscriptions with optional filters.
 
@@ -386,10 +392,7 @@ class LemonSqueezyAdapter:
         response = await self._make_request("GET", endpoint)
 
         data_list = response.get("data", [])
-        return [
-            LemonSqueezySubscription.from_api_response(item)
-            for item in data_list
-        ]
+        return [LemonSqueezySubscription.from_api_response(item) for item in data_list]
 
     async def cancel_subscription(self, subscription_id: str) -> bool:
         """
@@ -440,7 +443,7 @@ class LemonSqueezyAdapter:
                     "pause": {
                         "mode": mode,
                     }
-                }
+                },
             }
         }
 
@@ -475,7 +478,7 @@ class LemonSqueezyAdapter:
                 "id": subscription_id,
                 "attributes": {
                     "pause": None,
-                }
+                },
             }
         }
 
@@ -505,13 +508,13 @@ class LemonSqueezyAdapter:
         logger.info(f"Fetching customer portal URL for {customer_id}")
 
         # Fetch customer to get the portal URL from attributes
-        customer = await self.get_customer(customer_id)
+        await self.get_customer(customer_id)
 
         # The portal URL is typically in the customer data
         # For now, return a constructed URL (may need adjustment based on actual API)
-        portal_url = f"https://app.lemonsqueezy.com/my-orders"
+        portal_url = "https://app.lemonsqueezy.com/my-orders"
 
-        logger.info(f"Retrieved customer portal URL")
+        logger.info("Retrieved customer portal URL")
         return portal_url
 
     def get_checkout_url(
@@ -520,7 +523,7 @@ class LemonSqueezyAdapter:
         email: str,
         user_id: str,
         store_slug: str = "astats",
-        custom_data: Optional[Dict[str, Any]] = None,
+        custom_data: dict[str, Any] | None = None,
     ) -> str:
         """
         Generate checkout URL for a product variant.
@@ -576,8 +579,7 @@ class LemonSqueezyAdapter:
         """
         if not self.webhook_secret:
             raise LemonSqueezyWebhookError(
-                "Webhook secret not configured. "
-                "Set lemonsqueezy_webhook_secret in settings."
+                "Webhook secret not configured. Set lemonsqueezy_webhook_secret in settings."
             )
 
         try:
@@ -602,7 +604,7 @@ class LemonSqueezyAdapter:
             logger.error(f"Error verifying webhook signature: {e}")
             raise LemonSqueezyWebhookError(f"Signature verification failed: {e}")
 
-    def parse_webhook_event(self, payload: Dict[str, Any]) -> WebhookEvent:
+    def parse_webhook_event(self, payload: dict[str, Any]) -> WebhookEvent:
         """
         Parse webhook payload into WebhookEvent object.
 
@@ -628,9 +630,9 @@ class LemonSqueezyAdapter:
 
 # Factory function for easy instantiation
 def create_lemonsqueezy_adapter(
-    api_key: Optional[str] = None,
-    store_id: Optional[str] = None,
-    webhook_secret: Optional[str] = None,
+    api_key: str | None = None,
+    store_id: str | None = None,
+    webhook_secret: str | None = None,
 ) -> LemonSqueezyAdapter:
     """
     Create a LemonSqueezy adapter instance.

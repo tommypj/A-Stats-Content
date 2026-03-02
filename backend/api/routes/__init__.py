@@ -1,27 +1,28 @@
 """API Routes."""
+
 from fastapi import APIRouter
 
-from .health import router as health_router
-from .auth import router as auth_router
-from .outlines import router as outlines_router
-from .articles import router as articles_router
-from .images import router as images_router
-from .wordpress import router as wordpress_router
-from .analytics import router as analytics_router
-from .billing import router as billing_router
-from .project_billing import router as project_billing_router
-from .knowledge import router as knowledge_router
-from .social import router as social_router
+from .admin_alerts import router as admin_alerts_router
 from .admin_analytics import router as admin_analytics_router
 from .admin_content import router as admin_content_router
-from .admin_users import router as admin_users_router
 from .admin_generations import router as admin_generations_router
-from .admin_alerts import router as admin_alerts_router
+from .admin_users import router as admin_users_router
+from .agency import router as agency_router
+from .analytics import router as analytics_router
+from .articles import router as articles_router
+from .auth import router as auth_router
+from .billing import router as billing_router
+from .bulk import router as bulk_router
+from .health import router as health_router
+from .images import router as images_router
+from .knowledge import router as knowledge_router
+from .notifications import router as notifications_router
+from .outlines import router as outlines_router
+from .project_billing import router as project_billing_router
 from .project_invitations import router as project_invitations_router
 from .projects import router as projects_router
-from .notifications import router as notifications_router
-from .bulk import router as bulk_router
-from .agency import router as agency_router
+from .social import router as social_router
+from .wordpress import router as wordpress_router
 
 # Create main API router
 api_router = APIRouter()

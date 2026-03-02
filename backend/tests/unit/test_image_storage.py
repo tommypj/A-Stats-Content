@@ -2,10 +2,9 @@
 Tests for image storage adapters.
 """
 
-import os
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
 import pytest
-from pathlib import Path
-from unittest.mock import Mock, patch, AsyncMock, MagicMock
 from botocore.exceptions import ClientError, NoCredentialsError
 
 from adapters.storage.image_storage import (
@@ -35,7 +34,7 @@ class TestLocalStorageAdapter:
     def sample_image_data(self):
         """Sample image data for testing."""
         # Minimal valid PNG header
-        return b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00'
+        return b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00"
 
     @pytest.mark.asyncio
     async def test_save_image_creates_directory(self, adapter, sample_image_data):
@@ -58,7 +57,7 @@ class TestLocalStorageAdapter:
         path = await adapter.save_image(sample_image_data, "test.png")
 
         # Normalize path separators for Windows compatibility
-        normalized_path = path.replace('\\', '/')
+        normalized_path = path.replace("\\", "/")
         assert normalized_path.startswith(expected_path_prefix)
 
     @pytest.mark.asyncio
@@ -87,7 +86,7 @@ class TestLocalStorageAdapter:
         path = await adapter.save_image(sample_image_data, "test.png")
 
         full_path = adapter.base_path / path
-        with open(full_path, 'rb') as f:
+        with open(full_path, "rb") as f:
             saved_data = f.read()
 
         assert saved_data == sample_image_data
@@ -140,7 +139,7 @@ class TestS3StorageAdapter:
     @pytest.fixture
     def adapter(self, mock_s3_client):
         """Create S3StorageAdapter instance with mocked client."""
-        with patch('adapters.storage.image_storage.boto3.client', return_value=mock_s3_client):
+        with patch("adapters.storage.image_storage.boto3.client", return_value=mock_s3_client):
             adapter = S3StorageAdapter(
                 bucket="test-bucket",
                 region="us-east-1",
@@ -152,7 +151,7 @@ class TestS3StorageAdapter:
     @pytest.fixture
     def sample_image_data(self):
         """Sample image data for testing."""
-        return b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00'
+        return b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00"
 
     @pytest.mark.asyncio
     async def test_save_image_uploads_to_s3(self, adapter, sample_image_data):
@@ -164,14 +163,14 @@ class TestS3StorageAdapter:
 
         # Check the call arguments
         call_args = adapter.s3_client.put_object.call_args
-        assert call_args[1]['Bucket'] == 'test-bucket'
-        assert call_args[1]['Body'] == sample_image_data
-        assert call_args[1]['ContentType'] == 'image/png'
+        assert call_args[1]["Bucket"] == "test-bucket"
+        assert call_args[1]["Body"] == sample_image_data
+        assert call_args[1]["ContentType"] == "image/png"
         # ACL is no longer set — images are private, served via presigned URLs
-        assert 'ACL' not in call_args[1]
+        assert "ACL" not in call_args[1]
 
         # save_image now returns the S3 key (not the full URL)
-        assert 'images/' in url
+        assert "images/" in url
 
     @pytest.mark.asyncio
     async def test_save_image_sets_correct_content_type(self, adapter, sample_image_data):
@@ -179,17 +178,17 @@ class TestS3StorageAdapter:
         # Test JPEG
         await adapter.save_image(sample_image_data, "test.jpg")
         call_args = adapter.s3_client.put_object.call_args
-        assert call_args[1]['ContentType'] == 'image/jpeg'
+        assert call_args[1]["ContentType"] == "image/jpeg"
 
         # Test WebP
         await adapter.save_image(sample_image_data, "test.webp")
         call_args = adapter.s3_client.put_object.call_args
-        assert call_args[1]['ContentType'] == 'image/webp'
+        assert call_args[1]["ContentType"] == "image/webp"
 
         # Test GIF
         await adapter.save_image(sample_image_data, "test.gif")
         call_args = adapter.s3_client.put_object.call_args
-        assert call_args[1]['ContentType'] == 'image/gif'
+        assert call_args[1]["ContentType"] == "image/gif"
 
     @pytest.mark.asyncio
     async def test_save_image_organizes_by_date(self, adapter, sample_image_data):
@@ -207,7 +206,7 @@ class TestS3StorageAdapter:
     @pytest.mark.asyncio
     async def test_save_image_handles_no_credentials(self, sample_image_data):
         """Test error handling when credentials are missing."""
-        with patch('adapters.storage.image_storage.boto3.client') as mock_client:
+        with patch("adapters.storage.image_storage.boto3.client") as mock_client:
             mock_client.return_value.put_object.side_effect = NoCredentialsError()
 
             adapter = S3StorageAdapter(
@@ -224,8 +223,7 @@ class TestS3StorageAdapter:
     async def test_save_image_handles_client_error(self, adapter, sample_image_data):
         """Test error handling for S3 client errors."""
         adapter.s3_client.put_object.side_effect = ClientError(
-            {'Error': {'Code': 'AccessDenied', 'Message': 'Access Denied'}},
-            'PutObject'
+            {"Error": {"Code": "AccessDenied", "Message": "Access Denied"}}, "PutObject"
         )
 
         with pytest.raises(RuntimeError, match="Failed to upload to S3"):
@@ -238,10 +236,7 @@ class TestS3StorageAdapter:
         result = await adapter.delete_image(s3_key)
 
         assert result is True
-        adapter.s3_client.delete_object.assert_called_once_with(
-            Bucket='test-bucket',
-            Key=s3_key
-        )
+        adapter.s3_client.delete_object.assert_called_once_with(Bucket="test-bucket", Key=s3_key)
 
     @pytest.mark.asyncio
     async def test_delete_image_from_url(self, adapter):
@@ -257,8 +252,7 @@ class TestS3StorageAdapter:
     async def test_delete_image_handles_error(self, adapter):
         """Test error handling during deletion."""
         adapter.s3_client.delete_object.side_effect = ClientError(
-            {'Error': {'Code': 'NoSuchKey', 'Message': 'Key not found'}},
-            'DeleteObject'
+            {"Error": {"Code": "NoSuchKey", "Message": "Key not found"}}, "DeleteObject"
         )
 
         result = await adapter.delete_image("images/2026/02/test.png")
@@ -276,8 +270,8 @@ class TestS3StorageAdapter:
         url = await adapter.get_image_url(s3_key)
 
         adapter.s3_client.generate_presigned_url.assert_called_once_with(
-            'get_object',
-            Params={'Bucket': 'test-bucket', 'Key': s3_key},
+            "get_object",
+            Params={"Bucket": "test-bucket", "Key": s3_key},
             ExpiresIn=604800,
         )
         assert s3_key in url
@@ -304,7 +298,9 @@ class TestDownloadImage:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
-        with patch('adapters.storage.image_storage.aiohttp.ClientSession', return_value=mock_session):
+        with patch(
+            "adapters.storage.image_storage.aiohttp.ClientSession", return_value=mock_session
+        ):
             result = await download_image(test_url)
 
         assert result == test_data
@@ -324,7 +320,9 @@ class TestDownloadImage:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
-        with patch('adapters.storage.image_storage.aiohttp.ClientSession', return_value=mock_session):
+        with patch(
+            "adapters.storage.image_storage.aiohttp.ClientSession", return_value=mock_session
+        ):
             with pytest.raises(RuntimeError, match="Status: 404"):
                 await download_image(test_url)
 
@@ -340,7 +338,9 @@ class TestDownloadImage:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
-        with patch('adapters.storage.image_storage.aiohttp.ClientSession', return_value=mock_session):
+        with patch(
+            "adapters.storage.image_storage.aiohttp.ClientSession", return_value=mock_session
+        ):
             with pytest.raises(RuntimeError, match="Network error"):
                 await download_image(test_url)
 
@@ -350,9 +350,9 @@ class TestGetStorageAdapter:
 
     def test_get_local_adapter(self):
         """Test factory returns LocalStorageAdapter for 'local' type."""
-        with patch('adapters.storage.image_storage.settings') as mock_settings:
-            mock_settings.storage_type = 'local'
-            mock_settings.storage_local_path = './data/uploads'
+        with patch("adapters.storage.image_storage.settings") as mock_settings:
+            mock_settings.storage_type = "local"
+            mock_settings.storage_local_path = "./data/uploads"
 
             adapter = get_storage_adapter()
 
@@ -360,22 +360,22 @@ class TestGetStorageAdapter:
 
     def test_get_s3_adapter(self):
         """Test factory returns S3StorageAdapter for 's3' type."""
-        with patch('adapters.storage.image_storage.settings') as mock_settings:
-            mock_settings.storage_type = 's3'
-            mock_settings.s3_bucket = 'test-bucket'
-            mock_settings.s3_region = 'us-east-1'
+        with patch("adapters.storage.image_storage.settings") as mock_settings:
+            mock_settings.storage_type = "s3"
+            mock_settings.s3_bucket = "test-bucket"
+            mock_settings.s3_region = "us-east-1"
             mock_settings.s3_access_key = None
             mock_settings.s3_secret_key = None
 
-            with patch('adapters.storage.image_storage.boto3.client'):
+            with patch("adapters.storage.image_storage.boto3.client"):
                 adapter = get_storage_adapter()
 
             assert isinstance(adapter, S3StorageAdapter)
 
     def test_get_adapter_invalid_type(self):
         """Test factory raises error for invalid storage type."""
-        with patch('adapters.storage.image_storage.settings') as mock_settings:
-            mock_settings.storage_type = 'invalid'
+        with patch("adapters.storage.image_storage.settings") as mock_settings:
+            mock_settings.storage_type = "invalid"
 
             with pytest.raises(ValueError, match="Unknown storage type"):
                 get_storage_adapter()

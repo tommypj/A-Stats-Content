@@ -2,10 +2,10 @@
 Admin API schemas for platform analytics and management.
 """
 
-from datetime import date as date_type, datetime
-from typing import Optional, List
-from pydantic import BaseModel, ConfigDict, Field
+from datetime import date as date_type
+from datetime import datetime
 
+from pydantic import BaseModel, ConfigDict, Field
 
 # ============================================================================
 # Time Series Data (Shared)
@@ -74,10 +74,10 @@ class DashboardStatsResponse(BaseModel):
     content: ContentStats
     subscriptions: SubscriptionStats
     revenue: RevenueStats
-    platform_usage_7d: List[TimeSeriesData] = Field(
+    platform_usage_7d: list[TimeSeriesData] = Field(
         ..., description="Daily active users for past 7 days"
     )
-    platform_usage_30d: List[TimeSeriesData] = Field(
+    platform_usage_30d: list[TimeSeriesData] = Field(
         ..., description="Daily active users for past 30 days"
     )
 
@@ -112,9 +112,7 @@ class ConversionMetrics(BaseModel):
     free_to_professional: float = Field(
         ..., description="% free users who upgraded to professional"
     )
-    free_to_enterprise: float = Field(
-        ..., description="% free users who upgraded to enterprise"
-    )
+    free_to_enterprise: float = Field(..., description="% free users who upgraded to enterprise")
     overall_conversion_rate: float = Field(
         ..., description="% free users who upgraded to any paid tier"
     )
@@ -132,12 +130,10 @@ class GeographicDistribution(BaseModel):
 class UserAnalyticsResponse(BaseModel):
     """User analytics data."""
 
-    signup_trends: List[SignupTrend] = Field(
-        ..., description="Daily signups for past 30 days"
-    )
+    signup_trends: list[SignupTrend] = Field(..., description="Daily signups for past 30 days")
     retention_metrics: RetentionMetrics
     conversion_metrics: ConversionMetrics
-    geographic_distribution: List[GeographicDistribution] = Field(
+    geographic_distribution: list[GeographicDistribution] = Field(
         default_factory=list, description="User distribution by country"
     )
     total_users: int = Field(..., description="Total user count")
@@ -183,12 +179,12 @@ class ContentStatusBreakdown(BaseModel):
 class ContentAnalyticsResponse(BaseModel):
     """Content analytics data."""
 
-    content_trends: List[ContentTrend] = Field(
+    content_trends: list[ContentTrend] = Field(
         ..., description="Daily content creation for past 30 days"
     )
-    top_users: List[TopUser] = Field(..., description="Top 10 users by content created")
-    article_status_breakdown: List[ContentStatusBreakdown]
-    outline_status_breakdown: List[ContentStatusBreakdown]
+    top_users: list[TopUser] = Field(..., description="Top 10 users by content created")
+    article_status_breakdown: list[ContentStatusBreakdown]
+    outline_status_breakdown: list[ContentStatusBreakdown]
     total_articles: int
     total_outlines: int
     total_images: int
@@ -230,18 +226,14 @@ class ChurnIndicator(BaseModel):
 class RevenueAnalyticsResponse(BaseModel):
     """Revenue analytics data."""
 
-    monthly_revenue: List[MonthlyRevenue] = Field(
+    monthly_revenue: list[MonthlyRevenue] = Field(
         ..., description="Monthly revenue for past 12 months"
     )
-    subscription_distribution: List[SubscriptionDistribution]
-    churn_indicators: List[ChurnIndicator] = Field(
-        ..., description="Churn data for past 6 months"
-    )
+    subscription_distribution: list[SubscriptionDistribution]
+    churn_indicators: list[ChurnIndicator] = Field(..., description="Churn data for past 6 months")
     current_mrr: float = Field(..., description="Current monthly recurring revenue")
     current_arr: float = Field(..., description="Current annual recurring revenue")
-    revenue_growth_rate: float = Field(
-        ..., description="Revenue growth rate (month over month %)"
-    )
+    revenue_growth_rate: float = Field(..., description="Revenue growth rate (month over month %)")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -286,12 +278,12 @@ class BackgroundJobStatus(BaseModel):
 class SystemHealthResponse(BaseModel):
     """System health metrics."""
 
-    table_stats: List[TableStats] = Field(..., description="Records per table")
+    table_stats: list[TableStats] = Field(..., description="Records per table")
     storage_stats: StorageStats
-    recent_error_rates: List[ErrorRate] = Field(
+    recent_error_rates: list[ErrorRate] = Field(
         default_factory=list, description="Error rates for past 7 days"
     )
-    background_jobs: List[BackgroundJobStatus] = Field(
+    background_jobs: list[BackgroundJobStatus] = Field(
         default_factory=list, description="Background job queue status"
     )
     database_size_mb: float = Field(default=0.0, description="Total database size in MB")
@@ -307,10 +299,10 @@ class SystemHealthResponse(BaseModel):
 class UserUpdateRequest(BaseModel):
     """Request to update user details."""
 
-    role: Optional[str] = Field(None, pattern="^(user|admin|super_admin)$")
-    subscription_tier: Optional[str] = Field(None, pattern="^(free|starter|professional|enterprise)$")
-    is_suspended: Optional[bool] = None
-    suspended_reason: Optional[str] = Field(None, max_length=500)
+    role: str | None = Field(None, pattern="^(user|admin|super_admin)$")
+    subscription_tier: str | None = Field(None, pattern="^(free|starter|professional|enterprise)$")
+    is_suspended: bool | None = None
+    suspended_reason: str | None = Field(None, max_length=500)
 
 
 class SuspendUserRequest(BaseModel):
@@ -322,7 +314,7 @@ class SuspendUserRequest(BaseModel):
 class UnsuspendUserRequest(BaseModel):
     """Request to unsuspend a user."""
 
-    reason: Optional[str] = Field(None, max_length=500)
+    reason: str | None = Field(None, max_length=500)
 
 
 class PasswordResetRequest(BaseModel):
@@ -342,7 +334,7 @@ class UsageStatsResponse(BaseModel):
     articles_generated: int
     outlines_generated: int
     images_generated: int
-    usage_reset_date: Optional[datetime] = None
+    usage_reset_date: datetime | None = None
 
 
 class UserDetailResponse(BaseModel):
@@ -351,23 +343,23 @@ class UserDetailResponse(BaseModel):
     id: str
     email: str
     name: str
-    avatar_url: Optional[str] = None
+    avatar_url: str | None = None
     role: str
     status: str
     subscription_tier: str
     subscription_status: str
-    subscription_expires: Optional[datetime] = None
-    lemonsqueezy_customer_id: Optional[str] = None
-    lemonsqueezy_subscription_id: Optional[str] = None
+    subscription_expires: datetime | None = None
+    lemonsqueezy_customer_id: str | None = None
+    lemonsqueezy_subscription_id: str | None = None
     email_verified: bool
     language: str
     timezone: str
     usage_stats: UsageStatsResponse
-    last_login: Optional[datetime] = None
+    last_login: datetime | None = None
     login_count: int
     created_at: datetime
     updated_at: datetime
-    deleted_at: Optional[datetime] = None
+    deleted_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -382,7 +374,7 @@ class UserListItemResponse(BaseModel):
     status: str
     subscription_tier: str
     email_verified: bool
-    last_login: Optional[datetime] = None
+    last_login: datetime | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -417,15 +409,15 @@ class AuditLogResponse(BaseModel):
     """Audit log entry response."""
 
     id: str
-    admin_user_id: Optional[str] = None
-    admin_user: Optional[AdminUserInfo] = None
+    admin_user_id: str | None = None
+    admin_user: AdminUserInfo | None = None
     action: str
     target_type: str
-    target_id: Optional[str] = None
+    target_id: str | None = None
     description: str
-    metadata: Optional[dict] = None
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
+    metadata: dict | None = None
+    ip_address: str | None = None
+    user_agent: str | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -451,12 +443,14 @@ class UserListFilters(BaseModel):
 
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
-    search: Optional[str] = Field(None, description="Search by email or name")
-    role: Optional[str] = Field(None, pattern="^(user|admin|super_admin)$")
-    subscription_tier: Optional[str] = Field(None, pattern="^(free|starter|professional|enterprise)$")
-    status: Optional[str] = Field(None, pattern="^(pending|active|suspended|deleted)$")
-    email_verified: Optional[bool] = None
-    sort_by: str = Field(default="created_at", pattern="^(created_at|email|subscription_tier|last_login)$")
+    search: str | None = Field(None, description="Search by email or name")
+    role: str | None = Field(None, pattern="^(user|admin|super_admin)$")
+    subscription_tier: str | None = Field(None, pattern="^(free|starter|professional|enterprise)$")
+    status: str | None = Field(None, pattern="^(pending|active|suspended|deleted)$")
+    email_verified: bool | None = None
+    sort_by: str = Field(
+        default="created_at", pattern="^(created_at|email|subscription_tier|last_login)$"
+    )
     sort_order: str = Field(default="desc", pattern="^(asc|desc)$")
 
 
@@ -465,12 +459,12 @@ class AuditLogFilters(BaseModel):
 
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=50, ge=1, le=100)
-    admin_user_id: Optional[str] = None
-    target_type: Optional[str] = None
-    action: Optional[str] = None
-    target_id: Optional[str] = None
-    date_from: Optional[datetime] = None
-    date_to: Optional[datetime] = None
+    admin_user_id: str | None = None
+    target_type: str | None = None
+    action: str | None = None
+    target_id: str | None = None
+    date_from: datetime | None = None
+    date_to: datetime | None = None
     sort_order: str = Field(default="desc", pattern="^(asc|desc)$")
 
 
@@ -484,7 +478,7 @@ class UserActionResponse(BaseModel):
 
     success: bool
     message: str
-    user: Optional[UserDetailResponse] = None
+    user: UserDetailResponse | None = None
 
 
 class DeleteUserResponse(BaseModel):

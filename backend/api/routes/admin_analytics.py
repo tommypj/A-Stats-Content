@@ -5,47 +5,45 @@ Provides comprehensive analytics endpoints for admin users to monitor
 platform health, user activity, content generation, revenue, and system metrics.
 """
 
-from datetime import date, datetime, timedelta, timezone
-from typing import Annotated, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Request
-from api.middleware.rate_limit import limiter
-from sqlalchemy import select, func, and_, or_, desc, case
+from fastapi import APIRouter, Depends, Request
+from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps_admin import get_current_admin_user
+from api.middleware.rate_limit import limiter
 from api.schemas.admin import (
-    DashboardStatsResponse,
-    UserStats,
-    ContentStats,
-    SubscriptionStats,
-    RevenueStats,
-    TimeSeriesData,
-    UserAnalyticsResponse,
-    SignupTrend,
-    RetentionMetrics,
-    ConversionMetrics,
-    GeographicDistribution,
-    ContentAnalyticsResponse,
-    ContentTrend,
-    TopUser,
-    ContentStatusBreakdown,
-    RevenueAnalyticsResponse,
-    MonthlyRevenue,
-    SubscriptionDistribution,
+    BackgroundJobStatus,
     ChurnIndicator,
+    ContentAnalyticsResponse,
+    ContentStats,
+    ContentStatusBreakdown,
+    ContentTrend,
+    ConversionMetrics,
+    DashboardStatsResponse,
+    MonthlyRevenue,
+    RetentionMetrics,
+    RevenueAnalyticsResponse,
+    RevenueStats,
+    SignupTrend,
+    StorageStats,
+    SubscriptionDistribution,
+    SubscriptionStats,
     SystemHealthResponse,
     TableStats,
-    StorageStats,
-    ErrorRate,
-    BackgroundJobStatus,
+    TimeSeriesData,
+    TopUser,
+    UserAnalyticsResponse,
+    UserStats,
 )
 from infrastructure.database.connection import get_db
 from infrastructure.database.models import User
-from infrastructure.database.models.user import UserStatus, SubscriptionTier
-from infrastructure.database.models.content import Article, Outline, GeneratedImage, ContentStatus
-from infrastructure.database.models.social import ScheduledPost, PostStatus
+from infrastructure.database.models.content import Article, GeneratedImage, Outline
 from infrastructure.database.models.knowledge import KnowledgeSource, SourceStatus
+from infrastructure.database.models.social import PostStatus, ScheduledPost
+from infrastructure.database.models.user import SubscriptionTier, UserStatus
 
 router = APIRouter(prefix="/admin/analytics", tags=["Admin - Analytics"])
 
@@ -57,7 +55,7 @@ router = APIRouter(prefix="/admin/analytics", tags=["Admin - Analytics"])
 
 def get_date_range(days: int) -> tuple[datetime, datetime]:
     """Get datetime range for the past N days."""
-    end_date = datetime.now(timezone.utc)
+    end_date = datetime.now(UTC)
     start_date = end_date - timedelta(days=days)
     return start_date, end_date
 
@@ -102,15 +100,13 @@ async def get_dashboard_stats(
 
     **Admin access required.**
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     week_ago = now - timedelta(days=7)
     month_ago = now - timedelta(days=30)
 
     # ========== USER STATS ==========
     # Total users
-    total_users_result = await db.execute(
-        select(func.count(User.id))
-    )
+    total_users_result = await db.execute(select(func.count(User.id)))
     total_users = total_users_result.scalar() or 0
 
     # New users this week
@@ -139,9 +135,7 @@ async def get_dashboard_stats(
     active_users_week = active_users_week_result.scalar() or 0
 
     # Verified users
-    verified_users_result = await db.execute(
-        select(func.count(User.id)).where(User.email_verified == True)
-    )
+    verified_users_result = await db.execute(select(func.count(User.id)).where(User.email_verified))
     verified_users = verified_users_result.scalar() or 0
 
     # Pending users
@@ -202,12 +196,9 @@ async def get_dashboard_stats(
     # ========== SUBSCRIPTION STATS ==========
     # Count users by subscription tier
     subscription_counts_result = await db.execute(
-        select(
-            User.subscription_tier,
-            func.count(User.id)
-        ).group_by(User.subscription_tier)
+        select(User.subscription_tier, func.count(User.id)).group_by(User.subscription_tier)
     )
-    subscription_counts = {tier: count for tier, count in subscription_counts_result.all()}
+    subscription_counts = dict(subscription_counts_result.all())
 
     free_tier = subscription_counts.get(SubscriptionTier.FREE.value, 0)
     starter_tier = subscription_counts.get(SubscriptionTier.STARTER.value, 0)
@@ -222,11 +213,13 @@ async def get_dashboard_stats(
         select(func.count(User.id)).where(
             and_(
                 User.subscription_status == "cancelled",
-                User.subscription_tier.in_([
-                    SubscriptionTier.STARTER.value,
-                    SubscriptionTier.PROFESSIONAL.value,
-                    SubscriptionTier.ENTERPRISE.value
-                ])
+                User.subscription_tier.in_(
+                    [
+                        SubscriptionTier.STARTER.value,
+                        SubscriptionTier.PROFESSIONAL.value,
+                        SubscriptionTier.ENTERPRISE.value,
+                    ]
+                ),
             )
         )
     )
@@ -244,9 +237,9 @@ async def get_dashboard_stats(
     # ========== REVENUE STATS ==========
     # Calculate MRR (Monthly Recurring Revenue)
     mrr = (
-        starter_tier * TIER_PRICING[SubscriptionTier.STARTER.value] +
-        professional_tier * TIER_PRICING[SubscriptionTier.PROFESSIONAL.value] +
-        enterprise_tier * TIER_PRICING[SubscriptionTier.ENTERPRISE.value]
+        starter_tier * TIER_PRICING[SubscriptionTier.STARTER.value]
+        + professional_tier * TIER_PRICING[SubscriptionTier.PROFESSIONAL.value]
+        + enterprise_tier * TIER_PRICING[SubscriptionTier.ENTERPRISE.value]
     )
 
     # Calculate ARR (Annual Recurring Revenue)
@@ -321,7 +314,7 @@ async def get_user_analytics(
 
     **Note:** Cache recommended for this endpoint (heavy queries).
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     thirty_days_ago = now - timedelta(days=30)
 
     # ========== SIGNUP TRENDS ==========
@@ -345,7 +338,7 @@ async def get_user_analytics(
         .where(
             and_(
                 User.created_at >= thirty_days_ago,
-                User.email_verified == True,
+                User.email_verified,
             )
         )
         .group_by(func.date(User.created_at))
@@ -444,16 +437,12 @@ async def get_user_analytics(
 
     # ========== CONVERSION METRICS ==========
     # Total free users (ever)
-    total_free_result = await db.execute(
-        select(func.count(User.id))
-    )
+    total_free_result = await db.execute(select(func.count(User.id)))
     total_free = total_free_result.scalar() or 1
 
     # Users who upgraded to starter
     starter_count_result = await db.execute(
-        select(func.count(User.id)).where(
-            User.subscription_tier == SubscriptionTier.STARTER.value
-        )
+        select(func.count(User.id)).where(User.subscription_tier == SubscriptionTier.STARTER.value)
     )
     starter_count = starter_count_result.scalar() or 0
     free_to_starter = calculate_percentage(starter_count, total_free)
@@ -529,7 +518,7 @@ async def get_content_analytics(
 
     **Note:** Cache recommended for this endpoint (heavy queries).
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # ========== CONTENT TRENDS ==========
     thirty_days_ago = now - timedelta(days=30)
@@ -599,10 +588,7 @@ async def get_content_analytics(
     if top_users_articles:
         user_ids = list(top_users_articles.keys())
         outlines_counts_result = await db.execute(
-            select(
-                Outline.user_id,
-                func.count(Outline.id).label("outlines_count")
-            )
+            select(Outline.user_id, func.count(Outline.id).label("outlines_count"))
             .where(Outline.user_id.in_(user_ids))
             .group_by(Outline.user_id)
         )
@@ -610,10 +596,7 @@ async def get_content_analytics(
 
         # Get image counts for these users
         images_counts_result = await db.execute(
-            select(
-                GeneratedImage.user_id,
-                func.count(GeneratedImage.id).label("images_count")
-            )
+            select(GeneratedImage.user_id, func.count(GeneratedImage.id).label("images_count"))
             .where(GeneratedImage.user_id.in_(user_ids))
             .group_by(GeneratedImage.user_id)
         )
@@ -648,38 +631,28 @@ async def get_content_analytics(
     # ========== CONTENT STATUS BREAKDOWN ==========
     # Articles by status
     articles_status_result = await db.execute(
-        select(
-            Article.status,
-            func.count(Article.id)
-        ).group_by(Article.status)
+        select(Article.status, func.count(Article.id)).group_by(Article.status)
     )
-    articles_status_data = {status: count for status, count in articles_status_result.all()}
+    articles_status_data = dict(articles_status_result.all())
     total_articles_count = sum(articles_status_data.values()) or 1
 
     article_status_breakdown = [
         ContentStatusBreakdown(
-            status=status,
-            count=count,
-            percentage=calculate_percentage(count, total_articles_count)
+            status=status, count=count, percentage=calculate_percentage(count, total_articles_count)
         )
         for status, count in articles_status_data.items()
     ]
 
     # Outlines by status
     outlines_status_result = await db.execute(
-        select(
-            Outline.status,
-            func.count(Outline.id)
-        ).group_by(Outline.status)
+        select(Outline.status, func.count(Outline.id)).group_by(Outline.status)
     )
-    outlines_status_data = {status: count for status, count in outlines_status_result.all()}
+    outlines_status_data = dict(outlines_status_result.all())
     total_outlines_count = sum(outlines_status_data.values()) or 1
 
     outline_status_breakdown = [
         ContentStatusBreakdown(
-            status=status,
-            count=count,
-            percentage=calculate_percentage(count, total_outlines_count)
+            status=status, count=count, percentage=calculate_percentage(count, total_outlines_count)
         )
         for status, count in outlines_status_data.items()
     ]
@@ -731,7 +704,7 @@ async def get_revenue_analytics(
     **Note:** Revenue is estimated based on subscription tier pricing.
     Actual payment data would require LemonSqueezy webhook integration.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # ========== MONTHLY REVENUE (Last 12 months) ==========
     # NOTE: This is a simplified estimation. In production, you would track
@@ -755,11 +728,13 @@ async def get_revenue_analytics(
                 and_(
                     User.created_at >= month_start,
                     User.created_at < month_end,
-                    User.subscription_tier.in_([
-                        SubscriptionTier.STARTER.value,
-                        SubscriptionTier.PROFESSIONAL.value,
-                        SubscriptionTier.ENTERPRISE.value
-                    ])
+                    User.subscription_tier.in_(
+                        [
+                            SubscriptionTier.STARTER.value,
+                            SubscriptionTier.PROFESSIONAL.value,
+                            SubscriptionTier.ENTERPRISE.value,
+                        ]
+                    ),
                 )
             )
         )
@@ -773,7 +748,7 @@ async def get_revenue_analytics(
                 and_(
                     User.subscription_status == "cancelled",
                     User.updated_at >= month_start,
-                    User.updated_at < month_end
+                    User.updated_at < month_end,
                 )
             )
         )
@@ -782,28 +757,30 @@ async def get_revenue_analytics(
         # Estimate revenue: count active subscriptions at end of month
         # Simplified: current subscriptions (doesn't account for historical changes)
         active_subs_result = await db.execute(
-            select(
-                User.subscription_tier,
-                func.count(User.id)
-            )
+            select(User.subscription_tier, func.count(User.id))
             .where(
                 and_(
-                    User.subscription_tier.in_([
-                        SubscriptionTier.STARTER.value,
-                        SubscriptionTier.PROFESSIONAL.value,
-                        SubscriptionTier.ENTERPRISE.value
-                    ]),
-                    User.subscription_status == "active"
+                    User.subscription_tier.in_(
+                        [
+                            SubscriptionTier.STARTER.value,
+                            SubscriptionTier.PROFESSIONAL.value,
+                            SubscriptionTier.ENTERPRISE.value,
+                        ]
+                    ),
+                    User.subscription_status == "active",
                 )
             )
             .group_by(User.subscription_tier)
         )
-        active_subs = {tier: count for tier, count in active_subs_result.all()}
+        active_subs = dict(active_subs_result.all())
 
         revenue = (
-            active_subs.get(SubscriptionTier.STARTER.value, 0) * TIER_PRICING[SubscriptionTier.STARTER.value] +
-            active_subs.get(SubscriptionTier.PROFESSIONAL.value, 0) * TIER_PRICING[SubscriptionTier.PROFESSIONAL.value] +
-            active_subs.get(SubscriptionTier.ENTERPRISE.value, 0) * TIER_PRICING[SubscriptionTier.ENTERPRISE.value]
+            active_subs.get(SubscriptionTier.STARTER.value, 0)
+            * TIER_PRICING[SubscriptionTier.STARTER.value]
+            + active_subs.get(SubscriptionTier.PROFESSIONAL.value, 0)
+            * TIER_PRICING[SubscriptionTier.PROFESSIONAL.value]
+            + active_subs.get(SubscriptionTier.ENTERPRISE.value, 0)
+            * TIER_PRICING[SubscriptionTier.ENTERPRISE.value]
         )
 
         monthly_revenue.append(
@@ -819,14 +796,11 @@ async def get_revenue_analytics(
 
     # ========== SUBSCRIPTION DISTRIBUTION ==========
     subscription_counts_result = await db.execute(
-        select(
-            User.subscription_tier,
-            func.count(User.id)
-        )
+        select(User.subscription_tier, func.count(User.id))
         .where(User.subscription_status == "active")
         .group_by(User.subscription_tier)
     )
-    subscription_counts = {tier: count for tier, count in subscription_counts_result.all()}
+    subscription_counts = dict(subscription_counts_result.all())
 
     total_active_subs = sum(subscription_counts.values()) or 1
 
@@ -863,7 +837,7 @@ async def get_revenue_analytics(
                 and_(
                     User.subscription_status == "cancelled",
                     User.updated_at >= month_start,
-                    User.updated_at < month_end
+                    User.updated_at < month_end,
                 )
             )
         )
@@ -872,9 +846,7 @@ async def get_revenue_analytics(
         # Calculate churn rate: churned / active at start of month
         # Simplified: use current active count
         active_count_result = await db.execute(
-            select(func.count(User.id)).where(
-                User.subscription_status == "active"
-            )
+            select(func.count(User.id)).where(User.subscription_status == "active")
         )
         active_count = active_count_result.scalar() or 1
 
@@ -892,9 +864,12 @@ async def get_revenue_analytics(
 
     # ========== CURRENT MRR & ARR ==========
     current_mrr = (
-        subscription_counts.get(SubscriptionTier.STARTER.value, 0) * TIER_PRICING[SubscriptionTier.STARTER.value] +
-        subscription_counts.get(SubscriptionTier.PROFESSIONAL.value, 0) * TIER_PRICING[SubscriptionTier.PROFESSIONAL.value] +
-        subscription_counts.get(SubscriptionTier.ENTERPRISE.value, 0) * TIER_PRICING[SubscriptionTier.ENTERPRISE.value]
+        subscription_counts.get(SubscriptionTier.STARTER.value, 0)
+        * TIER_PRICING[SubscriptionTier.STARTER.value]
+        + subscription_counts.get(SubscriptionTier.PROFESSIONAL.value, 0)
+        * TIER_PRICING[SubscriptionTier.PROFESSIONAL.value]
+        + subscription_counts.get(SubscriptionTier.ENTERPRISE.value, 0)
+        * TIER_PRICING[SubscriptionTier.ENTERPRISE.value]
     )
     current_arr = current_mrr * 12
 
@@ -1009,9 +984,7 @@ async def get_system_health(
     pending_posts = pending_posts_result.scalar() or 0
 
     failed_posts_result = await db.execute(
-        select(func.count(ScheduledPost.id)).where(
-            ScheduledPost.status == PostStatus.FAILED.value
-        )
+        select(func.count(ScheduledPost.id)).where(ScheduledPost.status == PostStatus.FAILED.value)
     )
     failed_posts = failed_posts_result.scalar() or 0
 
@@ -1026,10 +999,7 @@ async def get_system_health(
     # Knowledge source processing
     pending_sources_result = await db.execute(
         select(func.count(KnowledgeSource.id)).where(
-            KnowledgeSource.status.in_([
-                SourceStatus.PENDING.value,
-                SourceStatus.PROCESSING.value
-            ])
+            KnowledgeSource.status.in_([SourceStatus.PENDING.value, SourceStatus.PROCESSING.value])
         )
     )
     pending_sources = pending_sources_result.scalar() or 0

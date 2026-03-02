@@ -6,16 +6,17 @@ All calls to the WordPress REST API are intercepted via unittest.mock.patch
 so no real network traffic is made.
 """
 
-import pytest
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
-from infrastructure.database.models import User, Article, GeneratedImage, ContentStatus
-from infrastructure.database.models.project import Project, ProjectMember, ProjectMemberRole
+import pytest
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from core.security.encryption import encrypt_credential
 from infrastructure.config import get_settings
+from infrastructure.database.models import Article, ContentStatus, GeneratedImage, User
+from infrastructure.database.models.project import Project, ProjectMember, ProjectMemberRole
 
 settings = get_settings()
 
@@ -25,6 +26,7 @@ pytestmark = pytest.mark.asyncio
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_wp_credentials(site_url: str = "https://mysite.example.com") -> dict:
     """Return a credentials dict suitable for storing on a Project model."""
@@ -41,6 +43,7 @@ def _make_wp_credentials(site_url: str = "https://mysite.example.com") -> dict:
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 async def project_with_wp(db_session: AsyncSession, test_user: User) -> Project:
@@ -171,6 +174,7 @@ async def generated_image(
 # Tests: POST /wordpress/connect
 # ---------------------------------------------------------------------------
 
+
 class TestConnectWordPress:
     """Tests for POST /api/v1/wordpress/connect."""
 
@@ -299,6 +303,7 @@ class TestConnectWordPress:
 # Tests: POST /wordpress/disconnect
 # ---------------------------------------------------------------------------
 
+
 class TestDisconnectWordPress:
     """Tests for POST /api/v1/wordpress/disconnect."""
 
@@ -346,6 +351,7 @@ class TestDisconnectWordPress:
 # ---------------------------------------------------------------------------
 # Tests: GET /wordpress/status (test-connection variant)
 # ---------------------------------------------------------------------------
+
 
 class TestWordPressStatus:
     """Tests for GET /api/v1/wordpress/status."""
@@ -407,6 +413,7 @@ class TestWordPressStatus:
 # ---------------------------------------------------------------------------
 # Tests: POST /wordpress/publish
 # ---------------------------------------------------------------------------
+
 
 class TestPublishToWordPress:
     """Tests for POST /api/v1/wordpress/publish."""
@@ -576,6 +583,7 @@ class TestPublishToWordPress:
 # Tests: POST /wordpress/upload-media
 # ---------------------------------------------------------------------------
 
+
 class TestUploadMedia:
     """Tests for POST /api/v1/wordpress/upload-media."""
 
@@ -592,6 +600,7 @@ class TestUploadMedia:
         """
         # Minimal 1x1 PNG so PIL can open it
         import base64
+
         png_1x1 = base64.b64decode(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9Q"
             "DwADhgGAWjR9awAAAABJRU5ErkJggg=="

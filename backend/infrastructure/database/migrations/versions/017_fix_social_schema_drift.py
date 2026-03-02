@@ -31,10 +31,9 @@ Revises: 016
 Create Date: 2026-02-23
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
-
 
 # revision identifiers, used by Alembic.
 revision = "017"
@@ -50,12 +49,27 @@ def upgrade() -> None:
 
     # Rename columns to match ORM model
     op.alter_column("social_accounts", "account_id", new_column_name="platform_user_id")
-    op.alter_column("social_accounts", "account_name", new_column_name="platform_username",
-                    existing_type=sa.String(255), nullable=True)
-    op.alter_column("social_accounts", "account_username", new_column_name="platform_display_name",
-                    existing_type=sa.String(255), nullable=True)
-    op.alter_column("social_accounts", "token_expiry", new_column_name="token_expires_at",
-                    existing_type=sa.DateTime(timezone=True), nullable=True)
+    op.alter_column(
+        "social_accounts",
+        "account_name",
+        new_column_name="platform_username",
+        existing_type=sa.String(255),
+        nullable=True,
+    )
+    op.alter_column(
+        "social_accounts",
+        "account_username",
+        new_column_name="platform_display_name",
+        existing_type=sa.String(255),
+        nullable=True,
+    )
+    op.alter_column(
+        "social_accounts",
+        "token_expiry",
+        new_column_name="token_expires_at",
+        existing_type=sa.DateTime(timezone=True),
+        nullable=True,
+    )
 
     # Drop old unique constraint (references old column name account_id)
     op.drop_constraint("uq_social_account", "social_accounts", type_="unique")
@@ -144,16 +158,36 @@ def upgrade() -> None:
     op.drop_index("ix_post_targets_account_id", "post_targets")
 
     # Rename FK columns
-    op.alter_column("post_targets", "post_id", new_column_name="scheduled_post_id",
-                    existing_type=postgresql.UUID(as_uuid=False), nullable=False)
-    op.alter_column("post_targets", "account_id", new_column_name="social_account_id",
-                    existing_type=postgresql.UUID(as_uuid=False), nullable=False)
+    op.alter_column(
+        "post_targets",
+        "post_id",
+        new_column_name="scheduled_post_id",
+        existing_type=postgresql.UUID(as_uuid=False),
+        nullable=False,
+    )
+    op.alter_column(
+        "post_targets",
+        "account_id",
+        new_column_name="social_account_id",
+        existing_type=postgresql.UUID(as_uuid=False),
+        nullable=False,
+    )
 
     # Rename other columns
-    op.alter_column("post_targets", "error_message", new_column_name="publish_error",
-                    existing_type=sa.Text(), nullable=True)
-    op.alter_column("post_targets", "posted_at", new_column_name="published_at",
-                    existing_type=sa.DateTime(timezone=True), nullable=True)
+    op.alter_column(
+        "post_targets",
+        "error_message",
+        new_column_name="publish_error",
+        existing_type=sa.Text(),
+        nullable=True,
+    )
+    op.alter_column(
+        "post_targets",
+        "posted_at",
+        new_column_name="published_at",
+        existing_type=sa.DateTime(timezone=True),
+        nullable=True,
+    )
 
     # Drop status column (ORM model uses is_published bool instead)
     op.drop_column("post_targets", "status")
@@ -169,8 +203,7 @@ def upgrade() -> None:
     )
     op.add_column(
         "post_targets",
-        sa.Column("is_published", sa.Boolean(), nullable=False,
-                  server_default=sa.text("false")),
+        sa.Column("is_published", sa.Boolean(), nullable=False, server_default=sa.text("false")),
     )
     op.add_column(
         "post_targets",
@@ -215,18 +248,37 @@ def downgrade() -> None:
 
     op.add_column(
         "post_targets",
-        sa.Column("status", sa.String(50), nullable=False,
-                  server_default=sa.text("'pending'")),
+        sa.Column("status", sa.String(50), nullable=False, server_default=sa.text("'pending'")),
     )
 
-    op.alter_column("post_targets", "published_at", new_column_name="posted_at",
-                    existing_type=sa.DateTime(timezone=True), nullable=True)
-    op.alter_column("post_targets", "publish_error", new_column_name="error_message",
-                    existing_type=sa.Text(), nullable=True)
-    op.alter_column("post_targets", "social_account_id", new_column_name="account_id",
-                    existing_type=postgresql.UUID(as_uuid=False), nullable=False)
-    op.alter_column("post_targets", "scheduled_post_id", new_column_name="post_id",
-                    existing_type=postgresql.UUID(as_uuid=False), nullable=False)
+    op.alter_column(
+        "post_targets",
+        "published_at",
+        new_column_name="posted_at",
+        existing_type=sa.DateTime(timezone=True),
+        nullable=True,
+    )
+    op.alter_column(
+        "post_targets",
+        "publish_error",
+        new_column_name="error_message",
+        existing_type=sa.Text(),
+        nullable=True,
+    )
+    op.alter_column(
+        "post_targets",
+        "social_account_id",
+        new_column_name="account_id",
+        existing_type=postgresql.UUID(as_uuid=False),
+        nullable=False,
+    )
+    op.alter_column(
+        "post_targets",
+        "scheduled_post_id",
+        new_column_name="post_id",
+        existing_type=postgresql.UUID(as_uuid=False),
+        nullable=False,
+    )
 
     op.create_index("ix_post_targets_account_id", "post_targets", ["account_id"])
     op.create_index("ix_post_targets_post_id", "post_targets", ["post_id"])
@@ -245,8 +297,7 @@ def downgrade() -> None:
 
     op.add_column(
         "scheduled_posts",
-        sa.Column("timezone", sa.String(50), nullable=False,
-                  server_default=sa.text("'UTC'")),
+        sa.Column("timezone", sa.String(50), nullable=False, server_default=sa.text("'UTC'")),
     )
     op.alter_column(
         "scheduled_posts",
@@ -275,11 +326,31 @@ def downgrade() -> None:
         ["user_id", "platform", "account_id"],
     )
 
-    op.alter_column("social_accounts", "token_expires_at", new_column_name="token_expiry",
-                    existing_type=sa.DateTime(timezone=True), nullable=True)
-    op.alter_column("social_accounts", "platform_display_name", new_column_name="account_username",
-                    existing_type=sa.String(255), nullable=True)
-    op.alter_column("social_accounts", "platform_username", new_column_name="account_name",
-                    existing_type=sa.String(255), nullable=False)
-    op.alter_column("social_accounts", "platform_user_id", new_column_name="account_id",
-                    existing_type=sa.String(255), nullable=False)
+    op.alter_column(
+        "social_accounts",
+        "token_expires_at",
+        new_column_name="token_expiry",
+        existing_type=sa.DateTime(timezone=True),
+        nullable=True,
+    )
+    op.alter_column(
+        "social_accounts",
+        "platform_display_name",
+        new_column_name="account_username",
+        existing_type=sa.String(255),
+        nullable=True,
+    )
+    op.alter_column(
+        "social_accounts",
+        "platform_username",
+        new_column_name="account_name",
+        existing_type=sa.String(255),
+        nullable=False,
+    )
+    op.alter_column(
+        "social_accounts",
+        "platform_user_id",
+        new_column_name="account_id",
+        existing_type=sa.String(255),
+        nullable=False,
+    )

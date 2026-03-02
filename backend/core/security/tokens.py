@@ -2,9 +2,8 @@
 JWT token service for authentication.
 """
 
-from datetime import datetime, timedelta, timezone
-from typing import Optional
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 from jose import JWTError, jwt
 
@@ -17,8 +16,8 @@ class TokenPayload:
     exp: datetime  # Expiration time
     iat: datetime  # Issued at
     type: str  # Token type: "access" or "refresh"
-    email: Optional[str] = None
-    role: Optional[str] = None
+    email: str | None = None
+    role: str | None = None
 
 
 class TokenService:
@@ -48,8 +47,8 @@ class TokenService:
     def create_access_token(
         self,
         user_id: str,
-        email: Optional[str] = None,
-        role: Optional[str] = None,
+        email: str | None = None,
+        role: str | None = None,
     ) -> str:
         """
         Create an access token.
@@ -62,7 +61,7 @@ class TokenService:
         Returns:
             Encoded JWT access token
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         expire = now + timedelta(minutes=self._access_token_expire_minutes)
 
         payload = {
@@ -79,7 +78,7 @@ class TokenService:
 
         return jwt.encode(payload, self._secret_key, algorithm=self._algorithm)
 
-    def create_refresh_token(self, user_id: str, expire_days: Optional[int] = None) -> str:
+    def create_refresh_token(self, user_id: str, expire_days: int | None = None) -> str:
         """
         Create a refresh token.
 
@@ -91,7 +90,7 @@ class TokenService:
         Returns:
             Encoded JWT refresh token
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         days = expire_days if expire_days is not None else self._refresh_token_expire_days
         expire = now + timedelta(days=days)
 
@@ -107,9 +106,9 @@ class TokenService:
     def create_token_pair(
         self,
         user_id: str,
-        email: Optional[str] = None,
-        role: Optional[str] = None,
-        refresh_expire_days: Optional[int] = None,
+        email: str | None = None,
+        role: str | None = None,
+        refresh_expire_days: int | None = None,
     ) -> tuple[str, str]:
         """
         Create both access and refresh tokens.
@@ -128,7 +127,7 @@ class TokenService:
         refresh_token = self.create_refresh_token(user_id, expire_days=refresh_expire_days)
         return access_token, refresh_token
 
-    def decode_token(self, token: str) -> Optional[TokenPayload]:
+    def decode_token(self, token: str) -> TokenPayload | None:
         """
         Decode and validate a JWT token.
 
@@ -153,8 +152,8 @@ class TokenService:
 
             return TokenPayload(
                 sub=payload.get("sub"),
-                exp=datetime.fromtimestamp(payload.get("exp"), tz=timezone.utc),
-                iat=datetime.fromtimestamp(payload.get("iat", 0), tz=timezone.utc),
+                exp=datetime.fromtimestamp(payload.get("exp"), tz=UTC),
+                iat=datetime.fromtimestamp(payload.get("iat", 0), tz=UTC),
                 type=payload.get("type"),
                 email=payload.get("email"),
                 role=payload.get("role"),
@@ -162,7 +161,7 @@ class TokenService:
         except JWTError:
             return None
 
-    def verify_access_token(self, token: str) -> Optional[TokenPayload]:
+    def verify_access_token(self, token: str) -> TokenPayload | None:
         """
         Verify an access token.
 
@@ -177,7 +176,7 @@ class TokenService:
             return payload
         return None
 
-    def verify_refresh_token(self, token: str) -> Optional[TokenPayload]:
+    def verify_refresh_token(self, token: str) -> TokenPayload | None:
         """
         Verify a refresh token.
 
@@ -203,7 +202,7 @@ class TokenService:
         Returns:
             Encoded JWT token for email verification
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         expire = now + timedelta(hours=24)
 
         payload = {
@@ -226,7 +225,7 @@ class TokenService:
         Returns:
             Encoded JWT token for password reset
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         expire = now + timedelta(hours=1)
 
         payload = {
@@ -238,9 +237,7 @@ class TokenService:
 
         return jwt.encode(payload, self._secret_key, algorithm=self._algorithm)
 
-    def verify_email_verification_token(
-        self, token: str
-    ) -> Optional[tuple[str, str]]:
+    def verify_email_verification_token(self, token: str) -> tuple[str, str] | None:
         """
         Verify an email verification token.
 
@@ -264,7 +261,7 @@ class TokenService:
         except JWTError:
             return None
 
-    def verify_password_reset_token(self, token: str) -> Optional[str]:
+    def verify_password_reset_token(self, token: str) -> str | None:
         """
         Verify a password reset token.
 

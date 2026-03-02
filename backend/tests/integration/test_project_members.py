@@ -15,8 +15,6 @@ All tests use async fixtures and httpx AsyncClient.
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import uuid4
 
 # Skip tests if projects module not implemented yet
 pytest.importorskip("api.routes.projects", reason="Projects API not yet implemented")
@@ -105,8 +103,7 @@ class TestListProjectMembers:
     ):
         """Member list should support pagination."""
         response = await async_client.get(
-            f"/api/v1/projects/{project['id']}/members?page=1&page_size=10",
-            headers=auth_headers
+            f"/api/v1/projects/{project['id']}/members?page=1&page_size=10", headers=auth_headers
         )
 
         assert response.status_code == 200
@@ -121,17 +118,10 @@ class TestAddProjectMember:
 
     @pytest.mark.asyncio
     async def test_add_member_as_owner(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict,
-        other_user: dict
+        self, async_client: AsyncClient, auth_headers: dict, project: dict, other_user: dict
     ):
         """OWNER should be able to add members to the project."""
-        payload = {
-            "email": other_user["email"],
-            "role": "member"
-        }
+        payload = {"email": other_user["email"], "role": "member"}
 
         response = await async_client.post(
             f"/api/v1/projects/{project['id']}/members", json=payload, headers=auth_headers
@@ -144,17 +134,10 @@ class TestAddProjectMember:
 
     @pytest.mark.asyncio
     async def test_add_member_as_admin(
-        self,
-        async_client: AsyncClient,
-        project_admin_auth: dict,
-        project: dict,
-        other_user: dict
+        self, async_client: AsyncClient, project_admin_auth: dict, project: dict, other_user: dict
     ):
         """ADMIN should be able to add members to the project."""
-        payload = {
-            "email": other_user["email"],
-            "role": "member"
-        }
+        payload = {"email": other_user["email"], "role": "member"}
 
         response = await async_client.post(
             f"/api/v1/projects/{project['id']}/members", json=payload, headers=project_admin_auth
@@ -164,17 +147,10 @@ class TestAddProjectMember:
 
     @pytest.mark.asyncio
     async def test_add_member_as_member_forbidden(
-        self,
-        async_client: AsyncClient,
-        project_member_auth: dict,
-        project: dict,
-        other_user: dict
+        self, async_client: AsyncClient, project_member_auth: dict, project: dict, other_user: dict
     ):
         """MEMBER should NOT be able to add members."""
-        payload = {
-            "email": other_user["email"],
-            "role": "member"
-        }
+        payload = {"email": other_user["email"], "role": "member"}
 
         response = await async_client.post(
             f"/api/v1/projects/{project['id']}/members", json=payload, headers=project_member_auth
@@ -184,17 +160,10 @@ class TestAddProjectMember:
 
     @pytest.mark.asyncio
     async def test_add_member_by_user_id(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict,
-        other_user: dict
+        self, async_client: AsyncClient, auth_headers: dict, project: dict, other_user: dict
     ):
         """Should be able to add member by user_id instead of email."""
-        payload = {
-            "user_id": other_user["id"],
-            "role": "viewer"
-        }
+        payload = {"user_id": other_user["id"], "role": "viewer"}
 
         response = await async_client.post(
             f"/api/v1/projects/{project['id']}/members", json=payload, headers=auth_headers
@@ -204,17 +173,10 @@ class TestAddProjectMember:
 
     @pytest.mark.asyncio
     async def test_add_member_validates_role(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict,
-        other_user: dict
+        self, async_client: AsyncClient, auth_headers: dict, project: dict, other_user: dict
     ):
         """Adding member with invalid role should fail."""
-        payload = {
-            "email": other_user["email"],
-            "role": "invalid_role"
-        }
+        payload = {"email": other_user["email"], "role": "invalid_role"}
 
         response = await async_client.post(
             f"/api/v1/projects/{project['id']}/members", json=payload, headers=auth_headers
@@ -224,17 +186,10 @@ class TestAddProjectMember:
 
     @pytest.mark.asyncio
     async def test_add_existing_member_fails(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict,
-        project_member: dict
+        self, async_client: AsyncClient, auth_headers: dict, project: dict, project_member: dict
     ):
         """Adding a user who is already a member should fail."""
-        payload = {
-            "email": project_member["email"],
-            "role": "member"
-        }
+        payload = {"email": project_member["email"], "role": "member"}
 
         response = await async_client.post(
             f"/api/v1/projects/{project['id']}/members", json=payload, headers=auth_headers
@@ -248,11 +203,7 @@ class TestUpdateMemberRole:
 
     @pytest.mark.asyncio
     async def test_update_member_role_as_owner(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict,
-        project_member: dict
+        self, async_client: AsyncClient, auth_headers: dict, project: dict, project_member: dict
     ):
         """OWNER should be able to update member roles."""
         payload = {"role": "admin"}
@@ -260,7 +211,7 @@ class TestUpdateMemberRole:
         response = await async_client.put(
             f"/api/v1/projects/{project['id']}/members/{project_member['id']}",
             json=payload,
-            headers=auth_headers
+            headers=auth_headers,
         )
 
         assert response.status_code == 200
@@ -272,7 +223,7 @@ class TestUpdateMemberRole:
         async_client: AsyncClient,
         project_admin_auth: dict,
         project: dict,
-        project_member: dict
+        project_member: dict,
     ):
         """ADMIN should be able to update member roles."""
         payload = {"role": "viewer"}
@@ -280,7 +231,7 @@ class TestUpdateMemberRole:
         response = await async_client.put(
             f"/api/v1/projects/{project['id']}/members/{project_member['id']}",
             json=payload,
-            headers=project_admin_auth
+            headers=project_admin_auth,
         )
 
         assert response.status_code == 200
@@ -291,7 +242,7 @@ class TestUpdateMemberRole:
         async_client: AsyncClient,
         project_member_auth: dict,
         project: dict,
-        project_viewer: dict
+        project_viewer: dict,
     ):
         """MEMBER should NOT be able to update member roles."""
         payload = {"role": "member"}
@@ -299,18 +250,14 @@ class TestUpdateMemberRole:
         response = await async_client.put(
             f"/api/v1/projects/{project['id']}/members/{project_viewer['id']}",
             json=payload,
-            headers=project_member_auth
+            headers=project_member_auth,
         )
 
         assert response.status_code == 403
 
     @pytest.mark.asyncio
     async def test_cannot_demote_owner(
-        self,
-        async_client: AsyncClient,
-        project_admin_auth: dict,
-        project: dict,
-        test_user: dict
+        self, async_client: AsyncClient, project_admin_auth: dict, project: dict, test_user: dict
     ):
         """ADMIN should NOT be able to demote the OWNER."""
         # Find owner member record
@@ -324,18 +271,14 @@ class TestUpdateMemberRole:
         response = await async_client.put(
             f"/api/v1/projects/{project['id']}/members/{owner['id']}",
             json=payload,
-            headers=project_admin_auth
+            headers=project_admin_auth,
         )
 
         assert response.status_code == 403
 
     @pytest.mark.asyncio
     async def test_cannot_promote_to_owner_if_owner_exists(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict,
-        project_member: dict
+        self, async_client: AsyncClient, auth_headers: dict, project: dict, project_member: dict
     ):
         """Cannot promote member to OWNER if project already has an OWNER."""
         payload = {"role": "owner"}
@@ -343,7 +286,7 @@ class TestUpdateMemberRole:
         response = await async_client.put(
             f"/api/v1/projects/{project['id']}/members/{project_member['id']}",
             json=payload,
-            headers=auth_headers
+            headers=auth_headers,
         )
 
         assert response.status_code == 400
@@ -354,16 +297,11 @@ class TestRemoveMember:
 
     @pytest.mark.asyncio
     async def test_remove_member_as_owner(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict,
-        project_member: dict
+        self, async_client: AsyncClient, auth_headers: dict, project: dict, project_member: dict
     ):
         """OWNER should be able to remove members."""
         response = await async_client.delete(
-            f"/api/v1/projects/{project['id']}/members/{project_member['id']}",
-            headers=auth_headers
+            f"/api/v1/projects/{project['id']}/members/{project_member['id']}", headers=auth_headers
         )
 
         assert response.status_code == 204
@@ -381,12 +319,12 @@ class TestRemoveMember:
         async_client: AsyncClient,
         project_admin_auth: dict,
         project: dict,
-        project_member: dict
+        project_member: dict,
     ):
         """ADMIN should be able to remove members."""
         response = await async_client.delete(
             f"/api/v1/projects/{project['id']}/members/{project_member['id']}",
-            headers=project_admin_auth
+            headers=project_admin_auth,
         )
 
         assert response.status_code == 204
@@ -397,22 +335,19 @@ class TestRemoveMember:
         async_client: AsyncClient,
         project_member_auth: dict,
         project: dict,
-        project_viewer: dict
+        project_viewer: dict,
     ):
         """MEMBER should NOT be able to remove members."""
         response = await async_client.delete(
             f"/api/v1/projects/{project['id']}/members/{project_viewer['id']}",
-            headers=project_member_auth
+            headers=project_member_auth,
         )
 
         assert response.status_code == 403
 
     @pytest.mark.asyncio
     async def test_cannot_remove_owner(
-        self,
-        async_client: AsyncClient,
-        project_admin_auth: dict,
-        project: dict
+        self, async_client: AsyncClient, project_admin_auth: dict, project: dict
     ):
         """Cannot remove the project OWNER."""
         # Find owner
@@ -422,8 +357,7 @@ class TestRemoveMember:
         owner = next(m for m in members_response.json()["items"] if m["role"] == "owner")
 
         response = await async_client.delete(
-            f"/api/v1/projects/{project['id']}/members/{owner['id']}",
-            headers=project_admin_auth
+            f"/api/v1/projects/{project['id']}/members/{owner['id']}", headers=project_admin_auth
         )
 
         assert response.status_code == 403
@@ -435,13 +369,12 @@ class TestRemoveMember:
         auth_headers: dict,
         project_member_auth: dict,
         project: dict,
-        project_member: dict
+        project_member: dict,
     ):
         """Removed member should lose access to project."""
         # Remove member
         await async_client.delete(
-            f"/api/v1/projects/{project['id']}/members/{project_member['id']}",
-            headers=auth_headers
+            f"/api/v1/projects/{project['id']}/members/{project_member['id']}", headers=auth_headers
         )
 
         # Verify member cannot access project
@@ -457,10 +390,7 @@ class TestLeaveProject:
 
     @pytest.mark.asyncio
     async def test_member_can_leave_project(
-        self,
-        async_client: AsyncClient,
-        project_member_auth: dict,
-        project: dict
+        self, async_client: AsyncClient, project_member_auth: dict, project: dict
     ):
         """MEMBER should be able to leave the project."""
         response = await async_client.post(
@@ -477,10 +407,7 @@ class TestLeaveProject:
 
     @pytest.mark.asyncio
     async def test_admin_can_leave_project(
-        self,
-        async_client: AsyncClient,
-        project_admin_auth: dict,
-        project: dict
+        self, async_client: AsyncClient, project_admin_auth: dict, project: dict
     ):
         """ADMIN should be able to leave the project."""
         response = await async_client.post(
@@ -491,10 +418,7 @@ class TestLeaveProject:
 
     @pytest.mark.asyncio
     async def test_owner_cannot_leave_project(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict
+        self, async_client: AsyncClient, auth_headers: dict, project: dict
     ):
         """OWNER should NOT be able to leave (must transfer ownership first)."""
         response = await async_client.post(
@@ -506,10 +430,7 @@ class TestLeaveProject:
 
     @pytest.mark.asyncio
     async def test_leave_non_member_project_fails(
-        self,
-        async_client: AsyncClient,
-        other_auth_headers: dict,
-        project: dict
+        self, async_client: AsyncClient, other_auth_headers: dict, project: dict
     ):
         """Cannot leave a project you're not a member of."""
         response = await async_client.post(
@@ -524,11 +445,7 @@ class TestTransferOwnership:
 
     @pytest.mark.asyncio
     async def test_transfer_ownership_as_owner(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict,
-        project_admin: dict
+        self, async_client: AsyncClient, auth_headers: dict, project: dict, project_admin: dict
     ):
         """OWNER should be able to transfer ownership to another member."""
         payload = {"new_owner_id": project_admin["user_id"]}
@@ -536,7 +453,7 @@ class TestTransferOwnership:
         response = await async_client.post(
             f"/api/v1/projects/{project['id']}/transfer-ownership",
             json=payload,
-            headers=auth_headers
+            headers=auth_headers,
         )
 
         assert response.status_code == 200
@@ -557,7 +474,7 @@ class TestTransferOwnership:
         async_client: AsyncClient,
         project_admin_auth: dict,
         project: dict,
-        project_member: dict
+        project_member: dict,
     ):
         """Only OWNER can transfer ownership."""
         payload = {"new_owner_id": project_member["user_id"]}
@@ -565,18 +482,14 @@ class TestTransferOwnership:
         response = await async_client.post(
             f"/api/v1/projects/{project['id']}/transfer-ownership",
             json=payload,
-            headers=project_admin_auth
+            headers=project_admin_auth,
         )
 
         assert response.status_code == 403
 
     @pytest.mark.asyncio
     async def test_transfer_ownership_to_non_member_fails(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict,
-        other_user: dict
+        self, async_client: AsyncClient, auth_headers: dict, project: dict, other_user: dict
     ):
         """Cannot transfer ownership to non-member."""
         payload = {"new_owner_id": other_user["id"]}
@@ -584,18 +497,14 @@ class TestTransferOwnership:
         response = await async_client.post(
             f"/api/v1/projects/{project['id']}/transfer-ownership",
             json=payload,
-            headers=auth_headers
+            headers=auth_headers,
         )
 
         assert response.status_code == 400
 
     @pytest.mark.asyncio
     async def test_transfer_ownership_demotes_old_owner(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict,
-        project_admin: dict
+        self, async_client: AsyncClient, auth_headers: dict, project: dict, project_admin: dict
     ):
         """Transferring ownership should demote old owner to admin."""
         payload = {"new_owner_id": project_admin["user_id"]}
@@ -603,12 +512,10 @@ class TestTransferOwnership:
         await async_client.post(
             f"/api/v1/projects/{project['id']}/transfer-ownership",
             json=payload,
-            headers=auth_headers
+            headers=auth_headers,
         )
 
         # Check old owner's role
-        members_response = await async_client.get(
-            f"/api/v1/projects/{project['id']}/members", headers=auth_headers
-        )
+        await async_client.get(f"/api/v1/projects/{project['id']}/members", headers=auth_headers)
         # Old owner should still be in project but as admin
         # (Exact user_id would depend on test_user fixture)

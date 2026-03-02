@@ -10,10 +10,9 @@ Tests admin content endpoints:
 - Authorization checks
 """
 
-import pytest
-from datetime import datetime
 from uuid import uuid4
 
+import pytest
 from fastapi import status
 from httpx import AsyncClient
 from sqlalchemy import select
@@ -25,6 +24,7 @@ from infrastructure.database.models import User
 try:
     from api.routes import admin
     from infrastructure.database.models.content import Article, Outline
+
     ADMIN_CONTENT_AVAILABLE = True
 except (ImportError, AttributeError):
     ADMIN_CONTENT_AVAILABLE = False
@@ -270,9 +270,7 @@ class TestAdminDeleteArticleEndpoint:
         assert response.status_code == status.HTTP_200_OK
 
         # Verify deletion in database
-        result = await db_session.execute(
-            select(Article).where(Article.id == sample_article.id)
-        )
+        result = await db_session.execute(select(Article).where(Article.id == sample_article.id))
         deleted_article = result.scalar_one_or_none()
         assert deleted_article is None
 
@@ -404,9 +402,7 @@ class TestAdminDeleteOutlineEndpoint:
         assert response.status_code == status.HTTP_200_OK
 
         # Verify deletion
-        result = await db_session.execute(
-            select(Outline).where(Outline.id == sample_outline.id)
-        )
+        result = await db_session.execute(select(Outline).where(Outline.id == sample_outline.id))
         deleted_outline = result.scalar_one_or_none()
         assert deleted_outline is None
 
@@ -557,9 +553,7 @@ class TestBulkDeleteEndpoint:
 
         # Verify deletion
         for article_id in article_ids:
-            result = await db_session.execute(
-                select(Article).where(Article.id == article_id)
-            )
+            result = await db_session.execute(select(Article).where(Article.id == article_id))
             assert result.scalar_one_or_none() is None
 
     @pytest.mark.asyncio

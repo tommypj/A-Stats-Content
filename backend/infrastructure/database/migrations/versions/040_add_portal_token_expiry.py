@@ -3,11 +3,11 @@
 Revision ID: 040
 Revises: 039
 """
-from alembic import op
-import sqlalchemy as sa
 
-revision = '040'
-down_revision = '039'
+from alembic import op
+
+revision = "040"
+down_revision = "039"
 branch_labels = None
 depends_on = None
 

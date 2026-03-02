@@ -2,11 +2,10 @@
 AEO (Answer Engine Optimization) database models.
 """
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, JSON, Index
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -35,7 +34,7 @@ class AEOScore(Base, TimestampMixin):
         nullable=False,
         index=True,
     )
-    project_id: Mapped[Optional[str]] = mapped_column(
+    project_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=True,
@@ -46,19 +45,19 @@ class AEOScore(Base, TimestampMixin):
     aeo_score: Mapped[int] = mapped_column(Integer, nullable=False)
 
     # Score breakdown (JSON: structure_score, faq_score, entity_score, conciseness_score, schema_score, citation_readiness)
-    score_breakdown: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    score_breakdown: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # AI suggestions for improvement
-    suggestions: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    suggestions: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
     # Previous score for trend tracking
-    previous_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    previous_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # When this score was computed
     scored_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
     )
 
     __table_args__ = (
@@ -92,25 +91,25 @@ class AEOCitation(Base, TimestampMixin):
         nullable=False,
         index=True,
     )
-    project_id: Mapped[Optional[str]] = mapped_column(
+    project_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
-    source: Mapped[str] = mapped_column(String(50), nullable=False)  # chatgpt, perplexity, gemini, bing_copilot
-    query: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
-    citation_url: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
-    citation_snippet: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source: Mapped[str] = mapped_column(
+        String(50), nullable=False
+    )  # chatgpt, perplexity, gemini, bing_copilot
+    query: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    citation_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    citation_snippet: Mapped[str | None] = mapped_column(Text, nullable=True)
     detected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
     )
 
-    __table_args__ = (
-        Index("ix_aeo_citations_article_source", "article_id", "source"),
-    )
+    __table_args__ = (Index("ix_aeo_citations_article_source", "article_id", "source"),)
 
     def __repr__(self) -> str:
         return f"<AEOCitation(article_id={self.article_id}, source={self.source})>"

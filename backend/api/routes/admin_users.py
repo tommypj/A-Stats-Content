@@ -3,45 +3,43 @@ Admin user management API routes.
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Annotated, Optional
+from datetime import UTC, datetime, timedelta
 from math import ceil
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, Header
-from sqlalchemy import select, func, or_, and_, desc, asc, delete
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
+from sqlalchemy import and_, asc, delete, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from infrastructure.database.connection import get_db
-from infrastructure.database.models.user import User, UserRole, UserStatus
-from infrastructure.database.models.admin import AdminAuditLog, AuditAction, AuditTargetType
-from core.security.password import password_hasher
-from core.security.tokens import TokenService
-from infrastructure.config.settings import settings
 from adapters.email.resend_adapter import email_service
 from api.deps_admin import get_current_admin_user, get_current_super_admin_user
-from api.utils import escape_like
 from api.schemas.admin import (
-    UserListResponse,
-    UserListItemResponse,
-    UserDetailResponse,
-    UserUpdateRequest,
-    SuspendUserRequest,
-    UnsuspendUserRequest,
-    PasswordResetRequest,
-    UserActionResponse,
-    DeleteUserResponse,
+    AdminUserInfo,
     AuditLogListResponse,
     AuditLogResponse,
-    AdminUserInfo,
+    DeleteUserResponse,
+    PasswordResetRequest,
+    SuspendUserRequest,
+    UnsuspendUserRequest,
     UsageStatsResponse,
+    UserActionResponse,
+    UserDetailResponse,
+    UserListItemResponse,
+    UserListResponse,
+    UserUpdateRequest,
 )
+from api.utils import escape_like
+from core.security.tokens import TokenService
+from infrastructure.config.settings import settings
+from infrastructure.database.connection import get_db
+from infrastructure.database.models.admin import AdminAuditLog, AuditAction, AuditTargetType
+from infrastructure.database.models.user import User, UserRole, UserStatus
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["Admin - Users"])
 
 
-def get_client_ip(request: Optional[Request]) -> Optional[str]:
+def get_client_ip(request: Request | None) -> str | None:
     """Return the real client IP, preferring X-Forwarded-For (set by Cloudflare/proxy)."""
     if not request:
         return None
@@ -72,9 +70,9 @@ async def create_audit_log(
     target_type: AuditTargetType,
     target_id: str,
     description: str,
-    metadata: Optional[dict] = None,
-    ip_address: Optional[str] = None,
-    user_agent: Optional[str] = None,
+    metadata: dict | None = None,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
 ) -> AdminAuditLog:
     """
     Create an audit log entry for admin actions.
@@ -92,11 +90,14 @@ async def create_audit_log(
 
     # ADM-15: truncate details if they exceed 10KB to prevent unbounded JSON growth
     import json as _json
+
     _MAX_DETAILS_BYTES = 10 * 1024
     try:
         if len(_json.dumps(details).encode()) > _MAX_DETAILS_BYTES:
             details = {"_truncated": True, "description": details.get("description", "")[:500]}
-            logger.warning("Audit log details exceeded 10KB — truncated for action %s", action.value)
+            logger.warning(
+                "Audit log details exceeded 10KB — truncated for action %s", action.value
+            )
     except Exception:
         pass
 
@@ -156,11 +157,11 @@ async def list_users(
     admin_user: User = Depends(get_current_admin_user),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    search: Optional[str] = Query(None),
-    role: Optional[str] = Query(None, pattern="^(user|admin|super_admin)$"),
-    subscription_tier: Optional[str] = Query(None, pattern="^(free|starter|professional|enterprise)$"),
-    status: Optional[str] = Query(None, pattern="^(pending|active|suspended|deleted)$"),
-    email_verified: Optional[bool] = Query(None),
+    search: str | None = Query(None),
+    role: str | None = Query(None, pattern="^(user|admin|super_admin)$"),
+    subscription_tier: str | None = Query(None, pattern="^(free|starter|professional|enterprise)$"),
+    status: str | None = Query(None, pattern="^(pending|active|suspended|deleted)$"),
+    email_verified: bool | None = Query(None),
     sort_by: str = Query("created_at", pattern="^(created_at|email|subscription_tier|last_login)$"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
 ) -> UserListResponse:
@@ -286,7 +287,7 @@ async def update_user(
     db: AsyncSession = Depends(get_db),
     admin_user: User = Depends(get_current_admin_user),
     http_request: Request = None,
-    user_agent: Optional[str] = Header(None),
+    user_agent: str | None = Header(None),
 ) -> UserActionResponse:
     """
     Update user details (role, subscription, suspension status).
@@ -319,7 +320,10 @@ async def update_user(
 
     # Prevent self-demotion for super_admin
     if request.role and user.id == admin_user.id:
-        if admin_user.role == UserRole.SUPER_ADMIN.value and request.role != UserRole.SUPER_ADMIN.value:
+        if (
+            admin_user.role == UserRole.SUPER_ADMIN.value
+            and request.role != UserRole.SUPER_ADMIN.value
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Cannot demote yourself from super_admin role",
@@ -345,14 +349,16 @@ async def update_user(
         old_values["subscription_tier"] = user.subscription_tier
         new_values["subscription_tier"] = request.subscription_tier
         user.subscription_tier = request.subscription_tier
-        changes["subscription_tier"] = f"{old_values['subscription_tier']} -> {new_values['subscription_tier']}"
+        changes["subscription_tier"] = (
+            f"{old_values['subscription_tier']} -> {new_values['subscription_tier']}"
+        )
 
     # Update suspension status
     if request.is_suspended is not None:
         old_status = user.status
         if request.is_suspended:
             user.status = UserStatus.SUSPENDED.value
-            user.suspended_at = datetime.now(timezone.utc)
+            user.suspended_at = datetime.now(UTC)
             if request.suspended_reason:
                 # Store reason in metadata for now
                 changes["suspended_reason"] = request.suspended_reason
@@ -396,7 +402,7 @@ async def update_user(
 
     return UserActionResponse(
         success=True,
-        message=f"User updated successfully",
+        message="User updated successfully",
         user=build_user_detail_response(user),
     )
 
@@ -408,7 +414,7 @@ async def suspend_user(
     db: AsyncSession = Depends(get_db),
     admin_user: User = Depends(get_current_admin_user),
     http_request: Request = None,
-    user_agent: Optional[str] = Header(None),
+    user_agent: str | None = Header(None),
 ) -> UserActionResponse:
     """
     Suspend a user account.
@@ -435,7 +441,7 @@ async def suspend_user(
     old_status = user.status
     user.status = UserStatus.SUSPENDED.value
     user.is_suspended = True
-    user.suspended_at = datetime.now(timezone.utc)
+    user.suspended_at = datetime.now(UTC)
     user.suspended_reason = request.reason  # ADM-07: persist reason to DB field
 
     await db.commit()
@@ -464,7 +470,7 @@ async def suspend_user(
 
     return UserActionResponse(
         success=True,
-        message=f"User suspended successfully",
+        message="User suspended successfully",
         user=build_user_detail_response(user),
     )
 
@@ -476,7 +482,7 @@ async def unsuspend_user(
     db: AsyncSession = Depends(get_db),
     admin_user: User = Depends(get_current_admin_user),
     http_request: Request = None,
-    user_agent: Optional[str] = Header(None),
+    user_agent: str | None = Header(None),
 ) -> UserActionResponse:
     """
     Unsuspend a user account.
@@ -515,7 +521,8 @@ async def unsuspend_user(
         action=AuditAction.USER_UNSUSPENDED,
         target_type=AuditTargetType.USER,
         target_id=user.id,
-        description=f"Unsuspended user {user.email}" + (f": {request.reason}" if request.reason else ""),
+        description=f"Unsuspended user {user.email}"
+        + (f": {request.reason}" if request.reason else ""),
         metadata={
             "reason": request.reason,
             "old_status": old_status,
@@ -528,7 +535,7 @@ async def unsuspend_user(
 
     return UserActionResponse(
         success=True,
-        message=f"User unsuspended successfully",
+        message="User unsuspended successfully",
         user=build_user_detail_response(user),
     )
 
@@ -540,7 +547,7 @@ async def delete_user(
     admin_user: User = Depends(get_current_super_admin_user),
     soft_delete: bool = Query(True, description="Soft delete (true) or hard delete (false)"),
     http_request: Request = None,
-    user_agent: Optional[str] = Header(None),
+    user_agent: str | None = Header(None),
 ) -> DeleteUserResponse:
     """
     Delete a user account (soft or hard delete).
@@ -564,7 +571,7 @@ async def delete_user(
             detail="Cannot delete your own account",
         )
 
-    deleted_at = datetime.now(timezone.utc)
+    deleted_at = datetime.now(UTC)
 
     if soft_delete:
         # Soft delete: mark as deleted
@@ -614,7 +621,7 @@ async def force_password_reset(
     db: AsyncSession = Depends(get_db),
     admin_user: User = Depends(get_current_admin_user),
     http_request: Request = None,
-    user_agent: Optional[str] = Header(None),
+    user_agent: str | None = Header(None),
 ) -> UserActionResponse:
     """
     Force a password reset for a user.
@@ -635,7 +642,7 @@ async def force_password_reset(
     # Generate reset token
     reset_token = token_service.create_password_reset_token(user.id)
     user.password_reset_token = reset_token
-    user.password_reset_expires = datetime.now(timezone.utc) + timedelta(hours=1)
+    user.password_reset_expires = datetime.now(UTC) + timedelta(hours=1)
 
     await db.commit()
     await db.refresh(user)
@@ -649,7 +656,7 @@ async def force_password_reset(
                 reset_token=reset_token,
             )
             email_sent = True
-        except Exception as e:
+        except Exception:
             # Log error but don't fail the request
             email_sent = False
     else:
@@ -673,7 +680,7 @@ async def force_password_reset(
 
     return UserActionResponse(
         success=True,
-        message=f"Password reset token generated" + (" and email sent" if email_sent else ""),
+        message="Password reset token generated" + (" and email sent" if email_sent else ""),
         user=build_user_detail_response(user),
     )
 
@@ -689,12 +696,12 @@ async def list_audit_logs(
     admin_user: User = Depends(get_current_admin_user),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=100),
-    admin_user_id: Optional[str] = Query(None),
-    target_type: Optional[str] = Query(None),
-    action: Optional[str] = Query(None),
-    target_id: Optional[str] = Query(None),
-    date_from: Optional[datetime] = Query(None),
-    date_to: Optional[datetime] = Query(None),
+    admin_user_id: str | None = Query(None),
+    target_type: str | None = Query(None),
+    action: str | None = Query(None),
+    target_id: str | None = Query(None),
+    date_from: datetime | None = Query(None),
+    date_to: datetime | None = Query(None),
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
 ) -> AuditLogListResponse:
     """
@@ -710,6 +717,7 @@ async def list_audit_logs(
 
     # Build query with eager loading of admin_user relationship
     from sqlalchemy.orm import selectinload
+
     query = select(AdminAuditLog).options(selectinload(AdminAuditLog.admin_user))
 
     # Apply filters
@@ -770,7 +778,9 @@ async def list_audit_logs(
                     id=log.admin_user.id,
                     email=log.admin_user.email,
                     name=log.admin_user.name,
-                ) if log.admin_user else None,
+                )
+                if log.admin_user
+                else None,
                 action=log.action,
                 target_type=log.target_type,
                 target_id=log.target_id,
@@ -795,7 +805,7 @@ async def reset_user_usage(
     db: AsyncSession = Depends(get_db),
     admin_user: User = Depends(get_current_admin_user),
     http_request: Request = None,
-    user_agent: Optional[str] = Header(None),
+    user_agent: str | None = Header(None),
 ) -> UserActionResponse:
     """
     Reset a user's monthly generation usage counters to zero.

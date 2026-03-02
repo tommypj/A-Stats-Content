@@ -3,19 +3,17 @@ Social media scheduling database models.
 """
 
 from datetime import datetime
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
 from uuid import uuid4
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     DateTime,
     ForeignKey,
-    Integer,
+    Index,
     String,
     Text,
-    JSON,
-    Index,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -23,7 +21,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base, TimestampMixin
 
 
-class Platform(str, Enum):
+class Platform(StrEnum):
     """Supported social media platforms."""
 
     TWITTER = "twitter"
@@ -32,7 +30,7 @@ class Platform(str, Enum):
     INSTAGRAM = "instagram"
 
 
-class PostStatus(str, Enum):
+class PostStatus(StrEnum):
     """Status of a scheduled post."""
 
     DRAFT = "draft"
@@ -44,7 +42,7 @@ class PostStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class PostTargetStatus(str, Enum):
+class PostTargetStatus(StrEnum):
     """Status of an individual post target (platform-specific)."""
 
     PENDING = "pending"
@@ -79,7 +77,7 @@ class SocialAccount(Base, TimestampMixin):
     )
 
     # Project ownership (optional - for multi-tenancy)
-    project_id: Mapped[Optional[str]] = mapped_column(
+    project_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=True,
@@ -89,26 +87,26 @@ class SocialAccount(Base, TimestampMixin):
     # Platform info
     platform: Mapped[str] = mapped_column(String(50), nullable=False)
     platform_user_id: Mapped[str] = mapped_column(String(255), nullable=False)
-    platform_username: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    platform_display_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    platform_username: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    platform_display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # OAuth tokens (encrypted)
     access_token_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
-    refresh_token_encrypted: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    token_expires_at: Mapped[Optional[datetime]] = mapped_column(
+    refresh_token_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    token_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
     # Account metadata
-    profile_image_url: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
-    account_metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    profile_image_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    account_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Connection status
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    last_verified_at: Mapped[Optional[datetime]] = mapped_column(
+    last_verified_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    verification_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    verification_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Indexes
     __table_args__ = (
@@ -151,7 +149,7 @@ class ScheduledPost(Base, TimestampMixin):
     )
 
     # Project ownership (optional - for multi-tenancy)
-    project_id: Mapped[Optional[str]] = mapped_column(
+    project_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=True,
@@ -160,28 +158,22 @@ class ScheduledPost(Base, TimestampMixin):
 
     # Post content
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    media_urls: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
-    link_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
+    media_urls: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    link_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
 
     # Scheduling
-    scheduled_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    status: Mapped[str] = mapped_column(
-        String(50), nullable=False, default=PostStatus.DRAFT.value
-    )
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(String(50), nullable=False, default=PostStatus.DRAFT.value)
 
     # Publishing metadata
-    published_at: Mapped[Optional[datetime]] = mapped_column(
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    publish_attempted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    publish_attempted_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    publish_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    publish_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Optional article linkage
-    article_id: Mapped[Optional[str]] = mapped_column(
+    article_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("articles.id", ondelete="SET NULL"),
         nullable=True,
@@ -239,21 +231,19 @@ class PostTarget(Base, TimestampMixin):
     )
 
     # Platform-specific content overrides
-    platform_content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    platform_metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    platform_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    platform_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Publishing status for this target
     is_published: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    published_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    platform_post_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    platform_post_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
-    publish_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    platform_post_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    platform_post_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    publish_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Analytics snapshot
-    analytics_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    last_analytics_fetch: Mapped[Optional[datetime]] = mapped_column(
+    analytics_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    last_analytics_fetch: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
@@ -269,9 +259,7 @@ class PostTarget(Base, TimestampMixin):
     )
 
     # Indexes
-    __table_args__ = (
-        Index("ix_post_targets_post", "scheduled_post_id", "social_account_id"),
-    )
+    __table_args__ = (Index("ix_post_targets_post", "scheduled_post_id", "social_account_id"),)
 
     def __repr__(self) -> str:
         return f"<PostTarget(id={self.id}, account={self.social_account_id})>"

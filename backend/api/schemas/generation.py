@@ -3,37 +3,39 @@ Schemas for generation tracking and admin alerts.
 """
 
 from datetime import datetime
-from typing import Optional, List
-from pydantic import BaseModel, ConfigDict
 
+from pydantic import BaseModel, ConfigDict
 
 # --- Generation Log Schemas ---
 
+
 class GenerationLogResponse(BaseModel):
     """Single generation log entry."""
+
     id: str
     user_id: str
-    project_id: Optional[str] = None
+    project_id: str | None = None
     resource_type: str
     resource_id: str
     status: str
-    error_message: Optional[str] = None
-    ai_model: Optional[str] = None
-    duration_ms: Optional[int] = None
-    input_metadata: Optional[dict] = None
+    error_message: str | None = None
+    ai_model: str | None = None
+    duration_ms: int | None = None
+    input_metadata: dict | None = None
     cost_credits: int = 0
     created_at: datetime
 
     # Joined user info
-    user_email: Optional[str] = None
-    user_name: Optional[str] = None
+    user_email: str | None = None
+    user_name: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class GenerationLogListResponse(BaseModel):
     """Paginated list of generation logs."""
-    items: List[GenerationLogResponse]
+
+    items: list[GenerationLogResponse]
     total: int
     page: int
     page_size: int
@@ -42,6 +44,7 @@ class GenerationLogListResponse(BaseModel):
 
 class GenerationStatsResponse(BaseModel):
     """Aggregated generation statistics."""
+
     total_generations: int = 0
     successful: int = 0
     failed: int = 0
@@ -58,7 +61,7 @@ class GenerationStatsResponse(BaseModel):
     images_failed: int = 0
 
     # Average duration (ms)
-    avg_duration_ms: Optional[int] = None
+    avg_duration_ms: int | None = None
 
     # Total credits consumed
     total_credits: int = 0
@@ -66,31 +69,34 @@ class GenerationStatsResponse(BaseModel):
 
 # --- Admin Alert Schemas ---
 
+
 class AdminAlertResponse(BaseModel):
     """Single admin alert."""
+
     id: str
     alert_type: str
     severity: str
     title: str
-    message: Optional[str] = None
-    resource_type: Optional[str] = None
-    resource_id: Optional[str] = None
-    user_id: Optional[str] = None
-    project_id: Optional[str] = None
+    message: str | None = None
+    resource_type: str | None = None
+    resource_id: str | None = None
+    user_id: str | None = None
+    project_id: str | None = None
     is_read: bool = False
     is_resolved: bool = False
     created_at: datetime
 
     # Joined user info
-    user_email: Optional[str] = None
-    user_name: Optional[str] = None
+    user_email: str | None = None
+    user_name: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class AdminAlertListResponse(BaseModel):
     """Paginated list of admin alerts."""
-    items: List[AdminAlertResponse]
+
+    items: list[AdminAlertResponse]
     total: int
     page: int
     page_size: int
@@ -99,11 +105,13 @@ class AdminAlertListResponse(BaseModel):
 
 class AdminAlertCountResponse(BaseModel):
     """Unread alert count for badge."""
+
     unread_count: int = 0
     critical_count: int = 0
 
 
 class AdminAlertUpdateRequest(BaseModel):
     """Request to update alert status."""
-    is_read: Optional[bool] = None
-    is_resolved: Optional[bool] = None
+
+    is_read: bool | None = None
+    is_resolved: bool | None = None

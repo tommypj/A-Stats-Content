@@ -12,10 +12,9 @@ Revises: 014
 Create Date: 2026-02-22
 """
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSON
-
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSON, UUID
 
 # revision identifiers, used by Alembic.
 revision = "015"
@@ -27,6 +26,7 @@ depends_on = None
 # ---------------------------------------------------------------------------
 # upgrade
 # ---------------------------------------------------------------------------
+
 
 def upgrade() -> None:
     """Rename all team-related objects to project-related objects."""
@@ -256,7 +256,9 @@ def upgrade() -> None:
     op.execute("ALTER INDEX ix_teams_subscription RENAME TO ix_projects_subscription")
     op.execute("ALTER INDEX ix_team_members_team_user RENAME TO ix_project_members_project_user")
     op.execute("ALTER INDEX ix_team_invitations_status RENAME TO ix_project_invitations_status")
-    op.execute("ALTER INDEX ix_team_invitations_expires_at RENAME TO ix_project_invitations_expires_at")
+    op.execute(
+        "ALTER INDEX ix_team_invitations_expires_at RENAME TO ix_project_invitations_expires_at"
+    )
     # Rename the functional index on users.current_team (created in migration 010 as
     # ix_users_current_team_id; the model declares it as ix_users_current_team — we
     # already dropped/recreated it above as ix_users_current_project_id, so here we
@@ -319,6 +321,7 @@ def upgrade() -> None:
 # downgrade
 # ---------------------------------------------------------------------------
 
+
 def downgrade() -> None:
     """Reverse all team->project renames and data migrations."""
 
@@ -365,7 +368,9 @@ def downgrade() -> None:
     op.execute("ALTER INDEX ix_projects_subscription RENAME TO ix_teams_subscription")
     op.execute("ALTER INDEX ix_project_members_project_user RENAME TO ix_team_members_team_user")
     op.execute("ALTER INDEX ix_project_invitations_status RENAME TO ix_team_invitations_status")
-    op.execute("ALTER INDEX ix_project_invitations_expires_at RENAME TO ix_team_invitations_expires_at")
+    op.execute(
+        "ALTER INDEX ix_project_invitations_expires_at RENAME TO ix_team_invitations_expires_at"
+    )
     op.execute(
         "DO $$ BEGIN "
         "IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'ix_users_current_project') "
@@ -387,7 +392,9 @@ def downgrade() -> None:
     # ------------------------------------------------------------------
 
     # team_invitations.project_id -> team_id
-    op.drop_constraint("project_invitations_project_id_fkey", "team_invitations", type_="foreignkey")
+    op.drop_constraint(
+        "project_invitations_project_id_fkey", "team_invitations", type_="foreignkey"
+    )
     op.drop_index("ix_project_invitations_project_id", table_name="team_invitations")
     op.alter_column(
         "team_invitations",

@@ -11,17 +11,16 @@ Covers:
 """
 
 import asyncio
-import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from services.task_queue import TaskQueue
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 async def _noop():
     """Coroutine that completes successfully with no return value."""
@@ -47,6 +46,7 @@ async def _slow(delay: float = 0.05):
 # ---------------------------------------------------------------------------
 # enqueue / get_status
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_enqueue_returns_task_id():
@@ -115,6 +115,7 @@ async def test_task_failed_status():
 # Duplicate enqueue protection
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_duplicate_enqueue_ignored_while_running():
     """Enqueueing the same task_id while it's still running should be a no-op."""
@@ -148,6 +149,7 @@ async def test_reenqueue_after_completion():
 # cleanup_old
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_cleanup_removes_old_completed_tasks():
     q = TaskQueue()
@@ -156,7 +158,7 @@ async def test_cleanup_removes_old_completed_tasks():
 
     # Artificially backdate the completed_at so it appears old
     record = q._tasks["old-1"]
-    record.completed_at = datetime.now(timezone.utc) - timedelta(seconds=3700)
+    record.completed_at = datetime.now(UTC) - timedelta(seconds=3700)
 
     removed = q.cleanup_old(max_age_seconds=3600)
     assert removed == 1
@@ -191,7 +193,7 @@ async def test_cleanup_removes_old_failed_tasks():
     await asyncio.sleep(0.05)
 
     record = q._tasks["fail-old"]
-    record.completed_at = datetime.now(timezone.utc) - timedelta(seconds=7200)
+    record.completed_at = datetime.now(UTC) - timedelta(seconds=7200)
 
     removed = q.cleanup_old(max_age_seconds=3600)
     assert removed == 1
@@ -200,6 +202,7 @@ async def test_cleanup_removes_old_failed_tasks():
 # ---------------------------------------------------------------------------
 # stats()
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_stats_counts():
@@ -224,6 +227,7 @@ async def test_stats_counts():
 # ---------------------------------------------------------------------------
 # to_dict timestamp fields
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_to_dict_iso_timestamps():

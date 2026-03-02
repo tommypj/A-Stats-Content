@@ -1,20 +1,22 @@
 """Subscription domain entities."""
+
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Optional
+from datetime import UTC, datetime
+from enum import StrEnum
 from uuid import UUID, uuid4
 
 
-class SubscriptionTier(str, Enum):
+class SubscriptionTier(StrEnum):
     """Available subscription tiers."""
+
     FREE = "free"
     PRO = "pro"
     ELITE = "elite"
 
 
-class BillingInterval(str, Enum):
+class BillingInterval(StrEnum):
     """Billing interval options."""
+
     MONTHLY = "monthly"
     YEARLY = "yearly"
 
@@ -83,8 +85,8 @@ class Subscription:
     user_id: UUID = field(default_factory=uuid4)
 
     # Stripe integration
-    stripe_customer_id: Optional[str] = None
-    stripe_subscription_id: Optional[str] = None
+    stripe_customer_id: str | None = None
+    stripe_subscription_id: str | None = None
 
     # Subscription details
     tier: SubscriptionTier = SubscriptionTier.FREE
@@ -92,9 +94,9 @@ class Subscription:
     status: str = "active"  # active, canceled, past_due, trialing
 
     # Dates
-    current_period_start: Optional[datetime] = None
-    current_period_end: Optional[datetime] = None
-    canceled_at: Optional[datetime] = None
+    current_period_start: datetime | None = None
+    current_period_end: datetime | None = None
+    canceled_at: datetime | None = None
 
     # Usage tracking
     articles_used: int = 0
@@ -105,8 +107,8 @@ class Subscription:
     credits_balance: int = 0
 
     # Timestamps
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self):
         if isinstance(self.id, str):

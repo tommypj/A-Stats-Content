@@ -18,13 +18,15 @@ Usage::
 
 import asyncio
 import logging
-from datetime import datetime, timezone
-from typing import Any, Coroutine, Dict, Optional
+from collections.abc import Coroutine
+from datetime import UTC, datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 # ── Internal record stored per task ──────────────────────────────────────────
+
 
 class _TaskRecord:
     __slots__ = (
@@ -39,14 +41,14 @@ class _TaskRecord:
 
     def __init__(self, task_id: str) -> None:
         self.task_id: str = task_id
-        self.status: str = "pending"          # pending | running | completed | failed
+        self.status: str = "pending"  # pending | running | completed | failed
         self.result: Any = None
-        self.error: Optional[str] = None
-        self.created_at: datetime = datetime.now(timezone.utc)
-        self.completed_at: Optional[datetime] = None
-        self._asyncio_task: Optional[asyncio.Task] = None
+        self.error: str | None = None
+        self.created_at: datetime = datetime.now(UTC)
+        self.completed_at: datetime | None = None
+        self._asyncio_task: asyncio.Task | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "task_id": self.task_id,
             "status": self.status,
@@ -59,11 +61,12 @@ class _TaskRecord:
 
 # ── TaskQueue class ───────────────────────────────────────────────────────────
 
+
 class TaskQueue:
     """Simple in-memory asyncio task queue."""
 
     def __init__(self) -> None:
-        self._tasks: Dict[str, _TaskRecord] = {}
+        self._tasks: dict[str, _TaskRecord] = {}
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -82,7 +85,7 @@ class TaskQueue:
                 task_id,
                 existing.status,
             )
-            coro.close()   # clean up the coroutine to avoid ResourceWarning
+            coro.close()  # clean up the coroutine to avoid ResourceWarning
             return task_id
 
         record = _TaskRecord(task_id)
@@ -95,7 +98,7 @@ class TaskQueue:
         logger.debug("task_queue: enqueued task %s", task_id)
         return task_id
 
-    def get_status(self, task_id: str) -> Optional[Dict[str, Any]]:
+    def get_status(self, task_id: str) -> dict[str, Any] | None:
         """
         Return the status dict for *task_id*, or None if it is unknown.
         """
@@ -110,7 +113,7 @@ class TaskQueue:
 
         Returns the number of tasks removed.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         to_delete = [
             tid
             for tid, rec in self._tasks.items()
@@ -124,9 +127,9 @@ class TaskQueue:
             logger.debug("task_queue: cleaned up %d old tasks", len(to_delete))
         return len(to_delete)
 
-    def stats(self) -> Dict[str, int]:
+    def stats(self) -> dict[str, int]:
         """Return counts by status (useful for health/monitoring endpoints)."""
-        counts: Dict[str, int] = {"pending": 0, "running": 0, "completed": 0, "failed": 0}
+        counts: dict[str, int] = {"pending": 0, "running": 0, "completed": 0, "failed": 0}
         for rec in self._tasks.values():
             counts[rec.status] = counts.get(rec.status, 0) + 1
         return counts
@@ -142,11 +145,9 @@ class TaskQueue:
         except Exception as exc:
             record.error = str(exc)
             record.status = "failed"
-            logger.error(
-                "task_queue: task %s failed: %s", record.task_id, exc, exc_info=True
-            )
+            logger.error("task_queue: task %s failed: %s", record.task_id, exc, exc_info=True)
         finally:
-            record.completed_at = datetime.now(timezone.utc)
+            record.completed_at = datetime.now(UTC)
             logger.debug(
                 "task_queue: task %s finished with status=%s", record.task_id, record.status
             )

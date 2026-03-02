@@ -3,9 +3,8 @@ Admin content moderation schemas.
 """
 
 from datetime import datetime
-from typing import Optional, List
-from pydantic import BaseModel, ConfigDict, Field
 
+from pydantic import BaseModel, ConfigDict, Field
 
 # --- Article Schemas ---
 
@@ -27,10 +26,10 @@ class AdminArticleListItem(BaseModel):
     keyword: str
     status: str
     word_count: int
-    seo_score: Optional[float] = None
+    seo_score: float | None = None
     created_at: datetime
     updated_at: datetime
-    published_at: Optional[datetime] = None
+    published_at: datetime | None = None
     author: AdminArticleAuthorInfo
 
     model_config = ConfigDict(from_attributes=True)
@@ -39,7 +38,7 @@ class AdminArticleListItem(BaseModel):
 class AdminArticleListResponse(BaseModel):
     """Paginated article list response."""
 
-    items: List[AdminArticleListItem]
+    items: list[AdminArticleListItem]
     total: int
     page: int
     page_size: int
@@ -51,23 +50,23 @@ class AdminArticleDetail(BaseModel):
 
     id: str
     title: str
-    slug: Optional[str] = None
+    slug: str | None = None
     keyword: str
-    meta_description: Optional[str] = None
-    content: Optional[str] = None
-    content_html: Optional[str] = None
+    meta_description: str | None = None
+    content: str | None = None
+    content_html: str | None = None
     status: str
     word_count: int
-    read_time: Optional[int] = None
-    seo_score: Optional[float] = None
-    seo_analysis: Optional[dict] = None
+    read_time: int | None = None
+    seo_score: float | None = None
+    seo_analysis: dict | None = None
     created_at: datetime
     updated_at: datetime
-    published_at: Optional[datetime] = None
-    published_url: Optional[str] = None
-    wordpress_post_id: Optional[int] = None
-    outline_id: Optional[str] = None
-    featured_image_id: Optional[str] = None
+    published_at: datetime | None = None
+    published_url: str | None = None
+    wordpress_post_id: int | None = None
+    outline_id: str | None = None
+    featured_image_id: str | None = None
     author: AdminArticleAuthorInfo
     image_count: int = 0
 
@@ -96,7 +95,7 @@ class AdminOutlineListItem(BaseModel):
 class AdminOutlineListResponse(BaseModel):
     """Paginated outline list response."""
 
-    items: List[AdminOutlineListItem]
+    items: list[AdminOutlineListItem]
     total: int
     page: int
     page_size: int
@@ -112,14 +111,14 @@ class AdminImageListItem(BaseModel):
     id: str
     prompt: str
     url: str
-    alt_text: Optional[str] = None
+    alt_text: str | None = None
     status: str
-    style: Optional[str] = None
-    model: Optional[str] = None
-    width: Optional[int] = None
-    height: Optional[int] = None
+    style: str | None = None
+    model: str | None = None
+    width: int | None = None
+    height: int | None = None
     created_at: datetime
-    article_id: Optional[str] = None
+    article_id: str | None = None
     author: AdminArticleAuthorInfo
 
     model_config = ConfigDict(from_attributes=True)
@@ -128,7 +127,7 @@ class AdminImageListItem(BaseModel):
 class AdminImageListResponse(BaseModel):
     """Paginated image list response."""
 
-    items: List[AdminImageListItem]
+    items: list[AdminImageListItem]
     total: int
     page: int
     page_size: int
@@ -144,8 +143,8 @@ class AdminSocialPostListItem(BaseModel):
     id: str
     content: str
     status: str
-    scheduled_at: Optional[datetime] = None
-    published_at: Optional[datetime] = None
+    scheduled_at: datetime | None = None
+    published_at: datetime | None = None
     platform_count: int = 0
     created_at: datetime
     updated_at: datetime
@@ -157,7 +156,7 @@ class AdminSocialPostListItem(BaseModel):
 class AdminSocialPostListResponse(BaseModel):
     """Paginated social post list response."""
 
-    items: List[AdminSocialPostListItem]
+    items: list[AdminSocialPostListItem]
     total: int
     page: int
     page_size: int
@@ -175,7 +174,9 @@ class BulkDeleteRequest(BaseModel):
         description="Type of content to delete",
         pattern="^(article|outline|image|social_post)$",
     )
-    ids: List[str] = Field(..., min_length=1, max_length=100, description="List of content IDs to delete (max 100)")
+    ids: list[str] = Field(
+        ..., min_length=1, max_length=100, description="List of content IDs to delete (max 100)"
+    )
 
 
 class BulkDeleteResponse(BaseModel):
@@ -184,7 +185,7 @@ class BulkDeleteResponse(BaseModel):
     success: bool
     deleted_count: int
     failed_count: int = 0
-    failed_ids: List[str] = Field(default_factory=list)
+    failed_ids: list[str] = Field(default_factory=list)
     message: str
 
 

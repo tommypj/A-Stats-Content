@@ -1,11 +1,11 @@
 """Storage adapters for file and image storage."""
 
 from .image_storage import (
-    StorageAdapter,
     LocalStorageAdapter,
     S3StorageAdapter,
-    get_storage_adapter,
+    StorageAdapter,
     download_image,
+    get_storage_adapter,
     storage_adapter,
 )
 

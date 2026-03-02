@@ -10,12 +10,8 @@ import csv
 import io
 import json
 import logging
-import os
 import re
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Optional, Tuple
-from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +64,7 @@ def _extract_txt(content: bytes) -> str:
         return content.decode("latin-1", errors="replace")
 
 
-def _extract_pdf(content: bytes) -> Tuple[str, bool]:
+def _extract_pdf(content: bytes) -> tuple[str, bool]:
     """
     Extract text from a PDF.
 
@@ -79,7 +75,7 @@ def _extract_pdf(content: bytes) -> Tuple[str, bool]:
         from pypdf import PdfReader  # type: ignore
 
         reader = PdfReader(io.BytesIO(content))
-        parts: List[str] = []
+        parts: list[str] = []
         for page in reader.pages:
             text = page.extract_text()
             if text:
@@ -103,7 +99,7 @@ def _extract_csv(content: bytes) -> str:
         if not rows:
             return ""
         # Build a simple table-like string
-        lines: List[str] = []
+        lines: list[str] = []
         header = rows[0]
         lines.append("\t".join(header))
         lines.append("-" * 40)
@@ -147,8 +143,9 @@ def _extract_html(content: bytes) -> str:
 def _extract_docx(content: bytes) -> str:
     """Extract text from a DOCX file using python-docx."""
     try:
-        import docx  # type: ignore
         from zipfile import BadZipFile
+
+        import docx  # type: ignore
 
         doc = docx.Document(io.BytesIO(content))
         paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
@@ -162,7 +159,7 @@ def _extract_docx(content: bytes) -> str:
         return ""
 
 
-def extract_text(content: bytes, file_type: str) -> Tuple[str, bool]:
+def extract_text(content: bytes, file_type: str) -> tuple[str, bool]:
     """
     Extract plain text from file bytes.
 
@@ -195,7 +192,8 @@ def extract_text(content: bytes, file_type: str) -> Tuple[str, bool]:
 # Chunking
 # ---------------------------------------------------------------------------
 
-def split_into_chunks(text: str, words_per_chunk: int = WORDS_PER_CHUNK) -> List[str]:
+
+def split_into_chunks(text: str, words_per_chunk: int = WORDS_PER_CHUNK) -> list[str]:
     """
     Split text into chunks of approximately *words_per_chunk* words.
 
@@ -213,8 +211,8 @@ def split_into_chunks(text: str, words_per_chunk: int = WORDS_PER_CHUNK) -> List
 
     paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
 
-    chunks: List[str] = []
-    current_words: List[str] = []
+    chunks: list[str] = []
+    current_words: list[str] = []
     current_count = 0
 
     for para in paragraphs:
@@ -257,7 +255,8 @@ def split_into_chunks(text: str, words_per_chunk: int = WORDS_PER_CHUNK) -> List
 # Keyword search
 # ---------------------------------------------------------------------------
 
-def score_chunk(chunk: str, query_words: List[str]) -> float:
+
+def score_chunk(chunk: str, query_words: list[str]) -> float:
     """
     Return a relevance score in [0, 1] for a chunk given query words.
 
@@ -274,6 +273,7 @@ def score_chunk(chunk: str, query_words: List[str]) -> float:
         if count > 0:
             # Logarithmic TF to avoid runaway scores for repeated terms
             import math
+
             total_score += 1 + math.log(count)
 
     # Normalise by number of query words so score is in a comparable range
@@ -281,10 +281,12 @@ def score_chunk(chunk: str, query_words: List[str]) -> float:
 
 
 def search_chunks(
-    chunks: List[Tuple[str, str, str, int]],  # (chunk_id, source_id, source_title, chunk_index, content)
+    chunks: list[
+        tuple[str, str, str, int]
+    ],  # (chunk_id, source_id, source_title, chunk_index, content)
     query: str,
     top_k: int = 5,
-) -> List[dict]:
+) -> list[dict]:
     """
     Keyword search over a list of chunk tuples.
 
@@ -317,7 +319,7 @@ def search_chunks(
     return results[:top_k]
 
 
-def build_answer(query: str, matched_chunks: List[dict]) -> str:
+def build_answer(query: str, matched_chunks: list[dict]) -> str:
     """
     Build a human-readable answer from matched chunks.
 
@@ -330,9 +332,7 @@ def build_answer(query: str, matched_chunks: List[dict]) -> str:
             "Try different keywords or upload more documents."
         )
 
-    lines: List[str] = [
-        f"Found {len(matched_chunks)} relevant passage(s) for: **{query}**\n"
-    ]
+    lines: list[str] = [f"Found {len(matched_chunks)} relevant passage(s) for: **{query}**\n"]
     for i, chunk in enumerate(matched_chunks, 1):
         lines.append(f"### Source {i}: {chunk['source_title']}\n")
         # Trim very long chunks to a readable excerpt (~500 chars)

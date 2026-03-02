@@ -1,11 +1,13 @@
 """Integration tests for outline endpoints."""
-import pytest
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
+
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
-from infrastructure.database.models import User, Outline, ContentStatus
+import pytest
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from infrastructure.database.models import ContentStatus, Outline, User
 
 pytestmark = pytest.mark.asyncio
 
@@ -29,7 +31,7 @@ class TestCreateOutline:
                 "tone": "professional",
                 "word_count_target": 1500,
                 "auto_generate": False,
-            }
+            },
         )
 
         assert response.status_code == 201
@@ -59,24 +61,24 @@ class TestCreateOutline:
                     heading="Introduction to Content Marketing",
                     subheadings=["What is Content Marketing", "Why It Matters"],
                     notes="Overview of content marketing basics",
-                    word_count_target=300
+                    word_count_target=300,
                 ),
                 OutlineSection(
                     heading="Content Strategy",
                     subheadings=["Planning", "Execution", "Measurement"],
                     notes="How to develop a content strategy",
-                    word_count_target=600
+                    word_count_target=600,
                 ),
             ],
             meta_description="A complete guide to content marketing for small business owners.",
             estimated_word_count=1500,
-            estimated_read_time=8
+            estimated_read_time=8,
         )
 
         with patch(
             "api.routes.outlines.content_ai_service.generate_outline",
             new_callable=AsyncMock,
-            return_value=mock_outline
+            return_value=mock_outline,
         ):
             response = await async_client.post(
                 "/api/v1/outlines",
@@ -87,7 +89,7 @@ class TestCreateOutline:
                     "tone": "professional",
                     "word_count_target": 1500,
                     "auto_generate": True,
-                }
+                },
             )
 
         assert response.status_code == 201
@@ -104,7 +106,7 @@ class TestCreateOutline:
             json={
                 "keyword": "test",
                 "auto_generate": False,
-            }
+            },
         )
         assert response.status_code == 401
 
@@ -120,7 +122,7 @@ class TestCreateOutline:
             json={
                 # Missing required keyword field
                 "auto_generate": False,
-            }
+            },
         )
         assert response.status_code == 422
 
@@ -225,12 +227,14 @@ class TestListOutlines:
     ):
         """Test filtering outlines by status."""
         # Create outlines with different statuses
-        for i, status in enumerate([
-            ContentStatus.DRAFT.value,
-            ContentStatus.COMPLETED.value,
-            ContentStatus.COMPLETED.value,
-            ContentStatus.FAILED.value,
-        ]):
+        for i, status in enumerate(
+            [
+                ContentStatus.DRAFT.value,
+                ContentStatus.COMPLETED.value,
+                ContentStatus.COMPLETED.value,
+                ContentStatus.FAILED.value,
+            ]
+        ):
             outline = Outline(
                 id=str(uuid4()),
                 user_id=test_user.id,
@@ -402,7 +406,7 @@ class TestUpdateOutline:
             json={
                 "title": "Updated Title",
                 "keyword": "updated keyword",
-            }
+            },
         )
 
         assert response.status_code == 200
@@ -433,14 +437,12 @@ class TestUpdateOutline:
                 "heading": "Introduction",
                 "subheadings": ["Overview", "Background"],
                 "notes": "Intro section",
-                "word_count_target": 200
+                "word_count_target": 200,
             }
         ]
 
         response = await async_client.put(
-            f"/api/v1/outlines/{outline.id}",
-            headers=auth_headers,
-            json={"sections": new_sections}
+            f"/api/v1/outlines/{outline.id}", headers=auth_headers, json={"sections": new_sections}
         )
 
         assert response.status_code == 200
@@ -455,9 +457,7 @@ class TestUpdateOutline:
     ):
         """Test updating non-existent outline."""
         response = await async_client.put(
-            f"/api/v1/outlines/{str(uuid4())}",
-            headers=auth_headers,
-            json={"title": "Updated"}
+            f"/api/v1/outlines/{str(uuid4())}", headers=auth_headers, json={"title": "Updated"}
         )
         assert response.status_code == 404
 
@@ -492,9 +492,8 @@ class TestDeleteOutline:
 
         # Verify outline was deleted
         from sqlalchemy import select
-        result = await db_session.execute(
-            select(Outline).where(Outline.id == outline.id)
-        )
+
+        result = await db_session.execute(select(Outline).where(Outline.id == outline.id))
         deleted_outline = result.scalar_one_or_none()
         assert deleted_outline is None
 
@@ -545,18 +544,18 @@ class TestRegenerateOutline:
                     heading="SEO Basics",
                     subheadings=["What is SEO"],
                     notes="Introduction to SEO",
-                    word_count_target=300
+                    word_count_target=300,
                 ),
             ],
             meta_description="A comprehensive guide to SEO optimization for marketers.",
             estimated_word_count=1000,
-            estimated_read_time=5
+            estimated_read_time=5,
         )
 
         with patch(
             "api.routes.outlines.content_ai_service.generate_outline",
             new_callable=AsyncMock,
-            return_value=mock_outline
+            return_value=mock_outline,
         ):
             response = await async_client.post(
                 f"/api/v1/outlines/{outline.id}/regenerate",
@@ -602,7 +601,7 @@ class TestRegenerateOutline:
         with patch(
             "api.routes.outlines.content_ai_service.generate_outline",
             new_callable=AsyncMock,
-            side_effect=Exception("AI service error")
+            side_effect=Exception("AI service error"),
         ):
             response = await async_client.post(
                 f"/api/v1/outlines/{outline.id}/regenerate",

@@ -1,8 +1,10 @@
 """Integration tests for authentication endpoints."""
+
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from unittest.mock import AsyncMock, patch
 
 from infrastructure.database.models.user import User, UserStatus
 
@@ -15,12 +17,15 @@ class TestRegistration:
     async def test_register_success(self, async_client: AsyncClient):
         """Test successful user registration."""
         with patch("api.routes.auth.email_service.send_verification_email", new_callable=AsyncMock):
-            response = await async_client.post("/api/v1/auth/register", json={
-                "email": "newuser@example.com",
-                "password": "SecurePass123!",
-                "name": "New User",
-                "language": "en"
-            })
+            response = await async_client.post(
+                "/api/v1/auth/register",
+                json={
+                    "email": "newuser@example.com",
+                    "password": "SecurePass123!",
+                    "name": "New User",
+                    "language": "en",
+                },
+            )
 
         assert response.status_code == 201
         data = response.json()
@@ -32,50 +37,64 @@ class TestRegistration:
 
     async def test_register_duplicate_email(self, async_client: AsyncClient, test_user: User):
         """Test registration with existing email fails."""
-        response = await async_client.post("/api/v1/auth/register", json={
-            "email": test_user.email,
-            "password": "SecurePass123!",
-            "name": "Duplicate User",
-            "language": "en"
-        })
+        response = await async_client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": test_user.email,
+                "password": "SecurePass123!",
+                "name": "Duplicate User",
+                "language": "en",
+            },
+        )
         assert response.status_code == 400
         assert "already exists" in response.json()["detail"].lower()
 
     async def test_register_weak_password(self, async_client: AsyncClient):
         """Test registration with weak password fails."""
-        response = await async_client.post("/api/v1/auth/register", json={
-            "email": "weak@example.com",
-            "password": "123",
-            "name": "Weak Password",
-            "language": "en"
-        })
+        response = await async_client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "weak@example.com",
+                "password": "123",
+                "name": "Weak Password",
+                "language": "en",
+            },
+        )
         assert response.status_code == 422
 
     async def test_register_invalid_email(self, async_client: AsyncClient):
         """Test registration with invalid email fails."""
-        response = await async_client.post("/api/v1/auth/register", json={
-            "email": "not-an-email",
-            "password": "SecurePass123!",
-            "name": "Invalid Email",
-            "language": "en"
-        })
+        response = await async_client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "not-an-email",
+                "password": "SecurePass123!",
+                "name": "Invalid Email",
+                "language": "en",
+            },
+        )
         assert response.status_code == 422
 
     async def test_register_missing_fields(self, async_client: AsyncClient):
         """Test registration with missing required fields."""
-        response = await async_client.post("/api/v1/auth/register", json={
-            "email": "incomplete@example.com"
-        })
+        response = await async_client.post(
+            "/api/v1/auth/register", json={"email": "incomplete@example.com"}
+        )
         assert response.status_code == 422
 
-    async def test_register_email_case_insensitive(self, async_client: AsyncClient, test_user: User):
+    async def test_register_email_case_insensitive(
+        self, async_client: AsyncClient, test_user: User
+    ):
         """Test that email is case-insensitive."""
-        response = await async_client.post("/api/v1/auth/register", json={
-            "email": test_user.email.upper(),
-            "password": "SecurePass123!",
-            "name": "Duplicate Upper",
-            "language": "en"
-        })
+        response = await async_client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": test_user.email.upper(),
+                "password": "SecurePass123!",
+                "name": "Duplicate Upper",
+                "language": "en",
+            },
+        )
         assert response.status_code == 400
 
 
@@ -84,10 +103,9 @@ class TestLogin:
 
     async def test_login_success(self, async_client: AsyncClient, test_user: User):
         """Test successful login."""
-        response = await async_client.post("/api/v1/auth/login", json={
-            "email": test_user.email,
-            "password": "testpassword123"
-        })
+        response = await async_client.post(
+            "/api/v1/auth/login", json={"email": test_user.email, "password": "testpassword123"}
+        )
         assert response.status_code == 200
         data = response.json()
         assert "access_token" in data
@@ -97,54 +115,48 @@ class TestLogin:
 
     async def test_login_wrong_password(self, async_client: AsyncClient, test_user: User):
         """Test login with wrong password."""
-        response = await async_client.post("/api/v1/auth/login", json={
-            "email": test_user.email,
-            "password": "wrongpassword"
-        })
+        response = await async_client.post(
+            "/api/v1/auth/login", json={"email": test_user.email, "password": "wrongpassword"}
+        )
         assert response.status_code == 401
         assert "invalid" in response.json()["detail"].lower()
 
     async def test_login_nonexistent_user(self, async_client: AsyncClient):
         """Test login with non-existent user."""
-        response = await async_client.post("/api/v1/auth/login", json={
-            "email": "nobody@example.com",
-            "password": "password123"
-        })
+        response = await async_client.post(
+            "/api/v1/auth/login", json={"email": "nobody@example.com", "password": "password123"}
+        )
         assert response.status_code == 401
         assert "invalid" in response.json()["detail"].lower()
 
     async def test_login_suspended_user(self, async_client: AsyncClient, suspended_user: User):
         """Test login with suspended user account."""
-        response = await async_client.post("/api/v1/auth/login", json={
-            "email": suspended_user.email,
-            "password": "testpassword123"
-        })
+        response = await async_client.post(
+            "/api/v1/auth/login",
+            json={"email": suspended_user.email, "password": "testpassword123"},
+        )
         assert response.status_code == 403
         assert "suspended" in response.json()["detail"].lower()
 
     async def test_login_email_case_insensitive(self, async_client: AsyncClient, test_user: User):
         """Test that login email is case-insensitive."""
-        response = await async_client.post("/api/v1/auth/login", json={
-            "email": test_user.email.upper(),
-            "password": "testpassword123"
-        })
+        response = await async_client.post(
+            "/api/v1/auth/login",
+            json={"email": test_user.email.upper(), "password": "testpassword123"},
+        )
         assert response.status_code == 200
         assert "access_token" in response.json()
 
     async def test_login_updates_last_login(
-        self,
-        async_client: AsyncClient,
-        test_user: User,
-        db_session: AsyncSession
+        self, async_client: AsyncClient, test_user: User, db_session: AsyncSession
     ):
         """Test that login updates last_login timestamp."""
         initial_login = test_user.last_login
         initial_count = test_user.login_count
 
-        await async_client.post("/api/v1/auth/login", json={
-            "email": test_user.email,
-            "password": "testpassword123"
-        })
+        await async_client.post(
+            "/api/v1/auth/login", json={"email": test_user.email, "password": "testpassword123"}
+        )
 
         await db_session.refresh(test_user)
         assert test_user.last_login != initial_login
@@ -157,16 +169,15 @@ class TestTokenRefresh:
     async def test_refresh_token_success(self, async_client: AsyncClient, test_user: User):
         """Test successful token refresh."""
         # First login to get tokens
-        login = await async_client.post("/api/v1/auth/login", json={
-            "email": test_user.email,
-            "password": "testpassword123"
-        })
+        login = await async_client.post(
+            "/api/v1/auth/login", json={"email": test_user.email, "password": "testpassword123"}
+        )
         refresh_token = login.json()["refresh_token"]
 
         # Refresh
-        response = await async_client.post("/api/v1/auth/refresh", json={
-            "refresh_token": refresh_token
-        })
+        response = await async_client.post(
+            "/api/v1/auth/refresh", json={"refresh_token": refresh_token}
+        )
         assert response.status_code == 200
         data = response.json()
         assert "access_token" in data
@@ -175,9 +186,9 @@ class TestTokenRefresh:
 
     async def test_refresh_token_invalid(self, async_client: AsyncClient):
         """Test refresh with invalid token."""
-        response = await async_client.post("/api/v1/auth/refresh", json={
-            "refresh_token": "invalid.token.here"
-        })
+        response = await async_client.post(
+            "/api/v1/auth/refresh", json={"refresh_token": "invalid.token.here"}
+        )
         assert response.status_code == 401
         assert "invalid" in response.json()["detail"].lower()
 
@@ -185,16 +196,18 @@ class TestTokenRefresh:
         """Test refresh with expired token."""
         # Create an expired token (this would require mocking time or using an actual expired token)
         expired_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyLCJleHAiOjE1MTYyMzkwMjJ9.4Adcj0vbD2Hg4LfBcFJa8kU6w4V0XeXqTLxZN8hQjzM"
-        response = await async_client.post("/api/v1/auth/refresh", json={
-            "refresh_token": expired_token
-        })
+        response = await async_client.post(
+            "/api/v1/auth/refresh", json={"refresh_token": expired_token}
+        )
         assert response.status_code == 401
 
 
 class TestCurrentUser:
     """Tests for getting current user."""
 
-    async def test_get_me_authenticated(self, async_client: AsyncClient, auth_headers: dict, test_user: User):
+    async def test_get_me_authenticated(
+        self, async_client: AsyncClient, auth_headers: dict, test_user: User
+    ):
         """Test getting current user when authenticated."""
         response = await async_client.get("/api/v1/auth/me", headers=auth_headers)
         assert response.status_code == 200
@@ -213,16 +226,14 @@ class TestCurrentUser:
     async def test_get_me_invalid_token(self, async_client: AsyncClient):
         """Test getting current user with invalid token."""
         response = await async_client.get(
-            "/api/v1/auth/me",
-            headers={"Authorization": "Bearer invalid.token.here"}
+            "/api/v1/auth/me", headers={"Authorization": "Bearer invalid.token.here"}
         )
         assert response.status_code == 401
 
     async def test_get_me_malformed_header(self, async_client: AsyncClient):
         """Test getting current user with malformed auth header."""
         response = await async_client.get(
-            "/api/v1/auth/me",
-            headers={"Authorization": "InvalidFormat token"}
+            "/api/v1/auth/me", headers={"Authorization": "InvalidFormat token"}
         )
         assert response.status_code == 401
 
@@ -231,15 +242,15 @@ class TestPasswordReset:
     """Tests for password reset flow."""
 
     async def test_request_password_reset_existing_user(
-        self,
-        async_client: AsyncClient,
-        test_user: User
+        self, async_client: AsyncClient, test_user: User
     ):
         """Test requesting password reset for existing user."""
-        with patch("api.routes.auth.email_service.send_password_reset_email", new_callable=AsyncMock):
-            response = await async_client.post("/api/v1/auth/password/reset-request", json={
-                "email": test_user.email
-            })
+        with patch(
+            "api.routes.auth.email_service.send_password_reset_email", new_callable=AsyncMock
+        ):
+            response = await async_client.post(
+                "/api/v1/auth/password/reset-request", json={"email": test_user.email}
+            )
 
         # Should return 202 even for existing emails (prevent enumeration)
         assert response.status_code == 202
@@ -247,28 +258,27 @@ class TestPasswordReset:
 
     async def test_request_password_reset_nonexistent_user(self, async_client: AsyncClient):
         """Test requesting password reset for non-existent email."""
-        response = await async_client.post("/api/v1/auth/password/reset-request", json={
-            "email": "nobody@example.com"
-        })
+        response = await async_client.post(
+            "/api/v1/auth/password/reset-request", json={"email": "nobody@example.com"}
+        )
         # Should return 202 even for non-existent emails (prevent enumeration)
         assert response.status_code == 202
         assert "sent" in response.json()["message"].lower()
 
     async def test_password_reset_invalid_token(self, async_client: AsyncClient):
         """Test password reset with invalid token."""
-        response = await async_client.post("/api/v1/auth/password/reset", json={
-            "token": "invalid-token",
-            "new_password": "NewSecurePass123!"
-        })
+        response = await async_client.post(
+            "/api/v1/auth/password/reset",
+            json={"token": "invalid-token", "new_password": "NewSecurePass123!"},
+        )
         assert response.status_code == 400
         assert "invalid" in response.json()["detail"].lower()
 
     async def test_password_reset_weak_new_password(self, async_client: AsyncClient):
         """Test password reset with weak new password."""
-        response = await async_client.post("/api/v1/auth/password/reset", json={
-            "token": "some-token",
-            "new_password": "123"
-        })
+        response = await async_client.post(
+            "/api/v1/auth/password/reset", json={"token": "some-token", "new_password": "123"}
+        )
         assert response.status_code == 422
 
 
@@ -280,58 +290,51 @@ class TestPasswordChange:
         async_client: AsyncClient,
         auth_headers: dict,
         test_user: User,
-        db_session: AsyncSession
+        db_session: AsyncSession,
     ):
         """Test successful password change."""
-        response = await async_client.post("/api/v1/auth/password/change",
+        response = await async_client.post(
+            "/api/v1/auth/password/change",
             headers=auth_headers,
-            json={
-                "current_password": "testpassword123",
-                "new_password": "NewSecurePass456!"
-            }
+            json={"current_password": "testpassword123", "new_password": "NewSecurePass456!"},
         )
         assert response.status_code == 200
         assert "changed successfully" in response.json()["message"].lower()
 
         # Verify can login with new password
-        login_response = await async_client.post("/api/v1/auth/login", json={
-            "email": test_user.email,
-            "password": "NewSecurePass456!"
-        })
+        login_response = await async_client.post(
+            "/api/v1/auth/login", json={"email": test_user.email, "password": "NewSecurePass456!"}
+        )
         assert login_response.status_code == 200
 
-    async def test_change_password_wrong_current(self, async_client: AsyncClient, auth_headers: dict):
+    async def test_change_password_wrong_current(
+        self, async_client: AsyncClient, auth_headers: dict
+    ):
         """Test password change with wrong current password."""
-        response = await async_client.post("/api/v1/auth/password/change",
+        response = await async_client.post(
+            "/api/v1/auth/password/change",
             headers=auth_headers,
-            json={
-                "current_password": "wrongpassword",
-                "new_password": "NewSecurePass456!"
-            }
+            json={"current_password": "wrongpassword", "new_password": "NewSecurePass456!"},
         )
         assert response.status_code == 400
         assert "incorrect" in response.json()["detail"].lower()
 
     async def test_change_password_unauthenticated(self, async_client: AsyncClient):
         """Test password change without authentication."""
-        response = await async_client.post("/api/v1/auth/password/change", json={
-            "current_password": "testpassword123",
-            "new_password": "NewSecurePass456!"
-        })
+        response = await async_client.post(
+            "/api/v1/auth/password/change",
+            json={"current_password": "testpassword123", "new_password": "NewSecurePass456!"},
+        )
         assert response.status_code == 401
 
     async def test_change_password_weak_new_password(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict
+        self, async_client: AsyncClient, auth_headers: dict
     ):
         """Test password change with weak new password."""
-        response = await async_client.post("/api/v1/auth/password/change",
+        response = await async_client.post(
+            "/api/v1/auth/password/change",
             headers=auth_headers,
-            json={
-                "current_password": "testpassword123",
-                "new_password": "weak"
-            }
+            json={"current_password": "testpassword123", "new_password": "weak"},
         )
         assert response.status_code == 422
 
@@ -339,13 +342,10 @@ class TestPasswordChange:
 class TestEmailVerification:
     """Tests for email verification."""
 
-    async def test_verify_email_success(
-        self,
-        async_client: AsyncClient,
-        db_session: AsyncSession
-    ):
+    async def test_verify_email_success(self, async_client: AsyncClient, db_session: AsyncSession):
         """Test successful email verification."""
         from uuid import uuid4
+
         from core.security.password import password_hasher
         from core.security.tokens import TokenService
         from infrastructure.config.settings import settings
@@ -366,9 +366,7 @@ class TestEmailVerification:
         token_service = TokenService(secret_key=settings.jwt_secret_key)
         token = token_service.create_email_verification_token(user.id, user.email)
 
-        response = await async_client.post(
-            "/api/v1/auth/verify-email", json={"token": token}
-        )
+        response = await async_client.post("/api/v1/auth/verify-email", json={"token": token})
         assert response.status_code == 200
         assert "verified successfully" in response.json()["message"].lower()
 
@@ -386,12 +384,11 @@ class TestEmailVerification:
         assert "invalid" in response.json()["detail"].lower()
 
     async def test_resend_verification_existing_unverified(
-        self,
-        async_client: AsyncClient,
-        db_session: AsyncSession
+        self, async_client: AsyncClient, db_session: AsyncSession
     ):
         """Test resending verification for unverified user."""
         from uuid import uuid4
+
         from core.security.password import password_hasher
 
         user = User(
@@ -438,7 +435,9 @@ class TestDeleteAccount:
     ):
         """Authenticated user can delete their account with correct confirmation."""
         import json as json_lib
+
         from sqlalchemy import select
+
         from infrastructure.database.models.user import User as UserModel
 
         response = await async_client.request(
@@ -451,9 +450,7 @@ class TestDeleteAccount:
         assert response.json()["message"] == "Account deleted successfully"
 
         # Verify the user row no longer exists in the database
-        result = await db_session.execute(
-            select(UserModel).where(UserModel.id == test_user.id)
-        )
+        result = await db_session.execute(select(UserModel).where(UserModel.id == test_user.id))
         assert result.scalar_one_or_none() is None
 
     async def test_delete_account_wrong_confirmation(
@@ -510,7 +507,9 @@ class TestDeleteAccount:
     ):
         """Sole-owner projects are deleted along with the account."""
         import json as json_lib
+
         from sqlalchemy import select
+
         from infrastructure.database.models.project import Project, ProjectMember, ProjectMemberRole
 
         # Create a project owned by the test user
@@ -542,7 +541,5 @@ class TestDeleteAccount:
         assert response.status_code == 200
 
         # The sole-owner project should have been deleted
-        result = await db_session.execute(
-            select(Project).where(Project.id == project_id)
-        )
+        result = await db_session.execute(select(Project).where(Project.id == project_id))
         assert result.scalar_one_or_none() is None

@@ -2,16 +2,16 @@
 Integration tests for images API routes.
 """
 
-import pytest
-from unittest.mock import AsyncMock, patch, Mock
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
+import pytest
 from fastapi import status
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from infrastructure.database.models import GeneratedImage, Article, User
 from adapters.ai.replicate_adapter import GeneratedImage as ReplicateGeneratedImage
+from infrastructure.database.models import Article, GeneratedImage, User
 
 
 class TestImageGenerateEndpoint:
@@ -39,18 +39,22 @@ class TestImageGenerateEndpoint:
         # Mock download_image
         mock_image_data = b"fake image bytes"
 
-        with patch(
-            "api.routes.images.image_ai_service.generate_image",
-            new_callable=AsyncMock,
-            return_value=mock_generated,
-        ), patch(
-            "api.routes.images.download_image",
-            new_callable=AsyncMock,
-            return_value=mock_image_data,
-        ), patch(
-            "api.routes.images.storage_adapter.save_image",
-            new_callable=AsyncMock,
-            return_value="images/2026/02/test_image.jpg",
+        with (
+            patch(
+                "api.routes.images.image_ai_service.generate_image",
+                new_callable=AsyncMock,
+                return_value=mock_generated,
+            ),
+            patch(
+                "api.routes.images.download_image",
+                new_callable=AsyncMock,
+                return_value=mock_image_data,
+            ),
+            patch(
+                "api.routes.images.storage_adapter.save_image",
+                new_callable=AsyncMock,
+                return_value="images/2026/02/test_image.jpg",
+            ),
         ):
             response = await async_client.post(
                 "/api/v1/images/generate",
@@ -103,18 +107,22 @@ class TestImageGenerateEndpoint:
             model="flux-1.1-pro",
         )
 
-        with patch(
-            "api.routes.images.image_ai_service.generate_image",
-            new_callable=AsyncMock,
-            return_value=mock_generated,
-        ), patch(
-            "api.routes.images.download_image",
-            new_callable=AsyncMock,
-            return_value=b"fake bytes",
-        ), patch(
-            "api.routes.images.storage_adapter.save_image",
-            new_callable=AsyncMock,
-            return_value="images/2026/02/test.jpg",
+        with (
+            patch(
+                "api.routes.images.image_ai_service.generate_image",
+                new_callable=AsyncMock,
+                return_value=mock_generated,
+            ),
+            patch(
+                "api.routes.images.download_image",
+                new_callable=AsyncMock,
+                return_value=b"fake bytes",
+            ),
+            patch(
+                "api.routes.images.storage_adapter.save_image",
+                new_callable=AsyncMock,
+                return_value="images/2026/02/test.jpg",
+            ),
         ):
             response = await async_client.post(
                 "/api/v1/images/generate",
@@ -478,6 +486,7 @@ class TestDeleteImageEndpoint:
 
         # Verify image was deleted from database
         from sqlalchemy import select
+
         result = await db_session.execute(
             select(GeneratedImage).where(GeneratedImage.id == image.id)
         )

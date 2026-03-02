@@ -15,22 +15,20 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from infrastructure.database.connection import get_db
-from infrastructure.database.models.project import Project, ProjectMember, ProjectMemberRole
-from infrastructure.database.models.user import User
-from infrastructure.config.settings import settings
 from api.routes.auth import get_current_user
 from api.schemas.project_billing import (
-    ProjectSubscriptionResponse,
+    ProjectCancelResponse,
     ProjectCheckoutRequest,
     ProjectCheckoutResponse,
     ProjectPortalResponse,
-    ProjectCancelResponse,
+    ProjectSubscriptionResponse,
     ProjectUsageResponse,
-    ProjectLimits,
-    ProjectUsageStats,
 )
-from services.project_usage import ProjectUsageService, PROJECT_TIER_LIMITS
+from infrastructure.config.settings import settings
+from infrastructure.database.connection import get_db
+from infrastructure.database.models.project import Project, ProjectMember, ProjectMemberRole
+from infrastructure.database.models.user import User
+from services.project_usage import ProjectUsageService
 
 logger = logging.getLogger(__name__)
 
@@ -133,9 +131,7 @@ async def get_project_subscription(
     await require_project_role(project_id, current_user, ProjectMemberRole.ADMIN, db)
 
     # Get project
-    result = await db.execute(
-        select(Project).where(Project.id == str(project_id))
-    )
+    result = await db.execute(select(Project).where(Project.id == str(project_id)))
     project = result.scalar_one_or_none()
 
     if not project:
@@ -182,12 +178,10 @@ async def create_project_checkout(
     Generates a checkout URL with project context passed in custom data.
     """
     # Require OWNER role for billing changes
-    member = await require_project_role(project_id, current_user, ProjectMemberRole.OWNER, db)
+    await require_project_role(project_id, current_user, ProjectMemberRole.OWNER, db)
 
     # Get project
-    result = await db.execute(
-        select(Project).where(Project.id == str(project_id))
-    )
+    result = await db.execute(select(Project).where(Project.id == str(project_id)))
     project = result.scalar_one_or_none()
 
     if not project:
@@ -222,11 +216,13 @@ async def create_project_checkout(
     # Build checkout URL with project context
     # Format: https://YOUR_STORE.lemonsqueezy.com/checkout/buy/{variant_id}
     store_url = f"https://{settings.lemonsqueezy_store_id}.lemonsqueezy.com"
-    params = urlencode({
-        "checkout[email]": current_user.email,
-        "checkout[custom][project_id]": str(project_id),
-        "checkout[custom][user_id]": current_user.id,
-    })
+    params = urlencode(
+        {
+            "checkout[email]": current_user.email,
+            "checkout[custom][project_id]": str(project_id),
+            "checkout[custom][user_id]": current_user.id,
+        }
+    )
     checkout_url = f"{store_url}/checkout/buy/{request.variant_id}?{params}"
 
     logger.info(
@@ -254,9 +250,7 @@ async def get_project_billing_portal(
     await require_project_role(project_id, current_user, ProjectMemberRole.OWNER, db)
 
     # Get project
-    result = await db.execute(
-        select(Project).where(Project.id == str(project_id))
-    )
+    result = await db.execute(select(Project).where(Project.id == str(project_id)))
     project = result.scalar_one_or_none()
 
     if not project:
@@ -303,9 +297,7 @@ async def cancel_project_subscription(
     await require_project_role(project_id, current_user, ProjectMemberRole.OWNER, db)
 
     # Get project
-    result = await db.execute(
-        select(Project).where(Project.id == str(project_id))
-    )
+    result = await db.execute(select(Project).where(Project.id == str(project_id)))
     project = result.scalar_one_or_none()
 
     if not project:
@@ -368,9 +360,7 @@ async def get_project_usage(
     await get_project_member(project_id, current_user.id, db)
 
     # Get project
-    result = await db.execute(
-        select(Project).where(Project.id == str(project_id))
-    )
+    result = await db.execute(select(Project).where(Project.id == str(project_id)))
     project = result.scalar_one_or_none()
 
     if not project:

@@ -4,18 +4,18 @@ Knowledge vault service for RAG operations.
 
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import Any
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from adapters.knowledge import ChromaAdapter, EmbeddingService, DocumentProcessor
 from adapters.ai.anthropic_adapter import AnthropicContentService
+from adapters.knowledge import ChromaAdapter, DocumentProcessor, EmbeddingService
 from infrastructure.database.models.knowledge import (
-    KnowledgeSource,
     KnowledgeQuery,
+    KnowledgeSource,
     SourceStatus,
 )
 
@@ -56,7 +56,7 @@ class KnowledgeService:
         user_id: str,
         file_path: str,
         db: AsyncSession,
-        project_id: Optional[str] = None,
+        project_id: str | None = None,
     ) -> bool:
         """
         Process a document: extract text, chunk, embed, store in ChromaDB.
@@ -91,7 +91,7 @@ class KnowledgeService:
 
             # 2. Update status to 'processing'
             source.status = SourceStatus.PROCESSING.value
-            source.processing_started_at = datetime.now(timezone.utc)
+            source.processing_started_at = datetime.now(UTC)
             await db.commit()
 
             logger.info(f"Processing document: {source.title} ({source_id})")
@@ -127,6 +127,7 @@ class KnowledgeService:
 
             # 5. Store in ChromaDB
             from adapters.knowledge.chroma_adapter import Document as ChromaDocument
+
             chroma_docs = [
                 ChromaDocument(
                     id=f"{source_id}_chunk_{i}",
@@ -150,7 +151,7 @@ class KnowledgeService:
             source.chunk_count = len(chunks)
             source.char_count = total_chars
             source.status = SourceStatus.COMPLETED.value
-            source.processing_completed_at = datetime.now(timezone.utc)
+            source.processing_completed_at = datetime.now(UTC)
             source.error_message = None
 
             await db.commit()
@@ -175,7 +176,7 @@ class KnowledgeService:
                 if source:
                     source.status = SourceStatus.FAILED.value
                     source.error_message = str(e)[:1000]  # Truncate if too long
-                    source.processing_completed_at = datetime.now(timezone.utc)
+                    source.processing_completed_at = datetime.now(UTC)
                     await db.commit()
 
             except Exception as db_error:
@@ -187,11 +188,11 @@ class KnowledgeService:
         self,
         user_id: str,
         query: str,
-        source_ids: Optional[List[str]] = None,
+        source_ids: list[str] | None = None,
         max_results: int = 5,
-        db: Optional[AsyncSession] = None,
-        project_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        db: AsyncSession | None = None,
+        project_id: str | None = None,
+    ) -> dict[str, Any]:
         """
         RAG query: embed query, retrieve chunks, generate answer.
 
@@ -253,17 +254,17 @@ class KnowledgeService:
             for result in results:
                 # Add to context
                 source_title = result.metadata.get("title", "Unknown")
-                context_parts.append(
-                    f"[Source: {source_title}]\n{result.content}"
-                )
+                context_parts.append(f"[Source: {source_title}]\n{result.content}")
 
                 # Add to sources list
-                sources.append({
-                    "source_id": result.metadata.get("source_id"),
-                    "source_title": source_title,
-                    "content": result.content[:500],  # Truncate for response
-                    "relevance_score": result.score,
-                })
+                sources.append(
+                    {
+                        "source_id": result.metadata.get("source_id"),
+                        "source_title": source_title,
+                        "content": result.content[:500],  # Truncate for response
+                        "relevance_score": result.score,
+                    }
+                )
 
             context = "\n\n---\n\n".join(context_parts)
 
@@ -351,7 +352,7 @@ Answer:"""
         source_id: str,
         user_id: str,
         db: AsyncSession,
-        project_id: Optional[str] = None,
+        project_id: str | None = None,
     ) -> bool:
         """
         Delete a source from DB and ChromaDB.
@@ -420,8 +421,8 @@ Answer:"""
         self,
         user_id: str,
         db: AsyncSession,
-        project_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        project_id: str | None = None,
+    ) -> dict[str, Any]:
         """
         Get statistics about a user's knowledge vault.
 

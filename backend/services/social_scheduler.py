@@ -7,26 +7,25 @@ platforms, and tracks results.
 """
 
 import asyncio
-from datetime import datetime, timezone, timedelta
-from typing import List, Optional
 import logging
+from datetime import UTC, datetime, timedelta
 
 import redis.asyncio as aioredis
-from sqlalchemy import select, update, and_
+from sqlalchemy import and_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from adapters.social import get_social_adapter, SocialPlatform
-from adapters.social.base import SocialCredentials, PostResult, SocialRateLimitError
-from infrastructure.database import async_session_maker
-from infrastructure.database.models.social import (
-    ScheduledPost,
-    PostTarget,
-    SocialAccount,
-    PostStatus,
-)
+from adapters.social import SocialPlatform, get_social_adapter
+from adapters.social.base import PostResult, SocialCredentials, SocialRateLimitError
 from core.security.encryption import decrypt_credential
 from infrastructure.config.settings import settings
+from infrastructure.database import async_session_maker
+from infrastructure.database.models.social import (
+    PostStatus,
+    PostTarget,
+    ScheduledPost,
+    SocialAccount,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +36,7 @@ class SocialSchedulerService:
     def __init__(self):
         self.is_running = False
         self.check_interval = 60  # Check every minute
-        self._task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
 
     async def start(self):
         """Start the scheduler background loop."""
@@ -46,7 +45,9 @@ class SocialSchedulerService:
             return
 
         self.is_running = True
-        logger.info("Social scheduler started - checking for posts every %d seconds", self.check_interval)
+        logger.info(
+            "Social scheduler started - checking for posts every %d seconds", self.check_interval
+        )
 
         while self.is_running:
             try:
@@ -80,7 +81,10 @@ class SocialSchedulerService:
                     logger.debug("process_due_posts already running in another instance, skipping")
                     return
         except Exception as redis_err:
-            logger.warning("SM-29: Redis lock unavailable (%s) — proceeding without distributed lock", redis_err)
+            logger.warning(
+                "SM-29: Redis lock unavailable (%s) — proceeding without distributed lock",
+                redis_err,
+            )
             # Proceed without lock — acceptable degradation in single-instance deployments
 
         try:
@@ -101,7 +105,7 @@ class SocialSchedulerService:
                 # SM-03: Atomically claim due posts by updating their status to PUBLISHING
                 # before loading them.  Any concurrent scheduler instance will skip posts
                 # already in PUBLISHING state, eliminating the race condition.
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
 
                 claim_stmt = (
                     update(ScheduledPost)
@@ -161,7 +165,7 @@ class SocialSchedulerService:
 
             # SM-03: Status is already set to PUBLISHING by the atomic claim in
             # process_due_posts. Just record the attempt timestamp.
-            post.publish_attempted_at = datetime.now(timezone.utc)
+            post.publish_attempted_at = datetime.now(UTC)
             await db.flush()
 
             # Track results
@@ -193,11 +197,11 @@ class SocialSchedulerService:
             # Update overall post status based on results
             if success_count > 0 and failed_count == 0:
                 post.status = PostStatus.PUBLISHED.value
-                post.published_at = datetime.now(timezone.utc)
+                post.published_at = datetime.now(UTC)
                 logger.info(f"Post {post.id} published successfully to all platforms")
             elif success_count > 0 and failed_count > 0:
                 post.status = PostStatus.PARTIALLY_PUBLISHED.value
-                post.published_at = datetime.now(timezone.utc)
+                post.published_at = datetime.now(UTC)
                 logger.warning(
                     f"Post {post.id} partially published: "
                     f"{success_count} succeeded, {failed_count} failed"
@@ -232,8 +236,7 @@ class SocialSchedulerService:
         """
         try:
             logger.info(
-                f"Publishing post {post.id} to {account.platform} "
-                f"({account.platform_username})"
+                f"Publishing post {post.id} to {account.platform} ({account.platform_username})"
             )
 
             # SM-41: Validate platform_user_id before attempting post
@@ -274,7 +277,9 @@ class SocialSchedulerService:
                 # SM-31: Disable the account so we stop attempting to publish on every tick.
                 # The user must reconnect their account to restore credentials.
                 account.is_active = False
-                account.error_message = "Credential decryption failed — please reconnect your account"
+                account.error_message = (
+                    "Credential decryption failed — please reconnect your account"
+                )
                 await db.commit()
                 return PostResult(
                     success=False,
@@ -285,7 +290,7 @@ class SocialSchedulerService:
             adapter = get_social_adapter(SocialPlatform(account.platform))
 
             # Check if token needs refresh
-            if credentials.token_expiry and credentials.token_expiry < datetime.now(timezone.utc):
+            if credentials.token_expiry and credentials.token_expiry < datetime.now(UTC):
                 logger.info(f"Refreshing expired token for {account.platform}")
                 try:
                     credentials = await adapter.refresh_token(credentials)
@@ -326,7 +331,9 @@ class SocialSchedulerService:
             if post.media_urls:
                 # Post with media
                 media_list = post.media_urls if isinstance(post.media_urls, list) else []
-                result = await adapter.post_with_media(credentials, post.content, media_list, **extra_kwargs)
+                result = await adapter.post_with_media(
+                    credentials, post.content, media_list, **extra_kwargs
+                )
             else:
                 # Text-only post
                 result = await adapter.post_text(credentials, post.content, **extra_kwargs)
@@ -337,16 +344,12 @@ class SocialSchedulerService:
                 target.platform_post_id = result.post_id
                 target.platform_post_url = result.post_url
                 target.publish_error = None
-                target.published_at = datetime.now(timezone.utc)
+                target.published_at = datetime.now(UTC)
 
-                logger.info(
-                    f"Successfully published to {account.platform}: {result.post_url}"
-                )
+                logger.info(f"Successfully published to {account.platform}: {result.post_url}")
             else:
                 target.publish_error = result.error_message
-                logger.warning(
-                    f"Failed to publish to {account.platform}: {result.error_message}"
-                )
+                logger.warning(f"Failed to publish to {account.platform}: {result.error_message}")
 
             return result
 
@@ -356,11 +359,12 @@ class SocialSchedulerService:
             if retry_delay is None:
                 # Try to parse from error string if retry_after not set as attribute
                 import re as _re
+
                 _m = _re.search(r"retry.after[:\s]+(\d+)", str(e), _re.IGNORECASE)
                 retry_delay = int(_m.group(1)) if _m else 60
             retry_delay = int(retry_delay)
             retry_delay = min(max(retry_delay, 1), 120)  # Cap at 2 minutes, minimum 1s
-            post.scheduled_at = datetime.now(timezone.utc) + timedelta(seconds=retry_delay)
+            post.scheduled_at = datetime.now(UTC) + timedelta(seconds=retry_delay)
             logger.warning(
                 f"Rate limit hit for {account.platform}, rescheduled in {retry_delay}s: {e}"
             )
@@ -368,7 +372,9 @@ class SocialSchedulerService:
             try:
                 if post.media_urls:
                     media_list = post.media_urls if isinstance(post.media_urls, list) else []
-                    result = await adapter.post_with_media(credentials, post.content, media_list, **extra_kwargs)
+                    result = await adapter.post_with_media(
+                        credentials, post.content, media_list, **extra_kwargs
+                    )
                 else:
                     result = await adapter.post_text(credentials, post.content, **extra_kwargs)
                 if result.success:
@@ -376,7 +382,7 @@ class SocialSchedulerService:
                     target.platform_post_id = result.post_id
                     target.platform_post_url = result.post_url
                     target.publish_error = None
-                    target.published_at = datetime.now(timezone.utc)
+                    target.published_at = datetime.now(UTC)
                     return result
             except Exception:
                 pass  # Fall through to failure below
@@ -427,9 +433,7 @@ class SocialSchedulerService:
 
             # Count results
             success_count = sum(1 for t in post.targets if t.is_published)
-            failed_count = sum(
-                1 for t in post.targets if not t.is_published and t.publish_error
-            )
+            failed_count = sum(1 for t in post.targets if not t.is_published and t.publish_error)
 
             return {
                 "success": True,
@@ -440,7 +444,11 @@ class SocialSchedulerService:
                     {
                         "account": t.social_account.platform_username,
                         "platform": t.social_account.platform,
-                        "status": "published" if t.is_published else "failed" if t.publish_error else "pending",
+                        "status": "published"
+                        if t.is_published
+                        else "failed"
+                        if t.publish_error
+                        else "pending",
                         "post_url": t.platform_post_url,
                         "error": t.publish_error,
                     }

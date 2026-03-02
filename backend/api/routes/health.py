@@ -1,14 +1,16 @@
 """Health check endpoints."""
+
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from infrastructure.database import get_db
-from infrastructure.config import get_settings
 from api.deps_admin import get_current_admin_user
+from infrastructure.config import get_settings
+from infrastructure.database import get_db
 from infrastructure.database.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -25,7 +27,7 @@ async def health_check():
         "app": settings.app_name,
         "version": settings.app_version,
         "environment": settings.environment,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
@@ -37,7 +39,7 @@ async def health_check_db(db: AsyncSession = Depends(get_db)):
         result = await asyncio.wait_for(db.execute(text("SELECT 1")), timeout=5.0)
         result.scalar()
         db_status = "connected"
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.error("Health check DB timeout")
         db_status = "error: database timeout"
     except Exception as e:
@@ -50,7 +52,7 @@ async def health_check_db(db: AsyncSession = Depends(get_db)):
         "version": settings.app_version,
         "environment": settings.environment,
         "database": db_status,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
@@ -59,11 +61,12 @@ async def health_redis():
     """INFRA-M1: Check Redis connectivity."""
     try:
         import redis.asyncio as aioredis
+
         r = aioredis.from_url(settings.redis_url)
         await asyncio.wait_for(r.ping(), timeout=3.0)
         await r.aclose()
         return {"status": "healthy", "service": "redis"}
-    except asyncio.TimeoutError:
+    except TimeoutError:
         raise HTTPException(status_code=503, detail="Redis timeout")
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Redis unavailable: {str(e)}")
@@ -84,6 +87,7 @@ async def readiness_check(db: AsyncSession = Depends(get_db)):
     redis_ok = False
     try:
         import redis.asyncio as aioredis
+
         r = aioredis.from_url(settings.redis_url)
         await asyncio.wait_for(r.ping(), timeout=2.0)
         await r.aclose()
@@ -108,8 +112,8 @@ async def liveness_check():
 @router.get("/health/services")
 async def services_check(admin_user: User = Depends(get_current_admin_user)):
     """Check status of external service connections."""
-    from adapters.ai.replicate_adapter import image_ai_service
     from adapters.ai.anthropic_adapter import content_ai_service
+    from adapters.ai.replicate_adapter import image_ai_service
 
     services = {}
 
@@ -132,5 +136,5 @@ async def services_check(admin_user: User = Depends(get_current_admin_user)):
     return {
         "status": "healthy" if all_configured else "degraded",
         "services": services,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }

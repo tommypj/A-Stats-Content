@@ -10,24 +10,24 @@ Tests the LemonSqueezy API integration including:
 - Error handling
 """
 
-import pytest
-import hmac
 import hashlib
-import json
-from datetime import datetime, timedelta
-from unittest.mock import Mock, patch, AsyncMock
-from typing import Dict, Any
+import hmac
+from typing import Any
+from unittest.mock import Mock, patch
+
+import pytest
 
 # These imports will work once the adapter is created
 # For now, we'll use pytest.importorskip to make tests conditional
 try:
     from adapters.billing.lemonsqueezy_adapter import (
         LemonSqueezyAdapter,
-        LemonSqueezyError,
         LemonSqueezyAuthError,
+        LemonSqueezyError,
         LemonSqueezyWebhookError,
         create_lemonsqueezy_adapter,
     )
+
     ADAPTER_AVAILABLE = True
 except ImportError:
     ADAPTER_AVAILABLE = False
@@ -47,7 +47,7 @@ def adapter():
 
 
 @pytest.fixture
-def mock_customer_response() -> Dict[str, Any]:
+def mock_customer_response() -> dict[str, Any]:
     """Mock successful customer API response."""
     return {
         "data": {
@@ -66,7 +66,7 @@ def mock_customer_response() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def mock_subscription_response() -> Dict[str, Any]:
+def mock_subscription_response() -> dict[str, Any]:
     """Mock successful subscription API response."""
     return {
         "data": {
@@ -108,7 +108,7 @@ def mock_subscription_response() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def webhook_payload_subscription_created() -> Dict[str, Any]:
+def webhook_payload_subscription_created() -> dict[str, Any]:
     """Sample subscription_created webhook payload."""
     return {
         "meta": {
@@ -134,7 +134,7 @@ def webhook_payload_subscription_created() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def webhook_payload_subscription_cancelled() -> Dict[str, Any]:
+def webhook_payload_subscription_cancelled() -> dict[str, Any]:
     """Sample subscription_cancelled webhook payload."""
     return {
         "meta": {
@@ -156,7 +156,7 @@ def webhook_payload_subscription_cancelled() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def webhook_payload_payment_failed() -> Dict[str, Any]:
+def webhook_payload_payment_failed() -> dict[str, Any]:
     """Sample order_payment_failed webhook payload."""
     return {
         "meta": {
@@ -393,11 +393,7 @@ class TestLemonSqueezyAdapter:
             pytest.skip("LemonSqueezy adapter not available")
 
         payload = b'{"event": "test"}'
-        signature = hmac.new(
-            adapter.webhook_secret.encode(),
-            payload,
-            hashlib.sha256
-        ).hexdigest()
+        signature = hmac.new(adapter.webhook_secret.encode(), payload, hashlib.sha256).hexdigest()
 
         # Should not raise any exception
         adapter.verify_webhook_signature(payload, signature)
@@ -442,9 +438,7 @@ class TestLemonSqueezyAdapter:
         assert event["status"] == "cancelled"
         assert event["cancelled"] is True
 
-    def test_parse_webhook_payment_failed(
-        self, adapter, webhook_payload_payment_failed
-    ):
+    def test_parse_webhook_payment_failed(self, adapter, webhook_payload_payment_failed):
         """Test parsing payment_failed webhook event."""
         if not ADAPTER_AVAILABLE:
             pytest.skip("LemonSqueezy adapter not available")
@@ -484,6 +478,7 @@ class TestLemonSqueezyAdapter:
         with patch("httpx.AsyncClient.get") as mock_get:
             # Simulate network error
             import httpx
+
             mock_get.side_effect = httpx.HTTPError("Network error")
 
             with pytest.raises(LemonSqueezyError, match="API request failed"):
@@ -498,9 +493,7 @@ class TestLemonSqueezyAdapter:
         with patch("httpx.AsyncClient.get") as mock_get:
             mock_response = Mock()
             mock_response.status_code = 401
-            mock_response.json.return_value = {
-                "errors": [{"detail": "Unauthorized"}]
-            }
+            mock_response.json.return_value = {"errors": [{"detail": "Unauthorized"}]}
             mock_get.return_value = mock_response
 
             with pytest.raises(LemonSqueezyAuthError, match="Authentication failed"):

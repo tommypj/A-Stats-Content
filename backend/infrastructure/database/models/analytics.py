@@ -2,21 +2,20 @@
 Analytics database models for Google Search Console integration.
 """
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy import (
+    JSON,
     Boolean,
+    Date,
     DateTime,
+    Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
-    Float,
-    Date,
-    Index,
-    JSON,
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -46,7 +45,7 @@ class GSCConnection(Base, TimestampMixin):
     )
 
     # Project ownership (optional - for multi-tenancy)
-    project_id: Mapped[Optional[str]] = mapped_column(
+    project_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=True,
@@ -61,17 +60,13 @@ class GSCConnection(Base, TimestampMixin):
     # Migration 038 renames these columns in the database.
     access_token_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
     refresh_token_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
-    token_expiry: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    token_expiry: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     # Connection metadata
     connected_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
-    last_sync: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    last_sync: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Status
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
@@ -82,7 +77,7 @@ class GSCConnection(Base, TimestampMixin):
     @property
     def is_token_expired(self) -> bool:
         """Check if access token is expired."""
-        return datetime.now(timezone.utc) >= self.token_expiry
+        return datetime.now(UTC) >= self.token_expiry
 
 
 class KeywordRanking(Base, TimestampMixin):
@@ -186,7 +181,9 @@ class PagePerformance(Base, TimestampMixin):
     )
 
     def __repr__(self) -> str:
-        return f"<PagePerformance(page={self.page_url[:50]}, date={self.date}, clicks={self.clicks})>"
+        return (
+            f"<PagePerformance(page={self.page_url[:50]}, date={self.date}, clicks={self.clicks})>"
+        )
 
 
 class DailyAnalytics(Base, TimestampMixin):
@@ -254,13 +251,13 @@ class ContentDecayAlert(Base, TimestampMixin):
         nullable=False,
         index=True,
     )
-    project_id: Mapped[Optional[str]] = mapped_column(
+    project_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
-    article_id: Mapped[Optional[str]] = mapped_column(
+    article_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("articles.id", ondelete="SET NULL"),
         nullable=True,
@@ -268,19 +265,17 @@ class ContentDecayAlert(Base, TimestampMixin):
     )
     alert_type: Mapped[str] = mapped_column(String(50), nullable=False)
     severity: Mapped[str] = mapped_column(String(20), nullable=False)
-    keyword: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    page_url: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    keyword: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    page_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     metric_name: Mapped[str] = mapped_column(String(50), nullable=False)
     metric_before: Mapped[float] = mapped_column(Float, nullable=False)
     metric_after: Mapped[float] = mapped_column(Float, nullable=False)
     period_days: Mapped[int] = mapped_column(Integer, default=7, nullable=False)
     percentage_change: Mapped[float] = mapped_column(Float, nullable=False)
-    suggested_actions: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    suggested_actions: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_resolved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    resolved_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         Index("ix_content_decay_alerts_user_type", "user_id", "alert_type"),

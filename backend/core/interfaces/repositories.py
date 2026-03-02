@@ -1,10 +1,10 @@
 """Repository interfaces for data access."""
+
 from abc import ABC, abstractmethod
-from typing import Optional
 from uuid import UUID
 
+from ..domain.content import Article, Outline
 from ..domain.user import User
-from ..domain.content import Outline, Article
 
 
 class UserRepository(ABC):
@@ -16,12 +16,12 @@ class UserRepository(ABC):
         ...
 
     @abstractmethod
-    async def get_by_id(self, user_id: UUID) -> Optional[User]:
+    async def get_by_id(self, user_id: UUID) -> User | None:
         """Get user by ID."""
         ...
 
     @abstractmethod
-    async def get_by_email(self, email: str) -> Optional[User]:
+    async def get_by_email(self, email: str) -> User | None:
         """Get user by email."""
         ...
 
@@ -50,14 +50,12 @@ class OutlineRepository(ABC):
         ...
 
     @abstractmethod
-    async def get_by_id(self, outline_id: UUID) -> Optional[Outline]:
+    async def get_by_id(self, outline_id: UUID) -> Outline | None:
         """Get outline by ID."""
         ...
 
     @abstractmethod
-    async def get_by_user(
-        self, user_id: UUID, skip: int = 0, limit: int = 50
-    ) -> list[Outline]:
+    async def get_by_user(self, user_id: UUID, skip: int = 0, limit: int = 50) -> list[Outline]:
         """Get outlines for a user."""
         ...
 
@@ -81,12 +79,12 @@ class ArticleRepository(ABC):
         ...
 
     @abstractmethod
-    async def get_by_id(self, article_id: UUID) -> Optional[Article]:
+    async def get_by_id(self, article_id: UUID) -> Article | None:
         """Get article by ID."""
         ...
 
     @abstractmethod
-    async def get_by_outline(self, outline_id: UUID) -> Optional[Article]:
+    async def get_by_outline(self, outline_id: UUID) -> Article | None:
         """Get article for an outline."""
         ...
 

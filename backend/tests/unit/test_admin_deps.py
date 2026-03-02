@@ -8,11 +8,10 @@ Tests admin authentication dependencies:
 - Role validation
 """
 
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
-from unittest.mock import Mock, AsyncMock
 
+import pytest
 from fastapi import HTTPException, status
 
 # Skip all tests if admin dependencies are not available
@@ -21,8 +20,10 @@ try:
         get_current_admin_user,
         get_current_super_admin,
     )
+
     from infrastructure.database.models import User
     from infrastructure.database.models.user import UserRole, UserStatus
+
     ADMIN_DEPS_AVAILABLE = True
 except (ImportError, AttributeError):
     ADMIN_DEPS_AVAILABLE = False
@@ -139,7 +140,7 @@ class TestGetCurrentAdminUser:
         if not ADMIN_DEPS_AVAILABLE:
             pytest.skip("Admin dependencies not available")
 
-        admin_user.deleted_at = datetime.now(timezone.utc)
+        admin_user.deleted_at = datetime.now(UTC)
 
         with pytest.raises(HTTPException) as exc_info:
             await get_current_admin_user(current_user=admin_user)

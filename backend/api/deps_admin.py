@@ -6,8 +6,8 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
 
-from infrastructure.database.models.user import User, UserRole
 from api.routes.auth import get_current_user
+from infrastructure.database.models.user import User, UserRole
 
 
 async def get_current_admin_user(

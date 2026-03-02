@@ -1,13 +1,14 @@
 """Content domain entities."""
+
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Optional
+from datetime import UTC, datetime
+from enum import StrEnum
 from uuid import UUID, uuid4
 
 
-class ContentStatus(str, Enum):
+class ContentStatus(StrEnum):
     """Content lifecycle status."""
+
     DRAFT = "draft"
     GENERATING = "generating"
     PENDING_REVIEW = "pending_review"
@@ -16,18 +17,20 @@ class ContentStatus(str, Enum):
     ARCHIVED = "archived"
 
 
-class JourneyPhase(str, Enum):
+class JourneyPhase(StrEnum):
     """SEO Journey Phase (Healing Stage)."""
+
     DISCOVERY = "discovery"
     VALIDATION = "validation"
     ACTION = "action"
 
 
-class PersonaIntensity(str, Enum):
+class PersonaIntensity(StrEnum):
     """Therapeutic persona intensity levels."""
+
     SUPPORTIVE = "supportive"  # Warm, gentle
-    BALANCED = "balanced"      # Professional yet caring
-    DIRECT = "direct"          # Clear, action-oriented
+    BALANCED = "balanced"  # Professional yet caring
+    DIRECT = "direct"  # Clear, action-oriented
 
 
 @dataclass
@@ -40,14 +43,14 @@ class Outline:
     # Core fields
     title: str = ""
     keyword: str = ""
-    brief: Optional[str] = None
+    brief: str | None = None
     status: ContentStatus = ContentStatus.DRAFT
 
     # SEO metadata
-    journey_phase: Optional[JourneyPhase] = None
-    search_volume: Optional[int] = None
-    current_position: Optional[float] = None
-    impressions: Optional[int] = None
+    journey_phase: JourneyPhase | None = None
+    search_volume: int | None = None
+    current_position: float | None = None
+    impressions: int | None = None
 
     # Generation settings
     language: str = "en"
@@ -55,13 +58,13 @@ class Outline:
     target_word_count: int = 1500
 
     # Timestamps
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    published_at: Optional[datetime] = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    published_at: datetime | None = None
 
     # WordPress integration
-    wordpress_post_id: Optional[int] = None
-    wordpress_url: Optional[str] = None
+    wordpress_post_id: int | None = None
+    wordpress_url: str | None = None
 
     def __post_init__(self):
         if isinstance(self.id, str):
@@ -92,12 +95,12 @@ class Article:
     sections: list[dict] = field(default_factory=list)
 
     # Featured image
-    featured_image_url: Optional[str] = None
-    featured_image_alt: Optional[str] = None
+    featured_image_url: str | None = None
+    featured_image_alt: str | None = None
 
     # Quality metrics
     word_count: int = 0
-    authenticity_score: Optional[float] = None
+    authenticity_score: float | None = None
 
     # Generation metadata
     model_used: str = "claude-sonnet-4-20250514"
@@ -105,8 +108,8 @@ class Article:
     generation_time_seconds: float = 0.0
 
     # Timestamps
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self):
         if isinstance(self.id, str):

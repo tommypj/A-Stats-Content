@@ -5,7 +5,6 @@ Replicate adapter for AI image generation using Ideogram V3 Turbo.
 import asyncio
 import logging
 import random
-from typing import Optional
 from dataclasses import dataclass
 
 try:
@@ -25,11 +24,30 @@ async def _retry_with_backoff(coro_factory, max_retries=3, base_delay=1.0):
             return await coro_factory()
         except Exception as e:
             error_str = str(e).lower()
-            is_transient = any(k in error_str for k in ["rate_limit", "429", "500", "502", "503", "504", "overloaded", "connection", "timeout"])
+            is_transient = any(
+                k in error_str
+                for k in [
+                    "rate_limit",
+                    "429",
+                    "500",
+                    "502",
+                    "503",
+                    "504",
+                    "overloaded",
+                    "connection",
+                    "timeout",
+                ]
+            )
             if not is_transient or attempt == max_retries:
                 raise
-            delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
-            logger.warning("Transient API error (attempt %d/%d), retrying in %.1fs: %s", attempt + 1, max_retries, delay, str(e))
+            delay = base_delay * (2**attempt) + random.uniform(0, 1)
+            logger.warning(
+                "Transient API error (attempt %d/%d), retrying in %.1fs: %s",
+                attempt + 1,
+                max_retries,
+                delay,
+                str(e),
+            )
             await asyncio.sleep(delay)
 
 
@@ -42,7 +60,7 @@ class GeneratedImage:
     width: int
     height: int
     model: str
-    style: Optional[str] = None
+    style: str | None = None
 
 
 # Map our frontend styles to Ideogram V3 native parameters.
@@ -111,7 +129,7 @@ class ReplicateImageService:
         prompt: str,
         width: int = 1024,
         height: int = 1024,
-        style: Optional[str] = None,
+        style: str | None = None,
     ) -> GeneratedImage:
         """
         Generate an image using Ideogram V3 Turbo via Replicate.
@@ -159,7 +177,7 @@ class ReplicateImageService:
             # Replicate models return various types: URL string, list of URLs, or FileOutput
             if isinstance(output, list) and len(output) > 0:
                 image_url = str(output[0])
-            elif hasattr(output, 'url'):
+            elif hasattr(output, "url"):
                 image_url = output.url
             else:
                 image_url = str(output)
@@ -189,21 +207,21 @@ class ReplicateImageService:
         ratio = width / height
         if abs(ratio - 1.0) < 0.05:
             aspect_ratio = "1:1"
-        elif abs(ratio - (4/3)) < 0.05:
+        elif abs(ratio - (4 / 3)) < 0.05:
             aspect_ratio = "4:3"
-        elif abs(ratio - (3/4)) < 0.05:
+        elif abs(ratio - (3 / 4)) < 0.05:
             aspect_ratio = "3:4"
-        elif abs(ratio - (16/9)) < 0.05:
+        elif abs(ratio - (16 / 9)) < 0.05:
             aspect_ratio = "16:9"
-        elif abs(ratio - (9/16)) < 0.05:
+        elif abs(ratio - (9 / 16)) < 0.05:
             aspect_ratio = "9:16"
-        elif abs(ratio - (3/2)) < 0.05:
+        elif abs(ratio - (3 / 2)) < 0.05:
             aspect_ratio = "3:2"
-        elif abs(ratio - (2/3)) < 0.05:
+        elif abs(ratio - (2 / 3)) < 0.05:
             aspect_ratio = "2:3"
-        elif abs(ratio - (4/5)) < 0.05:
+        elif abs(ratio - (4 / 5)) < 0.05:
             aspect_ratio = "4:5"
-        elif abs(ratio - (5/4)) < 0.05:
+        elif abs(ratio - (5 / 4)) < 0.05:
             aspect_ratio = "5:4"
         elif ratio > 1.5:
             aspect_ratio = "16:9"
@@ -244,7 +262,7 @@ class ReplicateImageService:
         prompt: str,
         width: int,
         height: int,
-        style: Optional[str] = None,
+        style: str | None = None,
     ) -> GeneratedImage:
         """
         Generate mock image data for development.

@@ -3,10 +3,10 @@
 
 from .wordpress_adapter import (
     WordPressAdapter,
+    WordPressAPIError,
+    WordPressAuthError,
     WordPressConnection,
     WordPressConnectionError,
-    WordPressAuthError,
-    WordPressAPIError,
 )
 
 __all__ = [

@@ -1,13 +1,14 @@
 """User domain entity."""
+
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Optional
+from datetime import UTC, datetime
+from enum import StrEnum
 from uuid import UUID, uuid4
 
 
-class UserRole(str, Enum):
+class UserRole(StrEnum):
     """User roles in the system."""
+
     USER = "user"
     ADMIN = "admin"
     SUPERUSER = "superuser"
@@ -24,15 +25,15 @@ class User:
     role: UserRole = UserRole.USER
     is_active: bool = True
     is_verified: bool = False
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     # Optional integrations
-    google_id: Optional[str] = None
-    gsc_refresh_token: Optional[str] = None
-    wordpress_url: Optional[str] = None
-    wordpress_username: Optional[str] = None
-    wordpress_app_password: Optional[str] = None
+    google_id: str | None = None
+    gsc_refresh_token: str | None = None
+    wordpress_url: str | None = None
+    wordpress_username: str | None = None
+    wordpress_app_password: str | None = None
 
     # Subscription
     subscription_tier: str = "free"

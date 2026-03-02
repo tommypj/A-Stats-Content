@@ -8,17 +8,16 @@ for programmatic SEO workflows.
 import asyncio
 import logging
 import time
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import select, and_, update
+from sqlalchemy import and_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from infrastructure.database.models.bulk import BulkJob, BulkJobItem, ContentTemplate
-from infrastructure.database.models.content import Outline, Article, ContentStatus
-from infrastructure.database.models.project import Project
 from infrastructure.config.settings import settings
+from infrastructure.database.models.bulk import BulkJob, BulkJobItem, ContentTemplate
+from infrastructure.database.models.content import ContentStatus, Outline
+from infrastructure.database.models.project import Project
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +25,9 @@ logger = logging.getLogger(__name__)
 async def create_bulk_outline_job(
     db: AsyncSession,
     user_id: str,
-    project_id: Optional[str],
+    project_id: str | None,
     keywords: list[dict],
-    template_id: Optional[str] = None,
+    template_id: str | None = None,
 ) -> BulkJob:
     """
     Create a bulk outline generation job.
@@ -77,7 +76,9 @@ async def process_bulk_outline_job(
 
     # Fetch job — with_for_update prevents concurrent workers from double-processing (BULK-29)
     job_result = await db.execute(
-        select(BulkJob).where(and_(BulkJob.id == job_id, BulkJob.user_id == user_id)).with_for_update()
+        select(BulkJob)
+        .where(and_(BulkJob.id == job_id, BulkJob.user_id == user_id))
+        .with_for_update()
     )
     job = job_result.scalar_one_or_none()
     if not job:
@@ -86,7 +87,7 @@ async def process_bulk_outline_job(
 
     # Mark as processing
     job.status = "processing"
-    job.started_at = datetime.now(timezone.utc)
+    job.started_at = datetime.now(UTC)
     await db.commit()
 
     # Load template config if any
@@ -121,7 +122,7 @@ async def process_bulk_outline_job(
 
     for item in items:
         item.status = "processing"
-        item.processing_started_at = datetime.now(timezone.utc)
+        item.processing_started_at = datetime.now(UTC)
         await db.commit()
 
         start_time = time.time()
@@ -131,23 +132,30 @@ async def process_bulk_outline_job(
         try:
             # Check usage limits
             from services.project_usage import ProjectUsageService
+
             usage_svc = ProjectUsageService(db)
             can_generate = await usage_svc.check_project_limit(job.project_id, "outlines")
             if not can_generate:
                 item.status = "failed"
                 item.error_message = "Usage limit reached for outlines this month"
-                item.processing_completed_at = datetime.now(timezone.utc)
+                item.processing_completed_at = datetime.now(UTC)
                 job.failed_items += 1
                 await db.commit()
                 continue
 
             # Merge template config with brand voice
             tone = template_config.get("tone") or brand_voice.get("tone", "professional")
-            target_audience = template_config.get("target_audience") or brand_voice.get("target_audience", "")
+            target_audience = template_config.get("target_audience") or brand_voice.get(
+                "target_audience", ""
+            )
             word_count = template_config.get("word_count_target", 1500)
             language = template_config.get("language") or brand_voice.get("language", "en")
-            writing_style = template_config.get("writing_style") or brand_voice.get("writing_style", "editorial")
-            custom_instructions = template_config.get("custom_instructions") or brand_voice.get("custom_instructions", "")
+            writing_style = template_config.get("writing_style") or brand_voice.get(
+                "writing_style", "editorial"
+            )
+            custom_instructions = template_config.get("custom_instructions") or brand_voice.get(
+                "custom_instructions", ""
+            )
 
             # LOW-05: sanitize keyword before passing to AI and before storing in DB
             safe_keyword = content_ai_service._sanitize_prompt_input(item.keyword or "", 100)
@@ -196,7 +204,7 @@ async def process_bulk_outline_job(
                 ai_model=settings.anthropic_model,
             )
             # BULK-30: propagate language to the outline record when the field exists
-            if hasattr(outline, 'language') and language:
+            if hasattr(outline, "language") and language:
                 outline.language = language
 
             db.add(outline)
@@ -211,14 +219,14 @@ async def process_bulk_outline_job(
             item.status = "completed"
             item.resource_type = "outline"
             item.resource_id = outline_id
-            item.processing_completed_at = datetime.now(timezone.utc)
+            item.processing_completed_at = datetime.now(UTC)
             job.completed_items += 1
 
         except Exception as e:
             logger.error("Bulk outline item %s failed: %s", item.id, str(e))
             item.status = "failed"
             item.error_message = str(e)[:500]
-            item.processing_completed_at = datetime.now(timezone.utc)
+            item.processing_completed_at = datetime.now(UTC)
             job.failed_items += 1
 
             # Log failure (only if gen_log was created)
@@ -252,17 +260,22 @@ async def process_bulk_outline_job(
     if job.failed_items > 0:
         job.error_summary = f"{job.failed_items}/{job.total_items} items failed"
 
-    job.completed_at = datetime.now(timezone.utc)
+    job.completed_at = datetime.now(UTC)
     await db.commit()
-    logger.info("Bulk job %s finished: %d/%d completed, %d failed",
-                job_id, job.completed_items, job.total_items, job.failed_items)
+    logger.info(
+        "Bulk job %s finished: %d/%d completed, %d failed",
+        job_id,
+        job.completed_items,
+        job.total_items,
+        job.failed_items,
+    )
 
 
 async def get_job_with_items(
     db: AsyncSession,
     job_id: str,
     user_id: str,
-) -> Optional[dict]:
+) -> dict | None:
     """Fetch a bulk job with all its items."""
     job_result = await db.execute(
         select(BulkJob).where(and_(BulkJob.id == job_id, BulkJob.user_id == user_id))
@@ -299,8 +312,12 @@ async def get_job_with_items(
                 "resource_type": item.resource_type,
                 "resource_id": item.resource_id,
                 "error_message": item.error_message,
-                "processing_started_at": item.processing_started_at.isoformat() if item.processing_started_at else None,
-                "processing_completed_at": item.processing_completed_at.isoformat() if item.processing_completed_at else None,
+                "processing_started_at": item.processing_started_at.isoformat()
+                if item.processing_started_at
+                else None,
+                "processing_completed_at": item.processing_completed_at.isoformat()
+                if item.processing_completed_at
+                else None,
             }
             for item in items
         ],
@@ -323,14 +340,16 @@ async def cancel_job(
     # Cancel all pending items
     await db.execute(
         update(BulkJobItem)
-        .where(and_(
-            BulkJobItem.bulk_job_id == job_id,
-            BulkJobItem.status == "pending",
-        ))
+        .where(
+            and_(
+                BulkJobItem.bulk_job_id == job_id,
+                BulkJobItem.status == "pending",
+            )
+        )
         .values(status="cancelled")
     )
 
     job.status = "cancelled" if job.completed_items == 0 else "partially_failed"
-    job.completed_at = datetime.now(timezone.utc)
+    job.completed_at = datetime.now(UTC)
     await db.commit()
     return True

@@ -5,46 +5,55 @@ Authentication API routes.
 import json
 import logging
 import secrets
-from datetime import datetime, timezone, timedelta
-from typing import Annotated, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Annotated
 from urllib.parse import urlencode
 from uuid import uuid4
 
 import httpx
-
-from fastapi import APIRouter, Body, Depends, HTTPException, status, Header, Request, UploadFile, File
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    File,
+    Header,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import select, delete, and_
+from sqlalchemy import and_, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from infrastructure.database.connection import get_db
-from infrastructure.database.models.user import User, UserStatus
-from infrastructure.database.models.project import Project, ProjectMember
-from infrastructure.database.models.content import Article, Outline, GeneratedImage
-from infrastructure.database.models.knowledge import KnowledgeSource
-from infrastructure.database.models.social import ScheduledPost, PostTarget
-from infrastructure.database.models.analytics import GSCConnection
-from infrastructure.config.settings import settings
-from adapters.storage.image_storage import storage_adapter
-from core.security.password import password_hasher
-from core.security.tokens import TokenService
 from adapters.email.resend_adapter import email_service
+from adapters.storage.image_storage import storage_adapter
 from api.middleware.rate_limit import limiter
 from api.schemas.auth import (
+    DeleteAccountRequest,
+    EmailChangeRequest,
+    EmailChangeVerifyRequest,
     LoginRequest,
+    PasswordChangeRequest,
+    PasswordResetConfirm,
+    PasswordResetRequest,
+    RefreshTokenRequest,
     RegisterRequest,
     TokenResponse,
     UserResponse,
     UserUpdateRequest,
-    RefreshTokenRequest,
-    PasswordResetRequest,
-    PasswordResetConfirm,
-    PasswordChangeRequest,
-    DeleteAccountRequest,
-    EmailChangeRequest,
-    EmailChangeVerifyRequest,
 )
+from core.security.password import password_hasher
+from core.security.tokens import TokenService
+from infrastructure.config.settings import settings
+from infrastructure.database.connection import get_db
+from infrastructure.database.models.analytics import GSCConnection
+from infrastructure.database.models.content import Article, GeneratedImage, Outline
+from infrastructure.database.models.knowledge import KnowledgeSource
+from infrastructure.database.models.project import Project, ProjectMember
+from infrastructure.database.models.social import ScheduledPost
+from infrastructure.database.models.user import User, UserStatus
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +66,7 @@ async def _blacklist_token(token: str, ttl_seconds: int = 604800) -> None:
     """
     try:
         import hashlib
+
         import redis.asyncio as aioredis
 
         token_hash = hashlib.sha256(token.encode()).hexdigest()[:16]
@@ -75,6 +85,7 @@ async def _is_token_blacklisted(token: str) -> bool:
     """
     try:
         import hashlib
+
         import redis.asyncio as aioredis
 
         token_hash = hashlib.sha256(token.encode()).hexdigest()[:16]
@@ -95,7 +106,9 @@ _MAX_SESSIONS_BY_TIER = {
 }
 
 
-async def _register_session(user_id: str, session_token: str, tier: str = "free", ttl: int = 604800) -> None:
+async def _register_session(
+    user_id: str, session_token: str, tier: str = "free", ttl: int = 604800
+) -> None:
     """Register a new session token for a user. Evicts oldest sessions when over the tier limit.
 
     Uses a Redis sorted set keyed by user_id where the score is the Unix timestamp
@@ -105,6 +118,7 @@ async def _register_session(user_id: str, session_token: str, tier: str = "free"
     try:
         import hashlib
         import time
+
         import redis.asyncio as aioredis
 
         r = aioredis.from_url(settings.redis_url)
@@ -128,6 +142,7 @@ async def _revoke_session(user_id: str, session_token: str) -> None:
     """Remove a specific session token from the user's active session set."""
     try:
         import hashlib
+
         import redis.asyncio as aioredis
 
         r = aioredis.from_url(settings.redis_url)
@@ -146,20 +161,20 @@ def _get_cookie_kwargs(settings_obj) -> dict:
     may not be explicitly set to 'production' but the frontend is on Vercel.
     SameSite=Lax is kept for local development (same-origin, HTTP-safe).
     """
-    is_production = getattr(settings_obj, 'environment', 'development') == 'production'
+    is_production = getattr(settings_obj, "environment", "development") == "production"
     # Also treat as cross-site when FRONTEND_URL is not localhost
-    frontend_url = getattr(settings_obj, 'frontend_url', 'http://localhost:3000')
-    is_deployed = not any(h in frontend_url for h in ('localhost', '127.0.0.1', '0.0.0.0'))
+    frontend_url = getattr(settings_obj, "frontend_url", "http://localhost:3000")
+    is_deployed = not any(h in frontend_url for h in ("localhost", "127.0.0.1", "0.0.0.0"))
     use_cross_site = is_production or is_deployed
-    kwargs = dict(
-        httponly=True,
-        secure=use_cross_site,
-        samesite="none" if use_cross_site else "lax",
-        path="/",
-    )
-    cookie_domain = getattr(settings_obj, 'cookie_domain', None)
+    kwargs = {
+        "httponly": True,
+        "secure": use_cross_site,
+        "samesite": "none" if use_cross_site else "lax",
+        "path": "/",
+    }
+    cookie_domain = getattr(settings_obj, "cookie_domain", None)
     if cookie_domain:
-        kwargs['domain'] = cookie_domain
+        kwargs["domain"] = cookie_domain
     return kwargs
 
 
@@ -168,7 +183,7 @@ def _set_auth_cookies(
     access_token: str,
     refresh_token: str,
     settings_obj,
-    refresh_max_age: Optional[int] = None,
+    refresh_max_age: int | None = None,
 ) -> None:
     """Set HttpOnly auth cookies on response.
 
@@ -179,10 +194,10 @@ def _set_auth_cookies(
     """
     kwargs = _get_cookie_kwargs(settings_obj)
     # Access token: same expiry as JWT (in seconds)
-    access_max_age = getattr(settings_obj, 'jwt_access_token_expire_minutes', 60) * 60
+    access_max_age = getattr(settings_obj, "jwt_access_token_expire_minutes", 60) * 60
     # Refresh token: use override when provided, else default from settings
     if refresh_max_age is None:
-        refresh_max_age = getattr(settings_obj, 'jwt_refresh_token_expire_days', 7) * 86400
+        refresh_max_age = getattr(settings_obj, "jwt_refresh_token_expire_days", 7) * 86400
     response.set_cookie("access_token", access_token, max_age=access_max_age, **kwargs)
     response.set_cookie("refresh_token", refresh_token, max_age=refresh_max_age, **kwargs)
 
@@ -233,7 +248,9 @@ async def get_current_user(
     token = None
     if authorization and authorization.startswith("Bearer "):
         parts = authorization.split(" ", 1)
-        token = parts[1] if len(parts) > 1 and parts[1] else None  # AUTH-20: guard empty/missing token
+        token = (
+            parts[1] if len(parts) > 1 and parts[1] else None
+        )  # AUTH-20: guard empty/missing token
 
     # Fall back to HttpOnly cookie
     if not token:
@@ -289,7 +306,7 @@ async def get_current_user(
         # Ensure both datetimes are timezone-aware for comparison
         pwd_changed = user.password_changed_at
         if pwd_changed.tzinfo is None:
-            pwd_changed = pwd_changed.replace(tzinfo=timezone.utc)
+            pwd_changed = pwd_changed.replace(tzinfo=UTC)
         if token_iat < pwd_changed:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -315,7 +332,7 @@ async def get_current_user(
             personal = await db.execute(
                 select(Project.id).where(
                     Project.owner_id == user.id,
-                    Project.is_personal == True,
+                    Project.is_personal,
                     Project.deleted_at.is_(None),
                 )
             )
@@ -403,9 +420,7 @@ async def register(
     await db.refresh(user)
 
     # Send verification email
-    verification_token = token_service.create_email_verification_token(
-        user.id, user.email
-    )
+    verification_token = token_service.create_email_verification_token(user.id, user.email)
     user.email_verification_token = verification_token
     await db.commit()
 
@@ -433,9 +448,7 @@ async def login(
     Authenticate user and return access tokens.
     """
     # Find user by email
-    result = await db.execute(
-        select(User).where(User.email == login_data.email.lower())
-    )
+    result = await db.execute(select(User).where(User.email == login_data.email.lower()))
     user = result.scalar_one_or_none()
 
     # AUTH-03: Always run bcrypt to prevent timing-based user-existence enumeration.
@@ -478,7 +491,7 @@ async def login(
         )
 
     # Update login tracking
-    user.last_login = datetime.now(timezone.utc)
+    user.last_login = datetime.now(UTC)
     user.login_count += 1
     await db.commit()
 
@@ -507,7 +520,9 @@ async def login(
         "expires_in": settings.jwt_access_token_expire_minutes * 60,
     }
     response = JSONResponse(content=response_data)
-    _set_auth_cookies(response, access_token, refresh_token, settings, refresh_max_age=refresh_ttl_seconds)
+    _set_auth_cookies(
+        response, access_token, refresh_token, settings, refresh_max_age=refresh_ttl_seconds
+    )
     return response
 
 
@@ -515,7 +530,7 @@ async def login(
 @limiter.limit("5/minute")  # AUTH-14: tightened from 10/min to match login limit
 async def refresh_token(
     request: Request,
-    body: Optional[RefreshTokenRequest] = Body(None),
+    body: RefreshTokenRequest | None = Body(None),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """
@@ -559,7 +574,7 @@ async def refresh_token(
     if user.password_changed_at:
         pwd_changed = user.password_changed_at
         if pwd_changed.tzinfo is None:
-            pwd_changed = pwd_changed.replace(tzinfo=timezone.utc)
+            pwd_changed = pwd_changed.replace(tzinfo=UTC)
         # AUTH-21: guard against payload.iat being None (malformed token)
         if payload.iat and payload.iat < pwd_changed:
             raise HTTPException(
@@ -635,9 +650,7 @@ async def request_password_reset(
     Request a password reset email.
     """
     # Find user by email
-    result = await db.execute(
-        select(User).where(User.email == reset_data.email.lower())
-    )
+    result = await db.execute(select(User).where(User.email == reset_data.email.lower()))
     user = result.scalar_one_or_none()
 
     # Always return success to prevent email enumeration
@@ -645,7 +658,7 @@ async def request_password_reset(
         # Create reset token
         reset_token = token_service.create_password_reset_token(user.id)
         user.password_reset_token = reset_token
-        user.password_reset_expires = datetime.now(timezone.utc) + timedelta(hours=1)
+        user.password_reset_expires = datetime.now(UTC) + timedelta(hours=1)
         await db.commit()
 
         # AUTH-08: Catch email service errors — still return success to caller.
@@ -696,7 +709,7 @@ async def reset_password(
             detail="Invalid or already used reset token",
         )
 
-    if user.password_reset_expires and user.password_reset_expires < datetime.now(timezone.utc):
+    if user.password_reset_expires and user.password_reset_expires < datetime.now(UTC):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Password reset token has expired",
@@ -706,7 +719,7 @@ async def reset_password(
     user.password_hash = password_hasher.hash(body.new_password)
     user.password_reset_token = None
     user.password_reset_expires = None
-    user.password_changed_at = datetime.now(timezone.utc)
+    user.password_changed_at = datetime.now(UTC)
     await db.commit()
 
     return {"message": "Password has been reset successfully"}
@@ -732,7 +745,7 @@ async def change_password(
 
     # Update password and bump password_changed_at so existing tokens are invalidated
     current_user.password_hash = password_hasher.hash(body.new_password)
-    current_user.password_changed_at = datetime.now(timezone.utc)
+    current_user.password_changed_at = datetime.now(UTC)
     await db.commit()
 
     return {"message": "Password has been changed successfully"}
@@ -760,9 +773,7 @@ async def verify_email(
     user_id, email = result
 
     # Find user
-    db_result = await db.execute(
-        select(User).where(User.id == user_id, User.email == email)
-    )
+    db_result = await db.execute(select(User).where(User.id == user_id, User.email == email))
     user = db_result.scalar_one_or_none()
 
     if not user:
@@ -804,24 +815,22 @@ async def resend_verification(
     Resend email verification.
     """
     # Find user by email
-    result = await db.execute(
-        select(User).where(User.email == body.email.lower())
-    )
+    result = await db.execute(select(User).where(User.email == body.email.lower()))
     user = result.scalar_one_or_none()
 
     # Always return success to prevent email enumeration
     if user and not user.email_verified:
         # Create verification token
         try:
-            verification_token = token_service.create_email_verification_token(
-                user.id, user.email
-            )
+            verification_token = token_service.create_email_verification_token(user.id, user.email)
             user.email_verification_token = verification_token
             await db.commit()
         except Exception as db_err:
             # AUTH-19: DB failure is non-fatal — still return success to prevent enumeration
             logger.error("Failed to save verification token for user %s: %s", user.id, db_err)
-            return {"message": "If the email exists and is not verified, a verification link has been sent"}
+            return {
+                "message": "If the email exists and is not verified, a verification link has been sent"
+            }
 
         try:
             await email_service.send_verification_email(
@@ -954,16 +963,12 @@ async def delete_account(
         # ------------------------------------------------------------------
         # Step 2: Remove this user from projects they do NOT own (member rows).
         # ------------------------------------------------------------------
-        await db.execute(
-            delete(ProjectMember).where(ProjectMember.user_id == user_id)
-        )
+        await db.execute(delete(ProjectMember).where(ProjectMember.user_id == user_id))
 
         # ------------------------------------------------------------------
         # Step 3: Delete GSC connections.
         # ------------------------------------------------------------------
-        await db.execute(
-            delete(GSCConnection).where(GSCConnection.user_id == user_id)
-        )
+        await db.execute(delete(GSCConnection).where(GSCConnection.user_id == user_id))
 
         # ------------------------------------------------------------------
         # Step 4: Delete the user record itself.
@@ -993,10 +998,10 @@ _AVATAR_ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 # Magic bytes for supported image formats (server-side validation independent of Content-Type header)
 _AVATAR_MAGIC_BYTES = {
-    b'\xff\xd8\xff': 'image/jpeg',
-    b'\x89PNG': 'image/png',
-    b'GIF8': 'image/gif',
-    b'RIFF': 'image/webp',  # RIFF....WEBP
+    b"\xff\xd8\xff": "image/jpeg",
+    b"\x89PNG": "image/png",
+    b"GIF8": "image/gif",
+    b"RIFF": "image/webp",  # RIFF....WEBP
 }
 
 
@@ -1186,7 +1191,11 @@ async def export_my_data(
     ]
 
     # Project memberships
-    result = await db.execute(select(ProjectMember).where(ProjectMember.user_id == user_id, ProjectMember.deleted_at.is_(None)))
+    result = await db.execute(
+        select(ProjectMember).where(
+            ProjectMember.user_id == user_id, ProjectMember.deleted_at.is_(None)
+        )
+    )
     memberships = [
         {
             "project_id": str(m.project_id),
@@ -1197,7 +1206,7 @@ async def export_my_data(
     ]
 
     export = {
-        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "exported_at": datetime.now(UTC).isoformat(),
         "profile": profile_data,
         "articles": articles,
         "outlines": outlines,
@@ -1237,8 +1246,9 @@ async def google_oauth_redirect(request: Request):
     the backend endpoint below, which sets auth cookies and then redirects
     to the frontend /auth/callback page.
     """
-    from api.oauth_helpers import store_oauth_state
     from fastapi.responses import RedirectResponse as RR
+
+    from api.oauth_helpers import store_oauth_state
 
     if not settings.google_client_id or not settings.google_auth_redirect_uri:
         raise HTTPException(
@@ -1265,9 +1275,9 @@ async def google_oauth_redirect(request: Request):
 @router.get("/google/callback")
 async def google_oauth_callback(
     request: Request,
-    code: Optional[str] = None,
-    state: Optional[str] = None,
-    error: Optional[str] = None,
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -1276,8 +1286,9 @@ async def google_oauth_callback(
     Exchanges the auth code for tokens, finds or creates the user account,
     sets HttpOnly auth cookies, and redirects to the frontend /auth/callback.
     """
-    from api.oauth_helpers import verify_oauth_state_full
     from fastapi.responses import RedirectResponse as RR
+
+    from api.oauth_helpers import verify_oauth_state_full
 
     frontend_url = settings.frontend_url
 
@@ -1382,7 +1393,7 @@ async def google_oauth_callback(
         # Update profile picture if not already set
         if google_picture and not user.avatar_url:
             user.avatar_url = google_picture
-        user.last_login = datetime.now(timezone.utc)
+        user.last_login = datetime.now(UTC)
         user.login_count += 1
         await db.commit()
 
@@ -1409,6 +1420,7 @@ async def google_oauth_callback(
 # ============================================================================
 # Email change flow
 # ============================================================================
+
 
 @router.post("/change-email", status_code=status.HTTP_200_OK)
 @limiter.limit("3/minute")
@@ -1480,17 +1492,13 @@ async def request_email_change(
             verification_url=verification_url,
         )
     except Exception as email_err:
-        logger.error(
-            "Failed to send email change verification to %s: %s", new_email, email_err
-        )
+        logger.error("Failed to send email change verification to %s: %s", new_email, email_err)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to send verification email. Please try again.",
         )
 
-    logger.info(
-        "Email change requested for user_id=%s new_email=%s", current_user.id, new_email
-    )
+    logger.info("Email change requested for user_id=%s new_email=%s", current_user.id, new_email)
     return {"message": "Verification email sent to your new address"}
 
 
@@ -1553,10 +1561,8 @@ async def verify_email_change(
 
     old_email = user.email
     user.email = new_email
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(UTC)
     await db.commit()
 
-    logger.info(
-        "Email changed for user_id=%s old=%s new=%s", user_id, old_email, new_email
-    )
+    logger.info("Email changed for user_id=%s old=%s new=%s", user_id, old_email, new_email)
     return {"message": "Email address updated successfully"}

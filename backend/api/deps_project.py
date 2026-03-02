@@ -4,36 +4,34 @@ Project content access dependencies for multi-tenancy.
 Provides helper functions to filter content by project ownership and verify access permissions.
 """
 
-from typing import Annotated, Any, List, Optional, Union
-from uuid import UUID
+from typing import Annotated, Any
 
 from fastapi import Depends, HTTPException, status
-from sqlalchemy import select, or_, and_, text
+from sqlalchemy import and_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.routes.auth import get_current_user
 from infrastructure.database.connection import get_db
-from infrastructure.database.models.user import User, UserStatus
-from infrastructure.database.models.content import Article, Outline, GeneratedImage
-from infrastructure.database.models.social import SocialAccount, ScheduledPost
-from infrastructure.database.models.knowledge import KnowledgeSource
 from infrastructure.database.models.analytics import GSCConnection
+from infrastructure.database.models.content import Article, GeneratedImage, Outline
+from infrastructure.database.models.knowledge import KnowledgeSource
 from infrastructure.database.models.project import ProjectMember, ProjectMemberRole
-
+from infrastructure.database.models.social import ScheduledPost, SocialAccount
+from infrastructure.database.models.user import User, UserStatus
 
 # Type alias for content models
-ContentModel = Union[
-    Article,
-    Outline,
-    GeneratedImage,
-    SocialAccount,
-    ScheduledPost,
-    KnowledgeSource,
-    GSCConnection,
-]
+ContentModel = (
+    Article
+    | Outline
+    | GeneratedImage
+    | SocialAccount
+    | ScheduledPost
+    | KnowledgeSource
+    | GSCConnection
+)
 
 
-def get_content_filter(user: User, project_id: Optional[str] = None):
+def get_content_filter(user: User, project_id: str | None = None):
     """
     Returns SQLAlchemy filter for content queries based on ownership.
 
@@ -248,12 +246,11 @@ async def verify_content_edit(
     )
 
 
-
 # Helper function to build content list query with project filtering
 def apply_content_filters(
     stmt: Any,
     user: User,
-    project_id: Optional[str] = None,
+    project_id: str | None = None,
 ) -> Any:
     """
     Apply content ownership filters to a SQLAlchemy statement.
@@ -283,10 +280,11 @@ def apply_content_filters(
 # Project Management Dependencies (for project CRUD routes)
 # =============================================================================
 
+
 async def get_project_by_id(
     project_id: str,
     db: AsyncSession,
-) -> "Project":
+) -> "Project":  # noqa: F821
     """
     Get a project by ID from database.
 
@@ -394,7 +392,7 @@ async def require_project_role(
     project_id: str,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
-    required_roles: List[str] = None,
+    required_roles: list[str] = None,
 ) -> "ProjectMember":
     """
     Dependency to require specific project role.
@@ -460,6 +458,7 @@ async def require_project_admin(
         )
 
     from infrastructure.database.models.project import ProjectMemberRole
+
     member = await get_project_member(project_id, current_user.id, db)
 
     if member.role not in [ProjectMemberRole.OWNER.value, ProjectMemberRole.ADMIN.value]:
@@ -498,6 +497,7 @@ async def require_project_owner(
         )
 
     from infrastructure.database.models.project import ProjectMemberRole
+
     member = await get_project_member(project_id, current_user.id, db)
 
     if member.role != ProjectMemberRole.OWNER.value:

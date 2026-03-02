@@ -5,7 +5,7 @@ Generation tracking and admin alert database models.
 from typing import Optional
 from uuid import uuid4
 
-from sqlalchemy import Boolean, Index, Integer, String, Text, JSON, ForeignKey
+from sqlalchemy import JSON, Boolean, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -33,7 +33,7 @@ class GenerationLog(Base, TimestampMixin):
     )
 
     # Project context (optional)
-    project_id: Mapped[Optional[str]] = mapped_column(
+    project_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("projects.id", ondelete="SET NULL"),
         nullable=True,
@@ -62,14 +62,14 @@ class GenerationLog(Base, TimestampMixin):
     )
     """Values: 'started', 'success', 'failed'"""
 
-    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Performance & cost tracking
-    ai_model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    duration_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    ai_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     """Duration of the generation in milliseconds."""
 
-    input_metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    input_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     """
     Structure:
     {
@@ -141,26 +141,26 @@ class AdminAlert(Base, TimestampMixin):
 
     # Alert content
     title: Mapped[str] = mapped_column(String(500), nullable=False)
-    message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Related resource
-    resource_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    resource_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     """Values: 'article', 'outline', 'image'"""
 
-    resource_id: Mapped[Optional[str]] = mapped_column(
+    resource_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         nullable=True,
     )
 
     # User who triggered the alert
-    user_id: Mapped[Optional[str]] = mapped_column(
+    user_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
 
     # Project context
-    project_id: Mapped[Optional[str]] = mapped_column(
+    project_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("projects.id", ondelete="SET NULL"),
         nullable=True,

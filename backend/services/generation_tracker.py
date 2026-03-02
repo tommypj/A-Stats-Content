@@ -5,14 +5,13 @@ and increments project usage counters only on success.
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from infrastructure.database.models.generation import GenerationLog, AdminAlert
+from infrastructure.database.models.generation import AdminAlert, GenerationLog
 from services.project_usage import ProjectUsageService
 
 logger = logging.getLogger(__name__)
@@ -27,10 +26,10 @@ class GenerationTracker:
     async def log_start(
         self,
         user_id: str,
-        project_id: Optional[str],
+        project_id: str | None,
         resource_type: str,
         resource_id: str,
-        input_metadata: Optional[dict] = None,
+        input_metadata: dict | None = None,
     ) -> GenerationLog:
         """Log the start of a generation. Returns the log entry for later update.
 
@@ -63,13 +62,11 @@ class GenerationTracker:
     async def log_success(
         self,
         log_id: str,
-        ai_model: Optional[str] = None,
-        duration_ms: Optional[int] = None,
+        ai_model: str | None = None,
+        duration_ms: int | None = None,
     ) -> None:
         """Mark generation as successful and increment usage."""
-        result = await self.db.execute(
-            select(GenerationLog).where(GenerationLog.id == log_id)
-        )
+        result = await self.db.execute(select(GenerationLog).where(GenerationLog.id == log_id))
         log = result.scalar_one_or_none()
         if not log:
             logger.warning("Generation log %s not found for success update", log_id)
@@ -93,9 +90,8 @@ class GenerationTracker:
             # Increment user-level counters for personal workspace
             try:
                 from infrastructure.database.models.user import User
-                user_result = await self.db.execute(
-                    select(User).where(User.id == log.user_id)
-                )
+
+                user_result = await self.db.execute(select(User).where(User.id == log.user_id))
                 user = user_result.scalar_one_or_none()
                 if user:
                     ALLOWED_USAGE_FIELDS = {
@@ -109,7 +105,9 @@ class GenerationTracker:
                         current = getattr(user, usage_field, 0) or 0
                         setattr(user, usage_field, current + 1)
                     else:
-                        logger.warning("Unknown resource_type '%s' for usage increment", log.resource_type)
+                        logger.warning(
+                            "Unknown resource_type '%s' for usage increment", log.resource_type
+                        )
                 else:
                     logger.warning("User %s not found for usage increment", log.user_id)
             except Exception as e:
@@ -121,16 +119,14 @@ class GenerationTracker:
         self,
         log_id: str,
         error_message: str,
-        user_id: Optional[str] = None,
-        project_id: Optional[str] = None,
-        resource_type: Optional[str] = None,
-        resource_id: Optional[str] = None,
-        duration_ms: Optional[int] = None,
+        user_id: str | None = None,
+        project_id: str | None = None,
+        resource_type: str | None = None,
+        resource_id: str | None = None,
+        duration_ms: int | None = None,
     ) -> None:
         """Mark generation as failed. Creates an admin alert. Does NOT increment usage."""
-        result = await self.db.execute(
-            select(GenerationLog).where(GenerationLog.id == log_id)
-        )
+        result = await self.db.execute(select(GenerationLog).where(GenerationLog.id == log_id))
         log = result.scalar_one_or_none()
         if not log:
             logger.warning("Generation log %s not found for failure update", log_id)
@@ -161,9 +157,9 @@ class GenerationTracker:
 
     async def check_limit(
         self,
-        project_id: Optional[str],
+        project_id: str | None,
         resource_type: str,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
     ) -> bool:
         """Check if the project (or user) can generate more of this resource type.
         Returns True if allowed, False if limit reached.
@@ -179,9 +175,8 @@ class GenerationTracker:
 
             try:
                 from infrastructure.database.models.user import User
-                user_result = await self.db.execute(
-                    select(User).where(User.id == user_id)
-                )
+
+                user_result = await self.db.execute(select(User).where(User.id == user_id))
                 user = user_result.scalar_one_or_none()
                 if not user:
                     # User row not found — this is an invalid auth state;
@@ -194,7 +189,8 @@ class GenerationTracker:
 
                 # Get plan limits — treat expired subscriptions as free tier
                 from core.plans import PLANS
-                now = datetime.now(timezone.utc)
+
+                now = datetime.now(UTC)
                 tier = user.subscription_tier or "free"
                 if user.subscription_expires and user.subscription_expires < now:
                     tier = "free"
@@ -217,7 +213,9 @@ class GenerationTracker:
                 }
                 usage_field = ALLOWED_USAGE_FIELDS.get(resource_type)
                 if not usage_field:
-                    logger.warning("Unknown resource_type '%s' for limit check — denying", resource_type)
+                    logger.warning(
+                        "Unknown resource_type '%s' for limit check — denying", resource_type
+                    )
                     return False  # API-M1: deny unknown resource types (fail closed)
                 current_usage = getattr(user, usage_field, 0) or 0
 
@@ -243,7 +241,7 @@ class GenerationTracker:
 
         Returns True if a reset was performed.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         reset_date = user.usage_reset_date
 
         # If no reset date is set, initialise it to the first of next month
@@ -254,9 +252,9 @@ class GenerationTracker:
             user.images_generated_this_month = 0
             user.social_posts_generated_this_month = 0
             if now.month == 12:
-                user.usage_reset_date = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc)
+                user.usage_reset_date = datetime(now.year + 1, 1, 1, tzinfo=UTC)
             else:
-                user.usage_reset_date = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc)
+                user.usage_reset_date = datetime(now.year, now.month + 1, 1, tzinfo=UTC)
             # PROJ-13: commit immediately so concurrent requests see the updated reset_date
             await self.db.commit()
             # Re-load expired attributes so check_limit can read them after commit
@@ -266,7 +264,7 @@ class GenerationTracker:
 
         # Ensure timezone-aware comparison
         if reset_date.tzinfo is None:
-            reset_date = reset_date.replace(tzinfo=timezone.utc)
+            reset_date = reset_date.replace(tzinfo=UTC)
 
         if now >= reset_date:
             user.articles_generated_this_month = 0
@@ -275,9 +273,9 @@ class GenerationTracker:
             user.social_posts_generated_this_month = 0
             # Set next reset to the first of the month after the current date
             if now.month == 12:
-                user.usage_reset_date = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc)
+                user.usage_reset_date = datetime(now.year + 1, 1, 1, tzinfo=UTC)
             else:
-                user.usage_reset_date = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc)
+                user.usage_reset_date = datetime(now.year, now.month + 1, 1, tzinfo=UTC)
             # PROJ-13: commit immediately so concurrent requests see the updated reset_date
             await self.db.commit()
             # Re-load expired attributes so check_limit can read them after commit
@@ -286,4 +284,3 @@ class GenerationTracker:
             return True
 
         return False
-

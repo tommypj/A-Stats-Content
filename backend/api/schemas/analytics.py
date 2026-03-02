@@ -2,10 +2,10 @@
 Analytics API schemas for Google Search Console integration.
 """
 
-from datetime import date as date_type, datetime
-from typing import Optional, List
-from pydantic import BaseModel, ConfigDict, Field
+from datetime import date as date_type
+from datetime import datetime
 
+from pydantic import BaseModel, ConfigDict, Field
 
 # ============================================================================
 # GSC Connection Schemas
@@ -30,9 +30,9 @@ class GSCConnectionStatus(BaseModel):
     """GSC connection status response."""
 
     connected: bool = Field(..., description="Whether GSC is connected")
-    site_url: Optional[str] = Field(None, description="Connected site URL")
-    last_sync: Optional[datetime] = Field(None, description="Last sync timestamp")
-    connected_at: Optional[datetime] = Field(None, description="Connection timestamp")
+    site_url: str | None = Field(None, description="Connected site URL")
+    last_sync: datetime | None = Field(None, description="Last sync timestamp")
+    connected_at: datetime | None = Field(None, description="Connection timestamp")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -47,7 +47,7 @@ class GSCSiteResponse(BaseModel):
 class GSCSiteListResponse(BaseModel):
     """List of verified sites from GSC."""
 
-    sites: List[GSCSiteResponse] = Field(default_factory=list)
+    sites: list[GSCSiteResponse] = Field(default_factory=list)
 
 
 class GSCSelectSiteRequest(BaseModel):
@@ -94,7 +94,7 @@ class KeywordRankingResponse(BaseModel):
 class KeywordRankingListResponse(BaseModel):
     """List of keyword rankings with pagination."""
 
-    items: List[KeywordRankingResponse]
+    items: list[KeywordRankingResponse]
     total: int
     page: int
     page_size: int
@@ -119,7 +119,7 @@ class PagePerformanceResponse(BaseModel):
 class PagePerformanceListResponse(BaseModel):
     """List of page performances with pagination."""
 
-    items: List[PagePerformanceResponse]
+    items: list[PagePerformanceResponse]
     total: int
     page: int
     page_size: int
@@ -143,7 +143,7 @@ class DailyAnalyticsResponse(BaseModel):
 class DailyAnalyticsListResponse(BaseModel):
     """List of daily analytics with pagination."""
 
-    items: List[DailyAnalyticsResponse]
+    items: list[DailyAnalyticsResponse]
     total: int
     page: int
     page_size: int
@@ -174,17 +174,17 @@ class AnalyticsSummaryResponse(BaseModel):
     avg_position: float = Field(default=0.0, description="Average position in period")
 
     # Trends (comparison to previous period)
-    clicks_trend: Optional[TrendData] = Field(None, description="Clicks trend")
-    impressions_trend: Optional[TrendData] = Field(None, description="Impressions trend")
-    ctr_trend: Optional[TrendData] = Field(None, description="CTR trend")
-    position_trend: Optional[TrendData] = Field(None, description="Position trend")
+    clicks_trend: TrendData | None = Field(None, description="Clicks trend")
+    impressions_trend: TrendData | None = Field(None, description="Impressions trend")
+    ctr_trend: TrendData | None = Field(None, description="CTR trend")
+    position_trend: TrendData | None = Field(None, description="Position trend")
 
     # Top performers
-    top_keywords: List[KeywordRankingResponse] = Field(
+    top_keywords: list[KeywordRankingResponse] = Field(
         default_factory=list,
         description="Top performing keywords",
     )
-    top_pages: List[PagePerformanceResponse] = Field(
+    top_pages: list[PagePerformanceResponse] = Field(
         default_factory=list,
         description="Top performing pages",
     )
@@ -205,8 +205,8 @@ class AnalyticsSummaryResponse(BaseModel):
 class DateRangeParams(BaseModel):
     """Date range query parameters."""
 
-    start_date: Optional[date_type] = Field(None, description="Start date (YYYY-MM-DD)")
-    end_date: Optional[date_type] = Field(None, description="End date (YYYY-MM-DD)")
+    start_date: date_type | None = Field(None, description="Start date (YYYY-MM-DD)")
+    end_date: date_type | None = Field(None, description="End date (YYYY-MM-DD)")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -223,14 +223,14 @@ class ArticlePerformanceItem(BaseModel):
     title: str
     keyword: str
     published_url: str
-    published_at: Optional[datetime] = None
-    seo_score: Optional[float] = None
+    published_at: datetime | None = None
+    seo_score: float | None = None
     total_clicks: int = 0
     total_impressions: int = 0
     avg_ctr: float = 0.0
     avg_position: float = 0.0
-    clicks_trend: Optional[TrendData] = None
-    position_trend: Optional[TrendData] = None
+    clicks_trend: TrendData | None = None
+    position_trend: TrendData | None = None
     performance_status: str = Field(
         default="new",
         description="improving, declining, neutral, or new",
@@ -240,7 +240,7 @@ class ArticlePerformanceItem(BaseModel):
 class ArticlePerformanceListResponse(BaseModel):
     """Paginated list of articles with GSC performance data."""
 
-    items: List[ArticlePerformanceItem]
+    items: list[ArticlePerformanceItem]
     total: int
     page: int
     page_size: int
@@ -266,17 +266,17 @@ class ArticlePerformanceDetailResponse(BaseModel):
     title: str
     keyword: str
     published_url: str
-    published_at: Optional[datetime] = None
-    seo_score: Optional[float] = None
+    published_at: datetime | None = None
+    seo_score: float | None = None
     total_clicks: int = 0
     total_impressions: int = 0
     avg_ctr: float = 0.0
     avg_position: float = 0.0
-    clicks_trend: Optional[TrendData] = None
-    impressions_trend: Optional[TrendData] = None
-    ctr_trend: Optional[TrendData] = None
-    position_trend: Optional[TrendData] = None
-    daily_data: List[ArticleDailyPerformance] = Field(default_factory=list)
+    clicks_trend: TrendData | None = None
+    impressions_trend: TrendData | None = None
+    ctr_trend: TrendData | None = None
+    position_trend: TrendData | None = None
+    daily_data: list[ArticleDailyPerformance] = Field(default_factory=list)
     start_date: date_type
     end_date: date_type
 
@@ -294,20 +294,18 @@ class KeywordOpportunity(BaseModel):
     impressions: int = 0
     ctr: float = 0.0
     position: float = 0.0
-    opportunity_type: str = Field(
-        ..., description="quick_win, content_gap, or rising"
-    )
+    opportunity_type: str = Field(..., description="quick_win, content_gap, or rising")
     position_change: float = 0.0
     has_existing_article: bool = False
-    existing_article_id: Optional[str] = None
+    existing_article_id: str | None = None
 
 
 class ContentOpportunitiesResponse(BaseModel):
     """Categorized content opportunities from keyword data."""
 
-    quick_wins: List[KeywordOpportunity] = Field(default_factory=list)
-    content_gaps: List[KeywordOpportunity] = Field(default_factory=list)
-    rising_keywords: List[KeywordOpportunity] = Field(default_factory=list)
+    quick_wins: list[KeywordOpportunity] = Field(default_factory=list)
+    content_gaps: list[KeywordOpportunity] = Field(default_factory=list)
+    rising_keywords: list[KeywordOpportunity] = Field(default_factory=list)
     total_opportunities: int = 0
     start_date: date_type
     end_date: date_type
@@ -316,7 +314,7 @@ class ContentOpportunitiesResponse(BaseModel):
 class ContentSuggestionRequest(BaseModel):
     """Request for AI-generated content suggestions."""
 
-    keywords: List[str] = Field(..., min_length=1, max_length=20)
+    keywords: list[str] = Field(..., min_length=1, max_length=20)
     max_suggestions: int = Field(default=5, ge=1, le=10)
 
 
@@ -327,17 +325,15 @@ class ContentSuggestion(BaseModel):
     target_keyword: str
     content_angle: str
     rationale: str
-    estimated_difficulty: str = Field(
-        ..., description="easy, medium, or hard"
-    )
+    estimated_difficulty: str = Field(..., description="easy, medium, or hard")
     estimated_word_count: int = 1500
 
 
 class ContentSuggestionsResponse(BaseModel):
     """Response containing AI-generated content suggestions."""
 
-    suggestions: List[ContentSuggestion] = Field(default_factory=list)
-    based_on_keywords: List[str] = Field(default_factory=list)
+    suggestions: list[ContentSuggestion] = Field(default_factory=list)
+    based_on_keywords: list[str] = Field(default_factory=list)
 
 
 # ============================================================================
@@ -350,23 +346,25 @@ class ContentDecayAlertResponse(BaseModel):
 
     id: str
     user_id: str
-    project_id: Optional[str] = None
-    article_id: Optional[str] = None
-    alert_type: str = Field(..., description="position_drop, traffic_drop, ctr_drop, impressions_drop")
+    project_id: str | None = None
+    article_id: str | None = None
+    alert_type: str = Field(
+        ..., description="position_drop, traffic_drop, ctr_drop, impressions_drop"
+    )
     severity: str = Field(..., description="warning or critical")
-    keyword: Optional[str] = None
-    page_url: Optional[str] = None
+    keyword: str | None = None
+    page_url: str | None = None
     metric_name: str
     metric_before: float
     metric_after: float
     period_days: int
     percentage_change: float
-    suggested_actions: Optional[dict] = None
+    suggested_actions: dict | None = None
     is_read: bool = False
     is_resolved: bool = False
-    resolved_at: Optional[datetime] = None
+    resolved_at: datetime | None = None
     created_at: datetime
-    article_title: Optional[str] = None
+    article_title: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -428,9 +426,9 @@ class AEOScoreResponse(BaseModel):
     id: str
     article_id: str
     aeo_score: int = Field(..., description="0-100 AEO score")
-    score_breakdown: Optional[AEOScoreBreakdown] = None
-    suggestions: Optional[list] = None
-    previous_score: Optional[int] = None
+    score_breakdown: AEOScoreBreakdown | None = None
+    suggestions: list | None = None
+    previous_score: int | None = None
     scored_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -443,7 +441,7 @@ class AEOArticleSummary(BaseModel):
     title: str
     keyword: str
     aeo_score: int
-    score_breakdown: Optional[dict] = None
+    score_breakdown: dict | None = None
 
 
 class AEOOverviewResponse(BaseModel):
@@ -475,10 +473,10 @@ class ConversionGoalResponse(BaseModel):
 
     id: str
     user_id: str
-    project_id: Optional[str] = None
+    project_id: str | None = None
     name: str
     goal_type: str = Field(..., description="page_visit, form_submit, purchase, or custom")
-    goal_config: Optional[dict] = None
+    goal_config: dict | None = None
     is_active: bool = True
     created_at: datetime
 
@@ -497,26 +495,26 @@ class CreateConversionGoalRequest(BaseModel):
 
     name: str = Field(..., min_length=1, max_length=200)
     goal_type: str = Field(..., description="page_visit, form_submit, purchase, or custom")
-    goal_config: Optional[dict] = None
+    goal_config: dict | None = None
 
 
 class UpdateConversionGoalRequest(BaseModel):
     """Request to update a conversion goal."""
 
-    name: Optional[str] = Field(None, min_length=1, max_length=200)
-    goal_type: Optional[str] = None
-    goal_config: Optional[dict] = None
-    is_active: Optional[bool] = None
+    name: str | None = Field(None, min_length=1, max_length=200)
+    goal_type: str | None = None
+    goal_config: dict | None = None
+    is_active: bool | None = None
 
 
 class ContentConversionResponse(BaseModel):
     """Single content conversion record."""
 
     id: str
-    article_id: Optional[str] = None
+    article_id: str | None = None
     goal_id: str
-    page_url: Optional[str] = None
-    keyword: Optional[str] = None
+    page_url: str | None = None
+    keyword: str | None = None
     date: date_type
     visits: int = 0
     conversions: int = 0
@@ -537,9 +535,9 @@ class RevenueOverviewResponse(BaseModel):
     active_goals: int = 0
     top_articles: list[dict] = Field(default_factory=list)
     top_keywords: list[dict] = Field(default_factory=list)
-    visits_trend: Optional[TrendData] = None
-    conversions_trend: Optional[TrendData] = None
-    revenue_trend: Optional[TrendData] = None
+    visits_trend: TrendData | None = None
+    conversions_trend: TrendData | None = None
+    revenue_trend: TrendData | None = None
     start_date: date_type
     end_date: date_type
 
@@ -550,7 +548,7 @@ class RevenueByArticleItem(BaseModel):
     article_id: str
     title: str
     keyword: str
-    published_url: Optional[str] = None
+    published_url: str | None = None
     visits: int = 0
     conversions: int = 0
     revenue: float = 0.0
@@ -591,7 +589,9 @@ class ImportConversionsRequest(BaseModel):
     """Request to import conversion data."""
 
     goal_id: str = Field(..., description="Conversion goal ID")
-    conversions: list[dict] = Field(..., min_length=1, max_length=1000, description="List of conversion records")
+    conversions: list[dict] = Field(
+        ..., min_length=1, max_length=1000, description="List of conversion records"
+    )
 
 
 class ImportConversionsResponse(BaseModel):
@@ -612,8 +612,8 @@ class RevenueReportResponse(BaseModel):
     total_organic_visits: int = 0
     total_conversions: int = 0
     total_revenue: float = 0.0
-    top_articles: Optional[list] = None
-    top_keywords: Optional[list] = None
+    top_articles: list | None = None
+    top_keywords: list | None = None
     generated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

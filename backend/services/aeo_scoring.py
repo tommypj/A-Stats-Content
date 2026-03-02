@@ -16,11 +16,10 @@ Scoring dimensions:
 import json
 import logging
 import re
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from infrastructure.database.models.aeo import AEOScore
@@ -31,28 +30,28 @@ logger = logging.getLogger(__name__)
 
 def _count_headings(content: str) -> dict:
     """Count heading levels in markdown content."""
-    h2_count = len(re.findall(r'^##\s', content, re.MULTILINE))
-    h3_count = len(re.findall(r'^###\s', content, re.MULTILINE))
-    h4_count = len(re.findall(r'^####\s', content, re.MULTILINE))
+    h2_count = len(re.findall(r"^##\s", content, re.MULTILINE))
+    h3_count = len(re.findall(r"^###\s", content, re.MULTILINE))
+    h4_count = len(re.findall(r"^####\s", content, re.MULTILINE))
     return {"h2": h2_count, "h3": h3_count, "h4": h4_count, "total": h2_count + h3_count + h4_count}
 
 
 def _count_lists(content: str) -> int:
     """Count list items in markdown."""
-    bullets = len(re.findall(r'^[\s]*[-*+]\s', content, re.MULTILINE))
-    numbered = len(re.findall(r'^[\s]*\d+\.\s', content, re.MULTILINE))
+    bullets = len(re.findall(r"^[\s]*[-*+]\s", content, re.MULTILINE))
+    numbered = len(re.findall(r"^[\s]*\d+\.\s", content, re.MULTILINE))
     return bullets + numbered
 
 
 def _count_tables(content: str) -> int:
     """Count markdown tables."""
-    return len(re.findall(r'^\|.*\|.*\|', content, re.MULTILINE))
+    return len(re.findall(r"^\|.*\|.*\|", content, re.MULTILINE))
 
 
 def _count_faq_patterns(content: str) -> int:
     """Count question-answer patterns."""
-    questions = len(re.findall(r'^#+\s.*\?', content, re.MULTILINE))
-    questions += len(re.findall(r'\*\*.*\?\*\*', content))
+    questions = len(re.findall(r"^#+\s.*\?", content, re.MULTILINE))
+    questions += len(re.findall(r"\*\*.*\?\*\*", content))
     return questions
 
 
@@ -60,8 +59,8 @@ def _has_direct_answers(content: str) -> int:
     """Count paragraphs that start with definitive statements."""
     # Patterns like "X is...", "The answer is...", "In short,..."
     patterns = [
-        r'(?:^|\n\n)(?:The |A |An |In short|To summarize|Simply put|Essentially)[A-Z]',
-        r'(?:^|\n\n)\w+ (?:is|are|was|were|refers to|means|describes) ',
+        r"(?:^|\n\n)(?:The |A |An |In short|To summarize|Simply put|Essentially)[A-Z]",
+        r"(?:^|\n\n)\w+ (?:is|are|was|were|refers to|means|describes) ",
     ]
     count = 0
     for p in patterns:
@@ -71,14 +70,18 @@ def _has_direct_answers(content: str) -> int:
 
 def _calculate_avg_paragraph_length(content: str) -> float:
     """Calculate average paragraph length in words."""
-    paragraphs = [p.strip() for p in content.split('\n\n') if p.strip() and not p.strip().startswith('#')]
+    paragraphs = [
+        p.strip() for p in content.split("\n\n") if p.strip() and not p.strip().startswith("#")
+    ]
     if not paragraphs:
         return 0
     lengths = [len(p.split()) for p in paragraphs]
     return sum(lengths) / len(lengths)
 
 
-def score_article_content(content: str, title: str, keyword: str, meta_description: str = "") -> dict:
+def score_article_content(
+    content: str, title: str, keyword: str, meta_description: str = ""
+) -> dict:
     """
     Score article content for AEO readiness.
     Returns dict with aeo_score (0-100), score_breakdown, and basic suggestions.
@@ -132,7 +135,9 @@ def score_article_content(content: str, title: str, keyword: str, meta_descripti
         structure_score += 5
     else:
         if word_count > 500:
-            suggestions.append("Add a comparison table or data table to improve structured data extraction")
+            suggestions.append(
+                "Add a comparison table or data table to improve structured data extraction"
+            )
 
     structure_score = min(20, structure_score)
 
@@ -146,7 +151,9 @@ def score_article_content(content: str, title: str, keyword: str, meta_descripti
         faq_score = 10
     else:
         faq_score = 0
-        suggestions.append("Add FAQ-style headings (questions as H2/H3) to match how AI engines search for answers")
+        suggestions.append(
+            "Add FAQ-style headings (questions as H2/H3) to match how AI engines search for answers"
+        )
 
     # 3. Entity Score (0-15) - topic coverage and keyword presence
     entity_score = 0
@@ -164,7 +171,9 @@ def score_article_content(content: str, title: str, keyword: str, meta_descripti
     if kw_lower and kw_lower in title.lower():
         entity_score += 4
     else:
-        suggestions.append("Include your target keyword in the article title for better AI recognition")
+        suggestions.append(
+            "Include your target keyword in the article title for better AI recognition"
+        )
 
     if meta_description and kw_lower and kw_lower in meta_description.lower():
         entity_score += 3
@@ -178,18 +187,24 @@ def score_article_content(content: str, title: str, keyword: str, meta_descripti
     elif direct_answers >= 1:
         conciseness_score += 5
     else:
-        suggestions.append("Start key paragraphs with direct, definitive statements (e.g., 'X is...')")
+        suggestions.append(
+            "Start key paragraphs with direct, definitive statements (e.g., 'X is...')"
+        )
 
     if 40 <= avg_para_len <= 80:
         conciseness_score += 5
     elif avg_para_len < 40:
         conciseness_score += 3
     elif avg_para_len > 120:
-        suggestions.append("Break long paragraphs into shorter ones (50-80 words) for AI extraction")
+        suggestions.append(
+            "Break long paragraphs into shorter ones (50-80 words) for AI extraction"
+        )
 
     # Short summary/TL;DR at top
     first_500 = content[:500].lower()
-    if any(marker in first_500 for marker in ["tldr", "tl;dr", "in short", "key takeaway", "summary"]):
+    if any(
+        marker in first_500 for marker in ["tldr", "tl;dr", "in short", "key takeaway", "summary"]
+    ):
         conciseness_score += 5
     else:
         suggestions.append("Add a TL;DR or key takeaway near the top of the article")
@@ -200,7 +215,7 @@ def score_article_content(content: str, title: str, keyword: str, meta_descripti
     schema_score = 0
     if "**" in content:  # Bold text
         schema_score += 2
-    if re.search(r'\[.*\]\(.*\)', content):  # Links
+    if re.search(r"\[.*\]\(.*\)", content):  # Links
         schema_score += 2
     if table_count >= 1:
         schema_score += 3
@@ -212,14 +227,14 @@ def score_article_content(content: str, title: str, keyword: str, meta_descripti
     citation_readiness = 0
 
     # Has stats/numbers
-    number_count = len(re.findall(r'\b\d+(?:\.\d+)?%?\b', content))
+    number_count = len(re.findall(r"\b\d+(?:\.\d+)?%?\b", content))
     if number_count >= 10:
         citation_readiness += 5
     elif number_count >= 5:
         citation_readiness += 3
 
     # Has quotable statements (bold phrases, definitions)
-    bold_phrases = len(re.findall(r'\*\*[^*]+\*\*', content))
+    bold_phrases = len(re.findall(r"\*\*[^*]+\*\*", content))
     if bold_phrases >= 5:
         citation_readiness += 5
     elif bold_phrases >= 2:
@@ -231,7 +246,14 @@ def score_article_content(content: str, title: str, keyword: str, meta_descripti
     citation_readiness = min(15, citation_readiness)
 
     # Total
-    aeo_score = structure_score + faq_score + entity_score + conciseness_score + schema_score + citation_readiness
+    aeo_score = (
+        structure_score
+        + faq_score
+        + entity_score
+        + conciseness_score
+        + schema_score
+        + citation_readiness
+    )
     aeo_score = min(100, max(0, aeo_score))
 
     return {
@@ -252,12 +274,10 @@ async def score_and_save(
     db: AsyncSession,
     article_id: str,
     user_id: str,
-) -> Optional[AEOScore]:
+) -> AEOScore | None:
     """Score an article and save/update the AEO score record."""
     article_result = await db.execute(
-        select(Article).where(
-            and_(Article.id == article_id, Article.user_id == user_id)
-        )
+        select(Article).where(and_(Article.id == article_id, Article.user_id == user_id))
     )
     article = article_result.scalar_one_or_none()
     if not article:
@@ -291,7 +311,7 @@ async def score_and_save(
         score_breakdown=result["score_breakdown"],
         suggestions=result["suggestions"],
         previous_score=previous_score,
-        scored_at=datetime.now(timezone.utc),
+        scored_at=datetime.now(UTC),
     )
     db.add(aeo)
     await db.commit()
@@ -306,9 +326,7 @@ async def generate_aeo_suggestions(
 ) -> dict:
     """Generate AI-powered AEO improvement suggestions."""
     article_result = await db.execute(
-        select(Article).where(
-            and_(Article.id == article_id, Article.user_id == user_id)
-        )
+        select(Article).where(and_(Article.id == article_id, Article.user_id == user_id))
     )
     article = article_result.scalar_one_or_none()
     if not article:
@@ -332,8 +350,8 @@ async def generate_aeo_suggestions(
 
 Title: {article.title}
 Keyword: {article.keyword}
-Current AEO Score: {current_score.aeo_score if current_score else 'Not scored'}
-Score Breakdown: {json.dumps(current_score.score_breakdown) if current_score and current_score.score_breakdown else 'N/A'}
+Current AEO Score: {current_score.aeo_score if current_score else "Not scored"}
+Score Breakdown: {json.dumps(current_score.score_breakdown) if current_score and current_score.score_breakdown else "N/A"}
 
 Content preview (first 3000 chars):
 {content_preview}
@@ -360,7 +378,9 @@ Return as JSON array of objects with keys: action, description, category, estima
         try:
             suggestions = json.loads(text)
             if not isinstance(suggestions, list):
-                suggestions = suggestions.get("suggestions", []) if isinstance(suggestions, dict) else []
+                suggestions = (
+                    suggestions.get("suggestions", []) if isinstance(suggestions, dict) else []
+                )
         except (ValueError, KeyError, IndexError) as e:
             # ANA-38: Specific fallback for fragile JSON extraction from AI response
             logger.warning("Failed to parse AEO suggestion JSON: %s", e)
@@ -374,12 +394,34 @@ Return as JSON array of objects with keys: action, description, category, estima
         return {"suggestions": suggestions}
     except Exception as e:
         logger.error("Failed to generate AEO suggestions: %s", str(e))
-        return {"suggestions": [
-            {"action": "Add FAQ section", "description": "Add question-answer headings matching common user queries.", "category": "faq", "estimated_impact": "high"},
-            {"action": "Improve structure", "description": "Use clear H2/H3 hierarchy with descriptive headings.", "category": "structure", "estimated_impact": "high"},
-            {"action": "Add TL;DR", "description": "Add a summary paragraph near the top of the article.", "category": "conciseness", "estimated_impact": "medium"},
-            {"action": "Include data points", "description": "Add statistics, percentages, and factual data for citation.", "category": "citation_readiness", "estimated_impact": "medium"},
-        ]}
+        return {
+            "suggestions": [
+                {
+                    "action": "Add FAQ section",
+                    "description": "Add question-answer headings matching common user queries.",
+                    "category": "faq",
+                    "estimated_impact": "high",
+                },
+                {
+                    "action": "Improve structure",
+                    "description": "Use clear H2/H3 hierarchy with descriptive headings.",
+                    "category": "structure",
+                    "estimated_impact": "high",
+                },
+                {
+                    "action": "Add TL;DR",
+                    "description": "Add a summary paragraph near the top of the article.",
+                    "category": "conciseness",
+                    "estimated_impact": "medium",
+                },
+                {
+                    "action": "Include data points",
+                    "description": "Add statistics, percentages, and factual data for citation.",
+                    "category": "citation_readiness",
+                    "estimated_impact": "medium",
+                },
+            ]
+        }
 
 
 async def get_aeo_overview(
@@ -446,10 +488,16 @@ async def get_aeo_overview(
 
     # Get article titles for top/bottom
     sorted_scores = sorted(scores, key=lambda s: s.aeo_score, reverse=True)
-    article_ids = [s.article_id for s in sorted_scores[:5]] + [s.article_id for s in sorted_scores[-5:]]
-    articles_q = select(Article.id, Article.title, Article.keyword).where(Article.id.in_(article_ids))
+    article_ids = [s.article_id for s in sorted_scores[:5]] + [
+        s.article_id for s in sorted_scores[-5:]
+    ]
+    articles_q = select(Article.id, Article.title, Article.keyword).where(
+        Article.id.in_(article_ids)
+    )
     articles_result = await db.execute(articles_q)
-    title_map = {row.id: {"title": row.title, "keyword": row.keyword} for row in articles_result.all()}
+    title_map = {
+        row.id: {"title": row.title, "keyword": row.keyword} for row in articles_result.all()
+    }
 
     top = [
         {

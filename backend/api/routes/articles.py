@@ -5,51 +5,48 @@ Article API routes.
 import asyncio
 import csv
 import io
+import json
 import logging
 import math
 import re
 import time
-import markdown
-import json
-import redis.asyncio as aioredis
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
-
-from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
+import markdown
+import redis.asyncio as aioredis
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
-from api.middleware.rate_limit import limiter
-from sqlalchemy import select, func, delete, case, and_
+from pydantic import BaseModel, Field
+from sqlalchemy import and_, case, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import defer
 
+from adapters.ai.anthropic_adapter import GeneratedArticle, content_ai_service
+from api.middleware.rate_limit import limiter
+from api.routes.auth import get_current_user
 from api.schemas.content import (
     ArticleCreateRequest,
     ArticleGenerateRequest,
-    ArticleUpdateRequest,
-    ArticleResponse,
-    ArticleListResponse,
     ArticleImproveRequest,
-    SocialPostsResponse,
-    SocialPostUpdateRequest,
-    ArticleRevisionResponse,
+    ArticleListResponse,
+    ArticleResponse,
     ArticleRevisionDetailResponse,
     ArticleRevisionListResponse,
+    ArticleUpdateRequest,
     BulkDeleteRequest,
     BulkDeleteResponse,
+    SocialPostsResponse,
+    SocialPostUpdateRequest,
 )
-from api.routes.auth import get_current_user
 from api.utils import escape_like
-from infrastructure.database.connection import get_db, async_session_maker
-from infrastructure.database.models import Article, ArticleRevision, Outline, User, ContentStatus
-from infrastructure.database.models.project import Project
-from infrastructure.database.models.keyword_cache import KeywordResearchCache
-from adapters.ai.anthropic_adapter import content_ai_service, GeneratedArticle
-from infrastructure.config.settings import settings
-from services.generation_tracker import GenerationTracker
 from core.plans import ARTICLE_IMPROVE_LIMIT
+from infrastructure.config.settings import settings
+from infrastructure.database.connection import async_session_maker, get_db
+from infrastructure.database.models import Article, ArticleRevision, ContentStatus, Outline, User
+from infrastructure.database.models.keyword_cache import KeywordResearchCache
+from infrastructure.database.models.project import Project
+from services.generation_tracker import GenerationTracker
 
 logger = logging.getLogger(__name__)
 
@@ -140,18 +137,20 @@ def analyze_seo(content: str, keyword: str, title: str, meta_description: str) -
     content_lower = content.lower()
     keyword_lower = keyword.lower()
     # SEO-08: normalize whitespace for consistent word count across backend/frontend
-    words = re.split(r'\s+', content.strip())
+    words = re.split(r"\s+", content.strip())
     word_count = len(words) if words and words[0] else 0
 
     # Keyword density (whole-word matches only to avoid substring false positives)
-    keyword_count = len(re.findall(r'\b' + re.escape(keyword_lower) + r'\b', content_lower))
+    keyword_count = len(re.findall(r"\b" + re.escape(keyword_lower) + r"\b", content_lower))
     keyword_density = (keyword_count / word_count * 100) if word_count > 0 else 0
 
     # Title keyword check
-    title_has_keyword = bool(re.search(r'\b' + re.escape(keyword_lower) + r'\b', title.lower()))
+    title_has_keyword = bool(re.search(r"\b" + re.escape(keyword_lower) + r"\b", title.lower()))
 
     # Keyword in opening (first 300 chars — covers HPPP hook + problem)
-    keyword_in_opening = bool(re.search(r'\b' + re.escape(keyword_lower) + r'\b', content_lower[:300]))
+    keyword_in_opening = bool(
+        re.search(r"\b" + re.escape(keyword_lower) + r"\b", content_lower[:300])
+    )
 
     # Headings: H2 count (## but not ###)
     h2_count = len(re.findall(r"^## ", content, re.MULTILINE))
@@ -163,13 +162,17 @@ def analyze_seo(content: str, keyword: str, title: str, meta_description: str) -
     external_links = len(re.findall(r"\[.*?\]\(https?://", content))
 
     # FAQ section (H2 titled "Frequently Asked Questions" or "FAQ")
-    has_faq = bool(re.search(r"^## .*(frequently asked questions|faq)", content, re.MULTILINE | re.IGNORECASE))
+    has_faq = bool(
+        re.search(r"^## .*(frequently asked questions|faq)", content, re.MULTILINE | re.IGNORECASE)
+    )
 
     # Structured lists (bullet or numbered)
     has_lists = bool(re.search(r"^(\s*[-*+]|\s*\d+\.)\s", content, re.MULTILINE))
 
     # Quick Answer / TL;DR block (> **Quick Answer:** or similar blockquote pattern)
-    has_quick_answer = bool(re.search(r">\s*\*\*(quick answer|tl;?dr|summary|key takeaway)", content, re.IGNORECASE))
+    has_quick_answer = bool(
+        re.search(r">\s*\*\*(quick answer|tl;?dr|summary|key takeaway)", content, re.IGNORECASE)
+    )
 
     # Image alt texts
     images = re.findall(r"!\[(.*?)\]\(", content)
@@ -199,31 +202,43 @@ def analyze_seo(content: str, keyword: str, title: str, meta_description: str) -
     elif len(meta_description) > 160:
         suggestions.append("Shorten meta description to under 160 characters")
     if h2_count < 3:
-        suggestions.append("Add more H2 headings (## Section) — aim for at least 3 modular sections")
+        suggestions.append(
+            "Add more H2 headings (## Section) — aim for at least 3 modular sections"
+        )
     if word_count < 1500:
-        suggestions.append(f"Expand content to 1500+ words (currently {word_count}) — articles 1500+ words average significantly more AI citations")
+        suggestions.append(
+            f"Expand content to 1500+ words (currently {word_count}) — articles 1500+ words average significantly more AI citations"
+        )
     if not has_faq:
-        suggestions.append("Add a '## Frequently Asked Questions' section — the highest-citation format for Google AI Overviews and Perplexity")
+        suggestions.append(
+            "Add a '## Frequently Asked Questions' section — the highest-citation format for Google AI Overviews and Perplexity"
+        )
     if external_links < 1:
-        suggestions.append("Add at least one external link to an authoritative source (study, official docs, industry report)")
+        suggestions.append(
+            "Add at least one external link to an authoritative source (study, official docs, industry report)"
+        )
     if not has_lists:
-        suggestions.append("Add bullet points or a numbered list — structured lists are among the most-cited formats by AI answer engines")
+        suggestions.append(
+            "Add bullet points or a numbered list — structured lists are among the most-cited formats by AI answer engines"
+        )
     if not has_quick_answer:
-        suggestions.append("Add a Quick Answer block near the top: > **Quick Answer:** [40-70 word standalone answer]")
+        suggestions.append(
+            "Add a Quick Answer block near the top: > **Quick Answer:** [40-70 word standalone answer]"
+        )
 
     # ----------------------------------------------------------------
     # Score (0-100) — updated weights for GEO/AEO 2025-2026
     # ----------------------------------------------------------------
     score = 0
-    score += 15 if 1 <= keyword_density <= 3 else 0          # Keyword density
-    score += 15 if title_has_keyword else 0                    # Keyword in title
+    score += 15 if 1 <= keyword_density <= 3 else 0  # Keyword density
+    score += 15 if title_has_keyword else 0  # Keyword in title
     score += 10 if meta_description and 120 <= len(meta_description) <= 160 else 0  # Meta desc
-    score += 15 if headings_structure == "good" else 0         # 3+ H2s
-    score += 15 if has_faq else 0                              # FAQ section (AEO signal)
-    score += 10 if external_links >= 1 else 0                  # External citation
-    score += 10 if has_lists else 0                            # Structured lists
-    score += 5 if has_quick_answer else 0                      # Quick Answer / TL;DR block
-    score += 5 if image_alt_texts else 0                       # Image alt texts (when images exist)
+    score += 15 if headings_structure == "good" else 0  # 3+ H2s
+    score += 15 if has_faq else 0  # FAQ section (AEO signal)
+    score += 10 if external_links >= 1 else 0  # External citation
+    score += 10 if has_lists else 0  # Structured lists
+    score += 5 if has_quick_answer else 0  # Quick Answer / TL;DR block
+    score += 5 if image_alt_texts else 0  # Image alt texts (when images exist)
 
     return {
         "score": min(100, score),
@@ -266,7 +281,7 @@ async def create_article(
     word_count = len(request.content.split()) if request.content else 0
     content_html = markdown.markdown(request.content) if request.content else None
 
-    project_id = getattr(current_user, 'current_project_id', None)
+    project_id = getattr(current_user, "current_project_id", None)
 
     article = Article(
         id=article_id,
@@ -305,16 +320,16 @@ async def create_article(
 async def _generate_article_background(
     article_id: str,
     user_id: str,
-    project_id: Optional[str],
+    project_id: str | None,
     outline_title: str,
     outline_keyword: str,
     outline_sections: list,
     outline_tone: str,
-    outline_target_audience: Optional[str],
+    outline_target_audience: str | None,
     writing_style: str,
     voice: str,
     list_usage: str,
-    custom_instructions: Optional[str],
+    custom_instructions: str | None,
     word_count_target: int = 1500,
     language: str = "en",
 ):
@@ -343,16 +358,16 @@ async def _generate_article_background(
 async def _run_article_generation(
     article_id: str,
     user_id: str,
-    project_id: Optional[str],
+    project_id: str | None,
     outline_title: str,
     outline_keyword: str,
     outline_sections: list,
     outline_tone: str,
-    outline_target_audience: Optional[str],
+    outline_target_audience: str | None,
     writing_style: str,
     voice: str,
     list_usage: str,
-    custom_instructions: Optional[str],
+    custom_instructions: str | None,
     word_count_target: int = 1500,
     language: str = "en",
 ):
@@ -362,9 +377,7 @@ async def _run_article_generation(
     tracker = None
     async with async_session_maker() as db:
         try:
-            result = await db.execute(
-                select(Article).where(Article.id == article_id)
-            )
+            result = await db.execute(select(Article).where(Article.id == article_id))
             article = result.scalar_one_or_none()
             if not article:
                 logger.error("Background generation: article %s not found", article_id)
@@ -421,7 +434,7 @@ async def _run_article_generation(
                 )
                 is_proofread = True
                 logger.info("Grammar proofread completed for article %s", article_id)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning(
                     "Grammar proofread timed out for article %s, using original content",
                     article_id,
@@ -429,7 +442,8 @@ async def _run_article_generation(
             except Exception as proof_err:
                 logger.warning(
                     "Grammar proofread failed for article %s, using original: %s",
-                    article_id, proof_err,
+                    article_id,
+                    proof_err,
                 )
 
             article.content = generated.content
@@ -466,10 +480,11 @@ async def _run_article_generation(
                     timeout=30.0,
                 )
                 article.image_prompt = image_prompt
-            except (asyncio.TimeoutError, Exception) as img_err:
+            except (TimeoutError, Exception) as img_err:
                 logger.warning(
                     "Failed to generate image prompt for article %s: %s",
-                    article_id, img_err,
+                    article_id,
+                    img_err,
                 )
 
             # Log successful generation and increment usage (single commit)
@@ -484,7 +499,9 @@ async def _run_article_generation(
             logger.info("Article %s generated successfully", article_id)
 
         except Exception as e:
-            logger.error("Background generation failed for article %s: %s", article_id, e, exc_info=True)
+            logger.error(
+                "Background generation failed for article %s: %s", article_id, e, exc_info=True
+            )
             try:
                 await db.rollback()
             except Exception:
@@ -492,9 +509,7 @@ async def _run_article_generation(
             # Use a fresh session to mark as failed (original session may be broken)
             try:
                 async with async_session_maker() as err_db:
-                    result = await err_db.execute(
-                        select(Article).where(Article.id == article_id)
-                    )
+                    result = await err_db.execute(select(Article).where(Article.id == article_id))
                     article = result.scalar_one_or_none()
                     if article:
                         article.status = ContentStatus.FAILED.value
@@ -517,7 +532,9 @@ async def _run_article_generation(
                         )
                         await tracker_db.commit()
                 except Exception:
-                    logger.error("Failed to log generation failure for article %s", article_id, exc_info=True)
+                    logger.error(
+                        "Failed to log generation failure for article %s", article_id, exc_info=True
+                    )
 
 
 @router.post("/generate", response_model=ArticleResponse, status_code=status.HTTP_201_CREATED)
@@ -533,7 +550,7 @@ async def generate_article(
     Returns immediately with status 'generating'; the frontend polls for completion.
     """
     # Get the outline — scoped to project or personal workspace
-    project_id = getattr(current_user, 'current_project_id', None)
+    project_id = getattr(current_user, "current_project_id", None)
     if project_id:
         outline_query = select(Outline).where(
             Outline.id == body.outline_id,
@@ -554,7 +571,11 @@ async def generate_article(
             detail="Outline not found",
         )
 
-    if outline.sections is None or not isinstance(outline.sections, list) or len(outline.sections) == 0:
+    if (
+        outline.sections is None
+        or not isinstance(outline.sections, list)
+        or len(outline.sections) == 0
+    ):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Outline has no sections to generate from",
@@ -603,7 +624,14 @@ async def generate_article(
 
     # GEN-47: Validate generation style params against allowed enum values.
     # Brand voice values come from user-editable JSON — sanitize to defaults on invalid input.
-    _VALID_WRITING_STYLES = {"editorial", "conversational", "formal", "technical", "simplified", "balanced"}
+    _VALID_WRITING_STYLES = {
+        "editorial",
+        "conversational",
+        "formal",
+        "technical",
+        "simplified",
+        "balanced",
+    }
     _VALID_VOICES = {"first_person", "second_person", "third_person"}
     _VALID_LIST_USAGES = {"heavy", "light", "balanced"}
 
@@ -649,8 +677,8 @@ async def generate_article(
 async def list_articles(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    status: Optional[str] = None,
-    keyword: Optional[str] = None,
+    status: str | None = None,
+    keyword: str | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -658,26 +686,33 @@ async def list_articles(
     List user's articles with pagination and filtering.
     """
     if current_user.current_project_id:
-        query = select(Article).options(
-            defer(Article.content), defer(Article.content_html)
-        ).where(
-            Article.project_id == current_user.current_project_id,
-            Article.deleted_at.is_(None),
+        query = (
+            select(Article)
+            .options(defer(Article.content), defer(Article.content_html))
+            .where(
+                Article.project_id == current_user.current_project_id,
+                Article.deleted_at.is_(None),
+            )
         )
     else:
-        query = select(Article).options(
-            defer(Article.content), defer(Article.content_html)
-        ).where(
-            Article.user_id == current_user.id,
-            Article.project_id.is_(None),
-            Article.deleted_at.is_(None),
+        query = (
+            select(Article)
+            .options(defer(Article.content), defer(Article.content_html))
+            .where(
+                Article.user_id == current_user.id,
+                Article.project_id.is_(None),
+                Article.deleted_at.is_(None),
+            )
         )
 
     if status:
         status = status.lower()
         VALID_STATUSES = {s.value for s in ContentStatus}
         if status not in VALID_STATUSES:
-            raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {', '.join(sorted(VALID_STATUSES))}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status. Must be one of: {', '.join(sorted(VALID_STATUSES))}",
+            )
         query = query.where(Article.status == status)
     if keyword:
         query = query.where(Article.keyword.ilike(f"%{escape_like(keyword)}%"))
@@ -710,7 +745,9 @@ async def get_content_health(
     ART-02: Uses SQL aggregates instead of loading all articles into memory.
     """
     # Build base filter conditions
-    status_filter = Article.status.in_([ContentStatus.COMPLETED.value, ContentStatus.PUBLISHED.value])
+    status_filter = Article.status.in_(
+        [ContentStatus.COMPLETED.value, ContentStatus.PUBLISHED.value]
+    )
     if current_user.current_project_id:
         base_filter = and_(
             Article.project_id == current_user.current_project_id,
@@ -731,8 +768,12 @@ async def get_content_health(
             func.count().label("total"),
             func.avg(Article.seo_score).label("avg_score"),
             func.count(case((Article.seo_score >= 80, 1))).label("excellent_count"),
-            func.count(case((and_(Article.seo_score >= 60, Article.seo_score < 80), 1))).label("good_count"),
-            func.count(case((and_(Article.seo_score.is_not(None), Article.seo_score < 60), 1))).label("needs_work_count"),
+            func.count(case((and_(Article.seo_score >= 60, Article.seo_score < 80), 1))).label(
+                "good_count"
+            ),
+            func.count(
+                case((and_(Article.seo_score.is_not(None), Article.seo_score < 60), 1))
+            ).label("needs_work_count"),
             func.count(case((Article.seo_score.is_(None), 1))).label("no_score_count"),
         ).where(base_filter)
     )
@@ -756,10 +797,7 @@ async def get_content_health(
         .where(base_filter, Article.seo_score.is_(None))
         .limit(10)
     )
-    no_score = [
-        {"id": str(r.id), "title": r.title, "keyword": r.keyword}
-        for r in no_score_rows
-    ]
+    no_score = [{"id": str(r.id), "title": r.title, "keyword": r.keyword} for r in no_score_rows]
 
     avg_score = float(agg.avg_score) if agg.avg_score is not None else None
     return {
@@ -811,7 +849,7 @@ async def get_keyword_suggestions(
             await redis_client.aclose()
 
     # 2. DB fallback
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     db_result = await db.execute(
         select(KeywordResearchCache)
         .where(KeywordResearchCache.user_id == current_user.id)
@@ -840,11 +878,14 @@ async def get_keyword_suggestions(
 
     # 3. Check monthly keyword research limit (only real AI calls count; cache hits above are free)
     from core.plans import PLANS as _PLANS
-    _now = datetime.now(timezone.utc)
+
+    _now = datetime.now(UTC)
     _tier = current_user.subscription_tier or "free"
     if current_user.subscription_expires and current_user.subscription_expires < _now:
         _tier = "free"
-    _monthly_limit = _PLANS.get(_tier, _PLANS["free"])["limits"].get("keyword_researches_per_month", 3)
+    _monthly_limit = _PLANS.get(_tier, _PLANS["free"])["limits"].get(
+        "keyword_researches_per_month", 3
+    )
     _count_key = f"kw_count:{current_user.id}:{_now.year}:{_now.month}"
     redis_client = None
     try:
@@ -893,7 +934,9 @@ Only return the JSON array, no other text."""
         )
 
         if not response.content:
-            raise HTTPException(status_code=502, detail="AI returned empty response — please try again")
+            raise HTTPException(
+                status_code=502, detail="AI returned empty response — please try again"
+            )
         text = response.content[0].text
         # Extract JSON from response (handle markdown code blocks)
         parts = text.split("```")
@@ -912,7 +955,9 @@ Only return the JSON array, no other text."""
             suggestions = json.loads(text.strip())
         except (json.JSONDecodeError, ValueError):
             logger.warning("AI returned invalid JSON for keyword suggestions: %s", text[:200])
-            raise HTTPException(status_code=502, detail="AI returned invalid response — please try again")
+            raise HTTPException(
+                status_code=502, detail="AI returned invalid response — please try again"
+            )
 
         result = {"seed_keyword": body.seed_keyword, "suggestions": suggestions}
         result_str = json.dumps(result)
@@ -969,7 +1014,10 @@ Only return the JSON array, no other text."""
         raise
     except Exception as e:
         logger.error("Keyword suggestion failed: %s", e)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to generate keyword suggestions")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate keyword suggestions",
+        )
 
 
 @router.get("/keyword-history")
@@ -979,7 +1027,7 @@ async def get_keyword_history(
     limit: int = Query(20, ge=1, le=50),
 ):
     """Return the user's recent keyword research history (non-expired entries only)."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     result = await db.execute(
         select(KeywordResearchCache)
         .where(KeywordResearchCache.user_id == current_user.id)
@@ -1031,15 +1079,17 @@ async def export_all_articles(
     writer = csv.writer(buf)
     writer.writerow(["id", "title", "status", "keyword", "word_count", "created_at", "updated_at"])
     for a in articles:
-        writer.writerow([
-            a.id,
-            a.title,
-            a.status,
-            a.keyword,
-            a.word_count or 0,
-            a.created_at.isoformat() if a.created_at else "",
-            a.updated_at.isoformat() if a.updated_at else "",
-        ])
+        writer.writerow(
+            [
+                a.id,
+                a.title,
+                a.status,
+                a.keyword,
+                a.word_count or 0,
+                a.created_at.isoformat() if a.created_at else "",
+                a.updated_at.isoformat() if a.updated_at else "",
+            ]
+        )
 
     buf.seek(0)
     return StreamingResponse(
@@ -1099,15 +1149,17 @@ async def export_article(
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow(["id", "title", "status", "keyword", "word_count", "created_at", "updated_at"])
-    writer.writerow([
-        article.id,
-        article.title,
-        article.status,
-        article.keyword,
-        article.word_count or 0,
-        article.created_at.isoformat() if article.created_at else "",
-        article.updated_at.isoformat() if article.updated_at else "",
-    ])
+    writer.writerow(
+        [
+            article.id,
+            article.title,
+            article.status,
+            article.keyword,
+            article.word_count or 0,
+            article.created_at.isoformat() if article.created_at else "",
+            article.updated_at.isoformat() if article.updated_at else "",
+        ]
+    )
     buf.seek(0)
     return StreamingResponse(
         iter([buf.getvalue()]),
@@ -1134,21 +1186,15 @@ async def bulk_delete_articles(
         return BulkDeleteResponse(deleted=0)
 
     if current_user.current_project_id:
-        stmt = (
-            delete(Article)
-            .where(
-                Article.id.in_(body.ids),
-                Article.project_id == current_user.current_project_id,
-            )
+        stmt = delete(Article).where(
+            Article.id.in_(body.ids),
+            Article.project_id == current_user.current_project_id,
         )
     else:
-        stmt = (
-            delete(Article)
-            .where(
-                Article.id.in_(body.ids),
-                Article.user_id == current_user.id,
-                Article.project_id.is_(None),
-            )
+        stmt = delete(Article).where(
+            Article.id.in_(body.ids),
+            Article.user_id == current_user.id,
+            Article.project_id.is_(None),
         )
 
     result = await db.execute(stmt)
@@ -1393,7 +1439,7 @@ async def improve_article(
         except Exception as seo_err:
             logger.warning("SEO re-analysis failed for article %s: %s", article_id, seo_err)
 
-    except asyncio.TimeoutError:
+    except TimeoutError:
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
             detail="Article improvement timed out. Please try again.",
@@ -1618,7 +1664,9 @@ async def generate_social_posts(
         resource_id=article_id,
     )
 
-    summary = article.meta_description or (article.content[:300] if article.content else article.title)
+    summary = article.meta_description or (
+        article.content[:300] if article.content else article.title
+    )
 
     try:
         posts = await content_ai_service.generate_social_posts(
@@ -1636,10 +1684,9 @@ async def generate_social_posts(
 
     await tracker.log_success(log_id=log.id, ai_model=settings.anthropic_model)
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     social_posts = {
-        platform: {"text": text, "generated_at": now}
-        for platform, text in posts.items()
+        platform: {"text": text, "generated_at": now} for platform, text in posts.items()
     }
 
     article.social_posts = social_posts
@@ -1734,9 +1781,7 @@ async def list_article_revisions(
     Returns lightweight items — no full content — for fast list rendering.
     """
     # Verify the caller owns / has access to the article
-    article_result = await db.execute(
-        _article_ownership_query(article_id, current_user)
-    )
+    article_result = await db.execute(_article_ownership_query(article_id, current_user))
     if not article_result.scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
 
@@ -1770,9 +1815,7 @@ async def get_article_revision(
     """
     Get a specific revision with full content for preview.
     """
-    article_result = await db.execute(
-        _article_ownership_query(article_id, current_user)
-    )
+    article_result = await db.execute(_article_ownership_query(article_id, current_user))
     if not article_result.scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
 
@@ -1805,9 +1848,7 @@ async def restore_article_revision(
     Before overwriting the article, a "restore" backup revision is saved
     with the article's current content so the user can undo the restore.
     """
-    article_result = await db.execute(
-        _article_ownership_query(article_id, current_user)
-    )
+    article_result = await db.execute(_article_ownership_query(article_id, current_user))
     article = article_result.scalar_one_or_none()
     if not article:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
@@ -1871,9 +1912,7 @@ async def get_link_suggestions(
     relevance.  No AI is required — this is a pure keyword-matching pass.
     """
     # Fetch the source article (project-scoped)
-    result = await db.execute(
-        _article_ownership_query(article_id, current_user)
-    )
+    result = await db.execute(_article_ownership_query(article_id, current_user))
     article = result.scalar_one_or_none()
     if not article:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
@@ -2020,8 +2059,8 @@ async def get_aeo_score(
     db: AsyncSession = Depends(get_db),
 ):
     """Get or calculate AEO score for an article."""
-    from services.aeo_scoring import score_and_save
     from infrastructure.database.models.aeo import AEOScore as AEOScoreModel
+    from services.aeo_scoring import score_and_save
 
     # Verify article belongs to current user
     if current_user.current_project_id:

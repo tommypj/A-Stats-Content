@@ -5,11 +5,10 @@ Simple synchronous processing for now. Can be upgraded to Celery/Redis queue lat
 """
 
 import logging
-from typing import Optional
-
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from infrastructure.database.session import get_session
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from services import get_knowledge_service
 
 logger = logging.getLogger(__name__)
@@ -40,7 +39,7 @@ async def process_document_task(
         f"source_id={source_id}, user_id={user_id}, file_path={file_path}"
     )
 
-    db: Optional[AsyncSession] = None
+    db: AsyncSession | None = None
 
     try:
         # Get database session

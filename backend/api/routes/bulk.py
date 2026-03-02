@@ -5,21 +5,21 @@ Bulk content generation API routes.
 import asyncio
 import logging
 import math
-from datetime import datetime, timezone
-from typing import Literal, Optional
+from datetime import UTC, datetime
+from typing import Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
-from api.middleware.rate_limit import limiter
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select, func, and_, desc
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.routes.auth import get_current_user
 from api.deps_project import get_project_member
-from infrastructure.database.connection import get_db, async_session_maker
+from api.middleware.rate_limit import limiter
+from api.routes.auth import get_current_user
+from infrastructure.database.connection import async_session_maker, get_db
 from infrastructure.database.models import User
-from infrastructure.database.models.bulk import ContentTemplate, BulkJob, BulkJobItem
+from infrastructure.database.models.bulk import BulkJob, BulkJobItem, ContentTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +33,8 @@ router = APIRouter(prefix="/bulk", tags=["bulk"])
 
 class KeywordInput(BaseModel):
     keyword: str = Field(..., min_length=1, max_length=500)
-    title: Optional[str] = Field(None, max_length=500)
-    target_audience: Optional[str] = Field(None, max_length=500)
+    title: str | None = Field(None, max_length=500)
+    target_audience: str | None = Field(None, max_length=500)
 
     @field_validator("keyword")
     @classmethod
@@ -46,7 +46,7 @@ class KeywordInput(BaseModel):
 
 class CreateBulkOutlineJobRequest(BaseModel):
     keywords: list[KeywordInput] = Field(..., min_length=1, max_length=50)
-    template_id: Optional[str] = None
+    template_id: str | None = None
 
 
 class TemplateConfigSchema(BaseModel):
@@ -62,26 +62,26 @@ class TemplateConfigSchema(BaseModel):
 
 class CreateTemplateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = None
+    description: str | None = None
     template_config: TemplateConfigSchema
 
 
 class UpdateTemplateRequest(BaseModel):
-    name: Optional[str] = Field(None, max_length=255)
-    description: Optional[str] = None
-    template_config: Optional[TemplateConfigSchema] = None
+    name: str | None = Field(None, max_length=255)
+    description: str | None = None
+    template_config: TemplateConfigSchema | None = None
 
 
 class BulkJobItemResponse(BaseModel):
     id: str
-    keyword: Optional[str] = None
-    title: Optional[str] = None
+    keyword: str | None = None
+    title: str | None = None
     status: Literal["pending", "processing", "completed", "failed"] = "pending"  # GEN-48
-    resource_type: Optional[str] = None
-    resource_id: Optional[str] = None
-    error_message: Optional[str] = None
-    processing_started_at: Optional[str] = None
-    processing_completed_at: Optional[str] = None
+    resource_type: str | None = None
+    resource_id: str | None = None
+    error_message: str | None = None
+    processing_started_at: str | None = None
+    processing_completed_at: str | None = None
 
 
 class BulkJobResponse(BaseModel):
@@ -91,10 +91,10 @@ class BulkJobResponse(BaseModel):
     total_items: int
     completed_items: int
     failed_items: int
-    template_id: Optional[str] = None
-    started_at: Optional[str] = None
-    completed_at: Optional[str] = None
-    error_summary: Optional[str] = None
+    template_id: str | None = None
+    started_at: str | None = None
+    completed_at: str | None = None
+    error_summary: str | None = None
     created_at: str
 
 
@@ -113,7 +113,7 @@ class BulkJobListResponse(BaseModel):
 class TemplateResponse(BaseModel):
     id: str
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     template_config: dict
     created_at: str
     updated_at: str
@@ -143,9 +143,7 @@ async def list_templates(
     total = (await db.execute(count_q)).scalar() or 0
 
     items_q = (
-        select(ContentTemplate)
-        .where(and_(*conditions))
-        .order_by(ContentTemplate.created_at.desc())
+        select(ContentTemplate).where(and_(*conditions)).order_by(ContentTemplate.created_at.desc())
     )
     result = await db.execute(items_q)
     templates = result.scalars().all()
@@ -189,7 +187,9 @@ async def create_template(
     await db.commit()
     await db.refresh(template)
 
-    logger.info("CROSS-02: Template created template_id=%s by user_id=%s", template.id, current_user.id)
+    logger.info(
+        "CROSS-02: Template created template_id=%s by user_id=%s", template.id, current_user.id
+    )
 
     return TemplateResponse(
         id=template.id,
@@ -232,7 +232,9 @@ async def update_template(
     await db.commit()
     await db.refresh(template)
 
-    logger.info("CROSS-02: Template updated template_id=%s by user_id=%s", template.id, current_user.id)
+    logger.info(
+        "CROSS-02: Template updated template_id=%s by user_id=%s", template.id, current_user.id
+    )
 
     return TemplateResponse(
         id=template.id,
@@ -267,7 +269,9 @@ async def delete_template(
     await db.delete(template)
     await db.commit()
 
-    logger.info("CROSS-02: Template deleted template_id=%s by user_id=%s", template_id, current_user.id)
+    logger.info(
+        "CROSS-02: Template deleted template_id=%s by user_id=%s", template_id, current_user.id
+    )
 
     return {"message": "Template deleted"}
 
@@ -281,7 +285,7 @@ async def delete_template(
 async def list_jobs(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
-    status_filter: Optional[str] = Query(default=None, alias="status"),
+    status_filter: str | None = Query(default=None, alias="status"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -363,6 +367,7 @@ async def create_bulk_outline_job(
 
     # BULK-06: Check outline usage limits at job creation so the user finds out immediately.
     from services.generation_tracker import GenerationTracker
+
     tracker = GenerationTracker(db)
     limit_ok = await tracker.check_limit(
         current_user.current_project_id, "outline", user_id=current_user.id
@@ -409,13 +414,14 @@ async def create_bulk_outline_job(
                 try:
                     async with async_session_maker() as _fail_session:
                         from sqlalchemy import update as _upd
+
                         await _fail_session.execute(
                             _upd(BulkJob)
                             .where(BulkJob.id == job.id)
                             .values(
                                 status="failed",
                                 error_summary=str(_bg_err)[:500],
-                                completed_at=datetime.now(timezone.utc),
+                                completed_at=datetime.now(UTC),
                             )
                         )
                         await _fail_session.commit()
@@ -453,7 +459,9 @@ async def cancel_job(
 
     success = await _cancel(db, job_id, current_user.id)
     if not success:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot cancel this job")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot cancel this job"
+        )
 
     return {"message": "Job cancelled"}
 
@@ -467,8 +475,9 @@ async def retry_failed_items(
     db: AsyncSession = Depends(get_db),
 ):
     """Retry failed items in a bulk job."""
-    from services.bulk_generation import process_bulk_outline_job
     from sqlalchemy import update as sql_update
+
+    from services.bulk_generation import process_bulk_outline_job
 
     job_result = await db.execute(
         select(BulkJob).where(and_(BulkJob.id == job_id, BulkJob.user_id == current_user.id))
@@ -486,6 +495,7 @@ async def retry_failed_items(
 
     # BULK-H2: Check usage limits before allowing retry
     from services.generation_tracker import GenerationTracker
+
     tracker = GenerationTracker(db)
     can_generate = await tracker.check_limit(str(current_user.id), "article")
     if not can_generate:
@@ -504,10 +514,12 @@ async def retry_failed_items(
     # Reset failed items to pending
     await db.execute(
         sql_update(BulkJobItem)
-        .where(and_(
-            BulkJobItem.bulk_job_id == job_id,
-            BulkJobItem.status == "failed",
-        ))
+        .where(
+            and_(
+                BulkJobItem.bulk_job_id == job_id,
+                BulkJobItem.status == "failed",
+            )
+        )
         .values(status="pending", error_message=None)
     )
     job.status = "processing"
@@ -524,13 +536,14 @@ async def retry_failed_items(
                 try:
                     async with async_session_maker() as _fail_session:
                         from sqlalchemy import update as _upd
+
                         await _fail_session.execute(
                             _upd(BulkJob)
                             .where(BulkJob.id == job.id)
                             .values(
                                 status="failed",
                                 error_summary=str(_bg_err)[:500],
-                                completed_at=datetime.now(timezone.utc),
+                                completed_at=datetime.now(UTC),
                             )
                         )
                         await _fail_session.commit()

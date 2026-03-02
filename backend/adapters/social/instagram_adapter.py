@@ -13,10 +13,24 @@ Key differences from FacebookAdapter:
 """
 
 import logging
-from typing import List, Optional, Dict, Any
+from typing import Any
 from urllib.parse import urlparse as _urlparse
 
 import httpx
+
+from infrastructure.config.settings import settings
+
+from .base import (
+    BaseSocialAdapter,
+    MediaUploadResult,
+    PostResult,
+    SocialAPIError,
+    SocialAuthError,
+    SocialCredentials,
+    SocialPlatform,
+    SocialRateLimitError,
+    SocialValidationError,
+)
 
 # SM-24: SSRF protection — only allow media URLs from trusted domains
 _ALLOWED_MEDIA_DOMAINS = {
@@ -33,23 +47,10 @@ def _validate_media_url(url: str) -> None:
     if parsed.scheme != "https":
         raise ValueError(f"Media URL must use HTTPS: {url}")
     if not any(
-        parsed.netloc == d or parsed.netloc.endswith("." + d)
-        for d in _ALLOWED_MEDIA_DOMAINS
+        parsed.netloc == d or parsed.netloc.endswith("." + d) for d in _ALLOWED_MEDIA_DOMAINS
     ):
         raise ValueError(f"Media URL domain not allowed: {parsed.netloc}")
 
-from infrastructure.config.settings import settings
-from .base import (
-    BaseSocialAdapter,
-    SocialPlatform,
-    SocialCredentials,
-    PostResult,
-    MediaUploadResult,
-    SocialAuthError,
-    SocialAPIError,
-    SocialRateLimitError,
-    SocialValidationError,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -85,10 +86,10 @@ class InstagramAdapter(BaseSocialAdapter):
 
     # Instagram OAuth scopes required for business account publishing
     SCOPES = [
-        "instagram_basic",            # Read profile info
+        "instagram_basic",  # Read profile info
         "instagram_content_publish",  # Create posts
-        "pages_show_list",            # Enumerate linked Facebook Pages
-        "pages_read_engagement",      # Read page / IG account data
+        "pages_show_list",  # Enumerate linked Facebook Pages
+        "pages_read_engagement",  # Read page / IG account data
     ]
 
     # Instagram caption character limit
@@ -96,9 +97,9 @@ class InstagramAdapter(BaseSocialAdapter):
 
     def __init__(
         self,
-        app_id: Optional[str] = None,
-        app_secret: Optional[str] = None,
-        redirect_uri: Optional[str] = None,
+        app_id: str | None = None,
+        app_secret: str | None = None,
+        redirect_uri: str | None = None,
         timeout: int = 30,
         mock_mode: bool = False,
     ):
@@ -202,7 +203,9 @@ class InstagramAdapter(BaseSocialAdapter):
                     },
                 )
                 if token_resp.status_code != 200:
-                    error_msg = token_resp.json().get("error", {}).get("message", "Token exchange failed")
+                    error_msg = (
+                        token_resp.json().get("error", {}).get("message", "Token exchange failed")
+                    )
                     logger.error("Instagram token exchange failed: %s", error_msg)
                     raise SocialAuthError(f"Token exchange failed: {error_msg}")
 
@@ -254,7 +257,7 @@ class InstagramAdapter(BaseSocialAdapter):
 
     async def _get_instagram_account(
         self, client: httpx.AsyncClient, access_token: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Resolve the Instagram Business Account linked to the authenticated user.
 
@@ -384,8 +387,8 @@ class InstagramAdapter(BaseSocialAdapter):
         self,
         credentials: SocialCredentials,
         text: str,
-        media_urls: List[str],
-        ig_user_id: Optional[str] = None,
+        media_urls: list[str],
+        ig_user_id: str | None = None,
         **kwargs,
     ) -> PostResult:
         """
@@ -437,7 +440,7 @@ class InstagramAdapter(BaseSocialAdapter):
             return PostResult(
                 success=True,
                 post_id="17841234567890123",
-                post_url=f"https://www.instagram.com/p/mock_post_id/",
+                post_url="https://www.instagram.com/p/mock_post_id/",
             )
 
         try:
@@ -459,7 +462,9 @@ class InstagramAdapter(BaseSocialAdapter):
 
                 if container_resp.status_code not in (200, 201):
                     error_data = container_resp.json() if container_resp.text else {}
-                    error_msg = error_data.get("error", {}).get("message", "Container creation failed")
+                    error_msg = error_data.get("error", {}).get(
+                        "message", "Container creation failed"
+                    )
                     logger.error("Instagram container creation error: %s", error_msg)
                     raise SocialAPIError(f"Instagram container creation failed: {error_msg}")
 
@@ -515,7 +520,7 @@ class InstagramAdapter(BaseSocialAdapter):
         credentials: SocialCredentials,
         media_bytes: bytes,
         media_type: str,
-        filename: Optional[str] = None,
+        filename: str | None = None,
         **kwargs,
     ) -> MediaUploadResult:
         """

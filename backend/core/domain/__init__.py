@@ -1,8 +1,8 @@
 # Domain Entities
 # Pure business objects with no external dependencies
-from .user import User, UserRole
-from .content import Outline, Article, ContentStatus
+from .content import Article, ContentStatus, Outline
 from .subscription import Subscription, SubscriptionTier
+from .user import User, UserRole
 
 __all__ = [
     "User",

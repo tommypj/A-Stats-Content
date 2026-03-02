@@ -2,10 +2,11 @@
 Project and multi-tenancy API schemas.
 """
 
-from datetime import datetime
-from typing import Optional, List
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 import re
+from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 # Project Role Enum (matches database enum)
@@ -38,18 +39,18 @@ class ProjectCreate(BaseModel):
     """Schema for creating a new project."""
 
     name: str = Field(..., min_length=1, max_length=100, description="Project name")
-    slug: Optional[str] = Field(
+    slug: str | None = Field(
         None,
         min_length=3,
         max_length=100,
         description="URL-friendly project identifier (auto-generated if not provided)",
     )
-    description: Optional[str] = Field(None, max_length=500, description="Project description")
-    logo_url: Optional[str] = Field(None, max_length=500, description="Project logo URL")
+    description: str | None = Field(None, max_length=500, description="Project description")
+    logo_url: str | None = Field(None, max_length=500, description="Project logo URL")
 
     @field_validator("slug")
     @classmethod
-    def validate_slug(cls, v: Optional[str]) -> Optional[str]:
+    def validate_slug(cls, v: str | None) -> str | None:
         """Validate slug format (lowercase alphanumeric with hyphens)."""
         if v is None:
             return v
@@ -65,10 +66,10 @@ class ProjectCreate(BaseModel):
 class ProjectUpdate(BaseModel):
     """Schema for updating a project."""
 
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    description: Optional[str] = Field(None, max_length=500)
-    logo_url: Optional[str] = Field(None, max_length=500)
-    settings: Optional[dict] = Field(None, description="Project settings JSON")
+    name: str | None = Field(None, min_length=1, max_length=100)
+    description: str | None = Field(None, max_length=500)
+    logo_url: str | None = Field(None, max_length=500)
+    settings: dict | None = Field(None, description="Project settings JSON")
 
 
 class ProjectResponse(BaseModel):
@@ -77,34 +78,34 @@ class ProjectResponse(BaseModel):
     id: str
     name: str
     slug: str
-    description: Optional[str] = None
-    avatar_url: Optional[str] = None
-    logo_url: Optional[str] = None  # Alias for avatar_url (frontend compatibility)
+    description: str | None = None
+    avatar_url: str | None = None
+    logo_url: str | None = None  # Alias for avatar_url (frontend compatibility)
 
     is_personal: bool = False
 
     # Billing
     subscription_tier: str
     subscription_status: str
-    lemonsqueezy_customer_id: Optional[str] = None
-    lemonsqueezy_subscription_id: Optional[str] = None
+    lemonsqueezy_customer_id: str | None = None
+    lemonsqueezy_subscription_id: str | None = None
 
     # Usage tracking
     articles_generated_this_month: int = 0
     outlines_generated_this_month: int = 0
     images_generated_this_month: int = 0
-    usage_reset_date: Optional[datetime] = None
+    usage_reset_date: datetime | None = None
     max_members: int = 5
 
     # Metadata
     owner_id: str
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
     # Member info (only when requested)
-    member_count: Optional[int] = None
-    current_user_role: Optional[str] = None
-    my_role: Optional[str] = None  # Alias for current_user_role (frontend compatibility)
+    member_count: int | None = None
+    current_user_role: str | None = None
+    my_role: str | None = None  # Alias for current_user_role (frontend compatibility)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -112,7 +113,7 @@ class ProjectResponse(BaseModel):
 class ProjectListResponse(BaseModel):
     """Paginated list of projects."""
 
-    projects: List[ProjectResponse]
+    projects: list[ProjectResponse]
     total: int
     page: int = 1
     page_size: int = 50
@@ -154,12 +155,12 @@ class ProjectMemberResponse(BaseModel):
     user_id: str
     role: str
     joined_at: datetime
-    invited_by_id: Optional[str] = None
+    invited_by_id: str | None = None
 
     # User info (joined from users table)
-    user_email: Optional[str] = None
-    user_name: Optional[str] = None
-    user_avatar_url: Optional[str] = None
+    user_email: str | None = None
+    user_name: str | None = None
+    user_avatar_url: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -167,7 +168,7 @@ class ProjectMemberResponse(BaseModel):
 class ProjectMemberListResponse(BaseModel):
     """List of project members."""
 
-    members: List[ProjectMemberResponse]
+    members: list[ProjectMemberResponse]
     total: int
 
 
@@ -203,16 +204,16 @@ class ProjectInvitationResponse(BaseModel):
     status: str
     invited_by_id: str
     expires_at: datetime
-    accepted_at: Optional[datetime] = None
+    accepted_at: datetime | None = None
     created_at: datetime
 
     # Project info (joined)
-    project_name: Optional[str] = None
-    project_slug: Optional[str] = None
+    project_name: str | None = None
+    project_slug: str | None = None
 
     # Inviter info (joined)
-    inviter_name: Optional[str] = None
-    inviter_email: Optional[str] = None
+    inviter_name: str | None = None
+    inviter_email: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -220,7 +221,7 @@ class ProjectInvitationResponse(BaseModel):
 class ProjectInvitationListResponse(BaseModel):
     """List of project invitations."""
 
-    invitations: List[ProjectInvitationResponse]
+    invitations: list[ProjectInvitationResponse]
     total: int
 
 
@@ -235,7 +236,7 @@ class ProjectInvitationPublicResponse(BaseModel):
 
     project_name: str
     project_slug: str
-    project_logo_url: Optional[str] = None
+    project_logo_url: str | None = None
     inviter_name: str
     role: str
     expires_at: datetime
@@ -249,7 +250,7 @@ class ProjectInvitationAcceptResponse(BaseModel):
     success: bool
     project_id: str
     project_name: str
-    redirect_url: Optional[str] = None  # For unauthenticated users needing to register/login
+    redirect_url: str | None = None  # For unauthenticated users needing to register/login
 
 
 # =============================================================================
@@ -263,7 +264,7 @@ class ProjectStats(BaseModel):
     articles_generated: int
     outlines_generated: int
     images_generated: int
-    usage_reset_date: Optional[datetime] = None
+    usage_reset_date: datetime | None = None
 
     # Limits based on subscription tier
     articles_limit: int
@@ -279,15 +280,15 @@ class ProjectStats(BaseModel):
 class ProjectSettings(BaseModel):
     """Project settings schema."""
 
-    branding: Optional[dict] = Field(
+    branding: dict | None = Field(
         None,
         description="Branding settings (primary_color, logo_url)",
     )
-    content: Optional[dict] = Field(
+    content: dict | None = Field(
         None,
         description="Content defaults (default_tone, default_language)",
     )
-    integrations: Optional[dict] = Field(
+    integrations: dict | None = Field(
         None,
         description="Integration settings (wordpress, gsc, etc)",
     )
@@ -301,17 +302,19 @@ class ProjectSettings(BaseModel):
 class ProjectSwitchRequest(BaseModel):
     """Schema for switching current project."""
 
-    project_id: Optional[str] = Field(None, description="Project ID to switch to, or null for personal workspace")
+    project_id: str | None = Field(
+        None, description="Project ID to switch to, or null for personal workspace"
+    )
 
 
 class ProjectSwitchResponse(BaseModel):
     """Response after switching projects."""
 
-    current_project_id: Optional[str] = None
-    message: Optional[str] = None
-    project_name: Optional[str] = None
-    project_slug: Optional[str] = None
-    user_role: Optional[str] = None
+    current_project_id: str | None = None
+    message: str | None = None
+    project_name: str | None = None
+    project_slug: str | None = None
+    user_role: str | None = None
 
 
 # Aliases for route compatibility
@@ -326,8 +329,8 @@ class ProjectWithMemberRoleResponse(BaseModel):
     id: str
     name: str
     slug: str
-    avatar_url: Optional[str] = None
-    description: Optional[str] = None
+    avatar_url: str | None = None
+    description: str | None = None
     created_at: datetime
     subscription_tier: str = "free"
     user_role: str  # Current user's role in this project
@@ -339,19 +342,19 @@ class ProjectDetailResponse(BaseModel):
     id: str
     name: str
     slug: str
-    avatar_url: Optional[str] = None
-    description: Optional[str] = None
-    owner_id: Optional[str] = None
+    avatar_url: str | None = None
+    description: str | None = None
+    owner_id: str | None = None
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
     is_personal: bool = False
     subscription_tier: str = "free"
     subscription_status: str = "active"
-    subscription_expires: Optional[datetime] = None
+    subscription_expires: datetime | None = None
     max_members: int = 5
     member_count: int = 0
-    current_user_role: Optional[str] = None  # Current user's role
-    members: Optional[list] = None
+    current_user_role: str | None = None  # Current user's role
+    members: list | None = None
 
 
 class ProjectDeleteResponse(BaseModel):
@@ -359,7 +362,7 @@ class ProjectDeleteResponse(BaseModel):
 
     success: bool = True
     message: str
-    project_id: Optional[str] = None
+    project_id: str | None = None
 
 
 class CurrentProjectResponse(BaseModel):
@@ -368,10 +371,10 @@ class CurrentProjectResponse(BaseModel):
     project: Optional["ProjectResponse"] = None
     is_personal_workspace: bool = True
     # Legacy flat fields (kept for backward compatibility)
-    project_id: Optional[str] = None
-    project_name: Optional[str] = None
-    project_slug: Optional[str] = None
-    user_role: Optional[str] = None
+    project_id: str | None = None
+    project_name: str | None = None
+    project_slug: str | None = None
+    user_role: str | None = None
 
 
 class AddMemberRequest(BaseModel):
@@ -387,7 +390,7 @@ class AddMemberResponse(BaseModel):
     success: bool
     message: str
     invitation_sent: bool = False
-    member: Optional[ProjectMemberResponse] = None
+    member: ProjectMemberResponse | None = None
 
 
 class UpdateMemberRoleRequest(BaseModel):
@@ -449,18 +452,14 @@ class TransferOwnershipResponse(BaseModel):
 class BrandVoiceSettings(BaseModel):
     """Brand voice settings for a project."""
 
-    tone: Optional[str] = Field(
+    tone: str | None = Field(
         None, description="Tone of voice (e.g., professional, casual, authoritative)"
     )
-    writing_style: Optional[str] = Field(
+    writing_style: str | None = Field(
         None, description="Writing style (e.g., informative, conversational, persuasive)"
     )
-    target_audience: Optional[str] = Field(
-        None, description="Target audience description"
-    )
-    custom_instructions: Optional[str] = Field(
+    target_audience: str | None = Field(None, description="Target audience description")
+    custom_instructions: str | None = Field(
         None, max_length=500, description="Free-text custom instructions for AI generation"
     )
-    language: Optional[str] = Field(
-        None, description="Default language code (e.g., en, es, de)"
-    )
+    language: str | None = Field(None, description="Default language code (e.g., en, es, de)")

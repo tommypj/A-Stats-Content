@@ -1,11 +1,13 @@
 """Integration tests for article endpoints."""
-import pytest
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
+
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
-from infrastructure.database.models import User, Article, Outline, ContentStatus
+import pytest
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from infrastructure.database.models import Article, ContentStatus, Outline, User
 
 pytestmark = pytest.mark.asyncio
 
@@ -28,7 +30,7 @@ class TestCreateArticle:
                 "keyword": "seo optimization",
                 "meta_description": "Learn everything about SEO optimization",
                 "content": "# Introduction\n\nSEO is important for digital marketing.",
-            }
+            },
         )
 
         assert response.status_code == 201
@@ -69,7 +71,7 @@ class TestCreateArticle:
                 "keyword": "seo",
                 "outline_id": outline.id,
                 "content": "Article content here",
-            }
+            },
         )
 
         assert response.status_code == 201
@@ -89,7 +91,7 @@ class TestCreateArticle:
                 "title": "How to Optimize Your Website for SEO",
                 "keyword": "seo",
                 "content": "Content here",
-            }
+            },
         )
 
         assert response.status_code == 201
@@ -103,7 +105,7 @@ class TestCreateArticle:
             json={
                 "title": "Test",
                 "keyword": "test",
-            }
+            },
         )
         assert response.status_code == 401
 
@@ -132,7 +134,7 @@ class TestGenerateArticle:
                     "heading": "Introduction",
                     "subheadings": ["What is SEO"],
                     "notes": "Overview",
-                    "word_count_target": 200
+                    "word_count_target": 200,
                 }
             ],
             status=ContentStatus.COMPLETED.value,
@@ -147,20 +149,20 @@ class TestGenerateArticle:
             title="Complete SEO Guide",
             content="# Introduction\n\nSEO optimization is crucial for success.",
             meta_description="Learn about SEO optimization strategies",
-            word_count=150
+            word_count=150,
         )
 
         with patch(
             "api.routes.articles.content_ai_service.generate_article",
             new_callable=AsyncMock,
-            return_value=mock_article
+            return_value=mock_article,
         ):
             response = await async_client.post(
                 "/api/v1/articles/generate",
                 headers=auth_headers,
                 json={
                     "outline_id": outline.id,
-                }
+                },
             )
 
         assert response.status_code == 201
@@ -182,7 +184,7 @@ class TestGenerateArticle:
             headers=auth_headers,
             json={
                 "outline_id": str(uuid4()),
-            }
+            },
         )
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()
@@ -211,7 +213,7 @@ class TestGenerateArticle:
             headers=auth_headers,
             json={
                 "outline_id": outline.id,
-            }
+            },
         )
         assert response.status_code == 400
         assert "no sections" in response.json()["detail"].lower()
@@ -229,7 +231,9 @@ class TestGenerateArticle:
             user_id=test_user.id,
             title="Test Outline",
             keyword="test",
-            sections=[{"heading": "Test", "subheadings": [], "notes": "", "word_count_target": 100}],
+            sections=[
+                {"heading": "Test", "subheadings": [], "notes": "", "word_count_target": 100}
+            ],
             status=ContentStatus.COMPLETED.value,
         )
         db_session.add(outline)
@@ -238,14 +242,14 @@ class TestGenerateArticle:
         with patch(
             "api.routes.articles.content_ai_service.generate_article",
             new_callable=AsyncMock,
-            side_effect=Exception("AI service error")
+            side_effect=Exception("AI service error"),
         ):
             response = await async_client.post(
                 "/api/v1/articles/generate",
                 headers=auth_headers,
                 json={
                     "outline_id": outline.id,
-                }
+                },
             )
 
         assert response.status_code == 201
@@ -344,11 +348,13 @@ class TestListArticles:
     ):
         """Test filtering articles by status."""
         # Create articles with different statuses
-        for i, status in enumerate([
-            ContentStatus.DRAFT.value,
-            ContentStatus.COMPLETED.value,
-            ContentStatus.PUBLISHED.value,
-        ]):
+        for i, status in enumerate(
+            [
+                ContentStatus.DRAFT.value,
+                ContentStatus.COMPLETED.value,
+                ContentStatus.PUBLISHED.value,
+            ]
+        ):
             article = Article(
                 id=str(uuid4()),
                 user_id=test_user.id,
@@ -499,7 +505,7 @@ class TestUpdateArticle:
             json={
                 "title": "Updated Title",
                 "content": "Updated content here with more text",
-            }
+            },
         )
 
         assert response.status_code == 200
@@ -531,9 +537,7 @@ class TestUpdateArticle:
         new_content = "# SEO Guide\n\nSEO optimization is key. " * 20  # Longer content
 
         response = await async_client.put(
-            f"/api/v1/articles/{article.id}",
-            headers=auth_headers,
-            json={"content": new_content}
+            f"/api/v1/articles/{article.id}", headers=auth_headers, json={"content": new_content}
         )
 
         assert response.status_code == 200
@@ -551,9 +555,7 @@ class TestUpdateArticle:
     ):
         """Test updating non-existent article."""
         response = await async_client.put(
-            f"/api/v1/articles/{str(uuid4())}",
-            headers=auth_headers,
-            json={"title": "Updated"}
+            f"/api/v1/articles/{str(uuid4())}", headers=auth_headers, json={"title": "Updated"}
         )
         assert response.status_code == 404
 
@@ -588,9 +590,8 @@ class TestDeleteArticle:
 
         # Verify article was deleted
         from sqlalchemy import select
-        result = await db_session.execute(
-            select(Article).where(Article.id == article.id)
-        )
+
+        result = await db_session.execute(select(Article).where(Article.id == article.id))
         deleted_article = result.scalar_one_or_none()
         assert deleted_article is None
 
@@ -632,14 +633,12 @@ class TestImproveArticle:
         with patch(
             "api.routes.articles.content_ai_service.improve_content",
             new_callable=AsyncMock,
-            return_value="Improved and enhanced content with better structure."
+            return_value="Improved and enhanced content with better structure.",
         ):
             response = await async_client.post(
                 f"/api/v1/articles/{article.id}/improve",
                 headers=auth_headers,
-                json={
-                    "improvement_type": "readability"
-                }
+                json={"improvement_type": "readability"},
             )
 
         assert response.status_code == 200
@@ -669,9 +668,7 @@ class TestImproveArticle:
         response = await async_client.post(
             f"/api/v1/articles/{article.id}/improve",
             headers=auth_headers,
-            json={
-                "improvement_type": "readability"
-            }
+            json={"improvement_type": "readability"},
         )
         assert response.status_code == 400
         assert "no content" in response.json()["detail"].lower()
@@ -685,9 +682,7 @@ class TestImproveArticle:
         response = await async_client.post(
             f"/api/v1/articles/{str(uuid4())}/improve",
             headers=auth_headers,
-            json={
-                "improvement_type": "readability"
-            }
+            json={"improvement_type": "readability"},
         )
         assert response.status_code == 404
 

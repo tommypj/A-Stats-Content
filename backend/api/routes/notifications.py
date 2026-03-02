@@ -1,7 +1,7 @@
 """User notification API routes."""
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -28,10 +28,10 @@ async def get_generation_status(
     minutes.  The list is sorted by updated_at descending and capped at 10
     entries.
     """
-    from infrastructure.database.models import Article, Outline, GeneratedImage
+    from infrastructure.database.models import Article, GeneratedImage, Outline
     from infrastructure.database.models.content import ContentStatus
 
-    five_min_ago = datetime.now(timezone.utc) - timedelta(minutes=5)
+    five_min_ago = datetime.now(UTC) - timedelta(minutes=5)
 
     # Articles that completed / failed recently
     articles_result = await db.execute(
@@ -89,7 +89,7 @@ async def get_generation_status(
     for row in articles_result.all():
         ts = row.updated_at
         if ts is not None and ts.tzinfo is None:
-            ts = ts.replace(tzinfo=timezone.utc)
+            ts = ts.replace(tzinfo=UTC)
         notifications.append(
             {
                 "id": f"article-{row.id}",
@@ -104,7 +104,7 @@ async def get_generation_status(
     for row in outlines_result.all():
         ts = row.updated_at
         if ts is not None and ts.tzinfo is None:
-            ts = ts.replace(tzinfo=timezone.utc)
+            ts = ts.replace(tzinfo=UTC)
         notifications.append(
             {
                 "id": f"outline-{row.id}",
@@ -119,7 +119,7 @@ async def get_generation_status(
     for row in images_result.all():
         ts = row.updated_at
         if ts is not None and ts.tzinfo is None:
-            ts = ts.replace(tzinfo=timezone.utc)
+            ts = ts.replace(tzinfo=UTC)
         # Use a truncated prompt as the display title (max 60 chars)
         prompt_preview = (row.prompt or "Image")[:60]
         if len(row.prompt or "") > 60:

@@ -3,9 +3,8 @@ Knowledge Vault API schemas for document upload and RAG queries.
 """
 
 from datetime import datetime
-from typing import Optional, List
-from pydantic import BaseModel, ConfigDict, Field
 
+from pydantic import BaseModel, ConfigDict, Field
 
 # ============================================================================
 # Upload Schemas
@@ -36,19 +35,19 @@ class KnowledgeSourceResponse(BaseModel):
 
     id: str
     title: str
-    project_id: Optional[str] = None
+    project_id: str | None = None
     filename: str
     file_type: str
     file_size: int
-    file_url: Optional[str]
+    file_url: str | None
     status: str
     chunk_count: int
     char_count: int
-    description: Optional[str]
-    tags: List[str] = Field(default_factory=list)
-    error_message: Optional[str]
-    processing_started_at: Optional[datetime]
-    processing_completed_at: Optional[datetime]
+    description: str | None
+    tags: list[str] = Field(default_factory=list)
+    error_message: str | None
+    processing_started_at: datetime | None
+    processing_completed_at: datetime | None
     created_at: datetime
     updated_at: datetime
 
@@ -58,7 +57,7 @@ class KnowledgeSourceResponse(BaseModel):
 class KnowledgeSourceListResponse(BaseModel):
     """Paginated list of knowledge sources."""
 
-    items: List[KnowledgeSourceResponse]
+    items: list[KnowledgeSourceResponse]
     total: int
     page: int
     page_size: int
@@ -68,9 +67,9 @@ class KnowledgeSourceListResponse(BaseModel):
 class KnowledgeSourceUpdateRequest(BaseModel):
     """Request to update knowledge source metadata."""
 
-    title: Optional[str] = Field(None, min_length=1, max_length=500)
-    description: Optional[str] = None
-    tags: Optional[List[str]] = None
+    title: str | None = Field(None, min_length=1, max_length=500)
+    description: str | None = None
+    tags: list[str] | None = None
 
 
 # ============================================================================
@@ -82,8 +81,8 @@ class QueryRequest(BaseModel):
     """Request to query the knowledge vault using RAG."""
 
     query: str = Field(..., min_length=1, max_length=1000)
-    project_id: Optional[str] = Field(None, description="Query project sources only")
-    source_ids: Optional[List[str]] = Field(
+    project_id: str | None = Field(None, description="Query project sources only")
+    source_ids: list[str] | None = Field(
         None,
         description="Filter to specific sources (empty = search all)",
     )
@@ -106,7 +105,7 @@ class SourceSnippet(BaseModel):
     source_title: str
     content: str
     relevance_score: float
-    chunk_index: Optional[int] = None
+    chunk_index: int | None = None
 
 
 class QueryResponse(BaseModel):
@@ -114,7 +113,7 @@ class QueryResponse(BaseModel):
 
     query: str
     answer: str
-    sources: List[SourceSnippet] = Field(default_factory=list)
+    sources: list[SourceSnippet] = Field(default_factory=list)
     query_time_ms: int
     chunks_retrieved: int
 

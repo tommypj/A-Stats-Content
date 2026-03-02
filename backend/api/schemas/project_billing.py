@@ -6,10 +6,9 @@ and billing operations.
 """
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProjectLimits(BaseModel):
@@ -18,7 +17,9 @@ class ProjectLimits(BaseModel):
     articles_per_month: int = Field(..., description="Articles limit per month (-1 = unlimited)")
     outlines_per_month: int = Field(..., description="Outlines limit per month (-1 = unlimited)")
     images_per_month: int = Field(..., description="Images limit per month (-1 = unlimited)")
-    social_posts_per_month: int = Field(..., description="Social post sets limit per month (-1 = unlimited)")
+    social_posts_per_month: int = Field(
+        ..., description="Social post sets limit per month (-1 = unlimited)"
+    )
     max_members: int = Field(..., description="Maximum project members allowed")
 
     model_config = ConfigDict(from_attributes=True)
@@ -37,7 +38,7 @@ class ProjectUsageStats(BaseModel):
     social_posts_limit: int = Field(..., description="Social post sets limit per month")
     members_count: int = Field(..., description="Current number of project members")
     members_limit: int = Field(..., description="Maximum members allowed")
-    usage_reset_date: Optional[datetime] = Field(None, description="Date when usage resets")
+    usage_reset_date: datetime | None = Field(None, description="Date when usage resets")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -47,12 +48,16 @@ class ProjectSubscriptionResponse(BaseModel):
 
     project_id: UUID = Field(..., description="Project ID")
     project_name: str = Field(..., description="Project name")
-    subscription_tier: str = Field(..., description="Subscription tier (free, starter, professional, enterprise)")
-    subscription_status: str = Field(..., description="Subscription status (active, cancelled, expired, past_due)")
-    subscription_expires: Optional[datetime] = Field(None, description="Subscription expiration date")
-    customer_id: Optional[str] = Field(None, description="LemonSqueezy customer ID")
-    subscription_id: Optional[str] = Field(None, description="LemonSqueezy subscription ID")
-    variant_id: Optional[str] = Field(None, description="LemonSqueezy variant ID")
+    subscription_tier: str = Field(
+        ..., description="Subscription tier (free, starter, professional, enterprise)"
+    )
+    subscription_status: str = Field(
+        ..., description="Subscription status (active, cancelled, expired, past_due)"
+    )
+    subscription_expires: datetime | None = Field(None, description="Subscription expiration date")
+    customer_id: str | None = Field(None, description="LemonSqueezy customer ID")
+    subscription_id: str | None = Field(None, description="LemonSqueezy subscription ID")
+    variant_id: str | None = Field(None, description="LemonSqueezy variant ID")
     usage: ProjectUsageStats = Field(..., description="Current usage statistics")
     limits: ProjectLimits = Field(..., description="Usage limits for current tier")
     can_manage: bool = Field(..., description="Whether user can manage billing (OWNER role)")

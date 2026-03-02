@@ -5,35 +5,33 @@ Outline API routes.
 import csv
 import html
 import io
-import json
 import logging
 import math
 import re
 import time
-from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
-from api.middleware.rate_limit import limiter
-from sqlalchemy import select, func, delete
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from adapters.ai.anthropic_adapter import content_ai_service
+from api.middleware.rate_limit import limiter
+from api.routes.auth import get_current_user
 from api.schemas.content import (
-    OutlineCreateRequest,
-    OutlineUpdateRequest,
-    OutlineResponse,
-    OutlineListResponse,
     BulkDeleteRequest,
     BulkDeleteResponse,
+    OutlineCreateRequest,
+    OutlineListResponse,
+    OutlineResponse,
+    OutlineUpdateRequest,
 )
-from api.routes.auth import get_current_user
 from api.utils import escape_like
-from infrastructure.database.connection import get_db
-from infrastructure.database.models import Outline, User, ContentStatus
-from infrastructure.database.models.project import Project
-from adapters.ai.anthropic_adapter import content_ai_service
 from infrastructure.config.settings import settings
+from infrastructure.database.connection import get_db
+from infrastructure.database.models import ContentStatus, Outline, User
+from infrastructure.database.models.project import Project
 from services.generation_tracker import GenerationTracker
 
 logger = logging.getLogger(__name__)
@@ -53,7 +51,7 @@ async def create_outline(
     Create a new outline, optionally auto-generating with AI.
     """
     outline_id = str(uuid4())
-    project_id = getattr(current_user, 'current_project_id', None)
+    project_id = getattr(current_user, "current_project_id", None)
 
     # Load brand voice defaults from the current project (if any)
     brand_voice: dict = {}
@@ -68,7 +66,9 @@ async def create_outline(
     # Apply brand voice defaults when the caller did not supply explicit values
     effective_tone = body.tone or brand_voice.get("tone")
     effective_target_audience = body.target_audience or brand_voice.get("target_audience")
-    effective_language = body.language or brand_voice.get("language") or current_user.language or "en"
+    effective_language = (
+        body.language or brand_voice.get("language") or current_user.language or "en"
+    )
 
     # Check usage limit before creating any records
     if body.auto_generate:
@@ -153,6 +153,7 @@ async def create_outline(
             duration_ms = int((time.time() - start_time) * 1000)
             try:
                 from infrastructure.database.connection import async_session_maker
+
                 async with async_session_maker() as tracker_db:
                     fail_tracker = GenerationTracker(tracker_db)
                     await fail_tracker.log_failure(
@@ -174,8 +175,8 @@ async def create_outline(
 async def list_outlines(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    status: Optional[str] = None,
-    keyword: Optional[str] = None,
+    status: str | None = None,
+    keyword: str | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -200,7 +201,10 @@ async def list_outlines(
         status = status.lower()
         VALID_STATUSES = {s.value for s in ContentStatus}
         if status not in VALID_STATUSES:
-            raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {', '.join(sorted(VALID_STATUSES))}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status. Must be one of: {', '.join(sorted(VALID_STATUSES))}",
+            )
         query = query.where(Outline.status == status)
     if keyword:
         query = query.where(Outline.keyword.ilike(f"%{escape_like(keyword)}%"))
@@ -251,19 +255,33 @@ async def export_all_outlines(
 
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(["id", "title", "keyword", "status", "tone", "word_count_target", "estimated_read_time", "created_at", "updated_at"])
+    writer.writerow(
+        [
+            "id",
+            "title",
+            "keyword",
+            "status",
+            "tone",
+            "word_count_target",
+            "estimated_read_time",
+            "created_at",
+            "updated_at",
+        ]
+    )
     for o in outlines:
-        writer.writerow([
-            o.id,
-            o.title,
-            o.keyword,
-            o.status,
-            o.tone or "",
-            o.word_count_target or 0,
-            o.estimated_read_time or 0,
-            o.created_at.isoformat() if o.created_at else "",
-            o.updated_at.isoformat() if o.updated_at else "",
-        ])
+        writer.writerow(
+            [
+                o.id,
+                o.title,
+                o.keyword,
+                o.status,
+                o.tone or "",
+                o.word_count_target or 0,
+                o.estimated_read_time or 0,
+                o.created_at.isoformat() if o.created_at else "",
+                o.updated_at.isoformat() if o.updated_at else "",
+            ]
+        )
 
     buf.seek(0)
     return StreamingResponse(
@@ -288,7 +306,7 @@ def _outline_to_markdown(outline) -> str:
         lines.append(f"**Word Count Target:** {outline.word_count_target}")
     lines.append("")
 
-    for section in (outline.sections or []):
+    for section in outline.sections or []:
         heading = section.get("heading", "")
         lines.append(f"## {heading}")
         for sub in section.get("subheadings", []):
@@ -318,11 +336,15 @@ def _outline_to_html(outline) -> str:
     if outline.tone:
         parts.append(f"<p><strong>Tone:</strong> {html.escape(outline.tone)}</p>")
     if outline.target_audience:
-        parts.append(f"<p><strong>Target Audience:</strong> {html.escape(outline.target_audience)}</p>")
+        parts.append(
+            f"<p><strong>Target Audience:</strong> {html.escape(outline.target_audience)}</p>"
+        )
     if outline.word_count_target:
-        parts.append(f"<p><strong>Word Count Target:</strong> {html.escape(str(outline.word_count_target))}</p>")
+        parts.append(
+            f"<p><strong>Word Count Target:</strong> {html.escape(str(outline.word_count_target))}</p>"
+        )
 
-    for section in (outline.sections or []):
+    for section in outline.sections or []:
         heading = html.escape(section.get("heading", ""))
         parts.append(f"<h2>{heading}</h2>")
         for sub in section.get("subheadings", []):
@@ -383,18 +405,32 @@ async def export_outline(
     # csv
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(["id", "title", "keyword", "status", "tone", "word_count_target", "estimated_read_time", "created_at", "updated_at"])
-    writer.writerow([
-        outline.id,
-        outline.title,
-        outline.keyword,
-        outline.status,
-        outline.tone or "",
-        outline.word_count_target or 0,
-        outline.estimated_read_time or 0,
-        outline.created_at.isoformat() if outline.created_at else "",
-        outline.updated_at.isoformat() if outline.updated_at else "",
-    ])
+    writer.writerow(
+        [
+            "id",
+            "title",
+            "keyword",
+            "status",
+            "tone",
+            "word_count_target",
+            "estimated_read_time",
+            "created_at",
+            "updated_at",
+        ]
+    )
+    writer.writerow(
+        [
+            outline.id,
+            outline.title,
+            outline.keyword,
+            outline.status,
+            outline.tone or "",
+            outline.word_count_target or 0,
+            outline.estimated_read_time or 0,
+            outline.created_at.isoformat() if outline.created_at else "",
+            outline.updated_at.isoformat() if outline.updated_at else "",
+        ]
+    )
     buf.seek(0)
     return StreamingResponse(
         iter([buf.getvalue()]),
@@ -421,21 +457,15 @@ async def bulk_delete_outlines(
         return BulkDeleteResponse(deleted=0)
 
     if current_user.current_project_id:
-        stmt = (
-            delete(Outline)
-            .where(
-                Outline.id.in_(body.ids),
-                Outline.project_id == current_user.current_project_id,
-            )
+        stmt = delete(Outline).where(
+            Outline.id.in_(body.ids),
+            Outline.project_id == current_user.current_project_id,
         )
     else:
-        stmt = (
-            delete(Outline)
-            .where(
-                Outline.id.in_(body.ids),
-                Outline.user_id == current_user.id,
-                Outline.project_id.is_(None),
-            )
+        stmt = delete(Outline).where(
+            Outline.id.in_(body.ids),
+            Outline.user_id == current_user.id,
+            Outline.project_id.is_(None),
         )
 
     result = await db.execute(stmt)
@@ -509,7 +539,15 @@ async def update_outline(
         )
 
     # GEN-04: Include "status" so PUT requests can change outline status (e.g., mark as reviewed).
-    ALLOWED_UPDATE_FIELDS = {"title", "keyword", "target_audience", "tone", "sections", "word_count_target", "status"}
+    ALLOWED_UPDATE_FIELDS = {
+        "title",
+        "keyword",
+        "target_audience",
+        "tone",
+        "sections",
+        "word_count_target",
+        "status",
+    }
     # Update fields
     update_data = request.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -623,7 +661,7 @@ async def regenerate_outline(
         )
 
     # Check usage limit before changing status
-    project_id = getattr(current_user, 'current_project_id', None)
+    project_id = getattr(current_user, "current_project_id", None)
     tracker = GenerationTracker(db)
     if not await tracker.check_limit(project_id, "outline", user_id=current_user.id):
         raise HTTPException(
@@ -697,6 +735,7 @@ async def regenerate_outline(
         duration_ms = int((time.time() - start_time) * 1000)
         try:
             from infrastructure.database.connection import async_session_maker
+
             async with async_session_maker() as tracker_db:
                 fail_tracker = GenerationTracker(tracker_db)
                 await fail_tracker.log_failure(

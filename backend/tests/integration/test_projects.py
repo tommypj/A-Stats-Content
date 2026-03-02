@@ -13,10 +13,11 @@ Tests cover full CRUD operations for projects including:
 All tests use async fixtures and httpx AsyncClient.
 """
 
+from uuid import uuid4
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import uuid4
 
 # Skip tests if projects module not implemented yet
 pytest.importorskip("api.routes.projects", reason="Projects API not yet implemented")
@@ -26,18 +27,14 @@ class TestCreateProject:
     """Tests for POST /projects endpoint."""
 
     @pytest.mark.asyncio
-    async def test_create_project_success(
-        self, async_client: AsyncClient, auth_headers: dict
-    ):
+    async def test_create_project_success(self, async_client: AsyncClient, auth_headers: dict):
         """User should be able to create a project and become OWNER."""
         payload = {
             "name": "My Project",
             "description": "Test project description",
         }
 
-        response = await async_client.post(
-            "/api/v1/projects", json=payload, headers=auth_headers
-        )
+        response = await async_client.post("/api/v1/projects", json=payload, headers=auth_headers)
 
         assert response.status_code == 201
         data = response.json()
@@ -66,9 +63,7 @@ class TestCreateProject:
         """Project name should be required and validated."""
         payload = {"name": ""}
 
-        response = await async_client.post(
-            "/api/v1/projects", json=payload, headers=auth_headers
-        )
+        response = await async_client.post("/api/v1/projects", json=payload, headers=auth_headers)
 
         assert response.status_code == 422
 
@@ -169,9 +164,7 @@ class TestGetProjectDetails:
         self, async_client: AsyncClient, auth_headers: dict, project: dict
     ):
         """Project member should be able to view project details."""
-        response = await async_client.get(
-            f"/api/v1/projects/{project['id']}", headers=auth_headers
-        )
+        response = await async_client.get(f"/api/v1/projects/{project['id']}", headers=auth_headers)
 
         assert response.status_code == 200
         data = response.json()
@@ -183,9 +176,7 @@ class TestGetProjectDetails:
         assert "updated_at" in data
 
     @pytest.mark.asyncio
-    async def test_get_project_requires_auth(
-        self, async_client: AsyncClient, project: dict
-    ):
+    async def test_get_project_requires_auth(self, async_client: AsyncClient, project: dict):
         """Getting project details should require authentication."""
         response = await async_client.get(f"/api/v1/projects/{project['id']}")
 
@@ -203,14 +194,10 @@ class TestGetProjectDetails:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_get_project_not_found(
-        self, async_client: AsyncClient, auth_headers: dict
-    ):
+    async def test_get_project_not_found(self, async_client: AsyncClient, auth_headers: dict):
         """Getting non-existent project should return 404 or 403 (user is not a member)."""
         fake_id = str(uuid4())
-        response = await async_client.get(
-            f"/api/v1/projects/{fake_id}", headers=auth_headers
-        )
+        response = await async_client.get(f"/api/v1/projects/{fake_id}", headers=auth_headers)
 
         # The route checks membership before checking if project exists,
         # so a non-member gets 403 even for a non-existent project
@@ -266,9 +253,7 @@ class TestUpdateProject:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_update_project_requires_auth(
-        self, async_client: AsyncClient, project: dict
-    ):
+    async def test_update_project_requires_auth(self, async_client: AsyncClient, project: dict):
         """Updating project should require authentication."""
         response = await async_client.put(
             f"/api/v1/projects/{project['id']}", json={"name": "New Name"}
@@ -294,9 +279,7 @@ class TestDeleteProject:
     """Tests for DELETE /projects/{id} endpoint."""
 
     @pytest.mark.asyncio
-    async def test_delete_project_as_owner(
-        self, async_client: AsyncClient, auth_headers: dict
-    ):
+    async def test_delete_project_as_owner(self, async_client: AsyncClient, auth_headers: dict):
         """OWNER should be able to delete the project."""
         # Create a project to delete
         create_response = await async_client.post(
@@ -305,9 +288,7 @@ class TestDeleteProject:
         project_id = create_response.json()["id"]
 
         # Delete the project - route returns 200 with ProjectDeleteResponse (message + project_id)
-        response = await async_client.delete(
-            f"/api/v1/projects/{project_id}", headers=auth_headers
-        )
+        response = await async_client.delete(f"/api/v1/projects/{project_id}", headers=auth_headers)
 
         assert response.status_code == 200
         assert "message" in response.json()
@@ -342,9 +323,7 @@ class TestDeleteProject:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_delete_project_requires_auth(
-        self, async_client: AsyncClient, project: dict
-    ):
+    async def test_delete_project_requires_auth(self, async_client: AsyncClient, project: dict):
         """Deleting project should require authentication."""
         response = await async_client.delete(f"/api/v1/projects/{project['id']}")
 
@@ -409,9 +388,7 @@ class TestSwitchProjectContext:
     ):
         """Switching project should persist for subsequent requests."""
         # Switch project
-        await async_client.post(
-            f"/api/v1/projects/{project['id']}/switch", headers=auth_headers
-        )
+        await async_client.post(f"/api/v1/projects/{project['id']}/switch", headers=auth_headers)
 
         # Create content (should use active project context)
         # TODO: This requires content creation API

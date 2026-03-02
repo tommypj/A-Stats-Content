@@ -10,24 +10,26 @@ Tests the scheduling logic including:
 - Media post workflows
 """
 
-import pytest
-from datetime import datetime, timedelta, timezone
-from unittest.mock import Mock, patch, AsyncMock, MagicMock
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
+
+import pytest
 
 # These imports will work once the service is created
 try:
-    from services.social_scheduler import (
-        SocialSchedulerService,
-        SchedulerError,
-        PublishError,
-    )
     from infrastructure.database.models.social import (
-        ScheduledPost,
         PostStatus,
         PostTarget,
+        ScheduledPost,
         SocialAccount,
     )
+    from services.social_scheduler import (
+        PublishError,
+        SchedulerError,
+        SocialSchedulerService,
+    )
+
     SERVICE_AVAILABLE = True
 except ImportError:
     SERVICE_AVAILABLE = False
@@ -62,10 +64,10 @@ def sample_pending_post():
         id=str(uuid4()),
         user_id=str(uuid4()),
         content="Test scheduled post",
-        scheduled_time=datetime.now(timezone.utc),
+        scheduled_time=datetime.now(UTC),
         status=PostStatus.PENDING,
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
     )
 
     # Add target
@@ -75,8 +77,8 @@ def sample_pending_post():
         account_id=str(uuid4()),
         platform="twitter",
         status=PostStatus.PENDING,
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
     )
     post.targets = [target]
 
@@ -93,10 +95,10 @@ def sample_future_post():
         id=str(uuid4()),
         user_id=str(uuid4()),
         content="Future post",
-        scheduled_time=datetime.now(timezone.utc) + timedelta(hours=2),
+        scheduled_time=datetime.now(UTC) + timedelta(hours=2),
         status=PostStatus.PENDING,
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
     )
 
     target = PostTarget(
@@ -105,8 +107,8 @@ def sample_future_post():
         account_id=str(uuid4()),
         platform="twitter",
         status=PostStatus.PENDING,
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
     )
     post.targets = [target]
 
@@ -127,10 +129,10 @@ def sample_social_account():
         account_id="123456",
         encrypted_access_token="encrypted_token",
         encrypted_refresh_token="encrypted_refresh_token",
-        token_expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        token_expires_at=datetime.now(UTC) + timedelta(hours=1),
         is_active=True,
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
     )
 
 
@@ -154,7 +156,9 @@ class TestSocialSchedulerService:
         mock_db_session.execute.return_value = mock_result
 
         # Mock successful publishing
-        with patch.object(scheduler_service, 'publish_post', new_callable=AsyncMock) as mock_publish:
+        with patch.object(
+            scheduler_service, "publish_post", new_callable=AsyncMock
+        ) as mock_publish:
             mock_publish.return_value = True
 
             processed = await scheduler_service.process_due_posts(mock_db_session)
@@ -197,7 +201,7 @@ class TestSocialSchedulerService:
         target = sample_pending_post.targets[0]
 
         # Mock adapter post method
-        with patch('adapters.social.twitter_adapter.TwitterAdapter.post_text') as mock_post:
+        with patch("adapters.social.twitter_adapter.TwitterAdapter.post_text") as mock_post:
             mock_post.return_value = {
                 "id": "1234567890",
                 "text": sample_pending_post.content,
@@ -230,7 +234,7 @@ class TestSocialSchedulerService:
         target = sample_pending_post.targets[0]
 
         # Mock adapter to raise error
-        with patch('adapters.social.twitter_adapter.TwitterAdapter.post_text') as mock_post:
+        with patch("adapters.social.twitter_adapter.TwitterAdapter.post_text") as mock_post:
             mock_post.side_effect = Exception("API Error")
 
             result = await scheduler_service.publish_to_platform(
@@ -258,19 +262,19 @@ class TestSocialSchedulerService:
             pytest.skip("Service not available")
 
         # Set token as expired
-        sample_social_account.token_expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
+        sample_social_account.token_expires_at = datetime.now(UTC) - timedelta(hours=1)
 
         target = sample_pending_post.targets[0]
 
         # Mock token refresh
-        with patch.object(scheduler_service, 'refresh_token') as mock_refresh:
+        with patch.object(scheduler_service, "refresh_token") as mock_refresh:
             mock_refresh.return_value = {
                 "access_token": "new_token",
                 "expires_in": 7200,
             }
 
             # Mock successful post
-            with patch('adapters.social.twitter_adapter.TwitterAdapter.post_text') as mock_post:
+            with patch("adapters.social.twitter_adapter.TwitterAdapter.post_text") as mock_post:
                 mock_post.return_value = {"id": "1234567890"}
 
                 await scheduler_service.publish_to_platform(
@@ -300,7 +304,7 @@ class TestSocialSchedulerService:
         target.retry_count = 1
 
         # Mock successful retry
-        with patch('adapters.social.twitter_adapter.TwitterAdapter.post_text') as mock_post:
+        with patch("adapters.social.twitter_adapter.TwitterAdapter.post_text") as mock_post:
             mock_post.return_value = {"id": "1234567890"}
 
             result = await scheduler_service.retry_target(
@@ -332,8 +336,8 @@ class TestSocialSchedulerService:
             account_id=str(uuid4()),
             platform="linkedin",
             status=PostStatus.PENDING,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
         sample_pending_post.targets.append(target2)
 
@@ -345,7 +349,7 @@ class TestSocialSchedulerService:
             account_name="twitter_user",
             account_id="123",
             encrypted_access_token="token1",
-            token_expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+            token_expires_at=datetime.now(UTC) + timedelta(hours=1),
             is_active=True,
         )
 
@@ -356,7 +360,7 @@ class TestSocialSchedulerService:
             account_name="linkedin_user",
             account_id="456",
             encrypted_access_token="token2",
-            token_expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+            token_expires_at=datetime.now(UTC) + timedelta(hours=1),
             is_active=True,
         )
 
@@ -366,10 +370,12 @@ class TestSocialSchedulerService:
         mock_db_session.execute.return_value = mock_result
 
         # Mock Twitter success, LinkedIn failure
-        with patch('adapters.social.twitter_adapter.TwitterAdapter.post_text') as mock_twitter:
+        with patch("adapters.social.twitter_adapter.TwitterAdapter.post_text") as mock_twitter:
             mock_twitter.return_value = {"id": "twitter_123"}
 
-            with patch('adapters.social.linkedin_adapter.LinkedInAdapter.post_text') as mock_linkedin:
+            with patch(
+                "adapters.social.linkedin_adapter.LinkedInAdapter.post_text"
+            ) as mock_linkedin:
                 mock_linkedin.side_effect = Exception("LinkedIn API Error")
 
                 await scheduler_service.publish_post(
@@ -400,10 +406,12 @@ class TestSocialSchedulerService:
         target = sample_pending_post.targets[0]
 
         # Mock media upload and post
-        with patch('adapters.social.twitter_adapter.TwitterAdapter.upload_media') as mock_upload:
+        with patch("adapters.social.twitter_adapter.TwitterAdapter.upload_media") as mock_upload:
             mock_upload.return_value = {"media_id": "123456789"}
 
-            with patch('adapters.social.twitter_adapter.TwitterAdapter.post_with_media') as mock_post:
+            with patch(
+                "adapters.social.twitter_adapter.TwitterAdapter.post_with_media"
+            ) as mock_post:
                 mock_post.return_value = {"id": "1234567890"}
 
                 await scheduler_service.publish_to_platform(
@@ -449,7 +457,7 @@ class TestSocialSchedulerService:
             pytest.skip("Service not available")
 
         # Create post with specific timezone
-        scheduled_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        scheduled_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
 
         post = ScheduledPost(
             id=str(uuid4()),
@@ -461,7 +469,7 @@ class TestSocialSchedulerService:
         )
 
         # Verify time is converted correctly
-        is_due = scheduler_service.is_post_due(post, datetime.now(timezone.utc))
+        is_due = scheduler_service.is_post_due(post, datetime.now(UTC))
         assert isinstance(is_due, bool)
 
     @pytest.mark.asyncio
@@ -478,7 +486,7 @@ class TestSocialSchedulerService:
             id=str(uuid4()),
             user_id=str(uuid4()),
             content="Concurrent test",
-            scheduled_time=datetime.now(timezone.utc),
+            scheduled_time=datetime.now(UTC),
             status=PostStatus.PUBLISHING,  # Already being published
         )
 
@@ -518,7 +526,7 @@ class TestSocialSchedulerService:
             pytest.skip("Service not available")
 
         new_content = "Updated content"
-        new_time = datetime.now(timezone.utc) + timedelta(hours=1)
+        new_time = datetime.now(UTC) + timedelta(hours=1)
 
         result = await scheduler_service.update_post(
             post_id=sample_pending_post.id,
@@ -542,7 +550,9 @@ class TestSocialSchedulerService:
         if not SERVICE_AVAILABLE:
             pytest.skip("Service not available")
 
-        with patch.object(scheduler_service, 'publish_post', new_callable=AsyncMock) as mock_publish:
+        with patch.object(
+            scheduler_service, "publish_post", new_callable=AsyncMock
+        ) as mock_publish:
             mock_publish.return_value = True
 
             result = await scheduler_service.publish_now(

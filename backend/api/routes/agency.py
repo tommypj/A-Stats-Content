@@ -7,27 +7,26 @@ and report generation, plus a public token-based client portal endpoint.
 
 import asyncio
 import math
-from datetime import date, datetime, timezone, timedelta
-from typing import Optional
-from uuid import uuid4
 import secrets
+from datetime import UTC, date, datetime, timedelta
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
-from api.middleware.rate_limit import limiter
-from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import select, func, and_, desc
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.middleware.rate_limit import limiter
 from api.routes.auth import get_current_user
 from infrastructure.database.connection import get_db
 from infrastructure.database.models import User
 from infrastructure.database.models.agency import (
     AgencyProfile,
     ClientWorkspace,
-    ReportTemplate,
     GeneratedReport,
+    ReportTemplate,
 )
-from infrastructure.database.models.project import Project, ProjectMember, ProjectMemberRole
+from infrastructure.database.models.project import Project
 
 router = APIRouter(prefix="/agency", tags=["Agency"])
 
@@ -39,18 +38,18 @@ router = APIRouter(prefix="/agency", tags=["Agency"])
 
 class AgencyProfileCreate(BaseModel):
     agency_name: str = Field(..., min_length=1, max_length=255)
-    logo_url: Optional[str] = Field(None, max_length=500)
-    brand_colors: Optional[dict] = None
-    contact_email: Optional[str] = Field(None, max_length=255)
-    footer_text: Optional[str] = None
+    logo_url: str | None = Field(None, max_length=500)
+    brand_colors: dict | None = None
+    contact_email: str | None = Field(None, max_length=255)
+    footer_text: str | None = None
 
 
 class AgencyProfileUpdate(BaseModel):
-    agency_name: Optional[str] = Field(None, min_length=1, max_length=255)
-    logo_url: Optional[str] = Field(None, max_length=500)
-    brand_colors: Optional[dict] = None
-    contact_email: Optional[str] = Field(None, max_length=255)
-    footer_text: Optional[str] = None
+    agency_name: str | None = Field(None, min_length=1, max_length=255)
+    logo_url: str | None = Field(None, max_length=500)
+    brand_colors: dict | None = None
+    contact_email: str | None = Field(None, max_length=255)
+    footer_text: str | None = None
 
 
 class AgencyProfileResponse(BaseModel):
@@ -59,11 +58,11 @@ class AgencyProfileResponse(BaseModel):
     id: str
     user_id: str
     agency_name: str
-    logo_url: Optional[str] = None
-    brand_colors: Optional[dict] = None
-    custom_domain: Optional[str] = None
-    contact_email: Optional[str] = None
-    footer_text: Optional[str] = None
+    logo_url: str | None = None
+    brand_colors: dict | None = None
+    custom_domain: str | None = None
+    contact_email: str | None = None
+    footer_text: str | None = None
     max_clients: int
     is_active: bool
     created_at: datetime
@@ -72,17 +71,17 @@ class AgencyProfileResponse(BaseModel):
 class ClientWorkspaceCreate(BaseModel):
     project_id: str
     client_name: str = Field(..., min_length=1, max_length=255)
-    client_email: Optional[str] = Field(None, max_length=255)
-    client_logo_url: Optional[str] = Field(None, max_length=500)
-    allowed_features: Optional[dict] = None
+    client_email: str | None = Field(None, max_length=255)
+    client_logo_url: str | None = Field(None, max_length=500)
+    allowed_features: dict | None = None
 
 
 class ClientWorkspaceUpdate(BaseModel):
-    client_name: Optional[str] = Field(None, min_length=1, max_length=255)
-    client_email: Optional[str] = Field(None, max_length=255)
-    client_logo_url: Optional[str] = Field(None, max_length=500)
-    is_portal_enabled: Optional[bool] = None
-    allowed_features: Optional[dict] = None
+    client_name: str | None = Field(None, min_length=1, max_length=255)
+    client_email: str | None = Field(None, max_length=255)
+    client_logo_url: str | None = Field(None, max_length=500)
+    is_portal_enabled: bool | None = None
+    allowed_features: dict | None = None
 
 
 class ClientWorkspaceResponse(BaseModel):
@@ -92,11 +91,11 @@ class ClientWorkspaceResponse(BaseModel):
     agency_id: str
     project_id: str
     client_name: str
-    client_email: Optional[str] = None
-    client_logo_url: Optional[str] = None
+    client_email: str | None = None
+    client_logo_url: str | None = None
     is_portal_enabled: bool
-    portal_access_token: Optional[str] = None
-    allowed_features: Optional[dict] = None
+    portal_access_token: str | None = None
+    allowed_features: dict | None = None
     created_at: datetime
 
 
@@ -106,8 +105,8 @@ class ReportTemplateCreate(BaseModel):
 
 
 class ReportTemplateUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=255)
-    template_config: Optional[dict] = None
+    name: str | None = Field(None, min_length=1, max_length=255)
+    template_config: dict | None = None
 
 
 class ReportTemplateResponse(BaseModel):
@@ -125,6 +124,22 @@ class ClientWorkspaceListResponse(BaseModel):
     total: int
 
 
+class GeneratedReportResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    agency_id: str
+    client_workspace_id: str
+    report_template_id: str | None = None
+    report_type: str
+    period_start: date
+    period_end: date
+    report_data: dict | None = None
+    pdf_url: str | None = None
+    generated_at: datetime
+    created_at: datetime
+
+
 class GeneratedReportListResponse(BaseModel):
     items: list[GeneratedReportResponse]
     total: int
@@ -140,26 +155,10 @@ class ReportTemplateListResponse(BaseModel):
 
 class GenerateReportRequest(BaseModel):
     client_workspace_id: str
-    report_template_id: Optional[str] = None
+    report_template_id: str | None = None
     report_type: str = Field(default="monthly", max_length=50)
     period_start: date
     period_end: date
-
-
-class GeneratedReportResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    agency_id: str
-    client_workspace_id: str
-    report_template_id: Optional[str] = None
-    report_type: str
-    period_start: date
-    period_end: date
-    report_data: Optional[dict] = None
-    pdf_url: Optional[str] = None
-    generated_at: datetime
-    created_at: datetime
 
 
 # ============================================================================
@@ -169,9 +168,7 @@ class GeneratedReportResponse(BaseModel):
 
 async def get_agency_profile(user_id: str, db: AsyncSession) -> AgencyProfile:
     """Fetch the agency profile for a user, raising 404 if it does not exist."""
-    result = await db.execute(
-        select(AgencyProfile).where(AgencyProfile.user_id == user_id)
-    )
+    result = await db.execute(select(AgencyProfile).where(AgencyProfile.user_id == user_id))
     profile = result.scalar_one_or_none()
     if not profile:
         raise HTTPException(
@@ -351,9 +348,7 @@ async def create_client_workspace(
 
     # Enforce max_clients limit
     count_result = await db.execute(
-        select(func.count(ClientWorkspace.id)).where(
-            ClientWorkspace.agency_id == profile.id
-        )
+        select(func.count(ClientWorkspace.id)).where(ClientWorkspace.agency_id == profile.id)
     )
     current_count = count_result.scalar() or 0
     if current_count >= profile.max_clients:
@@ -443,7 +438,7 @@ async def enable_client_portal(
 
     workspace.portal_access_token = secrets.token_urlsafe(48)  # 64-char base64 token
     workspace.is_portal_enabled = True
-    workspace.token_expires_at = datetime.now(timezone.utc) + timedelta(days=365)  # DB-M3: 1-year expiry
+    workspace.token_expires_at = datetime.now(UTC) + timedelta(days=365)  # DB-M3: 1-year expiry
 
     await db.commit()
     await db.refresh(workspace)
@@ -607,9 +602,7 @@ async def generate_report(
     profile = await get_agency_profile(current_user.id, db)
 
     # Validate the client workspace belongs to this agency
-    workspace = await get_client_workspace_for_agency(
-        body.client_workspace_id, profile.id, db
-    )
+    workspace = await get_client_workspace_for_agency(body.client_workspace_id, profile.id, db)
 
     # Validate optional template reference
     template = None
@@ -634,18 +627,14 @@ async def generate_report(
     # DailyAnalytics is keyed by user_id (the project owner), not project_id.
     # We retrieve the project owner to scope the query correctly.
     # -----------------------------------------------------------------------
-    proj_result = await db.execute(
-        select(Project).where(Project.id == workspace.project_id)
-    )
+    proj_result = await db.execute(select(Project).where(Project.id == workspace.project_id))
     project = proj_result.scalar_one_or_none()
     project_owner_id = project.owner_id if project else current_user.id
 
     daily_agg = await db.execute(
         select(
             func.coalesce(func.sum(DailyAnalytics.total_clicks), 0).label("total_clicks"),
-            func.coalesce(func.sum(DailyAnalytics.total_impressions), 0).label(
-                "total_impressions"
-            ),
+            func.coalesce(func.sum(DailyAnalytics.total_impressions), 0).label("total_impressions"),
         ).where(
             and_(
                 DailyAnalytics.user_id == project_owner_id,
@@ -663,9 +652,7 @@ async def generate_report(
     # -----------------------------------------------------------------------
     conv_agg = await db.execute(
         select(
-            func.coalesce(func.sum(ContentConversion.conversions), 0).label(
-                "total_conversions"
-            ),
+            func.coalesce(func.sum(ContentConversion.conversions), 0).label("total_conversions"),
             func.coalesce(func.sum(ContentConversion.revenue), 0).label("total_revenue"),
         ).where(
             and_(
@@ -750,7 +737,7 @@ async def generate_report(
         "top_keywords": top_keywords,
     }
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     generated_report = GeneratedReport(
         id=str(uuid4()),
         agency_id=profile.id,
@@ -772,7 +759,7 @@ async def generate_report(
 async def list_generated_reports(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
-    client_workspace_id: Optional[str] = Query(default=None),
+    client_workspace_id: str | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -797,9 +784,7 @@ async def list_generated_reports(
             )
         conditions.append(GeneratedReport.client_workspace_id == client_workspace_id)
 
-    count_result = await db.execute(
-        select(func.count(GeneratedReport.id)).where(and_(*conditions))
-    )
+    count_result = await db.execute(select(func.count(GeneratedReport.id)).where(and_(*conditions)))
     total = count_result.scalar() or 0
 
     result = await db.execute(
@@ -857,7 +842,7 @@ class PortalSummaryResponse(BaseModel):
 
     client_name: str
     agency_name: str
-    allowed_features: Optional[dict] = None
+    allowed_features: dict | None = None
     period_days: int
     total_clicks: int
     total_impressions: int
@@ -866,11 +851,11 @@ class PortalSummaryResponse(BaseModel):
     top_pages: list[dict]
     top_keywords: list[dict]
     # Branding fields for white-label portal customisation
-    agency_logo_url: Optional[str] = None
-    brand_colors: Optional[dict] = None
-    contact_email: Optional[str] = None
-    footer_text: Optional[str] = None
-    client_logo_url: Optional[str] = None
+    agency_logo_url: str | None = None
+    brand_colors: dict | None = None
+    contact_email: str | None = None
+    footer_text: str | None = None
+    client_logo_url: str | None = None
 
 
 @router.get("/portal/{token}", response_model=PortalSummaryResponse)
@@ -886,8 +871,8 @@ async def get_portal_data(
     """
     from infrastructure.database.models.analytics import (
         DailyAnalytics,
-        PagePerformance,
         KeywordRanking,
+        PagePerformance,
     )
     from infrastructure.database.models.revenue import ContentConversion
 
@@ -910,7 +895,7 @@ async def get_portal_data(
             detail="Client portal is not enabled",
         )
     # DB-M3: reject expired portal tokens
-    if workspace.token_expires_at and workspace.token_expires_at < datetime.now(timezone.utc):
+    if workspace.token_expires_at and workspace.token_expires_at < datetime.now(UTC):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Portal link has expired",
@@ -924,14 +909,12 @@ async def get_portal_data(
     agency_name = agency.agency_name if agency else "Agency"
 
     # Last 30 days
-    period_end = datetime.now(timezone.utc).date()
+    period_end = datetime.now(UTC).date()
     period_start = period_end - timedelta(days=30)
     period_days = 30
 
     # Project owner for analytics queries
-    proj_result = await db.execute(
-        select(Project).where(Project.id == workspace.project_id)
-    )
+    proj_result = await db.execute(select(Project).where(Project.id == workspace.project_id))
     project = proj_result.scalar_one_or_none()
     project_owner_id = project.owner_id if project else None
 
@@ -1050,13 +1033,25 @@ async def get_portal_data(
             }
             for row in keywords_result.all()
         ]
-        return _total_clicks, _total_impressions, _total_conversions, _total_revenue, _top_pages, _top_keywords
+        return (
+            _total_clicks,
+            _total_impressions,
+            _total_conversions,
+            _total_revenue,
+            _top_pages,
+            _top_keywords,
+        )
 
     try:
-        total_clicks, total_impressions, total_conversions, total_revenue, top_pages, top_keywords = (
-            await asyncio.wait_for(_aggregate(), timeout=10.0)
-        )
-    except asyncio.TimeoutError:
+        (
+            total_clicks,
+            total_impressions,
+            total_conversions,
+            total_revenue,
+            top_pages,
+            top_keywords,
+        ) = await asyncio.wait_for(_aggregate(), timeout=10.0)
+    except TimeoutError:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Portal data temporarily unavailable — please try again shortly",

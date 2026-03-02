@@ -1,12 +1,14 @@
 """Service interfaces for external integrations."""
+
 from abc import ABC, abstractmethod
-from typing import AsyncGenerator, Optional
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 
 
 @dataclass
 class GenerationResult:
     """Result of AI content generation."""
+
     content: str
     tokens_used: int
     model: str
@@ -16,6 +18,7 @@ class GenerationResult:
 @dataclass
 class ImageResult:
     """Result of image generation."""
+
     url: str
     width: int
     height: int
@@ -30,10 +33,10 @@ class AIService(ABC):
         self,
         outline_title: str,
         keyword: str,
-        brief: Optional[str] = None,
+        brief: str | None = None,
         persona_intensity: str = "balanced",
         target_words: int = 1500,
-        context: Optional[str] = None,
+        context: str | None = None,
     ) -> GenerationResult:
         """Generate a full article from outline."""
         ...
@@ -43,10 +46,10 @@ class AIService(ABC):
         self,
         outline_title: str,
         keyword: str,
-        brief: Optional[str] = None,
+        brief: str | None = None,
         persona_intensity: str = "balanced",
         target_words: int = 1500,
-        context: Optional[str] = None,
+        context: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """Generate article with streaming response."""
         ...
@@ -140,7 +143,7 @@ class PaymentService(ABC):
     async def create_customer(
         self,
         email: str,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> str:
         """Create a customer and return customer ID."""
         ...

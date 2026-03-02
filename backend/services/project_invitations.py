@@ -2,13 +2,13 @@
 Project invitation background service.
 """
 
-from datetime import datetime, timezone
 import logging
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from infrastructure.database.models import ProjectInvitation, InvitationStatus
+from infrastructure.database.models import InvitationStatus, ProjectInvitation
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ async def expire_old_invitations(db: AsyncSession) -> int:
     result = await db.execute(
         select(ProjectInvitation).where(
             ProjectInvitation.status == InvitationStatus.PENDING.value,
-            ProjectInvitation.expires_at < datetime.now(timezone.utc),
+            ProjectInvitation.expires_at < datetime.now(UTC),
         )
     )
     expired_invitations = result.scalars().all()
@@ -64,16 +64,18 @@ async def cleanup_old_invitations(db: AsyncSession, days_old: int = 30) -> int:
     """
     from datetime import timedelta
 
-    cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_old)
+    cutoff_date = datetime.now(UTC) - timedelta(days=days_old)
 
     # Find old non-pending invitations
     result = await db.execute(
         select(ProjectInvitation).where(
-            ProjectInvitation.status.in_([
-                InvitationStatus.ACCEPTED.value,
-                InvitationStatus.REVOKED.value,
-                InvitationStatus.EXPIRED.value,
-            ]),
+            ProjectInvitation.status.in_(
+                [
+                    InvitationStatus.ACCEPTED.value,
+                    InvitationStatus.REVOKED.value,
+                    InvitationStatus.EXPIRED.value,
+                ]
+            ),
             ProjectInvitation.updated_at < cutoff_date,
         )
     )

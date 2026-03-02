@@ -1,12 +1,14 @@
 """Application settings and configuration."""
+
 import json
 import logging as _logging
 import os
 import secrets
 from functools import lru_cache
-from typing import Optional
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 def _generate_dev_secret() -> str:
     """Generate a random secret for development use.
@@ -62,6 +64,7 @@ class Settings(BaseSettings):
     # Authentication / JWT
     secret_key: str = ""
     jwt_secret_key: str = ""
+
     @field_validator("secret_key", "jwt_secret_key", mode="before")
     @classmethod
     def fill_empty_secret(cls, v: str) -> str:
@@ -92,60 +95,67 @@ class Settings(BaseSettings):
             except json.JSONDecodeError:
                 # CONFIG-01: Warn when falling back from JSON to comma-split parsing
                 import logging
-                logging.getLogger(__name__).warning("CORS_ORIGINS is not valid JSON, falling back to comma-split")
-        return [origin.strip().strip("'\"").rstrip("/") for origin in v.split(",") if origin.strip()]
+
+                logging.getLogger(__name__).warning(
+                    "CORS_ORIGINS is not valid JSON, falling back to comma-split"
+                )
+        return [
+            origin.strip().strip("'\"").rstrip("/") for origin in v.split(",") if origin.strip()
+        ]
 
     # Anthropic (AI Content Generation)
-    anthropic_api_key: Optional[str] = None
+    anthropic_api_key: str | None = None
     anthropic_model: str = "claude-sonnet-4-20250514"
     anthropic_max_tokens: int = 4096
-    anthropic_timeout: int = 600  # Non-English articles can request 7000+ tokens and need up to 10 min
+    anthropic_timeout: int = (
+        600  # Non-English articles can request 7000+ tokens and need up to 10 min
+    )
     ai_request_timeout: int = 60  # GEN-31: timeout (seconds) for short AI requests (e.g. proofread)
     bulk_item_sleep_seconds: int = 2  # BULK-31: seconds to sleep between bulk generation items
 
     # Replicate (Image Generation)
-    replicate_api_token: Optional[str] = None
+    replicate_api_token: str | None = None
     replicate_model: str = "ideogram-ai/ideogram-v3-turbo"
 
     # Resend (Email)
-    resend_api_key: Optional[str] = None
+    resend_api_key: str | None = None
     resend_from_email: str = "noreply@astats.app"
 
     # Sentry (Error Tracking)
-    sentry_dsn: Optional[str] = None
+    sentry_dsn: str | None = None
 
     # LemonSqueezy (Payments)
-    lemonsqueezy_api_key: Optional[str] = None
-    lemonsqueezy_store_id: Optional[str] = None
-    lemonsqueezy_store_slug: Optional[str] = None
-    lemonsqueezy_webhook_secret: Optional[str] = None
-    lemonsqueezy_variant_starter_monthly: Optional[str] = None
-    lemonsqueezy_variant_starter_yearly: Optional[str] = None
-    lemonsqueezy_variant_professional_monthly: Optional[str] = None
-    lemonsqueezy_variant_professional_yearly: Optional[str] = None
-    lemonsqueezy_variant_enterprise_monthly: Optional[str] = None
-    lemonsqueezy_variant_enterprise_yearly: Optional[str] = None
+    lemonsqueezy_api_key: str | None = None
+    lemonsqueezy_store_id: str | None = None
+    lemonsqueezy_store_slug: str | None = None
+    lemonsqueezy_webhook_secret: str | None = None
+    lemonsqueezy_variant_starter_monthly: str | None = None
+    lemonsqueezy_variant_starter_yearly: str | None = None
+    lemonsqueezy_variant_professional_monthly: str | None = None
+    lemonsqueezy_variant_professional_yearly: str | None = None
+    lemonsqueezy_variant_enterprise_monthly: str | None = None
+    lemonsqueezy_variant_enterprise_yearly: str | None = None
 
     # Google (OAuth & Search Console)
-    google_client_id: Optional[str] = None
-    google_client_secret: Optional[str] = None
+    google_client_id: str | None = None
+    google_client_secret: str | None = None
     google_redirect_uri: str = "http://localhost:3000/analytics/callback"
     # Separate redirect URI for Google login/signup OAuth (backend callback)
     google_auth_redirect_uri: str = "http://localhost:8000/api/v1/auth/google/callback"
 
     # Twitter/X OAuth 2.0
-    twitter_client_id: Optional[str] = None
-    twitter_client_secret: Optional[str] = None
+    twitter_client_id: str | None = None
+    twitter_client_secret: str | None = None
     twitter_redirect_uri: str = "http://localhost:8000/api/v1/social/twitter/callback"
 
     # LinkedIn OAuth 2.0
-    linkedin_client_id: Optional[str] = None
-    linkedin_client_secret: Optional[str] = None
+    linkedin_client_id: str | None = None
+    linkedin_client_secret: str | None = None
     linkedin_redirect_uri: str = "http://localhost:8000/api/v1/social/linkedin/callback"
 
     # Facebook/Instagram OAuth
-    facebook_app_id: Optional[str] = None
-    facebook_app_secret: Optional[str] = None
+    facebook_app_id: str | None = None
+    facebook_app_secret: str | None = None
     facebook_redirect_uri: str = "http://localhost:8000/api/v1/social/facebook/callback"
 
     # ChromaDB (Vector Store)
@@ -156,21 +166,21 @@ class Settings(BaseSettings):
 
     # Embeddings
     embedding_model: str = "text-embedding-3-small"  # OpenAI model
-    openai_api_key: Optional[str] = None  # For embeddings
+    openai_api_key: str | None = None  # For embeddings
 
     # Storage
     storage_type: str = "local"  # local, s3
     storage_local_path: str = "./data/uploads"
-    s3_bucket: Optional[str] = None
-    s3_region: Optional[str] = None
-    s3_access_key: Optional[str] = None
-    s3_secret_key: Optional[str] = None
+    s3_bucket: str | None = None
+    s3_region: str | None = None
+    s3_access_key: str | None = None
+    s3_secret_key: str | None = None
 
     # Frontend URL (for email links)
     frontend_url: str = "http://localhost:3000"
 
     # Cookie domain (optional — set to share cookies across subdomains, e.g. ".example.com")
-    cookie_domain: Optional[str] = None
+    cookie_domain: str | None = None
 
     @property
     def is_production(self) -> bool:
@@ -190,7 +200,9 @@ class Settings(BaseSettings):
         via environment variables.
         """
         # INFRA-C1: Detect Railway/production infra even when ENVIRONMENT was not explicitly set
-        railway_env = os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_SERVICE_NAME")
+        railway_env = os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get(
+            "RAILWAY_SERVICE_NAME"
+        )
         if railway_env and self.environment == "development":
             _logging.getLogger(__name__).critical(
                 "RAILWAY environment detected but ENVIRONMENT is not set to 'production'. "
@@ -222,9 +234,18 @@ class Settings(BaseSettings):
         ls_variant_fields = [
             ("LEMONSQUEEZY_VARIANT_STARTER_MONTHLY", self.lemonsqueezy_variant_starter_monthly),
             ("LEMONSQUEEZY_VARIANT_STARTER_YEARLY", self.lemonsqueezy_variant_starter_yearly),
-            ("LEMONSQUEEZY_VARIANT_PROFESSIONAL_MONTHLY", self.lemonsqueezy_variant_professional_monthly),
-            ("LEMONSQUEEZY_VARIANT_PROFESSIONAL_YEARLY", self.lemonsqueezy_variant_professional_yearly),
-            ("LEMONSQUEEZY_VARIANT_ENTERPRISE_MONTHLY", self.lemonsqueezy_variant_enterprise_monthly),
+            (
+                "LEMONSQUEEZY_VARIANT_PROFESSIONAL_MONTHLY",
+                self.lemonsqueezy_variant_professional_monthly,
+            ),
+            (
+                "LEMONSQUEEZY_VARIANT_PROFESSIONAL_YEARLY",
+                self.lemonsqueezy_variant_professional_yearly,
+            ),
+            (
+                "LEMONSQUEEZY_VARIANT_ENTERPRISE_MONTHLY",
+                self.lemonsqueezy_variant_enterprise_monthly,
+            ),
             ("LEMONSQUEEZY_VARIANT_ENTERPRISE_YEARLY", self.lemonsqueezy_variant_enterprise_yearly),
         ]
         missing_variants = [name for name, val in ls_variant_fields if not val]
@@ -238,6 +259,7 @@ class Settings(BaseSettings):
         # INFRA-10: OAuth redirect URIs should be https:// non-localhost in production
         if effective_env == "production":
             from urllib.parse import urlparse as _urlparse
+
             _localhost_hosts = {"localhost", "127.0.0.1", "0.0.0.0", "::1"}
             for _uri_name, _uri_val in [
                 ("GOOGLE_REDIRECT_URI", self.google_redirect_uri),
@@ -250,7 +272,8 @@ class Settings(BaseSettings):
                     _logging.getLogger(__name__).warning(
                         "INFRA-10: %s is not a production-safe URL (got: %r). "
                         "OAuth for this provider will not work until updated.",
-                        _uri_name, _uri_val,
+                        _uri_name,
+                        _uri_val,
                     )
 
             # INFRA-15: Ensure database_echo is off in production to prevent SQL leaking into logs
@@ -266,7 +289,10 @@ class Settings(BaseSettings):
                     "INFRA-12: Potential DB connection pool exhaustion — "
                     "%d workers × pool_size=%d + max_overflow=%d = up to %d connections. "
                     "Verify your DB allows this many connections.",
-                    self.workers, self.db_pool_size, self.db_max_overflow, _pool_total,
+                    self.workers,
+                    self.db_pool_size,
+                    self.db_max_overflow,
+                    _pool_total,
                 )
 
             # INFRA-H1: Warn if any OAuth redirect URI contains localhost in production
@@ -282,7 +308,8 @@ class Settings(BaseSettings):
                     _logging.getLogger(__name__).warning(
                         "INFRA-H1: OAuth redirect URI %s contains 'localhost' in production: %s. "
                         "Update this to the production domain.",
-                        _name, _uri,
+                        _name,
+                        _uri,
                     )
 
 

@@ -3,16 +3,17 @@ Tests for WordPress REST API adapter.
 """
 
 import base64
-import pytest
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import AsyncMock, Mock, patch
+
 import httpx
+import pytest
 
 from adapters.cms.wordpress_adapter import (
     WordPressAdapter,
+    WordPressAPIError,
+    WordPressAuthError,
     WordPressConnection,
     WordPressConnectionError,
-    WordPressAuthError,
-    WordPressAPIError,
 )
 
 
@@ -70,12 +71,14 @@ class TestWordPressAdapter:
     @pytest.fixture
     def mock_response(self):
         """Create a mock HTTP response."""
+
         def _create_response(status_code=200, json_data=None):
             response = Mock(spec=httpx.Response)
             response.status_code = status_code
             response.json.return_value = json_data or {}
             response.text = ""
             return response
+
         return _create_response
 
     def test_adapter_initialization(self, adapter):
@@ -110,7 +113,7 @@ class TestWordPressAdapter:
     async def test_close_client(self, adapter):
         """Test closing the HTTP client."""
         # Create client
-        client = adapter._get_client()
+        adapter._get_client()
         assert adapter._client is not None
 
         # Close it
@@ -161,10 +164,7 @@ class TestWordPressAdapter:
     @pytest.mark.asyncio
     async def test_handle_response_api_error(self, adapter, mock_response):
         """Test API error handling."""
-        response = mock_response(
-            400,
-            {"code": "invalid_post", "message": "Invalid post data"}
-        )
+        response = mock_response(400, {"code": "invalid_post", "message": "Invalid post data"})
 
         with pytest.raises(WordPressAPIError) as exc_info:
             await adapter._handle_response(response)
@@ -175,12 +175,9 @@ class TestWordPressAdapter:
     async def test_test_connection_success(self, adapter, mock_response):
         """Test successful connection test."""
         mock_client = AsyncMock()
-        mock_client.get.return_value = mock_response(
-            200,
-            {"id": 1, "name": "Test User"}
-        )
+        mock_client.get.return_value = mock_response(200, {"id": 1, "name": "Test User"})
 
-        with patch.object(adapter, '_get_client', return_value=mock_client):
+        with patch.object(adapter, "_get_client", return_value=mock_client):
             result = await adapter.test_connection()
 
         assert result is True
@@ -194,7 +191,7 @@ class TestWordPressAdapter:
         mock_response_obj = mock_response(401, {"code": "invalid_auth"})
         mock_client.get.return_value = mock_response_obj
 
-        with patch.object(adapter, '_get_client', return_value=mock_client):
+        with patch.object(adapter, "_get_client", return_value=mock_client):
             # Since status is not 200, test_connection won't return False
             # Instead, _handle_response is called which raises WordPressAuthError
             with pytest.raises(WordPressAuthError):
@@ -208,7 +205,7 @@ class TestWordPressAdapter:
         mock_client = AsyncMock()
         mock_client.get.side_effect = httpx.ConnectError("Connection refused")
 
-        with patch.object(adapter, '_get_client', return_value=mock_client):
+        with patch.object(adapter, "_get_client", return_value=mock_client):
             with pytest.raises(WordPressConnectionError) as exc_info:
                 await adapter.test_connection()
 
@@ -220,7 +217,7 @@ class TestWordPressAdapter:
         mock_client = AsyncMock()
         mock_client.get.side_effect = httpx.TimeoutException("Timeout")
 
-        with patch.object(adapter, '_get_client', return_value=mock_client):
+        with patch.object(adapter, "_get_client", return_value=mock_client):
             with pytest.raises(WordPressConnectionError) as exc_info:
                 await adapter.test_connection()
 
@@ -237,7 +234,7 @@ class TestWordPressAdapter:
         mock_client = AsyncMock()
         mock_client.get.return_value = mock_response(200, mock_categories)
 
-        with patch.object(adapter, '_get_client', return_value=mock_client):
+        with patch.object(adapter, "_get_client", return_value=mock_client):
             categories = await adapter.get_categories()
 
         assert len(categories) == 2
@@ -254,7 +251,7 @@ class TestWordPressAdapter:
         mock_client = AsyncMock()
         mock_client.get.return_value = mock_response(200, mock_tags)
 
-        with patch.object(adapter, '_get_client', return_value=mock_client):
+        with patch.object(adapter, "_get_client", return_value=mock_client):
             tags = await adapter.get_tags()
 
         assert len(tags) == 2
@@ -277,7 +274,7 @@ class TestWordPressAdapter:
             "alt_text": "Test image",
         }
 
-        with patch('httpx.AsyncClient') as mock_async_client:
+        with patch("httpx.AsyncClient") as mock_async_client:
             # Mock download client
             mock_download_ctx = AsyncMock()
             mock_download_ctx.__aenter__.return_value.get.return_value = mock_download_response
@@ -285,8 +282,7 @@ class TestWordPressAdapter:
             # Mock upload client
             mock_upload_ctx = AsyncMock()
             mock_upload_ctx.__aenter__.return_value.post.return_value = mock_response(
-                201,
-                mock_media_response
+                201, mock_media_response
             )
 
             # Configure the mock to return different contexts
@@ -317,7 +313,7 @@ class TestWordPressAdapter:
         mock_client = AsyncMock()
         mock_client.post.return_value = mock_response(201, mock_post)
 
-        with patch.object(adapter, '_get_client', return_value=mock_client):
+        with patch.object(adapter, "_get_client", return_value=mock_client):
             post = await adapter.create_post(
                 title="Test Post",
                 content="<p>Test content</p>",
@@ -339,7 +335,7 @@ class TestWordPressAdapter:
         mock_client = AsyncMock()
         mock_client.post.return_value = mock_response(201, mock_post)
 
-        with patch.object(adapter, '_get_client', return_value=mock_client):
+        with patch.object(adapter, "_get_client", return_value=mock_client):
             post = await adapter.create_post(
                 title="Full Post",
                 content="<p>Full content</p>",
@@ -356,7 +352,7 @@ class TestWordPressAdapter:
 
         # Verify the post data sent to WordPress
         call_args = mock_client.post.call_args
-        post_data = call_args.kwargs['json']
+        post_data = call_args.kwargs["json"]
 
         assert post_data["categories"] == [1, 2]
         assert post_data["tags"] == [3, 4]
@@ -376,7 +372,7 @@ class TestWordPressAdapter:
         mock_client = AsyncMock()
         mock_client.post.return_value = mock_response(200, mock_updated_post)
 
-        with patch.object(adapter, '_get_client', return_value=mock_client):
+        with patch.object(adapter, "_get_client", return_value=mock_client):
             post = await adapter.update_post(
                 post_id=456,
                 title="Updated Title",
@@ -394,7 +390,7 @@ class TestWordPressAdapter:
         mock_client = AsyncMock()
         mock_client.post.return_value = mock_response(200, mock_updated_post)
 
-        with patch.object(adapter, '_get_client', return_value=mock_client):
+        with patch.object(adapter, "_get_client", return_value=mock_client):
             await adapter.update_post(
                 post_id=456,
                 title="Updated Title",
@@ -404,7 +400,7 @@ class TestWordPressAdapter:
 
         # Verify only non-None values were sent
         call_args = mock_client.post.call_args
-        post_data = call_args.kwargs['json']
+        post_data = call_args.kwargs["json"]
 
         assert "title" in post_data
         assert "status" not in post_data
@@ -423,7 +419,7 @@ class TestWordPressAdapter:
         mock_client = AsyncMock()
         mock_client.get.return_value = mock_response(200, mock_post)
 
-        with patch.object(adapter, '_get_client', return_value=mock_client):
+        with patch.object(adapter, "_get_client", return_value=mock_client):
             post = await adapter.get_post(post_id=456)
 
         assert post["id"] == 456
@@ -434,11 +430,10 @@ class TestWordPressAdapter:
         """Test retrieving a non-existent post."""
         mock_client = AsyncMock()
         mock_client.get.return_value = mock_response(
-            404,
-            {"code": "not_found", "message": "Post not found"}
+            404, {"code": "not_found", "message": "Post not found"}
         )
 
-        with patch.object(adapter, '_get_client', return_value=mock_client):
+        with patch.object(adapter, "_get_client", return_value=mock_client):
             with pytest.raises(WordPressAPIError) as exc_info:
                 await adapter.get_post(post_id=999)
 
@@ -451,12 +446,14 @@ class TestWordPressAdapterIntegration:
     @pytest.fixture
     def mock_response(self):
         """Create a mock HTTP response."""
+
         def _create_response(status_code=200, json_data=None):
             response = Mock(spec=httpx.Response)
             response.status_code = status_code
             response.json.return_value = json_data or {}
             response.text = ""
             return response
+
         return _create_response
 
     @pytest.mark.asyncio
@@ -472,12 +469,9 @@ class TestWordPressAdapterIntegration:
         mock_client = AsyncMock()
 
         # Step 1: Test connection
-        mock_client.get.return_value = mock_response(
-            200,
-            {"id": 1, "name": "Test User"}
-        )
+        mock_client.get.return_value = mock_response(200, {"id": 1, "name": "Test User"})
 
-        with patch.object(adapter, '_get_client', return_value=mock_client):
+        with patch.object(adapter, "_get_client", return_value=mock_client):
             connection_ok = await adapter.test_connection()
             assert connection_ok is True
 
@@ -490,14 +484,13 @@ class TestWordPressAdapterIntegration:
 
         mock_media = {"id": 123, "source_url": "https://example.com/image.jpg"}
 
-        with patch('httpx.AsyncClient') as mock_async_client:
+        with patch("httpx.AsyncClient") as mock_async_client:
             mock_download_ctx = AsyncMock()
             mock_download_ctx.__aenter__.return_value.get.return_value = mock_download_response
 
             mock_upload_ctx = AsyncMock()
             mock_upload_ctx.__aenter__.return_value.post.return_value = mock_response(
-                201,
-                mock_media
+                201, mock_media
             )
 
             mock_async_client.return_value.__aenter__.side_effect = [
@@ -515,7 +508,7 @@ class TestWordPressAdapterIntegration:
         mock_post = {"id": 456, "link": "https://example.com/test-post"}
         mock_client.post.return_value = mock_response(201, mock_post)
 
-        with patch.object(adapter, '_get_client', return_value=mock_client):
+        with patch.object(adapter, "_get_client", return_value=mock_client):
             post = await adapter.create_post(
                 title="Test Post",
                 content="<p>Content</p>",

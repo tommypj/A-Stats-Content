@@ -7,10 +7,25 @@ Supports Instagram posting via Facebook API for business accounts.
 """
 
 import logging
-from typing import List, Optional, Dict, Any
-from urllib.parse import urlencode, urlparse as _urlparse
+from typing import Any
+from urllib.parse import urlencode
+from urllib.parse import urlparse as _urlparse
 
 import httpx
+
+from infrastructure.config.settings import settings
+
+from .base import (
+    BaseSocialAdapter,
+    MediaUploadResult,
+    PostResult,
+    SocialAPIError,
+    SocialAuthError,
+    SocialCredentials,
+    SocialPlatform,
+    SocialRateLimitError,
+    SocialValidationError,
+)
 
 # SM-23: SSRF protection — only allow media URLs from trusted domains
 _ALLOWED_MEDIA_DOMAINS = {
@@ -27,23 +42,10 @@ def _validate_media_url(url: str) -> None:
     if parsed.scheme != "https":
         raise ValueError(f"Media URL must use HTTPS: {url}")
     if not any(
-        parsed.netloc == d or parsed.netloc.endswith("." + d)
-        for d in _ALLOWED_MEDIA_DOMAINS
+        parsed.netloc == d or parsed.netloc.endswith("." + d) for d in _ALLOWED_MEDIA_DOMAINS
     ):
         raise ValueError(f"Media URL domain not allowed: {parsed.netloc}")
 
-from infrastructure.config.settings import settings
-from .base import (
-    BaseSocialAdapter,
-    SocialPlatform,
-    SocialCredentials,
-    PostResult,
-    MediaUploadResult,
-    SocialAuthError,
-    SocialAPIError,
-    SocialRateLimitError,
-    SocialValidationError,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -68,12 +70,12 @@ class FacebookAdapter(BaseSocialAdapter):
 
     # OAuth scopes
     SCOPES = [
-        "pages_manage_posts",      # Post to pages
-        "pages_read_engagement",   # Read page data
-        "pages_show_list",         # List pages
-        "instagram_basic",         # Instagram basic access
-        "instagram_content_publish", # Publish to Instagram
-        "public_profile",          # Read public profile
+        "pages_manage_posts",  # Post to pages
+        "pages_read_engagement",  # Read page data
+        "pages_show_list",  # List pages
+        "instagram_basic",  # Instagram basic access
+        "instagram_content_publish",  # Publish to Instagram
+        "public_profile",  # Read public profile
     ]
 
     # Character limit (Facebook allows up to 63,206 characters)
@@ -81,9 +83,9 @@ class FacebookAdapter(BaseSocialAdapter):
 
     def __init__(
         self,
-        app_id: Optional[str] = None,
-        app_secret: Optional[str] = None,
-        redirect_uri: Optional[str] = None,
+        app_id: str | None = None,
+        app_secret: str | None = None,
+        redirect_uri: str | None = None,
         timeout: int = 30,
         mock_mode: bool = False,
     ):
@@ -249,7 +251,7 @@ class FacebookAdapter(BaseSocialAdapter):
             token_data = response.json()
             return token_data.get("access_token", short_lived_token)
 
-    async def _get_user_profile(self, access_token: str) -> Dict[str, Any]:
+    async def _get_user_profile(self, access_token: str) -> dict[str, Any]:
         """
         Get authenticated user's profile information.
 
@@ -273,7 +275,7 @@ class FacebookAdapter(BaseSocialAdapter):
 
             return response.json()
 
-    async def get_pages(self, credentials: SocialCredentials) -> List[Dict[str, Any]]:
+    async def get_pages(self, credentials: SocialCredentials) -> list[dict[str, Any]]:
         """
         Get list of Facebook Pages the user manages.
 
@@ -356,8 +358,8 @@ class FacebookAdapter(BaseSocialAdapter):
         self,
         credentials: SocialCredentials,
         text: str,
-        page_id: Optional[str] = None,
-        page_token: Optional[str] = None
+        page_id: str | None = None,
+        page_token: str | None = None,
     ) -> PostResult:
         """
         Post to Facebook page.
@@ -437,9 +439,9 @@ class FacebookAdapter(BaseSocialAdapter):
         self,
         credentials: SocialCredentials,
         text: str,
-        media_urls: List[str],
-        page_id: Optional[str] = None,
-        page_token: Optional[str] = None
+        media_urls: list[str],
+        page_id: str | None = None,
+        page_token: str | None = None,
     ) -> PostResult:
         """
         Post to Facebook page with media.
@@ -499,7 +501,9 @@ class FacebookAdapter(BaseSocialAdapter):
 
                     if response.status_code not in [200, 201]:
                         error_data = response.json() if response.text else {}
-                        error_msg = error_data.get("error", {}).get("message", "Post creation failed")
+                        error_msg = error_data.get("error", {}).get(
+                            "message", "Post creation failed"
+                        )
                         raise SocialAPIError(f"Post creation failed: {error_msg}")
 
                     result = response.json()
@@ -515,8 +519,12 @@ class FacebookAdapter(BaseSocialAdapter):
             else:
                 # For multiple images, need to upload each as unpublished, then create album
                 # This is a simplified version - full implementation would handle album creation
-                logger.warning("Multiple image posting requires album creation - posting first image only")
-                return await self.post_with_media(credentials, text, [media_urls[0]], page_id, page_token)
+                logger.warning(
+                    "Multiple image posting requires album creation - posting first image only"
+                )
+                return await self.post_with_media(
+                    credentials, text, [media_urls[0]], page_id, page_token
+                )
 
         except (SocialValidationError, SocialRateLimitError, SocialAPIError):
             raise
@@ -529,9 +537,9 @@ class FacebookAdapter(BaseSocialAdapter):
         credentials: SocialCredentials,
         media_bytes: bytes,
         media_type: str,
-        filename: Optional[str] = None,
-        page_id: Optional[str] = None,
-        page_token: Optional[str] = None
+        filename: str | None = None,
+        page_id: str | None = None,
+        page_token: str | None = None,
     ) -> MediaUploadResult:
         """
         Upload media to Facebook page.
@@ -566,9 +574,7 @@ class FacebookAdapter(BaseSocialAdapter):
             )
 
         try:
-            files = {
-                "source": (filename or "image.jpg", media_bytes, media_type)
-            }
+            files = {"source": (filename or "image.jpg", media_bytes, media_type)}
 
             data = {
                 "published": "false",  # Upload as unpublished
@@ -603,10 +609,7 @@ class FacebookAdapter(BaseSocialAdapter):
             raise SocialAPIError(f"Media upload failed: {e}")
 
     async def delete_post(
-        self,
-        credentials: SocialCredentials,
-        post_id: str,
-        page_token: Optional[str] = None
+        self, credentials: SocialCredentials, post_id: str, page_token: str | None = None
     ) -> bool:
         """
         Delete a Facebook post.

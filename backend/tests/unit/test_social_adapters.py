@@ -12,30 +12,32 @@ Tests the social media API integrations including:
 - Character limit validation
 """
 
+from datetime import UTC, datetime
+from typing import Any
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from datetime import datetime, timedelta, timezone
-from unittest.mock import Mock, patch, AsyncMock
-from typing import Dict, Any
 
 # These imports will work once the adapters are created
 # For now, we'll use pytest.importorskip to make tests conditional
 try:
-    from adapters.social.twitter_adapter import (
-        TwitterAdapter,
-        TwitterError,
-        TwitterAuthError,
-        TwitterRateLimitError,
+    from adapters.social.facebook_adapter import (
+        FacebookAdapter,
+        FacebookAuthError,
+        FacebookError,
     )
     from adapters.social.linkedin_adapter import (
         LinkedInAdapter,
-        LinkedInError,
         LinkedInAuthError,
+        LinkedInError,
     )
-    from adapters.social.facebook_adapter import (
-        FacebookAdapter,
-        FacebookError,
-        FacebookAuthError,
+    from adapters.social.twitter_adapter import (
+        TwitterAdapter,
+        TwitterAuthError,
+        TwitterError,
+        TwitterRateLimitError,
     )
+
     ADAPTERS_AVAILABLE = True
 except ImportError:
     ADAPTERS_AVAILABLE = False
@@ -45,6 +47,7 @@ except ImportError:
 # ============================================================================
 # Twitter/X Adapter Tests
 # ============================================================================
+
 
 @pytest.fixture
 def twitter_adapter():
@@ -59,7 +62,7 @@ def twitter_adapter():
 
 
 @pytest.fixture
-def mock_twitter_auth_response() -> Dict[str, Any]:
+def mock_twitter_auth_response() -> dict[str, Any]:
     """Mock successful Twitter OAuth token response."""
     return {
         "token_type": "bearer",
@@ -71,7 +74,7 @@ def mock_twitter_auth_response() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def mock_twitter_post_response() -> Dict[str, Any]:
+def mock_twitter_post_response() -> dict[str, Any]:
     """Mock successful Twitter post creation response."""
     return {
         "data": {
@@ -83,7 +86,7 @@ def mock_twitter_post_response() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def mock_twitter_media_response() -> Dict[str, Any]:
+def mock_twitter_media_response() -> dict[str, Any]:
     """Mock successful Twitter media upload response."""
     return {
         "media_id": 123456789,
@@ -197,7 +200,7 @@ class TestTwitterAdapter:
             mock_response = AsyncMock()
             mock_response.status_code = 429
             mock_response.headers = {
-                "x-rate-limit-reset": str(int(datetime.now(timezone.utc).timestamp()) + 900)
+                "x-rate-limit-reset": str(int(datetime.now(UTC).timestamp()) + 900)
             }
             mock_response.json.return_value = {
                 "title": "Too Many Requests",
@@ -215,7 +218,9 @@ class TestTwitterAdapter:
             assert "rate limit" in str(exc_info.value).lower()
 
     @pytest.mark.asyncio
-    async def test_post_with_media(self, twitter_adapter, mock_twitter_media_response, mock_twitter_post_response):
+    async def test_post_with_media(
+        self, twitter_adapter, mock_twitter_media_response, mock_twitter_post_response
+    ):
         """Test posting tweet with image attachments."""
         if not ADAPTERS_AVAILABLE:
             pytest.skip("Adapters not available")
@@ -229,9 +234,7 @@ class TestTwitterAdapter:
             # Mock tweet creation with media
             tweet_response = AsyncMock()
             tweet_response.status_code = 201
-            mock_twitter_post_response["data"]["attachments"] = {
-                "media_keys": ["123456789"]
-            }
+            mock_twitter_post_response["data"]["attachments"] = {"media_keys": ["123456789"]}
             tweet_response.json.return_value = mock_twitter_post_response
 
             mock_post.side_effect = [media_response, tweet_response]
@@ -313,6 +316,7 @@ class TestTwitterAdapter:
 # LinkedIn Adapter Tests
 # ============================================================================
 
+
 @pytest.fixture
 def linkedin_adapter():
     """Create LinkedInAdapter instance with test credentials."""
@@ -326,7 +330,7 @@ def linkedin_adapter():
 
 
 @pytest.fixture
-def mock_linkedin_auth_response() -> Dict[str, Any]:
+def mock_linkedin_auth_response() -> dict[str, Any]:
     """Mock successful LinkedIn OAuth token response."""
     return {
         "access_token": "test_linkedin_access_token",
@@ -336,7 +340,7 @@ def mock_linkedin_auth_response() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def mock_linkedin_post_response() -> Dict[str, Any]:
+def mock_linkedin_post_response() -> dict[str, Any]:
     """Mock successful LinkedIn post creation response."""
     return {
         "id": "urn:li:share:1234567890",
@@ -448,6 +452,7 @@ class TestLinkedInAdapter:
 # Facebook Adapter Tests
 # ============================================================================
 
+
 @pytest.fixture
 def facebook_adapter():
     """Create FacebookAdapter instance with test credentials."""
@@ -461,7 +466,7 @@ def facebook_adapter():
 
 
 @pytest.fixture
-def mock_facebook_auth_response() -> Dict[str, Any]:
+def mock_facebook_auth_response() -> dict[str, Any]:
     """Mock successful Facebook OAuth token response."""
     return {
         "access_token": "test_facebook_access_token",
@@ -471,7 +476,7 @@ def mock_facebook_auth_response() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def mock_facebook_post_response() -> Dict[str, Any]:
+def mock_facebook_post_response() -> dict[str, Any]:
     """Mock successful Facebook post creation response."""
     return {
         "id": "123456789_987654321",

@@ -8,7 +8,7 @@ and Application Password authentication.
 import base64
 import logging
 from dataclasses import dataclass
-from typing import List, Optional, Dict, Any
+from typing import Any
 from urllib.parse import urljoin
 
 import httpx
@@ -19,16 +19,19 @@ logger = logging.getLogger(__name__)
 # Custom Exceptions
 class WordPressConnectionError(Exception):
     """Raised when connection to WordPress site fails."""
+
     pass
 
 
 class WordPressAuthError(Exception):
     """Raised when authentication with WordPress fails."""
+
     pass
 
 
 class WordPressAPIError(Exception):
     """Raised when WordPress API returns an error."""
+
     pass
 
 
@@ -44,7 +47,7 @@ class WordPressConnection:
     def get_api_base_url(self) -> str:
         """Get the WordPress REST API base URL."""
         # Ensure site_url doesn't end with slash
-        site_url = self.site_url.rstrip('/')
+        site_url = self.site_url.rstrip("/")
         return f"{site_url}/wp-json/wp/v2"
 
 
@@ -73,9 +76,9 @@ class WordPressAdapter:
             timeout: Request timeout in seconds (default: 30)
         """
         self.connection = WordPressConnection(
-            site_url=site_url.rstrip('/'),
+            site_url=site_url.rstrip("/"),
             username=username,
-            app_password=app_password.replace(' ', ''),  # Remove spaces from app password
+            app_password=app_password.replace(" ", ""),  # Remove spaces from app password
         )
         self.timeout = timeout
         self._client = None
@@ -126,9 +129,9 @@ class WordPressAdapter:
             Full API URL
         """
         base_url = self.connection.get_api_base_url()
-        return urljoin(base_url + '/', endpoint)
+        return urljoin(base_url + "/", endpoint)
 
-    async def _handle_response(self, response: httpx.Response) -> Dict[str, Any]:
+    async def _handle_response(self, response: httpx.Response) -> dict[str, Any]:
         """
         Handle API response and raise appropriate exceptions.
 
@@ -157,8 +160,8 @@ class WordPressAdapter:
         if response.status_code >= 400:
             try:
                 error_data = response.json()
-                error_message = error_data.get('message', 'Unknown error')
-                error_code = error_data.get('code', response.status_code)
+                error_message = error_data.get("message", "Unknown error")
+                error_code = error_data.get("code", response.status_code)
             except Exception:
                 error_message = response.text or f"HTTP {response.status_code}"
                 error_code = response.status_code
@@ -215,7 +218,7 @@ class WordPressAdapter:
             self.connection.is_valid = False
             raise WordPressConnectionError(f"Connection test failed: {e}")
 
-    async def get_categories(self) -> List[Dict[str, Any]]:
+    async def get_categories(self) -> list[dict[str, Any]]:
         """
         Fetch available WordPress categories.
 
@@ -245,7 +248,7 @@ class WordPressAdapter:
             logger.error(f"Failed to fetch categories: {e}")
             raise WordPressAPIError(f"Failed to fetch categories: {e}")
 
-    async def get_tags(self) -> List[Dict[str, Any]]:
+    async def get_tags(self) -> list[dict[str, Any]]:
         """
         Fetch available WordPress tags.
 
@@ -280,7 +283,7 @@ class WordPressAdapter:
         image_url: str,
         filename: str,
         alt_text: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Upload an image to WordPress media library.
 
@@ -307,26 +310,24 @@ class WordPressAdapter:
 
             # Determine content type
             content_type = "image/jpeg"
-            if filename.lower().endswith('.png'):
+            if filename.lower().endswith(".png"):
                 content_type = "image/png"
-            elif filename.lower().endswith('.webp'):
+            elif filename.lower().endswith(".webp"):
                 content_type = "image/webp"
-            elif filename.lower().endswith('.gif'):
+            elif filename.lower().endswith(".gif"):
                 content_type = "image/gif"
 
             # Upload to WordPress
-            client = self._get_client()
+            self._get_client()
             url = self._build_url("media")
 
             # WordPress expects multipart form data for media uploads
-            files = {
-                'file': (filename, image_data, content_type)
-            }
+            files = {"file": (filename, image_data, content_type)}
 
             # Add alt text if provided
             data = {}
             if alt_text:
-                data['alt_text'] = alt_text
+                data["alt_text"] = alt_text
 
             logger.info(f"Uploading image to WordPress: {filename}")
 
@@ -366,12 +367,12 @@ class WordPressAdapter:
         title: str,
         content: str,
         status: str = "draft",
-        categories: Optional[List[int]] = None,
-        tags: Optional[List[int]] = None,
-        featured_media_id: Optional[int] = None,
-        meta_description: Optional[str] = None,
-        excerpt: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        categories: list[int] | None = None,
+        tags: list[int] | None = None,
+        featured_media_id: int | None = None,
+        meta_description: str | None = None,
+        excerpt: str | None = None,
+    ) -> dict[str, Any]:
         """
         Create a new WordPress post.
 
@@ -425,8 +426,7 @@ class WordPressAdapter:
             post = await self._handle_response(response)
 
             logger.info(
-                f"Post created successfully. "
-                f"ID: {post.get('id')}, Link: {post.get('link')}"
+                f"Post created successfully. ID: {post.get('id')}, Link: {post.get('link')}"
             )
             return post
 
@@ -440,7 +440,7 @@ class WordPressAdapter:
         self,
         post_id: int,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Update an existing WordPress post.
 
@@ -478,7 +478,7 @@ class WordPressAdapter:
         self,
         per_page: int = 50,
         status: str = "publish",
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Fetch published posts from WordPress for internal link suggestions.
 
@@ -519,7 +519,7 @@ class WordPressAdapter:
             logger.error(f"Failed to fetch WordPress posts: {e}")
             raise WordPressAPIError(f"Failed to fetch posts: {e}")
 
-    async def get_post(self, post_id: int) -> Dict[str, Any]:
+    async def get_post(self, post_id: int) -> dict[str, Any]:
         """
         Get details of a specific WordPress post.
 
@@ -540,7 +540,9 @@ class WordPressAdapter:
             response = await client.get(url)
             post = await self._handle_response(response)
 
-            logger.info(f"Retrieved post {post_id}: {post.get('title', {}).get('rendered', 'Untitled')}")
+            logger.info(
+                f"Retrieved post {post_id}: {post.get('title', {}).get('rendered', 'Untitled')}"
+            )
             return post
 
         except (WordPressAuthError, WordPressAPIError):

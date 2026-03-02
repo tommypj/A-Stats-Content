@@ -6,23 +6,22 @@ subscription tier, separate from individual user limits.
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Dict
+from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select, update, func
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.schemas.project_billing import ProjectLimits, ProjectUsageStats
 from infrastructure.database.models.project import Project, ProjectMember
 from infrastructure.database.models.user import SubscriptionTier
-from api.schemas.project_billing import ProjectLimits, ProjectUsageStats
 
 logger = logging.getLogger(__name__)
 
 
 # Project tier limits configuration
 # Project plans have higher limits than individual plans
-PROJECT_TIER_LIMITS: Dict[str, Dict[str, int]] = {
+PROJECT_TIER_LIMITS: dict[str, dict[str, int]] = {
     SubscriptionTier.FREE.value: {
         "articles_per_month": 3,
         "outlines_per_month": 3,
@@ -88,9 +87,7 @@ class ProjectUsageService:
         Raises:
             ValueError: If project not found
         """
-        result = await self.db.execute(
-            select(Project).where(Project.id == str(project_id))
-        )
+        result = await self.db.execute(select(Project).where(Project.id == str(project_id)))
         project = result.scalar_one_or_none()
 
         if not project:
@@ -110,7 +107,7 @@ class ProjectUsageService:
         """
         tier = project.subscription_tier
         # Treat expired subscriptions as free tier
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if project.subscription_expires and project.subscription_expires < now:
             tier = SubscriptionTier.FREE.value
         limits = PROJECT_TIER_LIMITS.get(tier, PROJECT_TIER_LIMITS[SubscriptionTier.FREE.value])
@@ -138,13 +135,17 @@ class ProjectUsageService:
 
         # Count active members via SQL instead of loading all into memory
         count_result = await self.db.execute(
-            select(func.count()).select_from(ProjectMember).where(
+            select(func.count())
+            .select_from(ProjectMember)
+            .where(
                 ProjectMember.project_id == str(project_id),
                 ProjectMember.deleted_at.is_(None),
             )
         )
         _raw_count = count_result.scalar()
-        active_members_count = int(_raw_count) if _raw_count is not None else 0  # GEN-36: explicit int conversion
+        active_members_count = (
+            int(_raw_count) if _raw_count is not None else 0
+        )  # GEN-36: explicit int conversion
 
         return ProjectUsageStats(
             articles_used=project.articles_generated_this_month,
@@ -211,21 +212,25 @@ class ProjectUsageService:
         valid_resources = list(resource_map.keys()) + ["members"]
         if resource not in valid_resources:
             raise ValueError(
-                f"Invalid resource type: {resource}. "
-                f"Must be one of: {', '.join(valid_resources)}"
+                f"Invalid resource type: {resource}. Must be one of: {', '.join(valid_resources)}"
             )
 
         # For members, query the count explicitly to avoid async lazy-load issues
         if resource == "members":
             from infrastructure.database.models.project import ProjectMember
+
             count_result = await self.db.execute(
-                select(func.count()).select_from(ProjectMember).where(
+                select(func.count())
+                .select_from(ProjectMember)
+                .where(
                     ProjectMember.project_id == str(project_id),
                     ProjectMember.deleted_at.is_(None),
                 )
             )
             _raw_members = count_result.scalar()
-            current_members = int(_raw_members) if _raw_members is not None else 0  # GEN-36: explicit int conversion
+            current_members = (
+                int(_raw_members) if _raw_members is not None else 0
+            )  # GEN-36: explicit int conversion
             resource_map["members"] = (current_members, limits.max_members)
 
         current_usage, limit = resource_map[resource]
@@ -239,8 +244,7 @@ class ProjectUsageService:
 
         if not can_create:
             logger.warning(
-                f"Project {project_id} has reached limit for {resource}: "
-                f"{current_usage}/{limit}"
+                f"Project {project_id} has reached limit for {resource}: {current_usage}/{limit}"
             )
 
         return can_create
@@ -277,7 +281,7 @@ class ProjectUsageService:
         values = {column.key: column + 1}
 
         # Set usage reset date if not already set
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if now.month == 12:
             next_month = now.replace(year=now.year + 1, month=1, day=1)
         else:
@@ -293,9 +297,7 @@ class ProjectUsageService:
         if result.rowcount == 0:
             # usage_reset_date was already set — just increment the counter
             await self.db.execute(
-                update(Project)
-                .where(Project.id == str(project_id))
-                .values(**values)
+                update(Project).where(Project.id == str(project_id)).values(**values)
             )
 
         await self.db.flush()
@@ -320,6 +322,7 @@ class ProjectUsageService:
         # of=_Project generates "FOR UPDATE OF projects" — safe with the LEFT OUTER JOIN
         # that SQLAlchemy adds when eager-loading the owner relationship.
         from infrastructure.database.models.project import Project as _Project
+
         result = await self.db.execute(
             select(_Project).where(_Project.id == str(project_id)).with_for_update(of=_Project)
         )
@@ -331,7 +334,7 @@ class ProjectUsageService:
         if not project.usage_reset_date:
             return False
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if now < project.usage_reset_date:
             return False
 

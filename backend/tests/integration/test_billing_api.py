@@ -10,24 +10,23 @@ Tests all billing endpoints including:
 - Webhook event processing
 """
 
-import pytest
-import hmac
 import hashlib
+import hmac
 import json
-from datetime import datetime, date, timedelta
-from unittest.mock import AsyncMock, patch, Mock
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
+import pytest
 from fastapi import status
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from infrastructure.database.models import User
-from infrastructure.database.models.user import SubscriptionTier
 
 # Skip all tests if billing routes are not available
 try:
     from api.routes import billing
+
     BILLING_AVAILABLE = True
 except (ImportError, AttributeError):
     BILLING_AVAILABLE = False
@@ -238,6 +237,7 @@ class TestCustomerPortalEndpoint:
 
         # Create subscribed user
         from core.security import PasswordHasher
+
         password_hasher = PasswordHasher()
 
         user = User(
@@ -257,6 +257,7 @@ class TestCustomerPortalEndpoint:
         # Generate auth token using jwt_secret_key (same key the route uses)
         from core.security import TokenService
         from infrastructure.config import get_settings
+
         app_settings = get_settings()
         token_service = TokenService(secret_key=app_settings.jwt_secret_key)
         access_token = token_service.create_access_token(user_id=user.id)
@@ -319,6 +320,7 @@ class TestCancelEndpoint:
 
         # Create subscribed user
         from core.security import PasswordHasher
+
         password_hasher = PasswordHasher()
 
         user = User(
@@ -339,6 +341,7 @@ class TestCancelEndpoint:
         # Generate auth token using jwt_secret_key (same key the route uses)
         from core.security import TokenService
         from infrastructure.config import get_settings
+
         app_settings = get_settings()
         token_service = TokenService(secret_key=app_settings.jwt_secret_key)
         access_token = token_service.create_access_token(user_id=user.id)
@@ -398,11 +401,7 @@ class TestWebhookEndpoint:
         serialization, which is what the route receives as the raw request body.
         """
         payload_bytes = json.dumps(payload, separators=(",", ":")).encode()
-        return hmac.new(
-            secret.encode(),
-            payload_bytes,
-            hashlib.sha256
-        ).hexdigest()
+        return hmac.new(secret.encode(), payload_bytes, hashlib.sha256).hexdigest()
 
     @pytest.mark.asyncio
     async def test_webhook_valid_signature(
@@ -499,6 +498,7 @@ class TestWebhookEndpoint:
 
         # Create test user
         from core.security import PasswordHasher
+
         password_hasher = PasswordHasher()
 
         user = User(
@@ -570,6 +570,7 @@ class TestWebhookEndpoint:
 
         # Create subscribed user
         from core.security import PasswordHasher
+
         password_hasher = PasswordHasher()
 
         user = User(
@@ -638,6 +639,7 @@ class TestWebhookEndpoint:
 
         # Create subscribed user
         from core.security import PasswordHasher
+
         password_hasher = PasswordHasher()
 
         user = User(
@@ -689,7 +691,9 @@ class TestWebhookEndpoint:
             assert response.status_code == status.HTTP_200_OK
 
 
-@pytest.mark.skip(reason="POST /billing/pause and POST /billing/resume endpoints do not exist in billing.py")
+@pytest.mark.skip(
+    reason="POST /billing/pause and POST /billing/resume endpoints do not exist in billing.py"
+)
 class TestPauseResumeEndpoints:
     """Tests for subscription pause/resume functionality.
 
@@ -709,6 +713,7 @@ class TestPauseResumeEndpoints:
             pytest.skip("Billing routes not available")
 
         from core.security import PasswordHasher
+
         password_hasher = PasswordHasher()
 
         user = User(
@@ -727,6 +732,7 @@ class TestPauseResumeEndpoints:
 
         from core.security import TokenService
         from infrastructure.config import get_settings
+
         settings = get_settings()
         token_service = TokenService(secret_key=settings.secret_key)
         access_token = token_service.create_access_token(user_id=user.id)
@@ -753,6 +759,7 @@ class TestPauseResumeEndpoints:
             pytest.skip("Billing routes not available")
 
         from core.security import PasswordHasher
+
         password_hasher = PasswordHasher()
 
         user = User(
@@ -771,6 +778,7 @@ class TestPauseResumeEndpoints:
 
         from core.security import TokenService
         from infrastructure.config import get_settings
+
         settings = get_settings()
         token_service = TokenService(secret_key=settings.secret_key)
         access_token = token_service.create_access_token(user_id=user.id)

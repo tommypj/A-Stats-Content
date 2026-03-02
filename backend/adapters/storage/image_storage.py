@@ -5,13 +5,12 @@ Provides abstract base class and concrete implementations for storing
 generated images locally or in cloud storage.
 """
 
-import os
 import logging
+import os
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlparse
 
 import aiofiles
 import aiohttp
@@ -75,7 +74,7 @@ class LocalStorageAdapter(StorageAdapter):
     Structure: /uploads/images/YYYY/MM/filename.png
     """
 
-    def __init__(self, base_path: Optional[str] = None):
+    def __init__(self, base_path: str | None = None):
         """
         Initialize local storage adapter.
 
@@ -106,16 +105,17 @@ class LocalStorageAdapter(StorageAdapter):
         filename = os.path.basename(filename)
 
         # Replace unsafe characters
-        unsafe_chars = ['/', '\\', '..', '\0', '\n', '\r', '\t']
+        unsafe_chars = ["/", "\\", "..", "\0", "\n", "\r", "\t"]
         for char in unsafe_chars:
-            filename = filename.replace(char, '_')
+            filename = filename.replace(char, "_")
 
         # IMG-32: Keep only safe characters (word chars, hyphens, dots)
         import re as _re
+
         filename = _re.sub(r"[^\w\-.]", "_", filename)
 
         # Ensure we have a valid extension
-        if '.' not in filename:
+        if "." not in filename:
             filename = f"{filename}.png"
 
         # Add timestamp to avoid collisions
@@ -147,7 +147,7 @@ class LocalStorageAdapter(StorageAdapter):
             file_path = full_dir / safe_filename
 
             # Save file asynchronously
-            async with aiofiles.open(file_path, 'wb') as f:
+            async with aiofiles.open(file_path, "wb") as f:
                 await f.write(image_data)
 
             # Return relative path
@@ -196,7 +196,7 @@ class LocalStorageAdapter(StorageAdapter):
         """
         # In development, this would be served by the backend API
         # In production, might be served by Nginx/CDN
-        api_base = settings.frontend_url.replace(':3000', ':8000')
+        api_base = settings.frontend_url.replace(":3000", ":8000")
         return f"{api_base}/uploads/{path}"
 
 
@@ -212,10 +212,10 @@ class S3StorageAdapter(StorageAdapter):
 
     def __init__(
         self,
-        bucket: Optional[str] = None,
-        region: Optional[str] = None,
-        access_key: Optional[str] = None,
-        secret_key: Optional[str] = None,
+        bucket: str | None = None,
+        region: str | None = None,
+        access_key: str | None = None,
+        secret_key: str | None = None,
     ):
         """
         Initialize S3 storage adapter.
@@ -235,14 +235,14 @@ class S3StorageAdapter(StorageAdapter):
         try:
             if self.access_key and self.secret_key:
                 self.s3_client = boto3.client(
-                    's3',
+                    "s3",
                     region_name=self.region,
                     aws_access_key_id=self.access_key,
                     aws_secret_access_key=self.secret_key,
                 )
             else:
                 # Try to use default credentials (IAM role, env vars, etc.)
-                self.s3_client = boto3.client('s3', region_name=self.region)
+                self.s3_client = boto3.client("s3", region_name=self.region)
 
             logger.info(f"S3 storage adapter initialized for bucket: {self.bucket}")
         except Exception as e:
@@ -293,13 +293,13 @@ class S3StorageAdapter(StorageAdapter):
             s3_key = self._get_s3_key(filename)
 
             # Determine content type
-            content_type = 'image/png'
-            if filename.lower().endswith('.jpg') or filename.lower().endswith('.jpeg'):
-                content_type = 'image/jpeg'
-            elif filename.lower().endswith('.webp'):
-                content_type = 'image/webp'
-            elif filename.lower().endswith('.gif'):
-                content_type = 'image/gif'
+            content_type = "image/png"
+            if filename.lower().endswith(".jpg") or filename.lower().endswith(".jpeg"):
+                content_type = "image/jpeg"
+            elif filename.lower().endswith(".webp"):
+                content_type = "image/webp"
+            elif filename.lower().endswith(".gif"):
+                content_type = "image/gif"
 
             # Upload to S3 with private ACL (default)
             self.s3_client.put_object(
@@ -342,7 +342,7 @@ class S3StorageAdapter(StorageAdapter):
             # IMG-30: Always use self.bucket, never parse bucket from URL.
             # IMG-29: Extract S3 key from URL using proper URL parsing (not fragile string split).
             s3_key = path
-            if path.startswith('http'):
+            if path.startswith("http"):
                 # Extract key from URL like https://bucket.s3.amazonaws.com/key/path
                 # or https://s3.amazonaws.com/bucket/key/path
                 parsed = urlparse(path)
@@ -350,7 +350,7 @@ class S3StorageAdapter(StorageAdapter):
                 s3_key = parsed.path.lstrip("/")
                 # For path-style URLs (s3.amazonaws.com/bucket/key) strip the bucket prefix
                 if s3_key.startswith(self.bucket + "/"):
-                    s3_key = s3_key[len(self.bucket) + 1:]
+                    s3_key = s3_key[len(self.bucket) + 1 :]
                 if not s3_key:
                     raise ValueError(f"IMG-29: Could not extract S3 key from URL: {path}")
 
@@ -382,13 +382,13 @@ class S3StorageAdapter(StorageAdapter):
 
         # If a CDN domain is configured, use it directly (CDN handles auth)
         # IMG-31: CDN domain must only come from settings, never from user input
-        cdn_domain = getattr(settings, 'cdn_domain', None)
+        cdn_domain = getattr(settings, "cdn_domain", None)
         if cdn_domain:
             return f"https://{cdn_domain}/{path}"
 
         return self.s3_client.generate_presigned_url(
-            'get_object',
-            Params={'Bucket': self.bucket, 'Key': path},
+            "get_object",
+            Params={"Bucket": self.bucket, "Key": path},
             ExpiresIn=self.PRESIGNED_URL_EXPIRY,
         )
 
@@ -421,8 +421,7 @@ async def download_image(url: str) -> bytes:
     parsed = urlparse(url)
     netloc = parsed.netloc
     if parsed.scheme != "https" or not any(
-        netloc == d or netloc.endswith("." + d)
-        for d in _TOP_LEVEL_ALLOWED_DOMAINS
+        netloc == d or netloc.endswith("." + d) for d in _TOP_LEVEL_ALLOWED_DOMAINS
     ):
         raise ValueError(f"Image URL failed domain validation: {netloc}")
 
@@ -452,9 +451,7 @@ async def download_image(url: str) -> bytes:
                     logger.info(f"Downloaded image from {url} ({len(image_data)} bytes)")
                     return image_data
                 else:
-                    raise RuntimeError(
-                        f"Failed to download image. Status: {response.status}"
-                    )
+                    raise RuntimeError(f"Failed to download image. Status: {response.status}")
     except (ValueError, RuntimeError):
         raise
     except aiohttp.ClientError as e:
@@ -484,9 +481,7 @@ def get_storage_adapter() -> StorageAdapter:
     elif storage_type == "s3":
         return S3StorageAdapter()
     else:
-        raise ValueError(
-            f"Unknown storage type: {storage_type}. Must be 'local' or 's3'"
-        )
+        raise ValueError(f"Unknown storage type: {storage_type}. Must be 'local' or 's3'")
 
 
 # Convenience singleton for quick access

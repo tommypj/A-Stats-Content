@@ -14,11 +14,10 @@ Tests cover invitation workflow:
 All tests use async fixtures and httpx AsyncClient.
 """
 
+from datetime import datetime
+
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime, timedelta
-from uuid import uuid4
 
 # Skip tests if projects module not implemented yet
 pytest.importorskip("api.routes.projects", reason="Projects API not yet implemented")
@@ -29,21 +28,13 @@ class TestSendInvitation:
 
     @pytest.mark.asyncio
     async def test_send_invitation_as_owner(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict
+        self, async_client: AsyncClient, auth_headers: dict, project: dict
     ):
         """OWNER should be able to send project invitations."""
-        payload = {
-            "email": "newmember@example.com",
-            "role": "member"
-        }
+        payload = {"email": "newmember@example.com", "role": "member"}
 
         response = await async_client.post(
-            f"/api/v1/projects/{project['id']}/invitations",
-            json=payload,
-            headers=auth_headers
+            f"/api/v1/projects/{project['id']}/invitations", json=payload, headers=auth_headers
         )
 
         assert response.status_code == 201
@@ -56,64 +47,43 @@ class TestSendInvitation:
 
     @pytest.mark.asyncio
     async def test_send_invitation_as_admin(
-        self,
-        async_client: AsyncClient,
-        project_admin_auth: dict,
-        project: dict
+        self, async_client: AsyncClient, project_admin_auth: dict, project: dict
     ):
         """ADMIN should be able to send project invitations."""
-        payload = {
-            "email": "admin-invite@example.com",
-            "role": "viewer"
-        }
+        payload = {"email": "admin-invite@example.com", "role": "viewer"}
 
         response = await async_client.post(
             f"/api/v1/projects/{project['id']}/invitations",
             json=payload,
-            headers=project_admin_auth
+            headers=project_admin_auth,
         )
 
         assert response.status_code == 201
 
     @pytest.mark.asyncio
     async def test_send_invitation_as_member_forbidden(
-        self,
-        async_client: AsyncClient,
-        project_member_auth: dict,
-        project: dict
+        self, async_client: AsyncClient, project_member_auth: dict, project: dict
     ):
         """MEMBER should NOT be able to send invitations."""
-        payload = {
-            "email": "forbidden@example.com",
-            "role": "member"
-        }
+        payload = {"email": "forbidden@example.com", "role": "member"}
 
         response = await async_client.post(
             f"/api/v1/projects/{project['id']}/invitations",
             json=payload,
-            headers=project_member_auth
+            headers=project_member_auth,
         )
 
         assert response.status_code == 403
 
     @pytest.mark.asyncio
     async def test_send_invitation_to_existing_member_fails(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict,
-        project_member: dict
+        self, async_client: AsyncClient, auth_headers: dict, project: dict, project_member: dict
     ):
         """Cannot send invitation to existing project member."""
-        payload = {
-            "email": project_member["email"],
-            "role": "member"
-        }
+        payload = {"email": project_member["email"], "role": "member"}
 
         response = await async_client.post(
-            f"/api/v1/projects/{project['id']}/invitations",
-            json=payload,
-            headers=auth_headers
+            f"/api/v1/projects/{project['id']}/invitations", json=payload, headers=auth_headers
         )
 
         # Route returns 400 (not 409) when user is already a member
@@ -121,23 +91,18 @@ class TestSendInvitation:
 
     @pytest.mark.asyncio
     async def test_send_invitation_with_custom_message(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict
+        self, async_client: AsyncClient, auth_headers: dict, project: dict
     ):
         """ProjectInvitationCreate does not support a custom message field; invite still succeeds."""
         # The "message" field is not part of ProjectInvitationCreate schema and will be ignored.
         payload = {
             "email": "custom@example.com",
             "role": "member",
-            "message": "Join us to collaborate on this project!"
+            "message": "Join us to collaborate on this project!",
         }
 
         response = await async_client.post(
-            f"/api/v1/projects/{project['id']}/invitations",
-            json=payload,
-            headers=auth_headers
+            f"/api/v1/projects/{project['id']}/invitations", json=payload, headers=auth_headers
         )
 
         assert response.status_code == 201
@@ -146,17 +111,14 @@ class TestSendInvitation:
 
     @pytest.mark.asyncio
     async def test_send_invitation_generates_unique_token(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict
+        self, async_client: AsyncClient, auth_headers: dict, project: dict
     ):
         """Each invitation should have a unique token."""
         # Send first invitation
         response1 = await async_client.post(
             f"/api/v1/projects/{project['id']}/invitations",
             json={"email": "user1@example.com", "role": "member"},
-            headers=auth_headers
+            headers=auth_headers,
         )
         token1 = response1.json()["token"]
 
@@ -164,7 +126,7 @@ class TestSendInvitation:
         response2 = await async_client.post(
             f"/api/v1/projects/{project['id']}/invitations",
             json={"email": "user2@example.com", "role": "member"},
-            headers=auth_headers
+            headers=auth_headers,
         )
         token2 = response2.json()["token"]
 
@@ -176,16 +138,11 @@ class TestListInvitations:
 
     @pytest.mark.asyncio
     async def test_list_invitations_as_owner(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict,
-        project_invitation: dict
+        self, async_client: AsyncClient, auth_headers: dict, project: dict, project_invitation: dict
     ):
         """OWNER should be able to list pending invitations."""
         response = await async_client.get(
-            f"/api/v1/projects/{project['id']}/invitations",
-            headers=auth_headers
+            f"/api/v1/projects/{project['id']}/invitations", headers=auth_headers
         )
 
         assert response.status_code == 200
@@ -196,46 +153,33 @@ class TestListInvitations:
 
     @pytest.mark.asyncio
     async def test_list_invitations_as_admin(
-        self,
-        async_client: AsyncClient,
-        project_admin_auth: dict,
-        project: dict
+        self, async_client: AsyncClient, project_admin_auth: dict, project: dict
     ):
         """ADMIN should be able to list pending invitations."""
         response = await async_client.get(
-            f"/api/v1/projects/{project['id']}/invitations",
-            headers=project_admin_auth
+            f"/api/v1/projects/{project['id']}/invitations", headers=project_admin_auth
         )
 
         assert response.status_code == 200
 
     @pytest.mark.asyncio
     async def test_list_invitations_as_member_forbidden(
-        self,
-        async_client: AsyncClient,
-        project_member_auth: dict,
-        project: dict
+        self, async_client: AsyncClient, project_member_auth: dict, project: dict
     ):
         """MEMBER should NOT be able to list invitations."""
         response = await async_client.get(
-            f"/api/v1/projects/{project['id']}/invitations",
-            headers=project_member_auth
+            f"/api/v1/projects/{project['id']}/invitations", headers=project_member_auth
         )
 
         assert response.status_code == 403
 
     @pytest.mark.asyncio
     async def test_list_invitations_shows_invitation_details(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict,
-        project_invitation: dict
+        self, async_client: AsyncClient, auth_headers: dict, project: dict, project_invitation: dict
     ):
         """Invitation list should show full details."""
         response = await async_client.get(
-            f"/api/v1/projects/{project['id']}/invitations",
-            headers=auth_headers
+            f"/api/v1/projects/{project['id']}/invitations", headers=auth_headers
         )
 
         # ProjectInvitationListResponse uses "invitations" not "items"
@@ -252,16 +196,13 @@ class TestListInvitations:
 
     @pytest.mark.asyncio
     async def test_list_invitations_filters_by_status(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict
+        self, async_client: AsyncClient, auth_headers: dict, project: dict
     ):
         """Should be able to filter invitations by status."""
         # Route uses query param "status_filter" not "status"
         response = await async_client.get(
             f"/api/v1/projects/{project['id']}/invitations?status_filter=pending",
-            headers=auth_headers
+            headers=auth_headers,
         )
 
         assert response.status_code == 200
@@ -276,29 +217,23 @@ class TestRevokeInvitation:
 
     @pytest.mark.asyncio
     async def test_revoke_invitation_as_owner(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict,
-        project_invitation: dict
+        self, async_client: AsyncClient, auth_headers: dict, project: dict, project_invitation: dict
     ):
         """OWNER should be able to revoke pending invitations."""
         response = await async_client.delete(
             f"/api/v1/projects/{project['id']}/invitations/{project_invitation['id']}",
-            headers=auth_headers
+            headers=auth_headers,
         )
 
         assert response.status_code == 204
 
         # Verify invitation is revoked
         list_response = await async_client.get(
-            f"/api/v1/projects/{project['id']}/invitations",
-            headers=auth_headers
+            f"/api/v1/projects/{project['id']}/invitations", headers=auth_headers
         )
         # ProjectInvitationListResponse uses "invitations" not "items"
         active_invitations = [
-            inv for inv in list_response.json()["invitations"]
-            if inv["status"] == "pending"
+            inv for inv in list_response.json()["invitations"] if inv["status"] == "pending"
         ]
         invitation_ids = [inv["id"] for inv in active_invitations]
         assert project_invitation["id"] not in invitation_ids
@@ -309,12 +244,12 @@ class TestRevokeInvitation:
         async_client: AsyncClient,
         project_admin_auth: dict,
         project: dict,
-        project_invitation: dict
+        project_invitation: dict,
     ):
         """ADMIN should be able to revoke invitations."""
         response = await async_client.delete(
             f"/api/v1/projects/{project['id']}/invitations/{project_invitation['id']}",
-            headers=project_admin_auth
+            headers=project_admin_auth,
         )
 
         assert response.status_code == 204
@@ -325,22 +260,19 @@ class TestRevokeInvitation:
         async_client: AsyncClient,
         project_member_auth: dict,
         project: dict,
-        project_invitation: dict
+        project_invitation: dict,
     ):
         """MEMBER should NOT be able to revoke invitations."""
         response = await async_client.delete(
             f"/api/v1/projects/{project['id']}/invitations/{project_invitation['id']}",
-            headers=project_member_auth
+            headers=project_member_auth,
         )
 
         assert response.status_code == 403
 
     @pytest.mark.asyncio
     async def test_revoke_accepted_invitation_fails(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict
+        self, async_client: AsyncClient, auth_headers: dict, project: dict
     ):
         """Cannot revoke an already accepted invitation."""
         # TODO: This requires accepting an invitation first
@@ -353,16 +285,12 @@ class TestResendInvitation:
 
     @pytest.mark.asyncio
     async def test_resend_invitation_as_owner(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict,
-        project_invitation: dict
+        self, async_client: AsyncClient, auth_headers: dict, project: dict, project_invitation: dict
     ):
         """OWNER should be able to resend invitations."""
         response = await async_client.post(
             f"/api/v1/projects/{project['id']}/invitations/{project_invitation['id']}/resend",
-            headers=auth_headers
+            headers=auth_headers,
         )
 
         assert response.status_code == 200
@@ -372,20 +300,16 @@ class TestResendInvitation:
 
     @pytest.mark.asyncio
     async def test_resend_invitation_extends_expiry(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict,
-        project_invitation: dict
+        self, async_client: AsyncClient, auth_headers: dict, project: dict, project_invitation: dict
     ):
         """Resending invitation should extend expiry date."""
         # Get original expiry; ProjectInvitationListResponse uses "invitations" not "items"
         original_response = await async_client.get(
-            f"/api/v1/projects/{project['id']}/invitations",
-            headers=auth_headers
+            f"/api/v1/projects/{project['id']}/invitations", headers=auth_headers
         )
         original_inv = next(
-            inv for inv in original_response.json()["invitations"]
+            inv
+            for inv in original_response.json()["invitations"]
             if inv["id"] == project_invitation["id"]
         )
         original_expires = original_inv["expires_at"]
@@ -393,16 +317,16 @@ class TestResendInvitation:
         # Resend
         await async_client.post(
             f"/api/v1/projects/{project['id']}/invitations/{project_invitation['id']}/resend",
-            headers=auth_headers
+            headers=auth_headers,
         )
 
         # Check new expiry
         new_response = await async_client.get(
-            f"/api/v1/projects/{project['id']}/invitations",
-            headers=auth_headers
+            f"/api/v1/projects/{project['id']}/invitations", headers=auth_headers
         )
         new_inv = next(
-            inv for inv in new_response.json()["invitations"]
+            inv
+            for inv in new_response.json()["invitations"]
             if inv["id"] == project_invitation["id"]
         )
         new_expires = new_inv["expires_at"]
@@ -416,20 +340,17 @@ class TestAcceptInvitation:
 
     @pytest.mark.skip(
         reason="project_invitation fixture uses 'invited@example.com' but other_auth_headers "
-               "is 'other@example.com'; email mismatch causes 403. Needs matching user fixture."
+        "is 'other@example.com'; email mismatch causes 403. Needs matching user fixture."
     )
     @pytest.mark.asyncio
     async def test_accept_invitation_logged_in_user(
-        self,
-        async_client: AsyncClient,
-        other_auth_headers: dict,
-        project_invitation: dict
+        self, async_client: AsyncClient, other_auth_headers: dict, project_invitation: dict
     ):
         """Logged-in user should be able to accept invitation."""
         # Endpoint is at /api/v1/projects/invitations/{token}/accept (router prefix is /projects)
         response = await async_client.post(
             f"/api/v1/projects/invitations/{project_invitation['token']}/accept",
-            headers=other_auth_headers
+            headers=other_auth_headers,
         )
 
         assert response.status_code == 200
@@ -447,41 +368,35 @@ class TestAcceptInvitation:
         async_client: AsyncClient,
         other_auth_headers: dict,
         project_invitation: dict,
-        project: dict
+        project: dict,
     ):
         """Accepting invitation should add user to project."""
         # Accept invitation via correct URL
         await async_client.post(
             f"/api/v1/projects/invitations/{project_invitation['token']}/accept",
-            headers=other_auth_headers
+            headers=other_auth_headers,
         )
 
         # Verify user can now access project (members endpoint not implemented yet,
         # but project GET should return 200 now instead of 403)
         project_response = await async_client.get(
-            f"/api/v1/projects/{project['id']}",
-            headers=other_auth_headers
+            f"/api/v1/projects/{project['id']}", headers=other_auth_headers
         )
         assert project_response.status_code == 200
 
     @pytest.mark.asyncio
     async def test_accept_invitation_new_user_flow(
-        self,
-        async_client: AsyncClient,
-        project_invitation: dict
+        self, async_client: AsyncClient, project_invitation: dict
     ):
         """New user should be able to register and accept invitation."""
         # First, register new user
         register_payload = {
             "email": project_invitation["email"],
             "password": "newpassword123",
-            "name": "New User"
+            "name": "New User",
         }
 
-        register_response = await async_client.post(
-            "/api/v1/auth/register",
-            json=register_payload
-        )
+        register_response = await async_client.post("/api/v1/auth/register", json=register_payload)
 
         # Then accept invitation with new user's token
         if register_response.status_code == 201:
@@ -490,16 +405,14 @@ class TestAcceptInvitation:
 
             accept_response = await async_client.post(
                 f"/api/v1/projects/invitations/{project_invitation['token']}/accept",
-                headers=new_auth
+                headers=new_auth,
             )
 
             assert accept_response.status_code == 200
 
     @pytest.mark.asyncio
     async def test_accept_expired_invitation_fails(
-        self,
-        async_client: AsyncClient,
-        other_auth_headers: dict
+        self, async_client: AsyncClient, other_auth_headers: dict
     ):
         """Cannot accept expired invitation."""
         # TODO: Create expired invitation fixture
@@ -512,38 +425,30 @@ class TestAcceptInvitation:
 
     @pytest.mark.asyncio
     async def test_accept_invalid_token_fails(
-        self,
-        async_client: AsyncClient,
-        other_auth_headers: dict
+        self, async_client: AsyncClient, other_auth_headers: dict
     ):
         """Cannot accept invitation with invalid token."""
         fake_token = "invalid_token_xyz"
 
         # Endpoint is at /api/v1/projects/invitations/{token}/accept
         response = await async_client.post(
-            f"/api/v1/projects/invitations/{fake_token}/accept",
-            headers=other_auth_headers
+            f"/api/v1/projects/invitations/{fake_token}/accept", headers=other_auth_headers
         )
 
         assert response.status_code == 404
 
     @pytest.mark.asyncio
     async def test_accept_already_accepted_invitation_fails(
-        self,
-        async_client: AsyncClient,
-        project_invitation: dict
+        self, async_client: AsyncClient, project_invitation: dict
     ):
         """Cannot accept the same invitation twice - using new user registration flow."""
         # Register a user with the invitation email
         register_payload = {
             "email": project_invitation["email"],
             "password": "newpassword123",
-            "name": "Invited User"
+            "name": "Invited User",
         }
-        register_response = await async_client.post(
-            "/api/v1/auth/register",
-            json=register_payload
-        )
+        register_response = await async_client.post("/api/v1/auth/register", json=register_payload)
 
         if register_response.status_code != 201:
             pytest.skip("Could not register user with invitation email")
@@ -553,13 +458,13 @@ class TestAcceptInvitation:
         # Accept once
         await async_client.post(
             f"/api/v1/projects/invitations/{project_invitation['token']}/accept",
-            headers=invited_auth
+            headers=invited_auth,
         )
 
         # Try to accept again
         response = await async_client.post(
             f"/api/v1/projects/invitations/{project_invitation['token']}/accept",
-            headers=invited_auth
+            headers=invited_auth,
         )
 
         # Route returns 400 (not 409) for already-accepted invitation
@@ -572,22 +477,13 @@ class TestInvitationEmailNotifications:
     @pytest.mark.skip(reason="mock_email_service fixture not implemented")
     @pytest.mark.asyncio
     async def test_send_invitation_sends_email(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict,
-        mock_email_service
+        self, async_client: AsyncClient, auth_headers: dict, project: dict, mock_email_service
     ):
         """Sending invitation should trigger email notification."""
-        payload = {
-            "email": "notify@example.com",
-            "role": "member"
-        }
+        payload = {"email": "notify@example.com", "role": "member"}
 
         await async_client.post(
-            f"/api/v1/projects/{project['id']}/invitations",
-            json=payload,
-            headers=auth_headers
+            f"/api/v1/projects/{project['id']}/invitations", json=payload, headers=auth_headers
         )
 
         # TODO: Verify email was sent
@@ -602,12 +498,12 @@ class TestInvitationEmailNotifications:
         auth_headers: dict,
         project: dict,
         project_invitation: dict,
-        mock_email_service
+        mock_email_service,
     ):
         """Resending invitation should trigger email notification."""
         await async_client.post(
             f"/api/v1/projects/{project['id']}/invitations/{project_invitation['id']}/resend",
-            headers=auth_headers
+            headers=auth_headers,
         )
 
         # TODO: Verify email was sent
@@ -619,34 +515,28 @@ class TestInvitationValidation:
 
     @pytest.mark.asyncio
     async def test_invitation_email_mismatch_fails(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project_invitation: dict
+        self, async_client: AsyncClient, auth_headers: dict, project_invitation: dict
     ):
         """User with different email cannot accept invitation."""
         # Create user with different email
         different_user_payload = {
             "email": "different@example.com",
             "password": "password123",
-            "name": "Different User"
+            "name": "Different User",
         }
 
         register_response = await async_client.post(
-            "/api/v1/auth/register",
-            json=different_user_payload
+            "/api/v1/auth/register", json=different_user_payload
         )
 
         if register_response.status_code == 201:
-            different_auth = {
-                "Authorization": f"Bearer {register_response.json()['access_token']}"
-            }
+            different_auth = {"Authorization": f"Bearer {register_response.json()['access_token']}"}
 
             # Try to accept invitation meant for different email
             # Endpoint is at /api/v1/projects/invitations/{token}/accept
             response = await async_client.post(
                 f"/api/v1/projects/invitations/{project_invitation['token']}/accept",
-                headers=different_auth
+                headers=different_auth,
             )
 
             # Should fail because email doesn't match
@@ -654,29 +544,17 @@ class TestInvitationValidation:
 
     @pytest.mark.asyncio
     async def test_invitation_expires_after_7_days(
-        self,
-        async_client: AsyncClient,
-        auth_headers: dict,
-        project: dict
+        self, async_client: AsyncClient, auth_headers: dict, project: dict
     ):
         """Invitations should expire after 7 days by default."""
-        payload = {
-            "email": "expiry-test@example.com",
-            "role": "member"
-        }
+        payload = {"email": "expiry-test@example.com", "role": "member"}
 
         response = await async_client.post(
-            f"/api/v1/projects/{project['id']}/invitations",
-            json=payload,
-            headers=auth_headers
+            f"/api/v1/projects/{project['id']}/invitations", json=payload, headers=auth_headers
         )
 
-        expires_at = datetime.fromisoformat(
-            response.json()["expires_at"].replace("Z", "+00:00")
-        )
-        created_at = datetime.fromisoformat(
-            response.json()["created_at"].replace("Z", "+00:00")
-        )
+        expires_at = datetime.fromisoformat(response.json()["expires_at"].replace("Z", "+00:00"))
+        created_at = datetime.fromisoformat(response.json()["created_at"].replace("Z", "+00:00"))
 
         # Should expire in ~7 days
         expiry_delta = expires_at - created_at

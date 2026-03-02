@@ -3,7 +3,6 @@ Authentication request and response schemas.
 """
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
@@ -56,7 +55,7 @@ class RefreshTokenRequest(BaseModel):
     the token in the body continue to work unchanged.
     """
 
-    refresh_token: Optional[str] = None
+    refresh_token: str | None = None
 
 
 class UserResponse(BaseModel):
@@ -65,7 +64,7 @@ class UserResponse(BaseModel):
     id: str
     email: str
     name: str
-    avatar_url: Optional[str] = None
+    avatar_url: str | None = None
     role: str
     email_verified: bool
     subscription_tier: str
@@ -73,7 +72,7 @@ class UserResponse(BaseModel):
     language: str
     timezone: str
     created_at: datetime
-    last_login: Optional[datetime] = None
+    last_login: datetime | None = None
     articles_generated_this_month: int = 0
     outlines_generated_this_month: int = 0
     images_generated_this_month: int = 0
@@ -84,9 +83,9 @@ class UserResponse(BaseModel):
 class UserUpdateRequest(BaseModel):
     """User update request schema."""
 
-    name: Optional[str] = Field(None, min_length=1, max_length=255)
-    language: Optional[str] = Field(None, max_length=10)
-    timezone: Optional[str] = Field(None, max_length=50)
+    name: str | None = Field(None, min_length=1, max_length=255)
+    language: str | None = Field(None, max_length=10)
+    timezone: str | None = Field(None, max_length=50)
 
 
 class PasswordChangeRequest(BaseModel):

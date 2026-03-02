@@ -4,51 +4,47 @@ Project management API routes for multi-tenancy.
 
 import logging
 import math
-from datetime import datetime, timezone
-from typing import Annotated, Optional, List
 import re
+from datetime import UTC, datetime
+from typing import Annotated
 
-logger = logging.getLogger(__name__)
-
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy import select, func, and_, or_, update as sql_update, delete as sql_delete
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import and_, func, select
+from sqlalchemy import update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from infrastructure.database.connection import get_db
-from infrastructure.database.models.user import User
-from infrastructure.database.models.project import Project, ProjectMember, ProjectMemberRole
-from api.routes.auth import get_current_user
 from api.deps_project import (
     get_project_by_id,
     get_project_member,
-    require_project_membership,
     require_project_admin,
     require_project_owner,
 )
+from api.routes.auth import get_current_user
 from api.schemas.project import (
+    BrandVoiceSettings,
+    CurrentProjectResponse,
+    LeaveProjectResponse,
     ProjectCreate,
-    ProjectUpdate,
-    ProjectResponse,
-    ProjectWithMemberRoleResponse,
-    ProjectListResponse,
-    ProjectDetailResponse,
     ProjectDeleteResponse,
+    ProjectDetailResponse,
+    ProjectListResponse,
+    ProjectMemberResponse,
+    ProjectResponse,
+    ProjectUpdate,
+    RemoveMemberResponse,
     SwitchProjectRequest,
     SwitchProjectResponse,
-    CurrentProjectResponse,
-    ProjectMemberResponse,
-    ProjectMembersListResponse,
-    AddMemberRequest,
-    AddMemberResponse,
-    UpdateMemberRoleRequest,
-    UpdateMemberRoleResponse,
-    RemoveMemberResponse,
-    LeaveProjectResponse,
     TransferOwnershipRequest,
     TransferOwnershipResponse,
-    BrandVoiceSettings,
+    UpdateMemberRoleRequest,
+    UpdateMemberRoleResponse,
 )
+from infrastructure.database.connection import get_db
+from infrastructure.database.models.project import Project, ProjectMember, ProjectMemberRole
+from infrastructure.database.models.user import User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -57,17 +53,18 @@ router = APIRouter(prefix="/projects", tags=["Projects"])
 # Helper Functions
 # =============================================================================
 
+
 def generate_unique_slug(name: str) -> str:
     """Generate a URL-friendly slug from project name."""
     slug = name.lower()
-    slug = re.sub(r'[^\w\s-]', '', slug)
-    slug = re.sub(r'[-\s]+', '-', slug)
-    slug = slug.strip('-')
+    slug = re.sub(r"[^\w\s-]", "", slug)
+    slug = re.sub(r"[-\s]+", "-", slug)
+    slug = slug.strip("-")
     slug = slug[:100]
     return slug
 
 
-async def ensure_unique_slug(db: AsyncSession, slug: str, project_id: Optional[str] = None) -> str:
+async def ensure_unique_slug(db: AsyncSession, slug: str, project_id: str | None = None) -> str:
     """Ensure slug is unique by appending number if necessary."""
     original_slug = slug
     counter = 1
@@ -89,12 +86,14 @@ async def ensure_unique_slug(db: AsyncSession, slug: str, project_id: Optional[s
 
     # Fallback: append a random suffix to guarantee uniqueness
     import uuid
+
     return f"{original_slug}-{uuid.uuid4().hex[:8]}"
 
 
 # =============================================================================
 # Project CRUD
 # =============================================================================
+
 
 @router.post("", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
 async def create_project(
@@ -119,7 +118,7 @@ async def create_project(
         name=data.name,
         slug=slug,
         description=data.description,
-        avatar_url=getattr(data, 'logo_url', None),
+        avatar_url=getattr(data, "logo_url", None),
         owner_id=current_user.id,
         subscription_tier="free",
         subscription_status="active",
@@ -135,7 +134,7 @@ async def create_project(
         user_id=current_user.id,
         role=ProjectMemberRole.OWNER.value,
         invited_by=None,  # Self-created
-        joined_at=datetime.now(timezone.utc),
+        joined_at=datetime.now(UTC),
     )
 
     db.add(member)
@@ -143,10 +142,14 @@ async def create_project(
     await db.refresh(project)
 
     # Calculate member count
-    stmt = select(func.count()).select_from(ProjectMember).where(
-        and_(
-            ProjectMember.project_id == project.id,
-            ProjectMember.deleted_at.is_(None),
+    stmt = (
+        select(func.count())
+        .select_from(ProjectMember)
+        .where(
+            and_(
+                ProjectMember.project_id == project.id,
+                ProjectMember.deleted_at.is_(None),
+            )
         )
     )
     result = await db.execute(stmt)
@@ -211,28 +214,30 @@ async def list_projects(
 
         member_count = counts.get(project.id, 0)
 
-        all_projects_with_roles.append({
-            "id": project.id,
-            "name": project.name,
-            "slug": project.slug,
-            "description": project.description,
-            "avatar_url": project.avatar_url,
-            "logo_url": project.avatar_url,
-            "owner_id": project.owner_id,
-            "is_personal": getattr(project, 'is_personal', False),
-            "subscription_tier": project.subscription_tier,
-            "subscription_status": project.subscription_status,
-            "member_count": member_count,
-            "current_user_role": membership.role,
-            "my_role": membership.role,
-            "created_at": project.created_at,
-            "updated_at": project.updated_at,
-        })
+        all_projects_with_roles.append(
+            {
+                "id": project.id,
+                "name": project.name,
+                "slug": project.slug,
+                "description": project.description,
+                "avatar_url": project.avatar_url,
+                "logo_url": project.avatar_url,
+                "owner_id": project.owner_id,
+                "is_personal": getattr(project, "is_personal", False),
+                "subscription_tier": project.subscription_tier,
+                "subscription_status": project.subscription_status,
+                "member_count": member_count,
+                "current_user_role": membership.role,
+                "my_role": membership.role,
+                "created_at": project.created_at,
+                "updated_at": project.updated_at,
+            }
+        )
 
     total = len(all_projects_with_roles)
     total_pages = math.ceil(total / page_size) if total > 0 else 0
     offset = (page - 1) * page_size
-    paginated = all_projects_with_roles[offset: offset + page_size]
+    paginated = all_projects_with_roles[offset : offset + page_size]
 
     return ProjectListResponse(
         projects=paginated,
@@ -253,7 +258,7 @@ async def get_current_project(
 
     Returns null if using personal workspace.
     """
-    if not hasattr(current_user, 'current_project_id') or not current_user.current_project_id:
+    if not hasattr(current_user, "current_project_id") or not current_user.current_project_id:
         return CurrentProjectResponse(
             project=None,
             is_personal_workspace=True,
@@ -276,10 +281,14 @@ async def get_current_project(
         )
 
     # Count members
-    count_stmt = select(func.count()).select_from(ProjectMember).where(
-        and_(
-            ProjectMember.project_id == project.id,
-            ProjectMember.deleted_at.is_(None),
+    count_stmt = (
+        select(func.count())
+        .select_from(ProjectMember)
+        .where(
+            and_(
+                ProjectMember.project_id == project.id,
+                ProjectMember.deleted_at.is_(None),
+            )
         )
     )
     count_result = await db.execute(count_stmt)
@@ -304,13 +313,14 @@ async def get_current_project(
 
     return CurrentProjectResponse(
         project=response,
-        is_personal_workspace=getattr(project, 'is_personal', False),
+        is_personal_workspace=getattr(project, "is_personal", False),
     )
 
 
 # =============================================================================
 # Brand Voice
 # =============================================================================
+
 
 @router.get("/current/brand-voice", response_model=BrandVoiceSettings)
 async def get_brand_voice(
@@ -322,7 +332,7 @@ async def get_brand_voice(
 
     Returns empty defaults if no project is selected or brand voice is not set.
     """
-    project_id = getattr(current_user, 'current_project_id', None)
+    project_id = getattr(current_user, "current_project_id", None)
     if not project_id:
         return BrandVoiceSettings()
 
@@ -352,7 +362,7 @@ async def update_brand_voice(
 
     Requires an active project to be selected and ADMIN or OWNER role.
     """
-    project_id = getattr(current_user, 'current_project_id', None)
+    project_id = getattr(current_user, "current_project_id", None)
     if not project_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -363,12 +373,16 @@ async def update_brand_voice(
     await require_project_admin(project_id, current_user, db)
 
     # PROJ-42: Use with_for_update() to prevent TOCTOU race conditions on concurrent updates
-    stmt = select(Project).where(
-        and_(
-            Project.id == project_id,
-            Project.deleted_at.is_(None),
+    stmt = (
+        select(Project)
+        .where(
+            and_(
+                Project.id == project_id,
+                Project.deleted_at.is_(None),
+            )
         )
-    ).with_for_update()
+        .with_for_update()
+    )
     result = await db.execute(stmt)
     project = result.scalar_one_or_none()
 
@@ -379,7 +393,7 @@ async def update_brand_voice(
         )
 
     project.brand_voice = data.model_dump(exclude_none=True)
-    project.updated_at = datetime.now(timezone.utc)
+    project.updated_at = datetime.now(UTC)
     await db.commit()
     await db.refresh(project)
 
@@ -402,7 +416,7 @@ async def switch_project_by_body(
         personal_result = await db.execute(
             select(Project).where(
                 Project.owner_id == current_user.id,
-                Project.is_personal == True,
+                Project.is_personal,
                 Project.deleted_at.is_(None),
             )
         )
@@ -418,7 +432,7 @@ async def switch_project_by_body(
         )
 
     # Verify membership before switching
-    membership = await get_project_member(request.project_id, current_user.id, db)
+    await get_project_member(request.project_id, current_user.id, db)
 
     # Update user's current project
     current_user.current_project_id = request.project_id
@@ -476,13 +490,15 @@ async def get_project(
         user = users_dict.get(member.user_id)
 
         if user:
-            members_info.append({
-                "id": member.id,
-                "user_id": member.user_id,
-                "role": member.role,
-                "joined_at": member.joined_at,
-                "invited_by": member.invited_by,
-            })
+            members_info.append(
+                {
+                    "id": member.id,
+                    "user_id": member.user_id,
+                    "role": member.role,
+                    "joined_at": member.joined_at,
+                    "invited_by": member.invited_by,
+                }
+            )
 
     return {
         "id": project.id,
@@ -516,7 +532,7 @@ async def update_project(
     Requires owner or admin role.
     """
     # Verify admin access
-    membership = await require_project_admin(project_id, current_user, db)
+    await require_project_admin(project_id, current_user, db)
 
     # Get project
     project = await get_project_by_id(project_id, db)
@@ -531,16 +547,20 @@ async def update_project(
     if data.settings is not None:
         project.settings = data.settings
 
-    project.updated_at = datetime.now(timezone.utc)
+    project.updated_at = datetime.now(UTC)
 
     await db.commit()
     await db.refresh(project)
 
     # Count members
-    count_stmt = select(func.count()).select_from(ProjectMember).where(
-        and_(
-            ProjectMember.project_id == project.id,
-            ProjectMember.deleted_at.is_(None),
+    count_stmt = (
+        select(func.count())
+        .select_from(ProjectMember)
+        .where(
+            and_(
+                ProjectMember.project_id == project.id,
+                ProjectMember.deleted_at.is_(None),
+            )
         )
     )
     count_result = await db.execute(count_stmt)
@@ -564,13 +584,13 @@ async def delete_project(
     Only the project owner can delete the project.
     """
     # Verify owner access
-    membership = await require_project_owner(project_id, current_user, db)
+    await require_project_owner(project_id, current_user, db)
 
     # Get project
     project = await get_project_by_id(project_id, db)
 
     # Guard: cannot delete personal workspace (PROJ-10: use 403, not 400)
-    if getattr(project, 'is_personal', False):
+    if getattr(project, "is_personal", False):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot delete personal workspace",
@@ -578,7 +598,9 @@ async def delete_project(
 
     # Defensive: log a warning if the project somehow has multiple owners
     owner_count_result = await db.execute(
-        select(func.count()).select_from(ProjectMember).where(
+        select(func.count())
+        .select_from(ProjectMember)
+        .where(
             and_(
                 ProjectMember.project_id == project_id,
                 ProjectMember.role == ProjectMemberRole.OWNER.value,
@@ -599,13 +621,13 @@ async def delete_project(
         )
 
     # Soft delete project
-    project.deleted_at = datetime.now(timezone.utc)
+    project.deleted_at = datetime.now(UTC)
 
     # Soft delete all memberships
     stmt = (
         sql_update(ProjectMember)
         .where(ProjectMember.project_id == project_id)
-        .values(deleted_at=datetime.now(timezone.utc))
+        .values(deleted_at=datetime.now(UTC))
     )
     await db.execute(stmt)
 
@@ -640,7 +662,10 @@ async def update_member_role(
 
     # Only owner can assign/change owner role
     if data.role == ProjectMemberRole.OWNER.value and caller.role != ProjectMemberRole.OWNER.value:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the project owner can assign the owner role")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the project owner can assign the owner role",
+        )
 
     # Get target member
     result = await db.execute(
@@ -655,8 +680,13 @@ async def update_member_role(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
 
     # Cannot demote the project owner unless you ARE the owner reassigning it
-    if member.role == ProjectMemberRole.OWNER.value and caller.role != ProjectMemberRole.OWNER.value:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot change the owner's role")
+    if (
+        member.role == ProjectMemberRole.OWNER.value
+        and caller.role != ProjectMemberRole.OWNER.value
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Cannot change the owner's role"
+        )
 
     old_role = member.role
     member.role = data.role
@@ -703,14 +733,15 @@ async def remove_member(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
 
     if member.role == ProjectMemberRole.OWNER.value:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot remove the project owner. Transfer ownership first.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot remove the project owner. Transfer ownership first.",
+        )
 
-    member.deleted_at = datetime.now(timezone.utc)
+    member.deleted_at = datetime.now(UTC)
 
     # PROJ-40: If the removed user currently has this project active, clear it
-    removed_user_result = await db.execute(
-        select(User).where(User.id == member_user_id)
-    )
+    removed_user_result = await db.execute(select(User).where(User.id == member_user_id))
     removed_user = removed_user_result.scalar_one_or_none()
     if removed_user and str(removed_user.current_project_id) == str(project_id):
         removed_user.current_project_id = None
@@ -735,7 +766,7 @@ async def leave_project(
             detail="Project owner cannot leave. Transfer ownership to another member first.",
         )
 
-    membership.deleted_at = datetime.now(timezone.utc)
+    membership.deleted_at = datetime.now(UTC)
 
     # Clear current_project_id if they were in this project
     if current_user.current_project_id == project_id:
@@ -766,7 +797,10 @@ async def transfer_ownership(
     )
     new_owner_member = new_owner_result.scalar_one_or_none()
     if not new_owner_member:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="New owner must already be a project member")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="New owner must already be a project member",
+        )
 
     # Demote current owner to admin, promote new owner
     caller_member = await get_project_member(project_id, current_user.id, db)
@@ -800,7 +834,7 @@ async def switch_project(
     Must be a member of the project to switch to it.
     """
     # Verify membership
-    membership = await get_project_member(project_id, current_user.id, db)
+    await get_project_member(project_id, current_user.id, db)
 
     # Update user's current project
     current_user.current_project_id = project_id

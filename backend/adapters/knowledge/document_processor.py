@@ -4,28 +4,29 @@ Document processor for extracting and chunking text from various file types.
 Supports PDF, TXT, Markdown, DOCX, and HTML files.
 """
 
-import io
 import logging
 import re
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
-from typing import BinaryIO, Dict, Any, List, Optional
+from typing import Any, BinaryIO
 
 logger = logging.getLogger(__name__)
 
 
 class DocumentProcessingError(Exception):
     """Base exception for document processing errors."""
+
     pass
 
 
 class UnsupportedDocumentError(DocumentProcessingError):
     """Raised when document type is not supported."""
+
     pass
 
 
-class DocumentType(str, Enum):
+class DocumentType(StrEnum):
     """Supported document types."""
 
     PDF = "pdf"
@@ -43,7 +44,7 @@ class ProcessedChunk:
     chunk_index: int
     start_char: int
     end_char: int
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
 
 @dataclass
@@ -53,7 +54,7 @@ class ProcessedDocument:
     source_id: str
     title: str
     document_type: DocumentType
-    chunks: List[ProcessedChunk]
+    chunks: list[ProcessedChunk]
     total_chars: int
     total_chunks: int
 
@@ -84,7 +85,7 @@ class DocumentProcessor:
         file: BinaryIO,
         filename: str,
         source_id: str,
-        metadata: Optional[Dict] = None,
+        metadata: dict | None = None,
     ) -> ProcessedDocument:
         """
         Process a file into chunks.
@@ -265,15 +266,13 @@ class DocumentProcessor:
             return text
 
         except ImportError:
-            logger.error(
-                "beautifulsoup4 not installed. Install with: pip install beautifulsoup4"
-            )
+            logger.error("beautifulsoup4 not installed. Install with: pip install beautifulsoup4")
             raise RuntimeError("beautifulsoup4 required for HTML processing")
         except Exception as e:
             logger.error(f"Failed to extract HTML text: {e}")
             raise
 
-    def chunk_text(self, text: str) -> List[ProcessedChunk]:
+    def chunk_text(self, text: str) -> list[ProcessedChunk]:
         """
         Split text into overlapping chunks.
 
@@ -307,15 +306,11 @@ class DocumentProcessor:
                 search_text = text[search_start:search_end]
 
                 # Find sentence boundaries (. ! ? followed by space or newline)
-                sentence_endings = [
-                    m.end() for m in re.finditer(r"[.!?]\s+", search_text)
-                ]
+                sentence_endings = [m.end() for m in re.finditer(r"[.!?]\s+", search_text)]
 
                 if sentence_endings:
                     # Use the sentence ending closest to our target
-                    best_ending = min(
-                        sentence_endings, key=lambda x: abs(x - (end - search_start))
-                    )
+                    best_ending = min(sentence_endings, key=lambda x: abs(x - (end - search_start)))
                     end = search_start + best_ending
 
             # Extract chunk

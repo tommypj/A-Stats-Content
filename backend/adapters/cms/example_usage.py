@@ -6,11 +6,12 @@ to publish articles to a WordPress site.
 """
 
 import asyncio
+
 from adapters.cms.wordpress_adapter import (
     WordPressAdapter,
-    WordPressConnectionError,
-    WordPressAuthError,
     WordPressAPIError,
+    WordPressAuthError,
+    WordPressConnectionError,
 )
 
 
@@ -87,7 +88,7 @@ async def main():
             excerpt="A demonstration of the WordPress adapter for automated content publishing.",
         )
 
-        print(f"✓ Post created successfully!")
+        print("✓ Post created successfully!")
         print(f"  Post ID: {post['id']}")
         print(f"  Post URL: {post['link']}")
         print(f"  Status: {post['status']}")
@@ -102,7 +103,7 @@ async def main():
 
         # Step 6: Retrieve the post
         print("\nRetrieving the post...")
-        retrieved_post = await adapter.get_post(post_id=post['id'])
+        retrieved_post = await adapter.get_post(post_id=post["id"])
         print(f"✓ Retrieved post: {retrieved_post['title']['rendered']}")
 
     except WordPressConnectionError as e:

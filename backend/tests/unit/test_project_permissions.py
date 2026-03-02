@@ -10,22 +10,22 @@ Tests cover the permission model for project roles:
 Each test verifies the authorization logic without database or API calls.
 """
 
-import pytest
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
 
 
 # Mock enums for project roles and actions
-class ProjectRole(str, Enum):
+class ProjectRole(StrEnum):
     """Project member roles with different permission levels."""
+
     OWNER = "owner"
     ADMIN = "admin"
     MEMBER = "member"
     VIEWER = "viewer"
 
 
-class ProjectAction(str, Enum):
+class ProjectAction(StrEnum):
     """Actions that can be performed on projects and content."""
+
     # Project management
     DELETE_PROJECT = "delete_project"
     UPDATE_PROJECT = "update_project"
@@ -103,6 +103,7 @@ class ProjectPermissionChecker:
 # Test OWNER Permissions
 # ============================================================================
 
+
 def test_owner_can_delete_project():
     """OWNER should have permission to delete the project."""
     assert ProjectPermissionChecker.can_perform(ProjectRole.OWNER, ProjectAction.DELETE_PROJECT)
@@ -167,6 +168,7 @@ def test_owner_can_view_billing():
 # Test ADMIN Permissions
 # ============================================================================
 
+
 def test_admin_cannot_delete_project():
     """ADMIN should NOT have permission to delete the project (OWNER only)."""
     assert not ProjectPermissionChecker.can_perform(ProjectRole.ADMIN, ProjectAction.DELETE_PROJECT)
@@ -211,14 +213,19 @@ def test_admin_can_view_billing():
 # Test MEMBER Permissions
 # ============================================================================
 
+
 def test_member_cannot_delete_project():
     """MEMBER should NOT have permission to delete the project."""
-    assert not ProjectPermissionChecker.can_perform(ProjectRole.MEMBER, ProjectAction.DELETE_PROJECT)
+    assert not ProjectPermissionChecker.can_perform(
+        ProjectRole.MEMBER, ProjectAction.DELETE_PROJECT
+    )
 
 
 def test_member_cannot_update_project():
     """MEMBER should NOT have permission to update project settings."""
-    assert not ProjectPermissionChecker.can_perform(ProjectRole.MEMBER, ProjectAction.UPDATE_PROJECT)
+    assert not ProjectPermissionChecker.can_perform(
+        ProjectRole.MEMBER, ProjectAction.UPDATE_PROJECT
+    )
 
 
 def test_member_cannot_add_member():
@@ -248,7 +255,9 @@ def test_member_can_view_content():
 
 def test_member_cannot_manage_billing():
     """MEMBER should NOT have permission to manage billing."""
-    assert not ProjectPermissionChecker.can_perform(ProjectRole.MEMBER, ProjectAction.MANAGE_BILLING)
+    assert not ProjectPermissionChecker.can_perform(
+        ProjectRole.MEMBER, ProjectAction.MANAGE_BILLING
+    )
 
 
 def test_member_cannot_view_billing():
@@ -260,14 +269,19 @@ def test_member_cannot_view_billing():
 # Test VIEWER Permissions
 # ============================================================================
 
+
 def test_viewer_cannot_delete_project():
     """VIEWER should NOT have permission to delete the project."""
-    assert not ProjectPermissionChecker.can_perform(ProjectRole.VIEWER, ProjectAction.DELETE_PROJECT)
+    assert not ProjectPermissionChecker.can_perform(
+        ProjectRole.VIEWER, ProjectAction.DELETE_PROJECT
+    )
 
 
 def test_viewer_cannot_update_project():
     """VIEWER should NOT have permission to update project settings."""
-    assert not ProjectPermissionChecker.can_perform(ProjectRole.VIEWER, ProjectAction.UPDATE_PROJECT)
+    assert not ProjectPermissionChecker.can_perform(
+        ProjectRole.VIEWER, ProjectAction.UPDATE_PROJECT
+    )
 
 
 def test_viewer_cannot_add_member():
@@ -277,7 +291,9 @@ def test_viewer_cannot_add_member():
 
 def test_viewer_cannot_create_content():
     """VIEWER should NOT have permission to create content."""
-    assert not ProjectPermissionChecker.can_perform(ProjectRole.VIEWER, ProjectAction.CREATE_CONTENT)
+    assert not ProjectPermissionChecker.can_perform(
+        ProjectRole.VIEWER, ProjectAction.CREATE_CONTENT
+    )
 
 
 def test_viewer_cannot_edit_content():
@@ -287,7 +303,9 @@ def test_viewer_cannot_edit_content():
 
 def test_viewer_cannot_delete_content():
     """VIEWER should NOT have permission to delete content."""
-    assert not ProjectPermissionChecker.can_perform(ProjectRole.VIEWER, ProjectAction.DELETE_CONTENT)
+    assert not ProjectPermissionChecker.can_perform(
+        ProjectRole.VIEWER, ProjectAction.DELETE_CONTENT
+    )
 
 
 def test_viewer_can_view_content():
@@ -302,7 +320,9 @@ def test_viewer_can_view_project():
 
 def test_viewer_cannot_manage_billing():
     """VIEWER should NOT have permission to manage billing."""
-    assert not ProjectPermissionChecker.can_perform(ProjectRole.VIEWER, ProjectAction.MANAGE_BILLING)
+    assert not ProjectPermissionChecker.can_perform(
+        ProjectRole.VIEWER, ProjectAction.MANAGE_BILLING
+    )
 
 
 def test_viewer_cannot_view_billing():
@@ -313,6 +333,7 @@ def test_viewer_cannot_view_billing():
 # ============================================================================
 # Permission Matrix Tests
 # ============================================================================
+
 
 def test_permission_hierarchy():
     """Test that permission hierarchy is correct: OWNER > ADMIN > MEMBER > VIEWER."""

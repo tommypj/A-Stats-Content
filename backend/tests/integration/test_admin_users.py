@@ -10,21 +10,21 @@ Tests admin user management endpoints:
 - Authorization and permission checks
 """
 
-import pytest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
+import pytest
 from fastapi import status
 from httpx import AsyncClient
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from infrastructure.database.models import User
-from infrastructure.database.models.user import UserRole, UserStatus, SubscriptionTier
+from infrastructure.database.models.user import UserRole, UserStatus
 
 # Skip all tests if admin routes are not available
 try:
     from api.routes import admin
+
     ADMIN_ROUTES_AVAILABLE = True
 except (ImportError, AttributeError):
     ADMIN_ROUTES_AVAILABLE = False
@@ -677,7 +677,7 @@ class TestDeleteUserEndpoint:
             pytest.skip("Admin routes not available")
 
         # Soft delete the user first
-        test_user.deleted_at = datetime.now(timezone.utc)
+        test_user.deleted_at = datetime.now(UTC)
         test_user.status = UserStatus.DELETED.value
         await db_session.commit()
 

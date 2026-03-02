@@ -7,13 +7,13 @@ integrating with various social media platforms (Twitter, LinkedIn, Facebook).
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional, List
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 
-class SocialPlatform(str, Enum):
+class SocialPlatform(StrEnum):
     """Supported social media platforms."""
+
     TWITTER = "twitter"
     LINKEDIN = "linkedin"
     FACEBOOK = "facebook"
@@ -26,12 +26,12 @@ class SocialCredentials:
 
     platform: SocialPlatform
     access_token: str
-    refresh_token: Optional[str]
-    token_expiry: Optional[datetime]
+    refresh_token: str | None
+    token_expiry: datetime | None
     account_id: str
     account_name: str
-    account_username: Optional[str] = None
-    profile_image_url: Optional[str] = None
+    account_username: str | None = None
+    profile_image_url: str | None = None
 
     def to_dict(self) -> dict:
         """Convert credentials to dictionary format."""
@@ -53,7 +53,9 @@ class SocialCredentials:
             platform=SocialPlatform(data["platform"]),
             access_token=data["access_token"],
             refresh_token=data.get("refresh_token"),
-            token_expiry=datetime.fromisoformat(data["token_expiry"]) if data.get("token_expiry") else None,
+            token_expiry=datetime.fromisoformat(data["token_expiry"])
+            if data.get("token_expiry")
+            else None,
             account_id=data["account_id"],
             account_name=data["account_name"],
             account_username=data.get("account_username"),
@@ -66,9 +68,9 @@ class PostResult:
     """Result of a social media post operation."""
 
     success: bool
-    post_id: Optional[str] = None
-    post_url: Optional[str] = None
-    error_message: Optional[str] = None
+    post_id: str | None = None
+    post_url: str | None = None
+    error_message: str | None = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary."""
@@ -86,7 +88,7 @@ class MediaUploadResult:
 
     media_id: str
     media_type: str  # image, video, gif
-    media_url: Optional[str] = None
+    media_url: str | None = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary."""
@@ -100,26 +102,31 @@ class MediaUploadResult:
 # Custom Exceptions
 class SocialAdapterError(Exception):
     """Base exception for social media adapter errors."""
+
     pass
 
 
 class SocialAuthError(SocialAdapterError):
     """Raised when OAuth authentication fails."""
+
     pass
 
 
 class SocialAPIError(SocialAdapterError):
     """Raised when social media API returns an error."""
+
     pass
 
 
 class SocialRateLimitError(SocialAdapterError):
     """Raised when API rate limit is exceeded."""
+
     pass
 
 
 class SocialValidationError(SocialAdapterError):
     """Raised when post content validation fails."""
+
     pass
 
 
@@ -216,10 +223,7 @@ class BaseSocialAdapter(ABC):
 
     @abstractmethod
     async def post_with_media(
-        self,
-        credentials: SocialCredentials,
-        text: str,
-        media_urls: List[str]
+        self, credentials: SocialCredentials, text: str, media_urls: list[str]
     ) -> PostResult:
         """
         Post content with media attachments.
@@ -245,7 +249,7 @@ class BaseSocialAdapter(ABC):
         credentials: SocialCredentials,
         media_bytes: bytes,
         media_type: str,
-        filename: Optional[str] = None
+        filename: str | None = None,
     ) -> MediaUploadResult:
         """
         Upload media for later use in posts.
@@ -305,6 +309,5 @@ class BaseSocialAdapter(ABC):
         limit = self.get_character_limit()
         if len(text) > limit:
             raise SocialValidationError(
-                f"Text exceeds {self.platform.value} character limit "
-                f"({len(text)} > {limit})"
+                f"Text exceeds {self.platform.value} character limit ({len(text)} > {limit})"
             )

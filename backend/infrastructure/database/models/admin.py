@@ -2,19 +2,18 @@
 Admin database models.
 """
 
-from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Optional
 from uuid import uuid4
 
-from sqlalchemy import DateTime, Index, String, Text, JSON, ForeignKey
+from sqlalchemy import JSON, ForeignKey, Index, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, TimestampMixin
 
 
-class AuditAction(str, Enum):
+class AuditAction(StrEnum):
     """Admin audit log action types."""
 
     # User management
@@ -46,7 +45,7 @@ class AuditAction(str, Enum):
     DATA_IMPORT = "data_import"
 
 
-class AuditTargetType(str, Enum):
+class AuditTargetType(StrEnum):
     """Admin audit log target types."""
 
     USER = "user"
@@ -87,7 +86,7 @@ class AdminAuditLog(Base, TimestampMixin):
     )
 
     # Target user (if action is on a user)
-    target_user_id: Mapped[Optional[str]] = mapped_column(
+    target_user_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
@@ -99,13 +98,13 @@ class AdminAuditLog(Base, TimestampMixin):
         nullable=False,
         index=True,
     )
-    target_id: Mapped[Optional[str]] = mapped_column(
+    target_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         nullable=True,
     )
 
     # Additional context
-    details: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     """
     Structure:
     {
@@ -117,7 +116,7 @@ class AdminAuditLog(Base, TimestampMixin):
     """
 
     # Request tracking
-    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)  # IPv6 max length
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)  # IPv6 max length
 
     # Relationships
     admin_user: Mapped[Optional["User"]] = relationship(

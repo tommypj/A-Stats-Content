@@ -3,8 +3,8 @@ WordPress integration API schemas.
 """
 
 from datetime import datetime
-from typing import Optional, List
-from pydantic import BaseModel, Field, HttpUrl
+
+from pydantic import BaseModel, Field
 
 
 class WordPressConnectRequest(BaseModel):
@@ -36,13 +36,13 @@ class WordPressConnectionResponse(BaseModel):
     site_url: str
     username: str
     is_connected: bool
-    connected_at: Optional[datetime] = None
-    last_tested_at: Optional[datetime] = None
+    connected_at: datetime | None = None
+    last_tested_at: datetime | None = None
     connection_valid: bool = Field(
         default=True,
         description="Whether the connection is currently valid",
     )
-    error_message: Optional[str] = Field(
+    error_message: str | None = Field(
         None,
         description="Error message if connection test failed",
     )
@@ -56,11 +56,11 @@ class WordPressPublishRequest(BaseModel):
         default="draft",
         description="WordPress post status: draft or publish",
     )
-    categories: Optional[List[int]] = Field(
+    categories: list[int] | None = Field(
         None,
         description="Category IDs to assign to the post",
     )
-    tags: Optional[List[int]] = Field(
+    tags: list[int] | None = Field(
         None,
         description="Tag IDs to assign to the post",
     )
@@ -88,8 +88,8 @@ class WordPressCategoryResponse(BaseModel):
     id: int
     name: str
     slug: str
-    count: Optional[int] = Field(None, description="Number of posts in this category")
-    parent: Optional[int] = Field(None, description="Parent category ID if nested")
+    count: int | None = Field(None, description="Number of posts in this category")
+    parent: int | None = Field(None, description="Parent category ID if nested")
 
 
 class WordPressTagResponse(BaseModel):
@@ -98,15 +98,15 @@ class WordPressTagResponse(BaseModel):
     id: int
     name: str
     slug: str
-    count: Optional[int] = Field(None, description="Number of posts with this tag")
+    count: int | None = Field(None, description="Number of posts with this tag")
 
 
 class WordPressMediaUploadRequest(BaseModel):
     """Request to upload an image to WordPress media library."""
 
     image_id: str = Field(..., description="UUID of the generated image to upload")
-    title: Optional[str] = Field(None, description="Media title (defaults to prompt)")
-    alt_text: Optional[str] = Field(None, description="Alt text for the image")
+    title: str | None = Field(None, description="Media title (defaults to prompt)")
+    alt_text: str | None = Field(None, description="Alt text for the image")
 
 
 class WordPressMediaUploadResponse(BaseModel):

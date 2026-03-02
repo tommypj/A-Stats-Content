@@ -1,6 +1,7 @@
 """Database connection and session management."""
+
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -26,8 +27,8 @@ engine = create_async_engine(
     pool_pre_ping=True,
     pool_size=settings.db_pool_size,
     max_overflow=settings.db_max_overflow,
-    pool_timeout=10,      # DB-M2: raise TimeoutError after 10s if no connection is available
-    pool_recycle=3600,    # DB-M2: recycle connections after 1 hour to prevent stale connections
+    pool_timeout=10,  # DB-M2: raise TimeoutError after 10s if no connection is available
+    pool_recycle=3600,  # DB-M2: recycle connections after 1 hour to prevent stale connections
     connect_args=_connect_args,
 )
 

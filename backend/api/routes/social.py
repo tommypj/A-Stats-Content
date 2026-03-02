@@ -2,69 +2,63 @@
 Social media scheduling API routes.
 """
 
-import asyncio
 import base64
 import hashlib
+import hmac as _hmac
 import json
-import secrets
-import time
-from datetime import datetime, timezone, date
-from typing import Optional, List
-from urllib.parse import urlencode, quote
+import logging
 import math
+import secrets
+from datetime import UTC, date, datetime
+from urllib.parse import quote, urlencode
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, status, Query, Body
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
-from api.middleware.rate_limit import limiter
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from api.middleware.rate_limit import limiter
+from api.oauth_helpers import store_oauth_state as _store_oauth_state
+from api.oauth_helpers import verify_oauth_state_full as _verify_oauth_state_full
+from api.routes.auth import get_current_user
 from api.schemas.social import (
-    ConnectAccountResponse,
-    SocialAccountResponse,
-    SocialAccountListResponse,
-    DisconnectAccountResponse,
-    VerifyAccountResponse,
-    CreatePostRequest,
-    UpdatePostRequest,
-    ScheduledPostResponse,
-    ScheduledPostListResponse,
-    PostTargetResponse,
-    CalendarResponse,
+    BestTimeSlot,
+    BestTimesResponse,
     CalendarDay,
     CalendarDayPost,
-    PostAnalyticsResponse,
+    CalendarResponse,
+    ConnectAccountResponse,
+    CreatePostRequest,
+    DisconnectAccountResponse,
     PlatformAnalytics,
-    PreviewRequest,
-    PreviewResponse,
     PlatformLimits,
-    BestTimesResponse,
-    BestTimeSlot,
+    PostAnalyticsResponse,
+    PostTargetResponse,
+    PreviewResponse,
+    ScheduledPostListResponse,
+    ScheduledPostResponse,
+    SocialAccountListResponse,
+    SocialAccountResponse,
+    UpdatePostRequest,
+    VerifyAccountResponse,
 )
-from api.routes.auth import get_current_user
+from core.security.encryption import encrypt_credential
+from infrastructure.config.settings import settings
 from infrastructure.database.connection import get_db
 from infrastructure.database.models import (
-    User,
-    SocialAccount,
-    ScheduledPost,
-    PostTarget,
     Platform,
     PostStatus,
+    PostTarget,
+    ScheduledPost,
+    SocialAccount,
+    User,
 )
-from infrastructure.config.settings import settings
-from core.security.encryption import encrypt_credential, decrypt_credential
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/social", tags=["Social Media"])
-
-# OAuth state helpers delegated to shared module
-from api.oauth_helpers import (
-    store_oauth_state as _store_oauth_state,
-    verify_oauth_state as _verify_oauth_state,
-    verify_oauth_state_full as _verify_oauth_state_full,
-)
-
 
 # ============================================
 # Platform Configuration
@@ -78,7 +72,7 @@ PLATFORM_LIMITS = {
 }
 
 
-def validate_content_length(content: str, platform: str) -> tuple[bool, Optional[str]]:
+def validate_content_length(content: str, platform: str) -> tuple[bool, str | None]:
     """
     Validate content length for a platform.
 
@@ -160,17 +154,21 @@ async def initiate_connection(
         # Instagram business accounts need additional scopes to access the
         # linked IG account via the Facebook Graph API.
         if platform == "instagram":
-            scope = "instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement"
+            scope = (
+                "instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement"
+            )
         else:
             scope = "public_profile,pages_show_list,pages_manage_posts"
 
-        params = urlencode({
-            "client_id": settings.facebook_app_id,
-            "redirect_uri": settings.facebook_redirect_uri,
-            "state": state,
-            "scope": scope,
-            "response_type": "code",
-        })
+        params = urlencode(
+            {
+                "client_id": settings.facebook_app_id,
+                "redirect_uri": settings.facebook_redirect_uri,
+                "state": state,
+                "scope": scope,
+                "response_type": "code",
+            }
+        )
         authorization_url = f"https://www.facebook.com/v21.0/dialog/oauth?{params}"
 
     elif platform == "twitter":
@@ -190,15 +188,17 @@ async def initiate_connection(
         await _store_oauth_state(
             state, str(current_user.id), platform=platform, code_verifier=code_verifier
         )
-        params = urlencode({
-            "response_type": "code",
-            "client_id": settings.twitter_client_id,
-            "redirect_uri": settings.twitter_redirect_uri,
-            "scope": "tweet.read tweet.write users.read offline.access",
-            "state": state,
-            "code_challenge": code_challenge,
-            "code_challenge_method": "S256",
-        })
+        params = urlencode(
+            {
+                "response_type": "code",
+                "client_id": settings.twitter_client_id,
+                "redirect_uri": settings.twitter_redirect_uri,
+                "scope": "tweet.read tweet.write users.read offline.access",
+                "state": state,
+                "code_challenge": code_challenge,
+                "code_challenge_method": "S256",
+            }
+        )
         authorization_url = f"https://twitter.com/i/oauth2/authorize?{params}"
 
     elif platform == "linkedin":
@@ -208,13 +208,15 @@ async def initiate_connection(
                 detail="LinkedIn integration is not configured. Please set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET.",
             )
         await _store_oauth_state(state, str(current_user.id), platform=platform)
-        params = urlencode({
-            "response_type": "code",
-            "client_id": settings.linkedin_client_id,
-            "redirect_uri": settings.linkedin_redirect_uri,
-            "scope": "openid profile email w_member_social",
-            "state": state,
-        })
+        params = urlencode(
+            {
+                "response_type": "code",
+                "client_id": settings.linkedin_client_id,
+                "redirect_uri": settings.linkedin_redirect_uri,
+                "scope": "openid profile email w_member_social",
+                "state": state,
+            }
+        )
         authorization_url = f"https://www.linkedin.com/oauth/v2/authorization?{params}"
 
     else:
@@ -235,10 +237,10 @@ async def initiate_connection(
 async def oauth_callback(
     request: Request,
     platform: str,
-    code: Optional[str] = Query(None),
-    state: Optional[str] = Query(None),
-    error: Optional[str] = Query(None),
-    error_description: Optional[str] = Query(None),
+    code: str | None = Query(None),
+    state: str | None = Query(None),
+    error: str | None = Query(None),
+    error_description: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -252,14 +254,10 @@ async def oauth_callback(
     # SM-36: Sanitize provider error params to prevent open redirect / injection
     if error:
         error_msg = quote(str(error_description or error or "OAuth error"), safe="")
-        return RedirectResponse(
-            url=f"{frontend_callback}?error={error_msg}&platform={platform}"
-        )
+        return RedirectResponse(url=f"{frontend_callback}?error={error_msg}&platform={platform}")
 
     if not code or not state:
-        return RedirectResponse(
-            url=f"{frontend_callback}?error=missing_params&platform={platform}"
-        )
+        return RedirectResponse(url=f"{frontend_callback}?error=missing_params&platform={platform}")
 
     # Validate platform
     try:
@@ -272,9 +270,7 @@ async def oauth_callback(
     # Verify state and extract user_id + stored platform (SM-06)
     state_data = await _verify_oauth_state_full(state)
     if not state_data:
-        return RedirectResponse(
-            url=f"{frontend_callback}?error=invalid_state&platform={platform}"
-        )
+        return RedirectResponse(url=f"{frontend_callback}?error=invalid_state&platform={platform}")
 
     user_id = state_data.get("user_id")
     stored_platform = state_data.get("platform", "")
@@ -283,24 +279,22 @@ async def oauth_callback(
     # Prevents cross-platform state reuse (e.g. using a twitter state on /facebook/callback).
     if stored_platform and stored_platform != platform:
         logger.warning(
-            "SM-06: OAuth state platform mismatch — stored=%r, callback=%r", stored_platform, platform
+            "SM-06: OAuth state platform mismatch — stored=%r, callback=%r",
+            stored_platform,
+            platform,
         )
         return RedirectResponse(
             url=f"{frontend_callback}?error=platform_mismatch&platform={platform}"
         )
 
     if not user_id:
-        return RedirectResponse(
-            url=f"{frontend_callback}?error=invalid_state&platform={platform}"
-        )
+        return RedirectResponse(url=f"{frontend_callback}?error=invalid_state&platform={platform}")
 
     # Look up the user
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
-        return RedirectResponse(
-            url=f"{frontend_callback}?error=user_not_found&platform={platform}"
-        )
+        return RedirectResponse(url=f"{frontend_callback}?error=user_not_found&platform={platform}")
 
     if platform in ("facebook", "instagram"):
         # Instagram business accounts authenticate through the Facebook Graph API,
@@ -369,7 +363,7 @@ async def oauth_callback(
         existing_account.platform_display_name = profile.get("display_name")
         existing_account.profile_image_url = profile.get("profile_image")
         existing_account.is_active = True
-        existing_account.last_verified_at = datetime.now(timezone.utc)
+        existing_account.last_verified_at = datetime.now(UTC)
         existing_account.verification_error = None
     else:
         new_account = SocialAccount(
@@ -384,16 +378,14 @@ async def oauth_callback(
             refresh_token_encrypted=refresh_token_encrypted,
             token_expires_at=tokens.get("expires_at"),
             is_active=True,
-            last_verified_at=datetime.now(timezone.utc),
+            last_verified_at=datetime.now(UTC),
         )
         db.add(new_account)
 
     await db.commit()
 
     # Redirect to frontend success page
-    return RedirectResponse(
-        url=f"{frontend_callback}?success=true&platform={platform}"
-    )
+    return RedirectResponse(url=f"{frontend_callback}?success=true&platform={platform}")
 
 
 # SM-40: TODO: This helper should only raise ValueError/httpx.HTTPError (not HTTPException)
@@ -426,7 +418,9 @@ async def _facebook_exchange_and_profile(code: str) -> tuple[dict, dict]:
         token_data = token_resp.json()
         # SM-37: Check for error field before accessing access_token
         if "error" in token_data:
-            raise ValueError(f"Facebook token exchange failed: {token_data['error'].get('message', 'Unknown error')}")
+            raise ValueError(
+                f"Facebook token exchange failed: {token_data['error'].get('message', 'Unknown error')}"
+            )
         short_token = token_data.get("access_token")
         if not short_token:
             raise ValueError("Facebook token response missing 'access_token'")
@@ -505,10 +499,10 @@ async def _facebook_exchange_and_profile(code: str) -> tuple[dict, dict]:
         if picture_url and not picture_url.startswith("https://"):
             picture_url = None
 
-        expires_at = datetime.now(timezone.utc).timestamp() + expires_in
+        expires_at = datetime.now(UTC).timestamp() + expires_in
         tokens = {
             "access_token": access_token,
-            "expires_at": datetime.fromtimestamp(expires_at, tz=timezone.utc),
+            "expires_at": datetime.fromtimestamp(expires_at, tz=UTC),
         }
         profile = {
             "id": me_id,
@@ -550,7 +544,8 @@ async def _twitter_exchange_and_profile(code: str, code_verifier: str) -> tuple[
         expires_at = None
         if expires_in:
             from datetime import timedelta
-            expires_at = datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))
+
+            expires_at = datetime.now(UTC) + timedelta(seconds=int(expires_in))
 
         # Step 2: Fetch user profile
         me_resp = await client.get(
@@ -601,7 +596,8 @@ async def _linkedin_exchange_and_profile(code: str) -> tuple[dict, dict]:
         expires_at = None
         if expires_in:
             from datetime import timedelta
-            expires_at = datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))
+
+            expires_at = datetime.now(UTC) + timedelta(seconds=int(expires_in))
 
         # Step 2: Fetch profile via OpenID Connect userinfo endpoint
         me_resp = await client.get(
@@ -654,7 +650,7 @@ async def disconnect_account(
 
     return DisconnectAccountResponse(
         message=f"{account.platform} account disconnected successfully",
-        disconnected_at=datetime.now(timezone.utc),
+        disconnected_at=datetime.now(UTC),
     )
 
 
@@ -690,7 +686,7 @@ async def verify_account(
     # Full platform API verification requires per-platform adapter calls;
     # for now, validate that the stored credentials are non-empty.
     is_valid = bool(account.access_token_encrypted)
-    account.last_verified_at = datetime.now(timezone.utc)
+    account.last_verified_at = datetime.now(UTC)
     account.verification_error = None if is_valid else "Token expired or invalid"
     account.is_active = is_valid
 
@@ -735,7 +731,7 @@ async def create_scheduled_post(
         )
 
     # Validate scheduled_at is in the future
-    if request.scheduled_at and request.scheduled_at < datetime.now(timezone.utc):
+    if request.scheduled_at and request.scheduled_at < datetime.now(UTC):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Scheduled time must be in the future",
@@ -751,9 +747,7 @@ async def create_scheduled_post(
             )
 
     # Determine status
-    post_status = (
-        PostStatus.SCHEDULED.value if request.scheduled_at else PostStatus.DRAFT.value
-    )
+    post_status = PostStatus.SCHEDULED.value if request.scheduled_at else PostStatus.DRAFT.value
 
     # Create scheduled post
     scheduled_post = ScheduledPost(
@@ -835,18 +829,20 @@ async def create_scheduled_post(
 async def list_scheduled_posts(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    status: Optional[str] = None,
-    platform: Optional[str] = None,
-    start_date: Optional[datetime] = None,
-    end_date: Optional[datetime] = None,
+    status: str | None = None,
+    platform: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """List scheduled posts with filtering."""
     # Build query with eager loading of targets to avoid N+1
-    query = select(ScheduledPost).options(
-        selectinload(ScheduledPost.targets).selectinload(PostTarget.social_account)
-    ).where(ScheduledPost.user_id == current_user.id)
+    query = (
+        select(ScheduledPost)
+        .options(selectinload(ScheduledPost.targets).selectinload(PostTarget.social_account))
+        .where(ScheduledPost.user_id == current_user.id)
+    )
 
     # Apply filters
     if status:
@@ -860,11 +856,7 @@ async def list_scheduled_posts(
 
     # Platform filter requires join
     if platform:
-        query = (
-            query.join(PostTarget)
-            .join(SocialAccount)
-            .where(SocialAccount.platform == platform)
-        )
+        query = query.join(PostTarget).join(SocialAccount).where(SocialAccount.platform == platform)
 
     # Get total count
     count_query = select(func.count()).select_from(query.subquery())
@@ -1168,7 +1160,7 @@ async def publish_post_now(
 
     # Update status
     post.status = PostStatus.PUBLISHING.value
-    post.publish_attempted_at = datetime.now(timezone.utc)
+    post.publish_attempted_at = datetime.now(UTC)
 
     await db.commit()
 
@@ -1187,7 +1179,7 @@ async def publish_post_now(
 async def get_calendar(
     start_date: date = Query(...),
     end_date: date = Query(...),
-    platform: Optional[str] = None,
+    platform: str | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1195,9 +1187,7 @@ async def get_calendar(
     # Build query with eager loading of targets to avoid N+1
     query = (
         select(ScheduledPost)
-        .options(
-            selectinload(ScheduledPost.targets).selectinload(PostTarget.social_account)
-        )
+        .options(selectinload(ScheduledPost.targets).selectinload(PostTarget.social_account))
         .where(
             and_(
                 ScheduledPost.user_id == current_user.id,
@@ -1211,11 +1201,7 @@ async def get_calendar(
 
     # Platform filter
     if platform:
-        query = (
-            query.join(PostTarget)
-            .join(SocialAccount)
-            .where(SocialAccount.platform == platform)
-        )
+        query = query.join(PostTarget).join(SocialAccount).where(SocialAccount.platform == platform)
 
     # Execute query
     result = await db.execute(query)
@@ -1267,7 +1253,7 @@ async def get_calendar(
 
 @router.get("/stats")
 async def get_post_stats(
-    breakdown: Optional[str] = Query(None, description="Breakdown type: 'platform'"),
+    breakdown: str | None = Query(None, description="Breakdown type: 'platform'"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1397,9 +1383,7 @@ async def get_post_analytics(
     # Calculate average engagement rate
     avg_engagement = None
     if total_impressions > 0:
-        avg_engagement = (
-            (total_likes + total_shares + total_comments) / total_impressions
-        ) * 100
+        avg_engagement = ((total_likes + total_shares + total_comments) / total_impressions) * 100
 
     return PostAnalyticsResponse(
         post_id=str(post.id),
@@ -1505,7 +1489,7 @@ async def get_best_posting_times(
     # day_of_week: 0=Monday .. 6=Sunday (ISO weekday - 1)
     slots: dict[tuple[int, int], dict] = {}  # (hour, dow) -> {score_sum, count}
 
-    for target, post in rows:
+    for target, _post in rows:
         pub_time = target.published_at
         hour = pub_time.hour
         dow = pub_time.weekday()  # 0=Monday
@@ -1563,10 +1547,6 @@ async def get_best_posting_times(
 # ============================================
 # Facebook Data Deletion Callback (no auth)
 # ============================================
-
-import base64
-import hashlib
-import hmac as _hmac
 
 
 @router.post("/facebook/data-deletion")

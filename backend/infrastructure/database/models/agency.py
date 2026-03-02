@@ -2,22 +2,20 @@
 White-Label Agency Mode database models for Phase 5.
 """
 
-from datetime import date as date_type, datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
+from datetime import date as date_type
 from uuid import uuid4
 
 from sqlalchemy import (
+    JSON,
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
-    Float,
-    Date,
-    Index,
-    JSON,
-    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -48,15 +46,13 @@ class AgencyProfile(Base, TimestampMixin):
 
     # Branding
     agency_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    logo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    brand_colors: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    custom_domain: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True, unique=True
-    )
+    logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    brand_colors: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    custom_domain: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
 
     # Contact and footer
-    contact_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    footer_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    contact_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    footer_text: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Limits and status
     max_clients: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
@@ -103,17 +99,15 @@ class ClientWorkspace(Base, TimestampMixin):
 
     # Client identity
     client_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    client_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    client_logo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    client_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    client_logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Portal access
-    is_portal_enabled: Mapped[bool] = mapped_column(
-        Boolean, default=False, nullable=False
-    )
-    portal_access_token: Mapped[Optional[str]] = mapped_column(
+    is_portal_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    portal_access_token: Mapped[str | None] = mapped_column(
         String(255), nullable=True, unique=True, index=True
     )
-    token_expires_at: Mapped[Optional[datetime]] = mapped_column(
+    token_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
         default=None,
@@ -121,11 +115,9 @@ class ClientWorkspace(Base, TimestampMixin):
     )
 
     # Feature gating (list of enabled feature keys)
-    allowed_features: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    allowed_features: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
-    __table_args__ = (
-        Index("ix_client_workspaces_agency_name", "agency_id", "client_name"),
-    )
+    __table_args__ = (Index("ix_client_workspaces_agency_name", "agency_id", "client_name"),)
 
     def __repr__(self) -> str:
         return (
@@ -162,12 +154,7 @@ class ReportTemplate(Base, TimestampMixin):
     template_config: Mapped[dict] = mapped_column(JSON, nullable=False)
 
     def __repr__(self) -> str:
-        return (
-            f"<ReportTemplate("
-            f"name={self.name!r}, "
-            f"agency_id={self.agency_id!r}"
-            f")>"
-        )
+        return f"<ReportTemplate(name={self.name!r}, agency_id={self.agency_id!r})>"
 
 
 class GeneratedReport(Base, TimestampMixin):
@@ -199,7 +186,7 @@ class GeneratedReport(Base, TimestampMixin):
     )
 
     # Optional template reference — row survives template deletion
-    report_template_id: Mapped[Optional[str]] = mapped_column(
+    report_template_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("report_templates.id", ondelete="SET NULL"),
         nullable=True,
@@ -212,14 +199,14 @@ class GeneratedReport(Base, TimestampMixin):
     period_end: Mapped[date_type] = mapped_column(Date, nullable=False)
 
     # Report payload and delivery
-    report_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    pdf_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    report_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    pdf_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Generation timestamp
     generated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
     )
 
     __table_args__ = (

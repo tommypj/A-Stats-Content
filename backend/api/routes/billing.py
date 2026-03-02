@@ -6,40 +6,49 @@ import hashlib
 import hmac
 import json
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Annotated, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Annotated
 from urllib.parse import urlencode
 
-VALID_SUBSCRIPTION_STATUSES = {"active", "cancelled", "paused", "expired", "past_due", "unpaid", "on_trial"}
-
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Header
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from infrastructure.database.connection import get_db
-from infrastructure.database.models.user import User, SubscriptionTier
-from infrastructure.database.models.project import Project
-from infrastructure.config.settings import settings
+from api.middleware.rate_limit import limiter
+from api.routes.auth import get_current_user
 from api.schemas.billing import (
-    PlanInfo,
-    PlanLimits,
-    PricingResponse,
-    SubscriptionStatus,
     CheckoutRequest,
     CheckoutResponse,
     CustomerPortalResponse,
+    PlanInfo,
+    PlanLimits,
+    PricingResponse,
     SubscriptionCancelResponse,
+    SubscriptionStatus,
     WebhookEventType,
 )
-from api.routes.auth import get_current_user
-from api.middleware.rate_limit import limiter
 from core.plans import PLANS
+from infrastructure.config.settings import settings
+from infrastructure.database.connection import get_db
+from infrastructure.database.models.project import Project
+from infrastructure.database.models.user import SubscriptionTier, User
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
+VALID_SUBSCRIPTION_STATUSES = {
+    "active",
+    "cancelled",
+    "paused",
+    "expired",
+    "past_due",
+    "unpaid",
+    "on_trial",
+}
+
 router = APIRouter(prefix="/billing", tags=["billing"])
+
 
 # BILL-34: single canonical variant_id → tier mapping used by both user and project webhook handlers
 # Built lazily at call time so settings values are resolved after app startup.
@@ -47,25 +56,34 @@ def _build_variant_to_tier() -> dict:
     return {
         str(v): tier
         for tier, keys in [
-            (SubscriptionTier.STARTER.value, [
-                settings.lemonsqueezy_variant_starter_monthly,
-                settings.lemonsqueezy_variant_starter_yearly,
-            ]),
-            (SubscriptionTier.PROFESSIONAL.value, [
-                settings.lemonsqueezy_variant_professional_monthly,
-                settings.lemonsqueezy_variant_professional_yearly,
-            ]),
-            (SubscriptionTier.ENTERPRISE.value, [
-                settings.lemonsqueezy_variant_enterprise_monthly,
-                settings.lemonsqueezy_variant_enterprise_yearly,
-            ]),
+            (
+                SubscriptionTier.STARTER.value,
+                [
+                    settings.lemonsqueezy_variant_starter_monthly,
+                    settings.lemonsqueezy_variant_starter_yearly,
+                ],
+            ),
+            (
+                SubscriptionTier.PROFESSIONAL.value,
+                [
+                    settings.lemonsqueezy_variant_professional_monthly,
+                    settings.lemonsqueezy_variant_professional_yearly,
+                ],
+            ),
+            (
+                SubscriptionTier.ENTERPRISE.value,
+                [
+                    settings.lemonsqueezy_variant_enterprise_monthly,
+                    settings.lemonsqueezy_variant_enterprise_yearly,
+                ],
+            ),
         ]
         for v in keys
         if v is not None
     }
 
 
-def _parse_iso_datetime(value: str) -> Optional[datetime]:
+def _parse_iso_datetime(value: str) -> datetime | None:
     """Parse ISO 8601 datetime string, handling Z suffix and invalid formats.
 
     Returns None on failure so callers don't accidentally set an immediate
@@ -75,9 +93,10 @@ def _parse_iso_datetime(value: str) -> Optional[datetime]:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         # BILL-29: Reject past timestamps — setting subscription_expires to a past date
         # would immediately revoke access. A 5-minute grace window absorbs clock skew.
-        if parsed < datetime.now(timezone.utc) - timedelta(minutes=5):
+        if parsed < datetime.now(UTC) - timedelta(minutes=5):
             logger.warning(
-                "Webhook datetime %s is in the past — skipping to avoid immediate revocation", parsed
+                "Webhook datetime %s is in the past — skipping to avoid immediate revocation",
+                parsed,
             )
             return None
         return parsed
@@ -106,11 +125,7 @@ def verify_webhook_signature(payload: bytes, signature: str, secret: str) -> boo
         logger.warning("LemonSqueezy webhook secret not configured")
         return False
 
-    expected_signature = hmac.new(
-        secret.encode(),
-        payload,
-        hashlib.sha256
-    ).hexdigest()
+    expected_signature = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
 
     return hmac.compare_digest(signature, expected_signature)
 
@@ -140,9 +155,7 @@ async def get_pricing():
 
 
 @router.get("/subscription", response_model=SubscriptionStatus)
-async def get_subscription_status(
-    current_user: Annotated[User, Depends(get_current_user)]
-):
+async def get_subscription_status(current_user: Annotated[User, Depends(get_current_user)]):
     """Get current user's subscription status and usage."""
     # Determine subscription status
     subscription_status = "none"
@@ -151,7 +164,7 @@ async def get_subscription_status(
         if current_user.lemonsqueezy_subscription_id:
             # Check if subscription has expired
             if current_user.subscription_expires:
-                if current_user.subscription_expires > datetime.now(timezone.utc):
+                if current_user.subscription_expires > datetime.now(UTC):
                     subscription_status = "active"
                 else:
                     subscription_status = "expired"
@@ -217,12 +230,14 @@ async def create_checkout(
             detail="Payment system not configured",
         )
     frontend_url = settings.frontend_url.rstrip("/")
-    params = urlencode({
-        "checkout[email]": current_user.email,
-        "checkout[custom][user_id]": str(current_user.id),
-        "checkout[custom][plan]": body.plan,
-        "checkout[redirect_url]": f"{frontend_url}/billing/success",
-    })
+    params = urlencode(
+        {
+            "checkout[email]": current_user.email,
+            "checkout[custom][user_id]": str(current_user.id),
+            "checkout[custom][plan]": body.plan,
+            "checkout[redirect_url]": f"{frontend_url}/billing/success",
+        }
+    )
     checkout_url = f"https://{store_slug}.lemonsqueezy.com/checkout/buy/{variant_id}?{params}"
 
     logger.info(
@@ -234,9 +249,7 @@ async def create_checkout(
 
 
 @router.get("/portal", response_model=CustomerPortalResponse)
-async def get_customer_portal(
-    current_user: Annotated[User, Depends(get_current_user)]
-):
+async def get_customer_portal(current_user: Annotated[User, Depends(get_current_user)]):
     """
     Get LemonSqueezy customer portal URL for managing subscription.
 
@@ -391,17 +404,23 @@ async def handle_project_subscription_webhook(
                 project.subscription_expires = _parse_iso_datetime(renews_at)
 
             if subscription_status in ["cancelled", "paused", "expired"]:
-                logger.info(f"Project subscription {subscription_status}: project_id={project_id}, expires={renews_at}")
+                logger.info(
+                    f"Project subscription {subscription_status}: project_id={project_id}, expires={renews_at}"
+                )
             else:
-                logger.info(f"Project subscription updated: project_id={project_id}, tier={tier}, status={subscription_status}")
+                logger.info(
+                    f"Project subscription updated: project_id={project_id}, tier={tier}, status={subscription_status}"
+                )
 
         elif event_name == WebhookEventType.SUBSCRIPTION_CANCELLED.value:
             # BILL-04: Revoke features immediately on cancellation rather than waiting
             # for the billing period to end. subscription_expires = now() means
             # BILL-01's expiry check in check_limit() will immediately treat them as free.
-            project.subscription_expires = datetime.now(timezone.utc)
+            project.subscription_expires = datetime.now(UTC)
             project.subscription_status = "cancelled"  # BILL-27
-            logger.info(f"Project subscription cancelled: project_id={project_id}, access revoked immediately")
+            logger.info(
+                f"Project subscription cancelled: project_id={project_id}, access revoked immediately"
+            )
 
         elif event_name == WebhookEventType.SUBSCRIPTION_EXPIRED.value:
             # Project subscription expired - downgrade to free
@@ -411,7 +430,9 @@ async def handle_project_subscription_webhook(
             project.lemonsqueezy_subscription_id = None
             project.lemonsqueezy_variant_id = None  # BILL-07
 
-            logger.info(f"Project subscription expired: project_id={project_id}, downgraded to free")
+            logger.info(
+                f"Project subscription expired: project_id={project_id}, downgraded to free"
+            )
 
         elif event_name == WebhookEventType.SUBSCRIPTION_PAYMENT_SUCCESS.value:
             # Payment successful - update renewal date
@@ -456,9 +477,13 @@ async def handle_project_subscription_webhook(
         logger.info(f"Project webhook processed successfully: project_id={project_id}")
 
     except Exception as e:
-        logger.error("Webhook processing failed for project %s: %s", project_id, str(e), exc_info=True)
+        logger.error(
+            "Webhook processing failed for project %s: %s", project_id, str(e), exc_info=True
+        )
         await db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Webhook processing failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Webhook processing failed"
+        )
 
 
 @router.post("/webhook")
@@ -500,7 +525,9 @@ async def handle_webhook(
     else:
         # BILL-06: Return 403 (not 503) when secret is unconfigured — prevents aggressive LS retries.
         logger.error("Webhook rejected: LEMONSQUEEZY_WEBHOOK_SECRET not configured")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Webhook verification not configured")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Webhook verification not configured"
+        )
 
     # Parse webhook payload
     try:
@@ -508,7 +535,9 @@ async def handle_webhook(
     except (json.JSONDecodeError, ValueError) as e:
         logger.error("Invalid JSON in webhook payload: %s", e)
         # BILL-05: Return 400 so LemonSqueezy stops retrying a malformed payload.
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid webhook payload: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid webhook payload: {e}"
+        )
 
     # Idempotency: deduplicate webhook events using Redis (24h TTL covers LemonSqueezy retry window)
     meta = payload.get("meta", {})
@@ -516,7 +545,9 @@ async def handle_webhook(
     if event_id:
         try:
             import redis.asyncio as aioredis
+
             from infrastructure.config.settings import settings as _settings
+
             r = aioredis.from_url(_settings.redis_url)
             redis_key = f"webhook:processed:{event_id}"
             already_processed = await r.exists(redis_key)
@@ -586,6 +617,7 @@ async def handle_webhook(
 
     # BILL-11: Reject malformed user_id before hitting the DB
     import uuid as _uuid
+
     try:
         _uuid.UUID(str(user_id))
     except (ValueError, AttributeError):
@@ -607,7 +639,9 @@ async def handle_webhook(
         if str(user.lemonsqueezy_customer_id) != str(customer_id):
             logger.error(
                 "BILL-02: Webhook customer_id %s does not match stored customer_id %s for user %s — rejecting",
-                customer_id, user.lemonsqueezy_customer_id, user_id,
+                customer_id,
+                user.lemonsqueezy_customer_id,
+                user_id,
             )
             return {"status": "error", "message": "Customer ID mismatch"}
 
@@ -650,7 +684,9 @@ async def handle_webhook(
             # Subscription updated (plan change, status change, etc.)
             user.subscription_tier = tier
             user.subscription_status = subscription_status or "active"  # BILL-08
-            user.lemonsqueezy_variant_id = str(variant_id) if variant_id else None  # BILL-36: keep variant_id in sync on plan changes
+            user.lemonsqueezy_variant_id = (
+                str(variant_id) if variant_id else None
+            )  # BILL-36: keep variant_id in sync on plan changes
 
             if renews_at:
                 user.subscription_expires = _parse_iso_datetime(renews_at)
@@ -658,14 +694,18 @@ async def handle_webhook(
             # If subscription is cancelled or paused, don't downgrade immediately
             # Let it expire naturally
             if subscription_status in ["cancelled", "paused", "expired"]:
-                logger.info(f"Subscription {subscription_status} for user {user_id}, will expire at {renews_at}")
+                logger.info(
+                    f"Subscription {subscription_status} for user {user_id}, will expire at {renews_at}"
+                )
             else:
-                logger.info(f"Subscription updated for user {user_id}: tier={tier}, status={subscription_status}")
+                logger.info(
+                    f"Subscription updated for user {user_id}: tier={tier}, status={subscription_status}"
+                )
 
         elif event_name == WebhookEventType.SUBSCRIPTION_CANCELLED.value:
             # BILL-04: Revoke features immediately on cancellation
             user.subscription_status = "cancelled"  # BILL-08
-            user.subscription_expires = datetime.now(timezone.utc)
+            user.subscription_expires = datetime.now(UTC)
             logger.info(f"Subscription cancelled for user {user_id}, access revoked immediately")
 
         elif event_name == WebhookEventType.SUBSCRIPTION_EXPIRED.value:
@@ -689,7 +729,8 @@ async def handle_webhook(
             # BILL-33: structured log includes subscription_id for easier ops investigation
             logger.warning(
                 "Payment failed for user %s (subscription %s)",
-                user_id, subscription_id,
+                user_id,
+                subscription_id,
             )
 
         elif event_name == WebhookEventType.SUBSCRIPTION_RESUMED.value:
@@ -707,7 +748,8 @@ async def handle_webhook(
             # BILL-33: structured log includes subscription_id for easier ops investigation
             logger.info(
                 "Subscription paused for user %s (subscription %s)",
-                user_id, subscription_id,
+                user_id,
+                subscription_id,
             )
 
         elif event_name == WebhookEventType.SUBSCRIPTION_UNPAUSED.value:
@@ -726,7 +768,7 @@ async def handle_webhook(
         personal_project_result = await db.execute(
             select(Project).where(
                 Project.owner_id == user.id,
-                Project.is_personal == True,
+                Project.is_personal,
             )
         )
         personal_project = personal_project_result.scalar_one_or_none()
@@ -742,7 +784,8 @@ async def handle_webhook(
             logger.warning(
                 "BILL-23: Personal project not found for user %s (tier=%s) — subscription sync skipped. "
                 "User and project tiers may diverge.",
-                user_id, tier,
+                user_id,
+                tier,
             )
 
         # Commit changes
@@ -754,4 +797,6 @@ async def handle_webhook(
     except Exception as e:
         logger.error("Webhook processing failed: %s", str(e), exc_info=True)
         await db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Webhook processing failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Webhook processing failed"
+        )

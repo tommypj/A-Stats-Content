@@ -13,7 +13,6 @@ import asyncio
 import json
 import logging
 import time
-from typing import Optional
 
 from fastapi import HTTPException, status
 
@@ -57,6 +56,7 @@ async def store_oauth_state(state: str, user_id: str, platform: str = "", **extr
     data = json.dumps({"user_id": str(user_id), "platform": platform, **extra})
     try:
         import redis.asyncio as aioredis
+
         r = aioredis.from_url(settings.redis_url)
         await r.setex(f"oauth_state:{state}", _OAUTH_STATE_TTL, data)
         await r.aclose()
@@ -67,12 +67,16 @@ async def store_oauth_state(state: str, user_id: str, platform: str = "", **extr
             if len(_oauth_states) >= _OAUTH_MAX_STATES:
                 # Drop oldest entries to make room
                 oldest = sorted(_oauth_states, key=lambda k: _oauth_states[k]["created_at"])
-                for k in oldest[:len(_oauth_states) - _OAUTH_MAX_STATES + 1]:
+                for k in oldest[: len(_oauth_states) - _OAUTH_MAX_STATES + 1]:
                     del _oauth_states[k]
-            _oauth_states[state] = {"user_id": str(user_id), "platform": platform, "created_at": time.time()}
+            _oauth_states[state] = {
+                "user_id": str(user_id),
+                "platform": platform,
+                "created_at": time.time(),
+            }
 
 
-async def verify_oauth_state(state: str) -> Optional[str]:
+async def verify_oauth_state(state: str) -> str | None:
     """Verify and consume an OAuth state. Returns user_id or None.
 
     Attempts Redis first; falls back to the in-memory dict when Redis is
@@ -80,6 +84,7 @@ async def verify_oauth_state(state: str) -> Optional[str]:
     """
     try:
         import redis.asyncio as aioredis
+
         r = aioredis.from_url(settings.redis_url)
         raw = await r.getdel(f"oauth_state:{state}")
         await r.aclose()
@@ -87,7 +92,15 @@ async def verify_oauth_state(state: str) -> Optional[str]:
             return None
         parsed = json.loads(raw)
         return parsed.get("user_id")
-    except (ImportError, OSError, ConnectionError, TypeError, ValueError, json.JSONDecodeError, KeyError):
+    except (
+        ImportError,
+        OSError,
+        ConnectionError,
+        TypeError,
+        ValueError,
+        json.JSONDecodeError,
+        KeyError,
+    ):
         # Redis unavailable or misconfigured — fallback to in-memory pop with expiry check
         async with _oauth_states_lock:
             entry = _oauth_states.pop(state, None)
@@ -98,20 +111,29 @@ async def verify_oauth_state(state: str) -> Optional[str]:
         return entry["user_id"]
 
 
-async def verify_oauth_state_full(state: str) -> Optional[dict]:
+async def verify_oauth_state_full(state: str) -> dict | None:
     """Verify and consume an OAuth state. Returns the full stored dict or None.
 
     Use this when you need ``platform`` in addition to ``user_id`` (SM-06).
     """
     try:
         import redis.asyncio as aioredis
+
         r = aioredis.from_url(settings.redis_url)
         raw = await r.getdel(f"oauth_state:{state}")
         await r.aclose()
         if raw is None:
             return None
         return json.loads(raw)
-    except (ImportError, OSError, ConnectionError, TypeError, ValueError, json.JSONDecodeError, KeyError):
+    except (
+        ImportError,
+        OSError,
+        ConnectionError,
+        TypeError,
+        ValueError,
+        json.JSONDecodeError,
+        KeyError,
+    ):
         async with _oauth_states_lock:
             entry = _oauth_states.pop(state, None)
         if not entry:

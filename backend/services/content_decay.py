@@ -7,38 +7,36 @@ declining content and generate alerts with AI-powered recovery suggestions.
 
 import logging
 from datetime import date, timedelta
-from typing import Optional
 from uuid import uuid4
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import and_, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from infrastructure.database.models.analytics import (
-    KeywordRanking,
-    PagePerformance,
     ContentDecayAlert,
+    KeywordRanking,
 )
 from infrastructure.database.models.content import Article
 
 logger = logging.getLogger(__name__)
 
 # Detection thresholds
-POSITION_WARNING_THRESHOLD = 3.0   # position worsened by 3+
+POSITION_WARNING_THRESHOLD = 3.0  # position worsened by 3+
 POSITION_CRITICAL_THRESHOLD = 5.0  # position worsened by 5+
-CLICKS_WARNING_PCT = -20.0         # clicks dropped 20%+
-CLICKS_CRITICAL_PCT = -40.0        # clicks dropped 40%+
-IMPRESSIONS_WARNING_PCT = -25.0    # impressions dropped 25%+
-IMPRESSIONS_CRITICAL_PCT = -50.0   # impressions dropped 50%+
+CLICKS_WARNING_PCT = -20.0  # clicks dropped 20%+
+CLICKS_CRITICAL_PCT = -40.0  # clicks dropped 40%+
+IMPRESSIONS_WARNING_PCT = -25.0  # impressions dropped 25%+
+IMPRESSIONS_CRITICAL_PCT = -50.0  # impressions dropped 50%+
 CTR_WARNING_PCT = -20.0
 CTR_CRITICAL_PCT = -40.0
-MIN_IMPRESSIONS_FOR_ALERT = 50     # minimum impressions to trigger alert
+MIN_IMPRESSIONS_FOR_ALERT = 50  # minimum impressions to trigger alert
 
 
 async def detect_keyword_decay(
     db: AsyncSession,
     user_id: str,
-    project_id: Optional[str] = None,
+    project_id: str | None = None,
     period_days: int = 7,
 ) -> list[ContentDecayAlert]:
     """
@@ -94,11 +92,15 @@ async def detect_keyword_decay(
 
     # ANA-29: No N+1 here — keywords and articles are each loaded in a single batch query.
     # Match articles to keywords
-    articles_q = select(Article.id, Article.keyword, Article.project_id, Article.published_url).where(
-        Article.user_id == user_id
-    )
+    articles_q = select(
+        Article.id, Article.keyword, Article.project_id, Article.published_url
+    ).where(Article.user_id == user_id)
     articles_result = await db.execute(articles_q)
-    article_map = {row.keyword.lower(): (row.id, row.project_id, row.published_url) for row in articles_result.all() if row.keyword}
+    article_map = {
+        row.keyword.lower(): (row.id, row.project_id, row.published_url)
+        for row in articles_result.all()
+        if row.keyword
+    }
 
     alerts: list[ContentDecayAlert] = []
 
@@ -134,42 +136,46 @@ async def detect_keyword_decay(
         if position_change >= POSITION_WARNING_THRESHOLD:
             severity = "critical" if position_change >= POSITION_CRITICAL_THRESHOLD else "warning"
             pct = (position_change / prev_position * 100) if prev_position > 0 else 0
-            alerts.append(ContentDecayAlert(
-                id=str(uuid4()),
-                user_id=user_id,
-                project_id=art_project_id,
-                article_id=article_id,
-                alert_type="position_drop",
-                severity=severity,
-                keyword=keyword,
-                page_url=article_info[2] if article_info else None,
-                metric_name="position",
-                metric_before=prev_position,
-                metric_after=curr_position,
-                period_days=period_days,
-                percentage_change=round(pct, 2),
-            ))
+            alerts.append(
+                ContentDecayAlert(
+                    id=str(uuid4()),
+                    user_id=user_id,
+                    project_id=art_project_id,
+                    article_id=article_id,
+                    alert_type="position_drop",
+                    severity=severity,
+                    keyword=keyword,
+                    page_url=article_info[2] if article_info else None,
+                    metric_name="position",
+                    metric_before=prev_position,
+                    metric_after=curr_position,
+                    period_days=period_days,
+                    percentage_change=round(pct, 2),
+                )
+            )
 
         # Clicks decay
         if prev_clicks > 0:
             clicks_pct = ((curr_clicks - prev_clicks) / prev_clicks) * 100
             if clicks_pct <= CLICKS_WARNING_PCT:
                 severity = "critical" if clicks_pct <= CLICKS_CRITICAL_PCT else "warning"
-                alerts.append(ContentDecayAlert(
-                    id=str(uuid4()),
-                    user_id=user_id,
-                    project_id=art_project_id,
-                    article_id=article_id,
-                    alert_type="traffic_drop",
-                    severity=severity,
-                    keyword=keyword,
-                    page_url=article_info[2] if article_info else None,
-                    metric_name="clicks",
-                    metric_before=float(prev_clicks),
-                    metric_after=float(curr_clicks),
-                    period_days=period_days,
-                    percentage_change=round(clicks_pct, 2),
-                ))
+                alerts.append(
+                    ContentDecayAlert(
+                        id=str(uuid4()),
+                        user_id=user_id,
+                        project_id=art_project_id,
+                        article_id=article_id,
+                        alert_type="traffic_drop",
+                        severity=severity,
+                        keyword=keyword,
+                        page_url=article_info[2] if article_info else None,
+                        metric_name="clicks",
+                        metric_before=float(prev_clicks),
+                        metric_after=float(curr_clicks),
+                        period_days=period_days,
+                        percentage_change=round(clicks_pct, 2),
+                    )
+                )
 
         # Impressions decay
         if prev_impressions > 0:
@@ -178,42 +184,46 @@ async def detect_keyword_decay(
             impressions_pct = 0.0
         if impressions_pct <= IMPRESSIONS_WARNING_PCT:
             severity = "critical" if impressions_pct <= IMPRESSIONS_CRITICAL_PCT else "warning"
-            alerts.append(ContentDecayAlert(
-                id=str(uuid4()),
-                user_id=user_id,
-                project_id=art_project_id,
-                article_id=article_id,
-                alert_type="impressions_drop",
-                severity=severity,
-                keyword=keyword,
-                page_url=article_info[2] if article_info else None,
-                metric_name="impressions",
-                metric_before=float(prev_impressions),
-                metric_after=float(curr_impressions),
-                period_days=period_days,
-                percentage_change=round(impressions_pct, 2),
-            ))
+            alerts.append(
+                ContentDecayAlert(
+                    id=str(uuid4()),
+                    user_id=user_id,
+                    project_id=art_project_id,
+                    article_id=article_id,
+                    alert_type="impressions_drop",
+                    severity=severity,
+                    keyword=keyword,
+                    page_url=article_info[2] if article_info else None,
+                    metric_name="impressions",
+                    metric_before=float(prev_impressions),
+                    metric_after=float(curr_impressions),
+                    period_days=period_days,
+                    percentage_change=round(impressions_pct, 2),
+                )
+            )
 
         # CTR decay
         if prev_ctr > 0:
             ctr_pct = ((curr_ctr - prev_ctr) / prev_ctr) * 100
             if ctr_pct <= CTR_WARNING_PCT:
                 severity = "critical" if ctr_pct <= CTR_CRITICAL_PCT else "warning"
-                alerts.append(ContentDecayAlert(
-                    id=str(uuid4()),
-                    user_id=user_id,
-                    project_id=art_project_id,
-                    article_id=article_id,
-                    alert_type="ctr_drop",
-                    severity=severity,
-                    keyword=keyword,
-                    page_url=article_info[2] if article_info else None,
-                    metric_name="ctr",
-                    metric_before=prev_ctr,
-                    metric_after=curr_ctr,
-                    period_days=period_days,
-                    percentage_change=round(ctr_pct, 2),
-                ))
+                alerts.append(
+                    ContentDecayAlert(
+                        id=str(uuid4()),
+                        user_id=user_id,
+                        project_id=art_project_id,
+                        article_id=article_id,
+                        alert_type="ctr_drop",
+                        severity=severity,
+                        keyword=keyword,
+                        page_url=article_info[2] if article_info else None,
+                        metric_name="ctr",
+                        metric_before=prev_ctr,
+                        metric_after=curr_ctr,
+                        period_days=period_days,
+                        percentage_change=round(ctr_pct, 2),
+                    )
+                )
 
     return alerts
 
@@ -221,7 +231,7 @@ async def detect_keyword_decay(
 async def run_decay_detection(
     db: AsyncSession,
     user_id: str,
-    project_id: Optional[str] = None,
+    project_id: str | None = None,
 ) -> int:
     """
     Run full decay detection and persist new alerts.
@@ -236,20 +246,17 @@ async def run_decay_detection(
     # ANA-07: scope dedup to current project to avoid cross-project suppression
     dedup_conditions = [
         ContentDecayAlert.user_id == user_id,
-        ContentDecayAlert.is_resolved == False,
+        not ContentDecayAlert.is_resolved,
     ]
     if project_id:
         dedup_conditions.append(ContentDecayAlert.project_id == project_id)
-    existing_q = select(
-        ContentDecayAlert.keyword, ContentDecayAlert.alert_type
-    ).where(and_(*dedup_conditions))
+    existing_q = select(ContentDecayAlert.keyword, ContentDecayAlert.alert_type).where(
+        and_(*dedup_conditions)
+    )
     existing_result = await db.execute(existing_q)
     existing_keys = {(row.keyword, row.alert_type) for row in existing_result.all()}
 
-    new_alerts = [
-        a for a in alerts
-        if (a.keyword, a.alert_type) not in existing_keys
-    ]
+    new_alerts = [a for a in alerts if (a.keyword, a.alert_type) not in existing_keys]
 
     # ANA-30: Catch IntegrityError per-alert to handle concurrent duplicate inserts.
     # Use nested savepoints so only the individual failing INSERT is rolled back,
@@ -262,7 +269,11 @@ async def run_decay_detection(
         except IntegrityError:
             await savepoint.rollback()
             # Alert already exists (concurrent insert), skip it
-            logger.debug("Skipping duplicate decay alert for keyword=%s type=%s", alert.keyword, alert.alert_type)
+            logger.debug(
+                "Skipping duplicate decay alert for keyword=%s type=%s",
+                alert.keyword,
+                alert.alert_type,
+            )
 
     if new_alerts:
         await db.commit()
@@ -330,6 +341,7 @@ Return as JSON array of objects with keys: action, description, priority, estima
     try:
         response = await content_ai_service.generate_text(prompt, max_tokens=1500)
         import json
+
         # ANA-34: Cap AI response size before parsing to prevent memory/CPU abuse
         if len(response) > 50000:
             response = response[:50000]
@@ -346,7 +358,9 @@ Return as JSON array of objects with keys: action, description, priority, estima
 
         suggestions = json.loads(text)
         if not isinstance(suggestions, list):
-            suggestions = suggestions.get("suggestions", []) if isinstance(suggestions, dict) else []
+            suggestions = (
+                suggestions.get("suggestions", []) if isinstance(suggestions, dict) else []
+            )
 
         # Store on the alert
         alert.suggested_actions = {"suggestions": suggestions}
@@ -355,26 +369,28 @@ Return as JSON array of objects with keys: action, description, priority, estima
         return {"suggestions": suggestions}
     except Exception as e:
         logger.error("Failed to generate recovery suggestions: %s", str(e))
-        return {"suggestions": [
-            {
-                "action": "Review and update content",
-                "description": f"Your {alert.metric_name} has declined by {alert.percentage_change}%. Review the content for freshness and relevance.",
-                "priority": "high",
-                "estimated_impact": "medium",
-            },
-            {
-                "action": "Analyze competitor content",
-                "description": "Check what competitors are ranking for this keyword and identify gaps in your content.",
-                "priority": "medium",
-                "estimated_impact": "high",
-            },
-            {
-                "action": "Improve on-page SEO",
-                "description": "Update meta title, description, and heading structure to better target the keyword.",
-                "priority": "medium",
-                "estimated_impact": "medium",
-            },
-        ]}
+        return {
+            "suggestions": [
+                {
+                    "action": "Review and update content",
+                    "description": f"Your {alert.metric_name} has declined by {alert.percentage_change}%. Review the content for freshness and relevance.",
+                    "priority": "high",
+                    "estimated_impact": "medium",
+                },
+                {
+                    "action": "Analyze competitor content",
+                    "description": "Check what competitors are ranking for this keyword and identify gaps in your content.",
+                    "priority": "medium",
+                    "estimated_impact": "high",
+                },
+                {
+                    "action": "Improve on-page SEO",
+                    "description": "Update meta title, description, and heading structure to better target the keyword.",
+                    "priority": "medium",
+                    "estimated_impact": "medium",
+                },
+            ]
+        }
 
 
 async def get_content_health_score(
@@ -396,7 +412,7 @@ async def get_content_health_score(
         .where(
             and_(
                 ContentDecayAlert.user_id == user_id,
-                ContentDecayAlert.is_resolved == False,
+                not ContentDecayAlert.is_resolved,
             )
         )
         .group_by(ContentDecayAlert.severity)
@@ -422,7 +438,7 @@ async def get_content_health_score(
     declining_q = select(func.count(func.distinct(ContentDecayAlert.article_id))).where(
         and_(
             ContentDecayAlert.user_id == user_id,
-            ContentDecayAlert.is_resolved == False,
+            not ContentDecayAlert.is_resolved,
             ContentDecayAlert.article_id.isnot(None),
         )
     )

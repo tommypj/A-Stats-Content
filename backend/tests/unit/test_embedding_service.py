@@ -9,16 +9,19 @@ Tests cover:
 - Dimension consistency
 """
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 
 # Skip if service not implemented yet
-pytest.importorskip("adapters.knowledge.embedding_service", reason="Embedding service not yet implemented")
+pytest.importorskip(
+    "adapters.knowledge.embedding_service", reason="Embedding service not yet implemented"
+)
 
 from adapters.knowledge.embedding_service import (
-    EmbeddingService,
     EmbeddingError,
     EmbeddingProvider,
+    EmbeddingService,
 )
 
 
@@ -107,7 +110,9 @@ class TestEmbeddingService:
         with patch("adapters.knowledge.embedding_service.httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.post = AsyncMock(
-                side_effect=httpx.HTTPStatusError("rate limit", request=mock_request, response=mock_resp)
+                side_effect=httpx.HTTPStatusError(
+                    "rate limit", request=mock_request, response=mock_resp
+                )
             )
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=None)

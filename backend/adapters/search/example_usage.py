@@ -6,12 +6,12 @@ SEO analytics data from Google Search Console.
 """
 
 import asyncio
-from datetime import date, timedelta
+from datetime import UTC, date, timedelta
+
 from adapters.search import (
-    GSCAdapter,
-    GSCCredentials,
-    GSCAuthError,
     GSCAPIError,
+    GSCAuthError,
+    GSCCredentials,
     create_gsc_adapter,
 )
 
@@ -50,7 +50,7 @@ async def example_oauth_flow():
 
     try:
         credentials = adapter.exchange_code(authorization_code)
-        print(f"\n3. Successfully obtained OAuth tokens")
+        print("\n3. Successfully obtained OAuth tokens")
         print(f"   Access Token: {credentials.access_token[:20]}...")
         print(f"   Refresh Token: {credentials.refresh_token[:20]}...")
         print(f"   Expires: {credentials.token_expiry}")
@@ -179,14 +179,10 @@ async def example_fetch_page_performance():
 
         for page in pages[:10]:
             # Truncate long URLs for display
-            url = page['page']
+            url = page["page"]
             if len(url) > 57:
                 url = url[:54] + "..."
-            print(
-                f"{url:<60} "
-                f"{page['clicks']:<10} "
-                f"{page['position']:<10.1f}"
-            )
+            print(f"{url:<60} {page['clicks']:<10} {page['position']:<10.1f}")
 
     except GSCAPIError as e:
         print(f"\nFailed to fetch page performance: {e}")
@@ -232,10 +228,10 @@ async def example_fetch_daily_stats():
             )
 
         # Calculate totals
-        total_clicks = sum(d['clicks'] for d in daily_stats)
-        total_impressions = sum(d['impressions'] for d in daily_stats)
+        total_clicks = sum(d["clicks"] for d in daily_stats)
+        total_impressions = sum(d["impressions"] for d in daily_stats)
         avg_ctr = total_clicks / total_impressions if total_impressions > 0 else 0
-        avg_position = sum(d['position'] for d in daily_stats) / len(daily_stats)
+        avg_position = sum(d["position"] for d in daily_stats) / len(daily_stats)
 
         print("-" * 65)
         print(
@@ -348,23 +344,18 @@ async def example_custom_search_analytics():
             row_limit=100,
         )
 
-        print(f"\nTop queries by device (showing first 10):")
+        print("\nTop queries by device (showing first 10):")
         print(f"{'Query':<30} {'Device':<10} {'Clicks':<10} {'Position':<10}")
         print("-" * 65)
 
         for row in rows[:10]:
-            query = row['keys'][0]  # First dimension
-            device = row['keys'][1]  # Second dimension
+            query = row["keys"][0]  # First dimension
+            device = row["keys"][1]  # Second dimension
 
             if len(query) > 27:
                 query = query[:24] + "..."
 
-            print(
-                f"{query:<30} "
-                f"{device:<10} "
-                f"{row['clicks']:<10} "
-                f"{row['position']:<10.1f}"
-            )
+            print(f"{query:<30} {device:<10} {row['clicks']:<10} {row['position']:<10.1f}")
 
     except GSCAPIError as e:
         print(f"\nFailed to fetch custom analytics: {e}")
@@ -384,11 +375,12 @@ async def example_token_refresh():
     adapter = create_gsc_adapter()
 
     # Simulate expired credentials
-    from datetime import datetime, timezone
+    from datetime import datetime
+
     credentials = GSCCredentials(
         access_token="expired_token",
         refresh_token="valid_refresh_token",
-        token_expiry=datetime.now(timezone.utc) - timedelta(hours=1),  # Expired
+        token_expiry=datetime.now(UTC) - timedelta(hours=1),  # Expired
         site_url="https://example.com",
     )
 
@@ -400,7 +392,7 @@ async def example_token_refresh():
         # Or you can manually refresh:
         new_credentials = adapter.refresh_tokens(credentials)
 
-        print(f"\nTokens refreshed successfully!")
+        print("\nTokens refreshed successfully!")
         print(f"New expiry: {new_credentials.token_expiry}")
         print(f"New access token: {new_credentials.access_token[:20]}...")
 

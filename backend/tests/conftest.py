@@ -10,21 +10,22 @@ from pathlib import Path
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
 
-import pytest
-from datetime import datetime, timedelta, timezone
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from httpx import AsyncClient, ASGITransport
+import pytest
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-# Import after path is set
-from infrastructure.database.models import Base, User
-from infrastructure.database.connection import get_db
 from core.security import PasswordHasher, TokenService
 from infrastructure.config import get_settings
+from infrastructure.database.connection import get_db
+
+# Import after path is set
+from infrastructure.database.models import Base, User
 
 # Initialize security services
 password_hasher = PasswordHasher()
@@ -69,9 +70,7 @@ async def db_engine():
 @pytest.fixture
 async def db_session(db_engine) -> AsyncGenerator[AsyncSession, None]:
     """Create a test database session."""
-    async_session = sessionmaker(
-        db_engine, class_=AsyncSession, expire_on_commit=False
-    )
+    async_session = sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
 
     async with async_session() as session:
         yield session
@@ -130,6 +129,7 @@ async def async_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, 
 # Billing Test Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 async def free_user(db_session: AsyncSession) -> User:
     """
@@ -180,7 +180,7 @@ async def subscribed_user(db_session: AsyncSession) -> User:
         lemonsqueezy_customer_id="12345",
         lemonsqueezy_subscription_id="67890",
         lemonsqueezy_variant_id="1",
-        subscription_expires=datetime.now(timezone.utc) + timedelta(days=30),
+        subscription_expires=datetime.now(UTC) + timedelta(days=30),
         status="active",
         email_verified=True,
     )
@@ -251,17 +251,13 @@ def valid_webhook_signature(valid_webhook_payload: dict) -> str:
 
     This signature is passed in the X-Signature header.
     """
-    import hmac
     import hashlib
+    import hmac
     import json
 
     webhook_secret = "test_webhook_secret"
     payload_bytes = json.dumps(valid_webhook_payload).encode()
-    signature = hmac.new(
-        webhook_secret.encode(),
-        payload_bytes,
-        hashlib.sha256
-    ).hexdigest()
+    signature = hmac.new(webhook_secret.encode(), payload_bytes, hashlib.sha256).hexdigest()
     return signature
 
 
@@ -288,6 +284,7 @@ def mock_lemonsqueezy_api():
 # ============================================================================
 # Knowledge Vault Test Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def sample_pdf():
@@ -423,7 +420,11 @@ async def processed_source(db_session: AsyncSession, test_user: User):
 
     Used for testing query operations that require indexed content.
     """
-    from infrastructure.database.models.knowledge import KnowledgeSource, KnowledgeChunk, SourceStatus
+    from infrastructure.database.models.knowledge import (
+        KnowledgeChunk,
+        KnowledgeSource,
+        SourceStatus,
+    )
 
     source = KnowledgeSource(
         id=str(uuid4()),
@@ -440,7 +441,7 @@ async def processed_source(db_session: AsyncSession, test_user: User):
     await db_session.flush()
 
     # Add actual chunks so query endpoint doesn't return 400
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     chunk_texts = [
         "Cognitive behavioral therapy (CBT) is a structured form of psychotherapy.",
         "Mindfulness meditation involves focusing attention on the present moment.",
@@ -567,7 +568,11 @@ async def processed_sources(db_session: AsyncSession, test_user: User):
 
     Used for testing multi-source queries and filtering.
     """
-    from infrastructure.database.models.knowledge import KnowledgeSource, KnowledgeChunk, SourceStatus
+    from infrastructure.database.models.knowledge import (
+        KnowledgeChunk,
+        KnowledgeSource,
+        SourceStatus,
+    )
 
     filenames = [
         "cbt_techniques.pdf",
@@ -596,7 +601,7 @@ async def processed_sources(db_session: AsyncSession, test_user: User):
     await db_session.flush()
 
     # Add chunks for each source
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for source in sources:
         for i in range(3):
             chunk = KnowledgeChunk(
@@ -634,12 +639,14 @@ def mock_chroma_client():
 
     # Mock common ChromaDB methods
     collection.add = Mock()
-    collection.query = Mock(return_value={
-        'ids': [['chunk1', 'chunk2']],
-        'documents': [['Document 1', 'Document 2']],
-        'distances': [[0.1, 0.2]],
-        'metadatas': [[{'source': 'test.pdf'}, {'source': 'test.pdf'}]]
-    })
+    collection.query = Mock(
+        return_value={
+            "ids": [["chunk1", "chunk2"]],
+            "documents": [["Document 1", "Document 2"]],
+            "distances": [[0.1, 0.2]],
+            "metadatas": [[{"source": "test.pdf"}, {"source": "test.pdf"}]],
+        }
+    )
     collection.delete = Mock()
     collection.count = Mock(return_value=0)
 
@@ -665,6 +672,7 @@ def mock_embedding_service():
     async def mock_embed_text(text: str):
         # Simple hash-based deterministic embedding
         import hashlib
+
         hash_val = int(hashlib.md5(text.encode()).hexdigest(), 16)
         # Generate 384-dimensional vector (common embedding size)
         embedding = [(hash_val >> i) % 100 / 100.0 for i in range(384)]
@@ -715,6 +723,7 @@ def other_auth_headers(other_user: User) -> dict:
 # ============================================================================
 # Admin Test Fixtures (Phase 9)
 # ============================================================================
+
 
 @pytest.fixture
 async def admin_user(db_session: AsyncSession) -> User:
@@ -825,6 +834,7 @@ async def suspended_user(db_session: AsyncSession) -> User:
 # ============================================================================
 # Team/Multi-tenancy Test Fixtures (Phase 10)
 # ============================================================================
+
 
 @pytest.fixture
 async def team(db_session: AsyncSession, test_user: User) -> dict:
@@ -1061,7 +1071,7 @@ async def team_invitation(db_session: AsyncSession, team: dict, test_user: User)
         role=ProjectRole.EDITOR.value,
         token=secrets.token_urlsafe(32),
         invited_by=test_user.id,
-        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+        expires_at=datetime.now(UTC) + timedelta(days=7),
         status="pending",
     )
     db_session.add(invitation)
@@ -1083,29 +1093,36 @@ async def team_invitation(db_session: AsyncSession, team: dict, test_user: User)
 async def project(team: dict) -> dict:
     return team
 
+
 @pytest.fixture
 async def project_admin(team_admin: dict) -> dict:
     return team_admin
+
 
 @pytest.fixture
 def project_admin_auth(team_admin_auth: dict) -> dict:
     return team_admin_auth
 
+
 @pytest.fixture
 async def project_member(team_member: dict) -> dict:
     return team_member
+
 
 @pytest.fixture
 def project_member_auth(team_member_auth: dict) -> dict:
     return team_member_auth
 
+
 @pytest.fixture
 async def project_viewer(team_viewer: dict) -> dict:
     return team_viewer
 
+
 @pytest.fixture
 def project_viewer_auth(team_viewer_auth: dict) -> dict:
     return team_viewer_auth
+
 
 @pytest.fixture
 async def project_invitation(team_invitation: dict) -> dict:
@@ -1116,10 +1133,12 @@ async def project_invitation(team_invitation: dict) -> dict:
 # Social Media Test Fixtures (Phase 8)
 # ============================================================================
 
+
 def _encrypt_token(value: str) -> str:
     """Encrypt a token using the app settings secret key."""
-    from infrastructure.config import get_settings
     from core.security.encryption import encrypt_credential
+    from infrastructure.config import get_settings
+
     settings = get_settings()
     return encrypt_credential(value, settings.secret_key)
 
@@ -1141,7 +1160,7 @@ async def connected_twitter_account(db_session: AsyncSession, test_user: User):
         platform_user_id="123456",
         access_token_encrypted=_encrypt_token("test_twitter_token"),
         refresh_token_encrypted=_encrypt_token("test_twitter_refresh"),
-        token_expires_at=datetime.now(timezone.utc) + timedelta(hours=2),
+        token_expires_at=datetime.now(UTC) + timedelta(hours=2),
         is_active=True,
     )
     db_session.add(account)
@@ -1166,7 +1185,7 @@ async def connected_linkedin_account(db_session: AsyncSession, test_user: User):
         platform_username="Test User",
         platform_user_id="urn:li:person:123456",
         access_token_encrypted=_encrypt_token("test_linkedin_token"),
-        token_expires_at=datetime.now(timezone.utc) + timedelta(days=60),
+        token_expires_at=datetime.now(UTC) + timedelta(days=60),
         is_active=True,
     )
     db_session.add(account)
@@ -1191,7 +1210,7 @@ async def connected_facebook_account(db_session: AsyncSession, test_user: User):
         platform_username="Test Page",
         platform_user_id="123456789",
         access_token_encrypted=_encrypt_token("test_facebook_token"),
-        token_expires_at=datetime.now(timezone.utc) + timedelta(days=60),
+        token_expires_at=datetime.now(UTC) + timedelta(days=60),
         is_active=True,
         account_metadata={"page_id": "123456789"},
     )
@@ -1227,13 +1246,13 @@ async def pending_post(
 
     Used for testing post retrieval, updates, and publishing.
     """
-    from infrastructure.database.models.social import ScheduledPost, PostTarget, PostStatus
+    from infrastructure.database.models.social import PostStatus, PostTarget, ScheduledPost
 
     post = ScheduledPost(
         id=str(uuid4()),
         user_id=test_user.id,
         content="Test pending post",
-        scheduled_at=datetime.now(timezone.utc) + timedelta(hours=2),
+        scheduled_at=datetime.now(UTC) + timedelta(hours=2),
         status=PostStatus.SCHEDULED,
     )
     db_session.add(post)
@@ -1263,15 +1282,15 @@ async def posted_post(
 
     Used for testing operations that should fail on published posts.
     """
-    from infrastructure.database.models.social import ScheduledPost, PostTarget, PostStatus
+    from infrastructure.database.models.social import PostStatus, PostTarget, ScheduledPost
 
     post = ScheduledPost(
         id=str(uuid4()),
         user_id=test_user.id,
         content="Test published post",
-        scheduled_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        scheduled_at=datetime.now(UTC) - timedelta(hours=1),
         status=PostStatus.PUBLISHED,
-        published_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        published_at=datetime.now(UTC) - timedelta(hours=1),
     )
     db_session.add(post)
     await db_session.flush()
@@ -1282,7 +1301,7 @@ async def posted_post(
         social_account_id=connected_twitter_account.id,
         is_published=True,
         platform_post_id="1234567890",
-        published_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        published_at=datetime.now(UTC) - timedelta(hours=1),
     )
     db_session.add(target)
 
@@ -1302,13 +1321,13 @@ async def failed_post(
 
     Used for testing retry operations and error handling.
     """
-    from infrastructure.database.models.social import ScheduledPost, PostTarget, PostStatus
+    from infrastructure.database.models.social import PostStatus, PostTarget, ScheduledPost
 
     post = ScheduledPost(
         id=str(uuid4()),
         user_id=test_user.id,
         content="Test failed post",
-        scheduled_at=datetime.now(timezone.utc) - timedelta(minutes=30),
+        scheduled_at=datetime.now(UTC) - timedelta(minutes=30),
         status=PostStatus.FAILED,
         publish_error="API Error: Rate limit exceeded",
     )
@@ -1340,7 +1359,7 @@ async def multiple_scheduled_posts(
 
     Used for testing pagination, filtering, and calendar views.
     """
-    from infrastructure.database.models.social import ScheduledPost, PostTarget, PostStatus
+    from infrastructure.database.models.social import PostStatus, PostTarget, ScheduledPost
 
     posts = []
 
@@ -1353,9 +1372,9 @@ async def multiple_scheduled_posts(
     ]
 
     for i, post_status in enumerate(statuses):
-        scheduled_at = datetime.now(timezone.utc) + timedelta(hours=(i + 1))
+        scheduled_at = datetime.now(UTC) + timedelta(hours=(i + 1))
         if post_status == PostStatus.PUBLISHED:
-            scheduled_at = datetime.now(timezone.utc) - timedelta(hours=1)
+            scheduled_at = datetime.now(UTC) - timedelta(hours=1)
 
         post = ScheduledPost(
             id=str(uuid4()),
@@ -1363,7 +1382,9 @@ async def multiple_scheduled_posts(
             content=f"Test post {i + 1}",
             scheduled_at=scheduled_at,
             status=post_status,
-            published_at=datetime.now(timezone.utc) - timedelta(hours=1) if post_status == PostStatus.PUBLISHED else None,
+            published_at=datetime.now(UTC) - timedelta(hours=1)
+            if post_status == PostStatus.PUBLISHED
+            else None,
         )
         db_session.add(post)
         await db_session.flush()
@@ -1376,7 +1397,7 @@ async def multiple_scheduled_posts(
                 social_account_id=account.id,
                 is_published=is_published,
                 platform_post_id=f"post_{i}_{account.platform}" if is_published else None,
-                published_at=datetime.now(timezone.utc) - timedelta(hours=1) if is_published else None,
+                published_at=datetime.now(UTC) - timedelta(hours=1) if is_published else None,
             )
             db_session.add(target)
 

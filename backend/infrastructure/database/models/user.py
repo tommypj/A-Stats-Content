@@ -3,18 +3,17 @@ User database model.
 """
 
 from datetime import datetime
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base, TimestampMixin
 
 
-class UserRole(str, Enum):
+class UserRole(StrEnum):
     """User roles enumeration."""
 
     USER = "user"
@@ -22,7 +21,7 @@ class UserRole(str, Enum):
     SUPER_ADMIN = "super_admin"
 
 
-class UserStatus(str, Enum):
+class UserStatus(StrEnum):
     """User account status enumeration."""
 
     PENDING = "pending"  # Email not verified
@@ -31,7 +30,7 @@ class UserStatus(str, Enum):
     DELETED = "deleted"  # Soft deleted
 
 
-class SubscriptionTier(str, Enum):
+class SubscriptionTier(StrEnum):
     """Subscription tier enumeration."""
 
     FREE = "free"
@@ -60,7 +59,7 @@ class User(Base, TimestampMixin):
         index=True,
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    avatar_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Authentication
     # INFRA-01: Use Text instead of String(255) — bcrypt hashes can be 60+ chars and
@@ -80,23 +79,19 @@ class User(Base, TimestampMixin):
 
     # Email verification
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    email_verification_token: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
-    )
-    email_verification_expires: Mapped[Optional[datetime]] = mapped_column(
+    email_verification_token: Mapped[str | None] = mapped_column(Text, nullable=True)
+    email_verification_expires: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
     # Password reset
-    password_reset_token: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
-    )
-    password_reset_expires: Mapped[Optional[datetime]] = mapped_column(
+    password_reset_token: Mapped[str | None] = mapped_column(Text, nullable=True)
+    password_reset_expires: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
     # Security: bumped only on password change/reset to invalidate existing tokens
-    password_changed_at: Mapped[Optional[datetime]] = mapped_column(
+    password_changed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
@@ -111,67 +106,47 @@ class User(Base, TimestampMixin):
         default="active",
         nullable=False,
     )  # active, cancelled, paused, past_due, expired
-    subscription_expires: Mapped[Optional[datetime]] = mapped_column(
+    subscription_expires: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    lemonsqueezy_customer_id: Mapped[Optional[str]] = mapped_column(
+    lemonsqueezy_customer_id: Mapped[str | None] = mapped_column(
         String(255), nullable=True, unique=True
     )
-    lemonsqueezy_subscription_id: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True
-    )
-    lemonsqueezy_variant_id: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True
-    )
+    lemonsqueezy_subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    lemonsqueezy_variant_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Preferences
     language: Mapped[str] = mapped_column(String(10), default="en", nullable=False)
-    timezone: Mapped[str] = mapped_column(
-        String(50), default="UTC", nullable=False
-    )
+    timezone: Mapped[str] = mapped_column(String(50), default="UTC", nullable=False)
 
     # Usage tracking
-    articles_generated_this_month: Mapped[int] = mapped_column(
-        default=0, nullable=False
-    )
-    outlines_generated_this_month: Mapped[int] = mapped_column(
-        default=0, nullable=False
-    )
-    images_generated_this_month: Mapped[int] = mapped_column(
-        default=0, nullable=False
-    )
-    social_posts_generated_this_month: Mapped[int] = mapped_column(
-        default=0, nullable=False
-    )
-    usage_reset_date: Mapped[Optional[datetime]] = mapped_column(
+    articles_generated_this_month: Mapped[int] = mapped_column(default=0, nullable=False)
+    outlines_generated_this_month: Mapped[int] = mapped_column(default=0, nullable=False)
+    images_generated_this_month: Mapped[int] = mapped_column(default=0, nullable=False)
+    social_posts_generated_this_month: Mapped[int] = mapped_column(default=0, nullable=False)
+    usage_reset_date: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
     # Login tracking
-    last_login: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     login_count: Mapped[int] = mapped_column(default=0, nullable=False)
 
     # Suspension fields
     # Note: redundant with status == "suspended", kept for backward compatibility
     is_suspended: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    suspended_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    suspended_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    suspended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    suspended_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Multi-tenancy - currently selected project
-    current_project_id: Mapped[Optional[str]] = mapped_column(
+    current_project_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("projects.id", ondelete="SET NULL"),
         nullable=True,
     )
 
     # Soft delete
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Indexes
     __table_args__ = (

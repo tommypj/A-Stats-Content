@@ -6,10 +6,9 @@ Revises: 010_create_team_tables
 Create Date: 2026-02-20
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
-
 
 # revision identifiers, used by Alembic.
 revision = "011"

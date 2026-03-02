@@ -3,10 +3,11 @@
 Revision ID: 039
 Revises: 038
 """
+
 from alembic import op
 
-revision = '039'
-down_revision = '038'
+revision = "039"
+down_revision = "038"
 branch_labels = None
 depends_on = None
 
@@ -16,11 +17,26 @@ def upgrade() -> None:
     # All are idempotent — skipped silently if they already exist.
     indexes = [
         # articles: most common dashboard query — project's non-deleted articles by status
-        ("ix_articles_project_status", "articles", "project_id, status", "WHERE deleted_at IS NULL"),
+        (
+            "ix_articles_project_status",
+            "articles",
+            "project_id, status",
+            "WHERE deleted_at IS NULL",
+        ),
         # articles: user's own non-deleted articles ordered by creation date
-        ("ix_articles_user_created", "articles", "user_id, created_at DESC", "WHERE deleted_at IS NULL"),
+        (
+            "ix_articles_user_created",
+            "articles",
+            "user_id, created_at DESC",
+            "WHERE deleted_at IS NULL",
+        ),
         # outlines: project's non-deleted outlines by status
-        ("ix_outlines_project_status", "outlines", "project_id, status", "WHERE deleted_at IS NULL"),
+        (
+            "ix_outlines_project_status",
+            "outlines",
+            "project_id, status",
+            "WHERE deleted_at IS NULL",
+        ),
         # generation_logs: "recent generations by user" (already has user+resource_type index;
         # this one targets time-sorted user history)
         ("ix_generation_logs_user_created", "generation_logs", "user_id, created_at DESC", None),

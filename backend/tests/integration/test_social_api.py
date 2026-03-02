@@ -8,26 +8,25 @@ Tests all social media endpoints including:
 - Publishing workflow
 """
 
-import pytest
-from datetime import datetime, date, timedelta, timezone
-from unittest.mock import AsyncMock, patch, Mock
+from datetime import UTC, date, datetime, timedelta
+from unittest.mock import patch
 from uuid import uuid4
 
+import pytest
 from fastapi import status
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from infrastructure.database.models import User
 
 # Skip all tests if social routes are not available
 try:
     from api.routes import social
     from infrastructure.database.models.social import (
-        SocialAccount,
-        ScheduledPost,
         PostStatus,
         PostTarget,
+        ScheduledPost,
+        SocialAccount,
     )
+
     SOCIAL_AVAILABLE = True
 except (ImportError, AttributeError):
     SOCIAL_AVAILABLE = False
@@ -37,6 +36,7 @@ except (ImportError, AttributeError):
 # ============================================================================
 # Account Management Tests
 # ============================================================================
+
 
 class TestAccountsEndpoint:
     """Tests for /social/accounts endpoints."""
@@ -117,7 +117,9 @@ class TestAccountsEndpoint:
         with patch("api.routes.social.settings") as mock_settings:
             mock_settings.facebook_app_id = "test_app_id"
             mock_settings.facebook_app_secret = "test_app_secret"
-            mock_settings.facebook_redirect_uri = "http://localhost:3000/api/social/facebook/callback"
+            mock_settings.facebook_redirect_uri = (
+                "http://localhost:3000/api/social/facebook/callback"
+            )
             response = await async_client.get(
                 "/api/v1/social/facebook/connect",
                 headers=auth_headers,
@@ -216,6 +218,7 @@ class TestAccountsEndpoint:
 # Post Management Tests
 # ============================================================================
 
+
 class TestPostsEndpoint:
     """Tests for /social/posts endpoints."""
 
@@ -230,7 +233,7 @@ class TestPostsEndpoint:
         if not SOCIAL_AVAILABLE:
             pytest.skip("Social routes not available")
 
-        scheduled_time = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
+        scheduled_time = (datetime.now(UTC) + timedelta(hours=2)).isoformat()
 
         response = await async_client.post(
             "/api/v1/social/posts",
@@ -259,7 +262,7 @@ class TestPostsEndpoint:
         if not SOCIAL_AVAILABLE:
             pytest.skip("Social routes not available")
 
-        scheduled_time = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
+        scheduled_time = (datetime.now(UTC) + timedelta(hours=2)).isoformat()
 
         response = await async_client.post(
             "/api/v1/social/posts",
@@ -284,7 +287,7 @@ class TestPostsEndpoint:
         if not SOCIAL_AVAILABLE:
             pytest.skip("Social routes not available")
 
-        scheduled_time = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
+        scheduled_time = (datetime.now(UTC) + timedelta(hours=2)).isoformat()
 
         # Twitter has 280 character limit
         long_content = "a" * 281
@@ -314,7 +317,7 @@ class TestPostsEndpoint:
         if not SOCIAL_AVAILABLE:
             pytest.skip("Social routes not available")
 
-        past_time = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        past_time = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
 
         response = await async_client.post(
             "/api/v1/social/posts",
@@ -408,7 +411,7 @@ class TestPostsEndpoint:
             pytest.skip("Social routes not available")
 
         new_content = "Updated post content"
-        new_time = (datetime.now(timezone.utc) + timedelta(hours=3)).isoformat()
+        new_time = (datetime.now(UTC) + timedelta(hours=3)).isoformat()
 
         response = await async_client.put(
             f"/api/v1/social/posts/{pending_post.id}",
@@ -515,6 +518,7 @@ class TestPostsEndpoint:
 # Calendar View Tests
 # ============================================================================
 
+
 class TestCalendarEndpoint:
     """Tests for /social/calendar endpoint."""
 
@@ -617,6 +621,7 @@ class TestCalendarEndpoint:
 # Statistics Tests
 # ============================================================================
 
+
 class TestStatsEndpoint:
     """Tests for /social/stats endpoint."""
 
@@ -670,6 +675,7 @@ class TestStatsEndpoint:
 # Media Upload Tests
 # ============================================================================
 
+
 class TestMediaUpload:
     """Tests for media upload functionality."""
 
@@ -684,7 +690,7 @@ class TestMediaUpload:
         if not SOCIAL_AVAILABLE:
             pytest.skip("Social routes not available")
 
-        scheduled_time = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
+        scheduled_time = (datetime.now(UTC) + timedelta(hours=2)).isoformat()
 
         response = await async_client.post(
             "/api/v1/social/posts",
@@ -714,9 +720,7 @@ class TestMediaUpload:
         pytest.skip("Media upload endpoint not yet implemented")
 
         # Create fake image file
-        files = {
-            "file": ("test.jpg", b"fake image content", "image/jpeg")
-        }
+        files = {"file": ("test.jpg", b"fake image content", "image/jpeg")}
 
         response = await async_client.post(
             "/api/v1/social/media/upload",

@@ -87,8 +87,21 @@ packages = ["api", "core", "infrastructure", "services", "adapters"]
 [tool.ruff]
 target-version = "py311"
 line-length = 100
+
+[tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]
-ignore = ["E501"]
+ignore = [
+    "E501",   # line too long
+    "B008",   # FastAPI Depends() in default args — intentional pattern
+    "B904",   # raise-without-from-cause — pedantic for this codebase
+    "N806",   # variable in function should be lowercase — SQLAlchemy conventions
+    "N817",   # CamelCase imported as non-CamelCase alias
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/conftest.py" = ["E402"]          # sys.path.insert before imports is intentional
+"tests/**/*.py" = ["F401"]              # test imports often used for side-effects/availability
+"infrastructure/database/models/*.py" = ["F821"]  # SQLAlchemy string forward refs
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

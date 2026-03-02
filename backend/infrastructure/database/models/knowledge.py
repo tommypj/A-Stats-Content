@@ -3,18 +3,17 @@ Knowledge Vault database models: KnowledgeSource, KnowledgeChunk, and KnowledgeQ
 """
 
 from datetime import datetime
-from enum import Enum
-from typing import Optional, List
+from enum import StrEnum
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, JSON, Index
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, TimestampMixin
 
 
-class SourceStatus(str, Enum):
+class SourceStatus(StrEnum):
     """Knowledge source processing status enumeration."""
 
     PENDING = "pending"
@@ -49,7 +48,7 @@ class KnowledgeSource(Base, TimestampMixin):
     )
 
     # Project ownership (optional - for multi-tenancy)
-    project_id: Mapped[Optional[str]] = mapped_column(
+    project_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=True,
@@ -65,7 +64,7 @@ class KnowledgeSource(Base, TimestampMixin):
         index=True,
     )  # pdf, txt, md, docx, html
     file_size: Mapped[int] = mapped_column(nullable=False)  # bytes
-    file_url: Mapped[Optional[str]] = mapped_column(
+    file_url: Mapped[str | None] = mapped_column(
         String(1000),
         nullable=True,
     )  # Storage URL (e.g., S3, local path)
@@ -79,26 +78,26 @@ class KnowledgeSource(Base, TimestampMixin):
     )
     chunk_count: Mapped[int] = mapped_column(default=0, nullable=False)
     char_count: Mapped[int] = mapped_column(default=0, nullable=False)
-    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Metadata
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    tags: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tags: Mapped[list | None] = mapped_column(JSON, nullable=True)
     """
     Structure:
     ["tag1", "tag2", "tag3"]
     """
 
     # Processing details
-    processing_started_at: Mapped[Optional[datetime]] = mapped_column(
+    processing_started_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    processing_completed_at: Mapped[Optional[datetime]] = mapped_column(
+    processing_completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
     # Soft delete
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+    deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True
     )
 
@@ -161,20 +160,18 @@ class KnowledgeChunk(Base):
     char_count: Mapped[int] = mapped_column(default=0, nullable=False)
 
     # Timestamp (created_at only, no updated_at needed for immutable chunks)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     # DB-09: back_populates to complete the bidirectional relationship
     source = relationship("KnowledgeSource", back_populates="chunks")
 
     # Indexes
-    __table_args__ = (
-        Index("ix_knowledge_chunks_source_index", "source_id", "chunk_index"),
-    )
+    __table_args__ = (Index("ix_knowledge_chunks_source_index", "source_id", "chunk_index"),)
 
     def __repr__(self) -> str:
-        return f"<KnowledgeChunk(id={self.id}, source_id={self.source_id}, index={self.chunk_index})>"
+        return (
+            f"<KnowledgeChunk(id={self.id}, source_id={self.source_id}, index={self.chunk_index})>"
+        )
 
 
 class KnowledgeQuery(Base, TimestampMixin):
@@ -204,8 +201,8 @@ class KnowledgeQuery(Base, TimestampMixin):
 
     # Query data
     query_text: Mapped[str] = mapped_column(Text, nullable=False)
-    response_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    sources_used: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    response_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sources_used: Mapped[list | None] = mapped_column(JSON, nullable=True)
     """
     Structure:
     [
@@ -224,12 +221,10 @@ class KnowledgeQuery(Base, TimestampMixin):
 
     # Optional: Track if query was successful
     success: Mapped[bool] = mapped_column(default=True, nullable=False)
-    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Indexes
-    __table_args__ = (
-        Index("ix_knowledge_queries_user_created", "user_id", "created_at"),
-    )
+    __table_args__ = (Index("ix_knowledge_queries_user_created", "user_id", "created_at"),)
 
     def __repr__(self) -> str:
         return f"<KnowledgeQuery(id={self.id}, query={self.query_text[:30]}, chunks={self.chunks_retrieved})>"

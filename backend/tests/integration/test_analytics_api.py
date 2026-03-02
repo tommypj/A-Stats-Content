@@ -2,21 +2,21 @@
 Integration tests for analytics API routes.
 """
 
-import pytest
-from datetime import datetime, date, timedelta, timezone
-from unittest.mock import AsyncMock, patch, Mock
+from datetime import UTC, date, datetime, timedelta
+from unittest.mock import patch
 from uuid import uuid4
 
+import pytest
 from fastapi import status
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from infrastructure.database.models import User
 from infrastructure.database.models.analytics import (
+    DailyAnalytics,
     GSCConnection,
     KeywordRanking,
     PagePerformance,
-    DailyAnalytics,
 )
 
 
@@ -118,9 +118,9 @@ class TestGSCStatusEndpoint:
             site_url="https://example.com",
             access_token="test_access_token",
             refresh_token="test_refresh_token",
-            token_expiry=datetime.now(timezone.utc) + timedelta(hours=1),
+            token_expiry=datetime.now(UTC) + timedelta(hours=1),
             is_active=True,
-            last_sync=datetime.now(timezone.utc),
+            last_sync=datetime.now(UTC),
         )
         db_session.add(connection)
         await db_session.commit()
@@ -164,7 +164,7 @@ class TestDisconnectGSCEndpoint:
             site_url="https://example.com",
             access_token="test_access_token",
             refresh_token="test_refresh_token",
-            token_expiry=datetime.now(timezone.utc) + timedelta(hours=1),
+            token_expiry=datetime.now(UTC) + timedelta(hours=1),
             is_active=True,
         )
         db_session.add(connection)
@@ -240,7 +240,7 @@ class TestGetKeywordsEndpoint:
             site_url="https://example.com",
             access_token="test_access_token",
             refresh_token="test_refresh_token",
-            token_expiry=datetime.now(timezone.utc) + timedelta(hours=1),
+            token_expiry=datetime.now(UTC) + timedelta(hours=1),
             is_active=True,
         )
         db_session.add(connection)
@@ -274,7 +274,7 @@ class TestGetKeywordsEndpoint:
             site_url="https://example.com",
             access_token="test_access_token",
             refresh_token="test_refresh_token",
-            token_expiry=datetime.now(timezone.utc) + timedelta(hours=1),
+            token_expiry=datetime.now(UTC) + timedelta(hours=1),
             is_active=True,
         )
         db_session.add(connection)
@@ -325,7 +325,7 @@ class TestGetKeywordsEndpoint:
             site_url="https://example.com",
             access_token="test_access_token",
             refresh_token="test_refresh_token",
-            token_expiry=datetime.now(timezone.utc) + timedelta(hours=1),
+            token_expiry=datetime.now(UTC) + timedelta(hours=1),
             is_active=True,
         )
         db_session.add(connection)
@@ -376,7 +376,7 @@ class TestGetKeywordsEndpoint:
             site_url="https://example.com",
             access_token="test_access_token",
             refresh_token="test_refresh_token",
-            token_expiry=datetime.now(timezone.utc) + timedelta(hours=1),
+            token_expiry=datetime.now(UTC) + timedelta(hours=1),
             is_active=True,
         )
         db_session.add(connection)
@@ -464,7 +464,7 @@ class TestGetPagesEndpoint:
             site_url="https://example.com",
             access_token="test_access_token",
             refresh_token="test_refresh_token",
-            token_expiry=datetime.now(timezone.utc) + timedelta(hours=1),
+            token_expiry=datetime.now(UTC) + timedelta(hours=1),
             is_active=True,
         )
         db_session.add(connection)
@@ -515,7 +515,7 @@ class TestGetPagesEndpoint:
             site_url="https://example.com",
             access_token="test_access_token",
             refresh_token="test_refresh_token",
-            token_expiry=datetime.now(timezone.utc) + timedelta(hours=1),
+            token_expiry=datetime.now(UTC) + timedelta(hours=1),
             is_active=True,
         )
         db_session.add(connection)
@@ -596,7 +596,7 @@ class TestGetDailyAnalyticsEndpoint:
             site_url="https://example.com",
             access_token="test_access_token",
             refresh_token="test_refresh_token",
-            token_expiry=datetime.now(timezone.utc) + timedelta(hours=1),
+            token_expiry=datetime.now(UTC) + timedelta(hours=1),
             is_active=True,
         )
         db_session.add(connection)
@@ -643,7 +643,7 @@ class TestGetDailyAnalyticsEndpoint:
             site_url="https://example.com",
             access_token="test_access_token",
             refresh_token="test_refresh_token",
-            token_expiry=datetime.now(timezone.utc) + timedelta(hours=1),
+            token_expiry=datetime.now(UTC) + timedelta(hours=1),
             is_active=True,
         )
         db_session.add(connection)
@@ -712,7 +712,7 @@ class TestGetAnalyticsSummaryEndpoint:
             site_url="https://example.com",
             access_token="test_access_token",
             refresh_token="test_refresh_token",
-            token_expiry=datetime.now(timezone.utc) + timedelta(hours=1),
+            token_expiry=datetime.now(UTC) + timedelta(hours=1),
             is_active=True,
         )
         db_session.add(connection)
@@ -814,7 +814,7 @@ class TestGetAnalyticsSummaryEndpoint:
             site_url="https://example.com",
             access_token="test_access_token",
             refresh_token="test_refresh_token",
-            token_expiry=datetime.now(timezone.utc) + timedelta(hours=1),
+            token_expiry=datetime.now(UTC) + timedelta(hours=1),
             is_active=True,
         )
         db_session.add(connection)
@@ -850,7 +850,7 @@ class TestGetAnalyticsSummaryEndpoint:
             site_url="https://example.com",
             access_token="test_access_token",
             refresh_token="test_refresh_token",
-            token_expiry=datetime.now(timezone.utc) + timedelta(hours=1),
+            token_expiry=datetime.now(UTC) + timedelta(hours=1),
             is_active=True,
         )
         db_session.add(connection)

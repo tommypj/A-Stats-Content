@@ -3,18 +3,29 @@ Content database models: Outline and Article.
 """
 
 from datetime import datetime
-from enum import Enum
-from typing import Optional, List
+from enum import StrEnum
+from typing import Optional
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, JSON, Float, UniqueConstraint, func
+from sqlalchemy import (
+    JSON,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, TimestampMixin
 
 
-class ContentStatus(str, Enum):
+class ContentStatus(StrEnum):
     """Content status enumeration."""
 
     DRAFT = "draft"
@@ -24,7 +35,7 @@ class ContentStatus(str, Enum):
     FAILED = "failed"
 
 
-class ContentTone(str, Enum):
+class ContentTone(StrEnum):
     """Content tone enumeration."""
 
     PROFESSIONAL = "professional"
@@ -55,7 +66,7 @@ class Outline(Base, TimestampMixin):
     )
 
     # Project ownership (optional - for multi-tenancy)
-    project_id: Mapped[Optional[str]] = mapped_column(
+    project_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=True,
@@ -65,7 +76,7 @@ class Outline(Base, TimestampMixin):
     # Content
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     keyword: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    target_audience: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    target_audience: Mapped[str | None] = mapped_column(String(500), nullable=True)
     tone: Mapped[str] = mapped_column(
         String(50),
         default=ContentTone.PROFESSIONAL.value,
@@ -73,7 +84,7 @@ class Outline(Base, TimestampMixin):
     )
 
     # Structure (JSON array of sections)
-    sections: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    sections: Mapped[list | None] = mapped_column(JSON, nullable=True)
     """
     Structure:
     [
@@ -95,28 +106,26 @@ class Outline(Base, TimestampMixin):
         index=True,
     )
     word_count_target: Mapped[int] = mapped_column(default=1500, nullable=False)
-    estimated_read_time: Mapped[Optional[int]] = mapped_column(nullable=True)  # minutes
+    estimated_read_time: Mapped[int | None] = mapped_column(nullable=True)  # minutes
 
     # AI Generation
-    ai_model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    generation_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    generation_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ai_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    generation_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    generation_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Soft delete
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+    deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True
     )
 
     # Relationships
-    articles: Mapped[List["Article"]] = relationship(
+    articles: Mapped[list["Article"]] = relationship(
         "Article",
         back_populates="outline",
         cascade="all, delete-orphan",
     )
 
-    __table_args__ = (
-        Index("ix_outlines_created_at", "created_at"),
-    )
+    __table_args__ = (Index("ix_outlines_created_at", "created_at"),)
 
     def __repr__(self) -> str:
         return f"<Outline(id={self.id}, title={self.title[:30]}, status={self.status})>"
@@ -150,7 +159,7 @@ class Article(Base, TimestampMixin):
     )
 
     # Project ownership (optional - for multi-tenancy)
-    project_id: Mapped[Optional[str]] = mapped_column(
+    project_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=True,
@@ -158,7 +167,7 @@ class Article(Base, TimestampMixin):
     )
 
     # Optional outline reference
-    outline_id: Mapped[Optional[str]] = mapped_column(
+    outline_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("outlines.id", ondelete="SET NULL"),
         nullable=True,
@@ -167,11 +176,11 @@ class Article(Base, TimestampMixin):
 
     # Content
     title: Mapped[str] = mapped_column(String(500), nullable=False)
-    slug: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    slug: Mapped[str | None] = mapped_column(String(500), nullable=True)
     keyword: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    meta_description: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
-    content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    content_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    meta_description: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    content_html: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Metadata
     status: Mapped[str] = mapped_column(
@@ -181,12 +190,14 @@ class Article(Base, TimestampMixin):
         index=True,
     )
     word_count: Mapped[int] = mapped_column(default=0, nullable=False)
-    read_time: Mapped[Optional[int]] = mapped_column(nullable=True)  # minutes
-    improve_count: Mapped[int] = mapped_column(default=0, nullable=False)  # AI improvement passes used (max = ARTICLE_IMPROVE_LIMIT)
+    read_time: Mapped[int | None] = mapped_column(nullable=True)  # minutes
+    improve_count: Mapped[int] = mapped_column(
+        default=0, nullable=False
+    )  # AI improvement passes used (max = ARTICLE_IMPROVE_LIMIT)
 
     # SEO
-    seo_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    seo_analysis: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    seo_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    seo_analysis: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     """
     Structure:
     {
@@ -203,28 +214,26 @@ class Article(Base, TimestampMixin):
     """
 
     # AI Generation
-    ai_model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    generation_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    generation_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    image_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ai_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    generation_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    generation_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    image_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Soft delete
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+    deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True
     )
 
     # Publishing
-    published_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    published_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    wordpress_post_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    wordpress_post_id: Mapped[int | None] = mapped_column(nullable=True)
 
     # Social media posts (AI-generated content for sharing)
-    social_posts: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    social_posts: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Featured image
-    featured_image_id: Mapped[Optional[str]] = mapped_column(
+    featured_image_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("generated_images.id", ondelete="SET NULL"),
         nullable=True,
@@ -236,7 +245,7 @@ class Article(Base, TimestampMixin):
         "Outline",
         back_populates="articles",
     )
-    images: Mapped[List["GeneratedImage"]] = relationship(
+    images: Mapped[list["GeneratedImage"]] = relationship(
         "GeneratedImage",
         back_populates="article",
         foreign_keys="GeneratedImage.article_id",
@@ -275,7 +284,7 @@ class ArticleRevision(Base):
         nullable=False,
         index=True,
     )
-    created_by: Mapped[Optional[str]] = mapped_column(
+    created_by: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
@@ -283,10 +292,10 @@ class ArticleRevision(Base):
     )
 
     # Snapshot content
-    content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    content_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    content_html: Mapped[str | None] = mapped_column(Text, nullable=True)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
-    meta_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    meta_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     word_count: Mapped[int] = mapped_column(Integer, default=0)
 
     # Revision metadata
@@ -324,7 +333,7 @@ class GeneratedImage(Base, TimestampMixin):
     )
 
     # Project ownership (optional - for multi-tenancy)
-    project_id: Mapped[Optional[str]] = mapped_column(
+    project_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=True,
@@ -332,7 +341,7 @@ class GeneratedImage(Base, TimestampMixin):
     )
 
     # Optional article reference
-    article_id: Mapped[Optional[str]] = mapped_column(
+    article_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("articles.id", ondelete="SET NULL"),
         nullable=True,
@@ -342,14 +351,14 @@ class GeneratedImage(Base, TimestampMixin):
     # Image data
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     url: Mapped[str] = mapped_column(String(1000), nullable=False)
-    local_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    alt_text: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    local_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    alt_text: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Generation metadata
-    style: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    width: Mapped[Optional[int]] = mapped_column(nullable=True)
-    height: Mapped[Optional[int]] = mapped_column(nullable=True)
+    style: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    width: Mapped[int | None] = mapped_column(nullable=True)
+    height: Mapped[int | None] = mapped_column(nullable=True)
 
     # Status
     status: Mapped[str] = mapped_column(
@@ -365,9 +374,7 @@ class GeneratedImage(Base, TimestampMixin):
         foreign_keys=[article_id],
     )
 
-    __table_args__ = (
-        Index("ix_generated_images_created_at", "created_at"),
-    )
+    __table_args__ = (Index("ix_generated_images_created_at", "created_at"),)
 
     def __repr__(self) -> str:
         return f"<GeneratedImage(id={self.id}, prompt={self.prompt[:30]})>"

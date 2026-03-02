@@ -6,14 +6,11 @@ with image generation workflows (e.g., Replicate).
 """
 
 import asyncio
-from typing import Optional
-from adapters.storage import storage_adapter, download_image
+
+from adapters.storage import download_image, storage_adapter
 
 
-async def save_generated_image_from_url(
-    image_url: str,
-    filename: Optional[str] = None
-) -> str:
+async def save_generated_image_from_url(image_url: str, filename: str | None = None) -> str:
     """
     Download and save an image from a URL (e.g., Replicate output).
 
@@ -45,10 +42,7 @@ async def save_generated_image_from_url(
     return public_url
 
 
-async def save_image_bytes(
-    image_data: bytes,
-    filename: str
-) -> tuple[str, str]:
+async def save_image_bytes(image_data: bytes, filename: str) -> tuple[str, str]:
     """
     Save raw image bytes to storage.
 
@@ -97,10 +91,7 @@ class ImageGenerationUseCase:
         self.storage = storage_adapter
 
     async def generate_and_save(
-        self,
-        prompt: str,
-        user_id: int,
-        project_id: Optional[int] = None
+        self, prompt: str, user_id: int, project_id: int | None = None
     ) -> dict:
         """
         Generate an image and save it to storage.
@@ -127,12 +118,13 @@ class ImageGenerationUseCase:
         # image_data = await download_image(image_url)
 
         # For this example, create a mock image
-        image_data = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00'
+        image_data = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00"
 
         # Create organized filename
         from datetime import datetime
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        safe_prompt = prompt[:30].replace(' ', '_').replace('/', '_')
+        safe_prompt = prompt[:30].replace(" ", "_").replace("/", "_")
         filename = f"user_{user_id}_{safe_prompt}_{timestamp}.png"
 
         # Save to storage
@@ -173,7 +165,7 @@ async def example_route_handler():
 
     # Example 2: Save raw bytes
     print("=== Example 2: Save raw bytes ===")
-    mock_image = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00'
+    mock_image = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00"
     storage_path, public_url = await save_image_bytes(mock_image, "test_image.png")
     print(f"Storage path: {storage_path}")
     print(f"Public URL: {public_url}")
@@ -183,9 +175,7 @@ async def example_route_handler():
     print("=== Example 3: Use Case Integration ===")
     use_case = ImageGenerationUseCase()
     result = await use_case.generate_and_save(
-        prompt="A serene mountain landscape at sunset",
-        user_id=123,
-        project_id=456
+        prompt="A serene mountain landscape at sunset", user_id=123, project_id=456
     )
     print("Generation result:", result)
     print()

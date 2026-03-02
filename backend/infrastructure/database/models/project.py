@@ -2,20 +2,29 @@
 Project and multi-tenancy database models.
 """
 
-from datetime import datetime, timedelta, timezone
-from enum import Enum
-from typing import Optional
-from uuid import uuid4
 import secrets
+from datetime import UTC, datetime, timedelta
+from enum import StrEnum
+from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, JSON, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, TimestampMixin
 
 
-class ProjectMemberRole(str, Enum):
+class ProjectMemberRole(StrEnum):
     """Project member role enumeration."""
 
     OWNER = "owner"  # Full control, can delete project
@@ -24,7 +33,7 @@ class ProjectMemberRole(str, Enum):
     VIEWER = "viewer"  # Read-only access
 
 
-class InvitationStatus(str, Enum):
+class InvitationStatus(StrEnum):
     """Project invitation status enumeration."""
 
     PENDING = "pending"  # Waiting for user to accept
@@ -47,11 +56,9 @@ class Project(Base, TimestampMixin):
 
     # Basic info
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    slug: Mapped[str] = mapped_column(
-        String(255), nullable=False, index=True
-    )
-    avatar_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    slug: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_personal: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Owner (creator of the project)
@@ -63,50 +70,36 @@ class Project(Base, TimestampMixin):
     )
 
     # Billing
-    subscription_tier: Mapped[str] = mapped_column(
-        String(50), default="free", nullable=False
-    )
-    subscription_status: Mapped[str] = mapped_column(
-        String(50), default="active", nullable=False
-    )
-    subscription_expires: Mapped[Optional[datetime]] = mapped_column(
+    subscription_tier: Mapped[str] = mapped_column(String(50), default="free", nullable=False)
+    subscription_status: Mapped[str] = mapped_column(String(50), default="active", nullable=False)
+    subscription_expires: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    lemonsqueezy_customer_id: Mapped[Optional[str]] = mapped_column(
+    lemonsqueezy_customer_id: Mapped[str | None] = mapped_column(
         String(255), nullable=True, unique=True
     )
-    lemonsqueezy_subscription_id: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True
-    )
+    lemonsqueezy_subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # BILL-07: Store variant_id separately so the frontend can determine the current plan variant.
-    lemonsqueezy_variant_id: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True
-    )
+    lemonsqueezy_variant_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Project limits (shared across all members)
     max_members: Mapped[int] = mapped_column(default=5, nullable=False)
-    articles_generated_this_month: Mapped[int] = mapped_column(
-        default=0, nullable=False
-    )
-    outlines_generated_this_month: Mapped[int] = mapped_column(
-        default=0, nullable=False
-    )
+    articles_generated_this_month: Mapped[int] = mapped_column(default=0, nullable=False)
+    outlines_generated_this_month: Mapped[int] = mapped_column(default=0, nullable=False)
     images_generated_this_month: Mapped[int] = mapped_column(default=0, nullable=False)
     social_posts_generated_this_month: Mapped[int] = mapped_column(default=0, nullable=False)
-    usage_reset_date: Mapped[Optional[datetime]] = mapped_column(
+    usage_reset_date: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
     # WordPress integration
-    wordpress_credentials: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    wordpress_credentials: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Brand voice settings (tone, writing_style, target_audience, custom_instructions, language)
-    brand_voice: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    brand_voice: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Soft delete
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     owner = relationship("User", foreign_keys=[owner_id], lazy="joined")
@@ -177,7 +170,7 @@ class ProjectMember(Base, TimestampMixin):
     )
 
     # Invitation tracking
-    invited_by: Mapped[Optional[str]] = mapped_column(
+    invited_by: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
@@ -187,8 +180,10 @@ class ProjectMember(Base, TimestampMixin):
     )
 
     # Soft delete
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True, index=True  # DB-06: index for deleted_at IS NULL filters
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        index=True,  # DB-06: index for deleted_at IS NULL filters
     )
 
     # Relationships
@@ -237,7 +232,7 @@ class ProjectInvitation(Base, TimestampMixin):
         index=True,
     )
     # PROJ-09: SET NULL (not CASCADE) so deleting the inviter preserves the audit trail.
-    invited_by: Mapped[Optional[str]] = mapped_column(
+    invited_by: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
@@ -265,41 +260,33 @@ class ProjectInvitation(Base, TimestampMixin):
     )
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc) + timedelta(days=7),
+        default=lambda: datetime.now(UTC) + timedelta(days=7),
         nullable=False,
     )
 
     # Acceptance tracking
-    accepted_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    accepted_by_user_id: Mapped[Optional[str]] = mapped_column(
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    accepted_by_user_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
 
     # Revocation tracking
-    revoked_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    revoked_by: Mapped[Optional[str]] = mapped_column(
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_by: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
 
     # Soft delete (PROJ-03: required for GDPR compliance and consistency with all other models)
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     project = relationship("Project", back_populates="invitations")
     inviter = relationship("User", foreign_keys=[invited_by], lazy="joined")
-    accepted_by = relationship(
-        "User", foreign_keys=[accepted_by_user_id], lazy="joined"
-    )
+    accepted_by = relationship("User", foreign_keys=[accepted_by_user_id], lazy="joined")
     revoker = relationship("User", foreign_keys=[revoked_by], lazy="joined")
 
     # Indexes
@@ -323,14 +310,11 @@ class ProjectInvitation(Base, TimestampMixin):
         """Check if invitation has expired."""
         if self.status == InvitationStatus.EXPIRED.value:
             return True
-        return datetime.now(timezone.utc) > self.expires_at
+        return datetime.now(UTC) > self.expires_at
 
     def can_accept(self) -> bool:
         """Check if invitation can be accepted."""
-        return (
-            self.status == InvitationStatus.PENDING.value
-            and not self.is_expired
-        )
+        return self.status == InvitationStatus.PENDING.value and not self.is_expired
 
     def can_resend(self) -> bool:
         """Check if invitation can be resent."""

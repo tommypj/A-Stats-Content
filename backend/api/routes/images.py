@@ -6,29 +6,28 @@ import asyncio
 import logging
 import math
 import time
-from typing import Optional
 from uuid import uuid4
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
-from api.middleware.rate_limit import limiter
-from sqlalchemy import select, func, delete
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from adapters.ai.replicate_adapter import image_ai_service
+from adapters.storage.image_storage import download_image, storage_adapter
+from api.middleware.rate_limit import limiter
+from api.routes.auth import get_current_user
 from api.schemas.content import (
-    ImageGenerateRequest,
-    ImageSetFeaturedRequest,
-    ImageResponse,
-    ImageListResponse,
     BulkDeleteRequest,
     BulkDeleteResponse,
+    ImageGenerateRequest,
+    ImageListResponse,
+    ImageResponse,
+    ImageSetFeaturedRequest,
 )
-from api.routes.auth import get_current_user
-from infrastructure.database.connection import get_db, async_session_maker
-from infrastructure.database.models import GeneratedImage, Article, User, ContentStatus
-from adapters.ai.replicate_adapter import image_ai_service
-from adapters.storage.image_storage import storage_adapter, download_image
+from infrastructure.database.connection import async_session_maker, get_db
+from infrastructure.database.models import Article, GeneratedImage, User
 from services.generation_tracker import GenerationTracker
 from services.task_queue import task_queue
 
@@ -47,14 +46,15 @@ _image_generation_semaphore = asyncio.Semaphore(IMAGE_GENERATION_CONCURRENCY)
 # Background image generation helpers
 # ---------------------------------------------------------------------------
 
+
 async def _run_image_generation(
     image_id: str,
     user_id: str,
-    project_id: Optional[str],
+    project_id: str | None,
     prompt: str,
-    style: Optional[str],
-    width: Optional[int],
-    height: Optional[int],
+    style: str | None,
+    width: int | None,
+    height: int | None,
 ) -> None:
     """
     Inner implementation of background image generation.
@@ -70,9 +70,7 @@ async def _run_image_generation(
 
         try:
             # Fetch the image record that was pre-created by the endpoint
-            result = await db.execute(
-                select(GeneratedImage).where(GeneratedImage.id == image_id)
-            )
+            result = await db.execute(select(GeneratedImage).where(GeneratedImage.id == image_id))
             image = result.scalar_one_or_none()
             if not image:
                 logger.error("Background image generation: record %s not found", image_id)
@@ -104,7 +102,7 @@ async def _run_image_generation(
                     ),
                     timeout=120.0,  # 2-minute hard limit
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # IMG-25: Mark record as failed on timeout so callers see a terminal state
                 image.status = "failed"
                 image.error_message = "Generation timed out"
@@ -147,9 +145,7 @@ async def _run_image_generation(
                         )
                     raise
             except (httpx.HTTPError, OSError, ValueError) as dl_err:
-                logger.warning(
-                    "Failed to cache image locally for %s: %s", image_id, dl_err
-                )
+                logger.warning("Failed to cache image locally for %s: %s", image_id, dl_err)
 
             logger.info("Image %s generated successfully", image_id)
 
@@ -184,7 +180,7 @@ async def _run_image_generation(
                             duration_ms=duration_ms,
                         )
                         await tracker_db.commit()
-                except (OSError, SQLAlchemyError) as log_err:
+                except (OSError, SQLAlchemyError):
                     logger.error(
                         "Failed to log image generation failure for %s", image_id, exc_info=True
                     )
@@ -193,11 +189,11 @@ async def _run_image_generation(
 async def _generate_image_background(
     image_id: str,
     user_id: str,
-    project_id: Optional[str],
+    project_id: str | None,
     prompt: str,
-    style: Optional[str],
-    width: Optional[int],
-    height: Optional[int],
+    style: str | None,
+    width: int | None,
+    height: int | None,
 ) -> None:
     """Background task wrapper that acquires the semaphore before calling the inner impl."""
     async with _image_generation_semaphore:
@@ -215,6 +211,7 @@ async def _generate_image_background(
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
 
 @router.post("/generate", response_model=ImageResponse, status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit("10/minute")
@@ -298,7 +295,7 @@ async def generate_image(
 async def list_images(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    article_id: Optional[str] = None,
+    article_id: str | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -307,7 +304,9 @@ async def list_images(
     """
     # Base query
     if current_user.current_project_id:
-        query = select(GeneratedImage).where(GeneratedImage.project_id == current_user.current_project_id)
+        query = select(GeneratedImage).where(
+            GeneratedImage.project_id == current_user.current_project_id
+        )
     else:
         query = select(GeneratedImage).where(
             GeneratedImage.user_id == current_user.id,
@@ -360,21 +359,15 @@ async def bulk_delete_images(
         return BulkDeleteResponse(deleted=0)
 
     if current_user.current_project_id:
-        stmt = (
-            delete(GeneratedImage)
-            .where(
-                GeneratedImage.id.in_(body.ids),
-                GeneratedImage.project_id == current_user.current_project_id,
-            )
+        stmt = delete(GeneratedImage).where(
+            GeneratedImage.id.in_(body.ids),
+            GeneratedImage.project_id == current_user.current_project_id,
         )
     else:
-        stmt = (
-            delete(GeneratedImage)
-            .where(
-                GeneratedImage.id.in_(body.ids),
-                GeneratedImage.user_id == current_user.id,
-                GeneratedImage.project_id.is_(None),
-            )
+        stmt = delete(GeneratedImage).where(
+            GeneratedImage.id.in_(body.ids),
+            GeneratedImage.user_id == current_user.id,
+            GeneratedImage.project_id.is_(None),
         )
 
     result = await db.execute(stmt)

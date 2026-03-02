@@ -5,13 +5,12 @@ Provides Redis-based queue management for more reliable scheduling.
 Falls back to database polling if Redis is unavailable.
 """
 
-import json
 import logging
-from datetime import datetime, timezone
-from typing import Optional, List
+from datetime import UTC, datetime
 
 try:
     import redis.asyncio as redis
+
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
@@ -35,7 +34,7 @@ class PostQueueManager:
     PROCESSING_SET = "social:processing_posts"
 
     def __init__(self):
-        self.redis: Optional[redis.Redis] = None
+        self.redis: redis.Redis | None = None
         self._connected = False
 
     async def connect(self):
@@ -47,8 +46,7 @@ class PostQueueManager:
         """
         if not REDIS_AVAILABLE:
             logger.warning(
-                "redis.asyncio is not available. "
-                "Install with: pip install redis[asyncio]"
+                "redis.asyncio is not available. Install with: pip install redis[asyncio]"
             )
             return
 
@@ -108,7 +106,7 @@ class PostQueueManager:
             logger.error(f"Failed to schedule post in Redis: {e}")
             return False
 
-    async def get_due_posts(self, limit: int = 100) -> List[str]:
+    async def get_due_posts(self, limit: int = 100) -> list[str]:
         """
         Get posts that are due for publishing.
 
@@ -122,7 +120,7 @@ class PostQueueManager:
             return []
 
         try:
-            now = datetime.now(timezone.utc).timestamp()
+            now = datetime.now(UTC).timestamp()
 
             # Get posts with score <= now (sorted by timestamp)
             posts = await self.redis.zrangebyscore(
@@ -317,7 +315,7 @@ class PostQueueManager:
                 # Simple recovery: move back to scheduled with current time
                 # A more sophisticated approach would check actual processing time
                 await self.redis.srem(self.PROCESSING_SET, post_id)
-                await self.schedule_post(post_id, datetime.now(timezone.utc))
+                await self.schedule_post(post_id, datetime.now(UTC))
                 recovered += 1
 
             if recovered > 0:

@@ -6,18 +6,19 @@ Supports OpenAI embeddings via API or mock embeddings for development.
 
 import hashlib
 import logging
-from enum import Enum
-from typing import List, Optional
+from enum import StrEnum
 
 import httpx
 
+from infrastructure.config.settings import settings
 
-class EmbeddingProvider(str, Enum):
+
+class EmbeddingProvider(StrEnum):
     """Supported embedding providers."""
+
     OPENAI = "openai"
     MOCK = "mock"
 
-from infrastructure.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +45,7 @@ class EmbeddingService:
         "text-embedding-ada-002": 1536,
     }
 
-    def __init__(
-        self, api_key: Optional[str] = None, model: str = "text-embedding-3-small"
-    ):
+    def __init__(self, api_key: str | None = None, model: str = "text-embedding-3-small"):
         """
         Initialize embedding service.
 
@@ -58,11 +57,9 @@ class EmbeddingService:
         self.model = model or settings.embedding_model
 
         if not self.api_key:
-            logger.warning(
-                "OpenAI API key not provided. Using mock embeddings for development."
-            )
+            logger.warning("OpenAI API key not provided. Using mock embeddings for development.")
 
-    async def embed_text(self, text: str) -> List[float]:
+    async def embed_text(self, text: str) -> list[float]:
         """
         Generate embedding for a single text.
 
@@ -109,7 +106,7 @@ class EmbeddingService:
             logger.error(f"Unexpected error generating embedding: {e}")
             raise EmbeddingError(f"Embedding generation failed: {e}")
 
-    async def embed_texts(self, texts: List[str]) -> List[List[float]]:
+    async def embed_texts(self, texts: list[str]) -> list[list[float]]:
         """
         Generate embeddings for multiple texts (batched).
 
@@ -147,9 +144,7 @@ class EmbeddingService:
                 embeddings = [item["embedding"] for item in items if "embedding" in item]
                 if not embeddings:
                     raise EmbeddingError("OpenAI API returned no embedding vectors")
-                logger.info(
-                    f"Generated {len(embeddings)} embeddings using model {self.model}"
-                )
+                logger.info(f"Generated {len(embeddings)} embeddings using model {self.model}")
                 return embeddings
 
         except httpx.HTTPStatusError as e:
@@ -159,7 +154,7 @@ class EmbeddingService:
             logger.error(f"Unexpected error generating embeddings: {e}")
             raise EmbeddingError(f"Batch embedding generation failed: {e}")
 
-    async def embed_text_mock(self, text: str) -> List[float]:
+    async def embed_text_mock(self, text: str) -> list[float]:
         """
         Generate mock embedding for development without API key.
 

@@ -4,16 +4,11 @@ Knowledge vault adapters for document processing and RAG.
 
 from .chroma_adapter import (
     ChromaAdapter,
-    ChromaDBError,
     ChromaDBConnectionError,
+    ChromaDBError,
     Document,
     QueryResult,
     get_chroma_adapter,
-)
-from .embedding_service import (
-    EmbeddingService,
-    EmbeddingError,
-    embedding_service,
 )
 from .document_processor import (
     DocumentProcessor,
@@ -21,6 +16,11 @@ from .document_processor import (
     ProcessedChunk,
     ProcessedDocument,
     document_processor,
+)
+from .embedding_service import (
+    EmbeddingError,
+    EmbeddingService,
+    embedding_service,
 )
 
 __all__ = [

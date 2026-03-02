@@ -2,79 +2,77 @@
 Analytics API routes for Google Search Console integration.
 """
 
+import logging
 import math
-from datetime import date, datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, date, datetime, timedelta
 from urllib.parse import urlencode, urlparse, urlunparse
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy import select, func, and_, or_, desc, delete
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import and_, delete, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.oauth_helpers import require_valid_oauth_state, store_oauth_state
+from api.routes.auth import get_current_user
 from api.schemas.analytics import (
-    GSCConnectResponse,
-    GSCCallbackRequest,
-    GSCConnectionStatus,
-    GSCSiteResponse,
-    GSCSiteListResponse,
-    GSCSelectSiteRequest,
-    GSCSyncResponse,
-    GSCDisconnectResponse,
-    KeywordRankingResponse,
-    KeywordRankingListResponse,
-    PagePerformanceResponse,
-    PagePerformanceListResponse,
-    DailyAnalyticsResponse,
-    DailyAnalyticsListResponse,
+    AEOArticleSummary,
+    AEOOverviewResponse,
     AnalyticsSummaryResponse,
-    TrendData,
-    ArticlePerformanceItem,
-    ArticlePerformanceListResponse,
     ArticleDailyPerformance,
     ArticlePerformanceDetailResponse,
-    KeywordOpportunity,
-    ContentOpportunitiesResponse,
-    ContentSuggestionRequest,
-    ContentSuggestion,
-    ContentSuggestionsResponse,
-    ContentDecayAlertResponse,
+    ArticlePerformanceItem,
+    ArticlePerformanceListResponse,
     ContentDecayAlertListResponse,
+    ContentDecayAlertResponse,
     ContentHealthSummaryResponse,
-    DecayRecoverySuggestionsResponse,
-    RunDecayDetectionResponse,
-    AEOOverviewResponse,
-    AEOArticleSummary,
-    ConversionGoalResponse,
+    ContentOpportunitiesResponse,
+    ContentSuggestion,
+    ContentSuggestionRequest,
+    ContentSuggestionsResponse,
     ConversionGoalListResponse,
-    CreateConversionGoalRequest,
-    UpdateConversionGoalRequest,
-    RevenueOverviewResponse,
-    RevenueByArticleListResponse,
-    RevenueByKeywordListResponse,
-    ImportConversionsRequest,
-    ImportConversionsResponse,
-    RevenueReportResponse,
-    DeviceBreakdownItem,
-    DeviceBreakdownResponse,
+    ConversionGoalResponse,
     CountryBreakdownItem,
     CountryBreakdownResponse,
+    CreateConversionGoalRequest,
+    DailyAnalyticsListResponse,
+    DecayRecoverySuggestionsResponse,
+    DeviceBreakdownItem,
+    DeviceBreakdownResponse,
+    GSCConnectionStatus,
+    GSCConnectResponse,
+    GSCDisconnectResponse,
+    GSCSelectSiteRequest,
+    GSCSiteListResponse,
+    GSCSiteResponse,
+    GSCSyncResponse,
+    ImportConversionsRequest,
+    ImportConversionsResponse,
+    KeywordOpportunity,
+    KeywordRankingListResponse,
+    PagePerformanceListResponse,
+    RevenueByArticleListResponse,
+    RevenueByKeywordListResponse,
+    RevenueOverviewResponse,
+    RevenueReportResponse,
+    RunDecayDetectionResponse,
+    TrendData,
+    UpdateConversionGoalRequest,
 )
-from api.routes.auth import get_current_user
-from api.oauth_helpers import store_oauth_state, require_valid_oauth_state
 from api.utils import escape_like
+from infrastructure.config.settings import settings
 from infrastructure.database.connection import get_db
 from infrastructure.database.models import User
 from infrastructure.database.models.analytics import (
+    ContentDecayAlert,
+    DailyAnalytics,
     GSCConnection,
     KeywordRanking,
     PagePerformance,
-    DailyAnalytics,
-    ContentDecayAlert,
 )
-from infrastructure.database.models.revenue import ConversionGoal, ContentConversion, RevenueReport
 from infrastructure.database.models.content import Article
-from infrastructure.config.settings import settings
+from infrastructure.database.models.revenue import ContentConversion, ConversionGoal
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -120,18 +118,16 @@ def calculate_trend(current: float, previous: float) -> TrendData:
 
 
 async def get_gsc_connection(
-    user_id: str, db: AsyncSession, project_id: Optional[str] = None
-) -> Optional[GSCConnection]:
+    user_id: str, db: AsyncSession, project_id: str | None = None
+) -> GSCConnection | None:
     """Get user's GSC connection, optionally filtered by project_id."""
     conditions = [
         GSCConnection.user_id == user_id,
-        GSCConnection.is_active == True,
+        GSCConnection.is_active,
     ]
     if project_id:
         conditions.append(GSCConnection.project_id == project_id)
-    result = await db.execute(
-        select(GSCConnection).where(*conditions)
-    )
+    result = await db.execute(select(GSCConnection).where(*conditions))
     return result.scalar_one_or_none()
 
 
@@ -204,12 +200,8 @@ async def gsc_oauth_callback(
         credentials = gsc_adapter.exchange_code(code)
 
         # Encrypt the tokens before storing
-        encrypted_access_token = encrypt_credential(
-            credentials.access_token, settings.secret_key
-        )
-        encrypted_refresh_token = encrypt_credential(
-            credentials.refresh_token, settings.secret_key
-        )
+        encrypted_access_token = encrypt_credential(credentials.access_token, settings.secret_key)
+        encrypted_refresh_token = encrypt_credential(credentials.refresh_token, settings.secret_key)
 
         # Check if connection already exists (including inactive ones)
         result = await db.execute(
@@ -223,7 +215,7 @@ async def gsc_oauth_callback(
             existing_connection.refresh_token_encrypted = encrypted_refresh_token
             existing_connection.token_expiry = credentials.token_expiry
             existing_connection.is_active = True
-            existing_connection.connected_at = datetime.now(timezone.utc)
+            existing_connection.connected_at = datetime.now(UTC)
             connection = existing_connection
         else:
             # Create new connection
@@ -234,7 +226,7 @@ async def gsc_oauth_callback(
                 access_token_encrypted=encrypted_access_token,
                 refresh_token_encrypted=encrypted_refresh_token,
                 token_expiry=credentials.token_expiry,
-                connected_at=datetime.now(timezone.utc),
+                connected_at=datetime.now(UTC),
                 is_active=True,
             )
             db.add(connection)
@@ -247,7 +239,7 @@ async def gsc_oauth_callback(
             "connected_at": connection.connected_at,
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to connect GSC",
@@ -273,7 +265,7 @@ async def disconnect_gsc(
     connection.is_active = False
     await db.commit()
 
-    return GSCDisconnectResponse(disconnected_at=datetime.now(timezone.utc))
+    return GSCDisconnectResponse(disconnected_at=datetime.now(UTC))
 
 
 @router.get("/gsc/status", response_model=GSCConnectionStatus)
@@ -306,6 +298,7 @@ async def get_gsc_sites(
     List verified sites from Google Search Console.
     """
     import logging
+
     logger = logging.getLogger(__name__)
 
     connection = await get_gsc_connection(current_user.id, db)
@@ -427,10 +420,12 @@ async def sync_gsc_data(
 
     try:
         # Import required modules
+        from datetime import date as date_type
+
+        from sqlalchemy.dialects.postgresql import insert
+
         from adapters.search.gsc_adapter import GSCAdapter, GSCCredentials
         from core.security.encryption import decrypt_credential, encrypt_credential
-        from datetime import date as date_type
-        from sqlalchemy.dialects.postgresql import insert
 
         # Decrypt the stored tokens
         decrypted_access_token = decrypt_credential(
@@ -454,16 +449,20 @@ async def sync_gsc_data(
         # ANA-03: Proactively refresh and persist token if expired, before any API calls.
         token_expiry = connection.token_expiry
         if token_expiry.tzinfo is None:
-            token_expiry = token_expiry.replace(tzinfo=timezone.utc)
-        if datetime.now(timezone.utc) >= token_expiry:
+            token_expiry = token_expiry.replace(tzinfo=UTC)
+        if datetime.now(UTC) >= token_expiry:
             try:
                 credentials = gsc_adapter.refresh_tokens(credentials)
-                connection.access_token_encrypted = encrypt_credential(credentials.access_token, settings.secret_key)
+                connection.access_token_encrypted = encrypt_credential(
+                    credentials.access_token, settings.secret_key
+                )
                 connection.token_expiry = credentials.token_expiry
                 await db.commit()
                 logger.info("GSC token refreshed and persisted for user %s", current_user.id)
             except Exception as refresh_err:
-                logger.error("Failed to refresh GSC token for user %s: %s", current_user.id, refresh_err)
+                logger.error(
+                    "Failed to refresh GSC token for user %s: %s", current_user.id, refresh_err
+                )
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="GSC token expired and refresh failed. Please reconnect Google Search Console.",
@@ -512,7 +511,7 @@ async def sync_gsc_data(
                     "impressions": stmt.excluded.impressions,
                     "ctr": stmt.excluded.ctr,
                     "position": stmt.excluded.position,
-                    "updated_at": datetime.now(timezone.utc),
+                    "updated_at": datetime.now(UTC),
                 },
             )
             await db.execute(stmt)
@@ -538,7 +537,7 @@ async def sync_gsc_data(
                     "impressions": stmt.excluded.impressions,
                     "ctr": stmt.excluded.ctr,
                     "position": stmt.excluded.position,
-                    "updated_at": datetime.now(timezone.utc),
+                    "updated_at": datetime.now(UTC),
                 },
             )
             await db.execute(stmt)
@@ -564,13 +563,13 @@ async def sync_gsc_data(
                     "total_impressions": stmt.excluded.total_impressions,
                     "avg_ctr": stmt.excluded.avg_ctr,
                     "avg_position": stmt.excluded.avg_position,
-                    "updated_at": datetime.now(timezone.utc),
+                    "updated_at": datetime.now(UTC),
                 },
             )
             await db.execute(stmt)
 
         # Update last_sync timestamp
-        sync_completed_at = datetime.now(timezone.utc)
+        sync_completed_at = datetime.now(UTC)
         connection.last_sync = sync_completed_at
         await db.commit()
 
@@ -580,7 +579,7 @@ async def sync_gsc_data(
             sync_started_at=sync_completed_at,
         )
 
-    except Exception as e:
+    except Exception:
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -597,9 +596,9 @@ async def sync_gsc_data(
 async def get_keyword_rankings(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
-    keyword: Optional[str] = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    keyword: str | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -647,9 +646,9 @@ async def get_keyword_rankings(
 async def get_page_performances(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
-    page_url: Optional[str] = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    page_url: str | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -697,8 +696,8 @@ async def get_page_performances(
 async def get_daily_analytics(
     page: int = Query(1, ge=1),
     page_size: int = Query(30, ge=1, le=365),
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -757,8 +756,12 @@ async def get_device_breakdown(
     from adapters.search.gsc_adapter import GSCAdapter, GSCCredentials
     from core.security.encryption import decrypt_credential
 
-    decrypted_access_token = decrypt_credential(connection.access_token_encrypted, settings.secret_key)
-    decrypted_refresh_token = decrypt_credential(connection.refresh_token_encrypted, settings.secret_key)
+    decrypted_access_token = decrypt_credential(
+        connection.access_token_encrypted, settings.secret_key
+    )
+    decrypted_refresh_token = decrypt_credential(
+        connection.refresh_token_encrypted, settings.secret_key
+    )
 
     credentials = GSCCredentials(
         access_token=decrypted_access_token,
@@ -791,8 +794,12 @@ async def get_country_breakdown(
     from adapters.search.gsc_adapter import GSCAdapter, GSCCredentials
     from core.security.encryption import decrypt_credential
 
-    decrypted_access_token = decrypt_credential(connection.access_token_encrypted, settings.secret_key)
-    decrypted_refresh_token = decrypt_credential(connection.refresh_token_encrypted, settings.secret_key)
+    decrypted_access_token = decrypt_credential(
+        connection.access_token_encrypted, settings.secret_key
+    )
+    decrypted_refresh_token = decrypt_credential(
+        connection.refresh_token_encrypted, settings.secret_key
+    )
 
     credentials = GSCCredentials(
         access_token=decrypted_access_token,
@@ -814,8 +821,8 @@ async def get_country_breakdown(
 
 @router.get("/summary", response_model=AnalyticsSummaryResponse)
 async def get_analytics_summary(
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -947,7 +954,7 @@ def normalize_url(url: str) -> str:
     url = url.lower().strip().rstrip("/")
     for prefix in ("https://", "http://"):
         if url.startswith(prefix):
-            url = url[len(prefix):]
+            url = url[len(prefix) :]
             break
     if url.startswith("www."):
         url = url[4:]
@@ -958,9 +965,12 @@ def normalize_url(url: str) -> str:
 async def get_article_performance(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
-    sort_by: str = Query("total_clicks", pattern="^(total_clicks|total_impressions|avg_position|avg_ctr|published_at)$"),
+    start_date: date | None = None,
+    end_date: date | None = None,
+    sort_by: str = Query(
+        "total_clicks",
+        pattern="^(total_clicks|total_impressions|avg_position|avg_ctr|published_at)$",
+    ),
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -1093,8 +1103,12 @@ async def get_article_performance(
         has_current = cur is not None
         has_previous = prev is not None
 
-        clicks_trend = calculate_trend(total_clicks, prev_clicks) if has_current or has_previous else None
-        position_trend = calculate_trend(avg_position, prev_position) if has_current or has_previous else None
+        clicks_trend = (
+            calculate_trend(total_clicks, prev_clicks) if has_current or has_previous else None
+        )
+        position_trend = (
+            calculate_trend(avg_position, prev_position) if has_current or has_previous else None
+        )
 
         # Determine performance status
         if not has_current and not has_previous:
@@ -1134,7 +1148,7 @@ async def get_article_performance(
         "total_impressions": lambda x: x.total_impressions,
         "avg_position": lambda x: x.avg_position,
         "avg_ctr": lambda x: x.avg_ctr,
-        "published_at": lambda x: x.published_at or datetime.min.replace(tzinfo=timezone.utc),
+        "published_at": lambda x: x.published_at or datetime.min.replace(tzinfo=UTC),
     }
     items.sort(key=sort_key_map.get(sort_by, sort_key_map["total_clicks"]), reverse=reverse)
 
@@ -1157,8 +1171,8 @@ async def get_article_performance(
 @router.get("/article-performance/{article_id}", response_model=ArticlePerformanceDetailResponse)
 async def get_article_performance_detail(
     article_id: str,
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1187,7 +1201,9 @@ async def get_article_performance_detail(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
 
     if not article.published_url:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Article has no published URL")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Article has no published URL"
+        )
 
     # Default date range
     if not end_date:
@@ -1202,13 +1218,17 @@ async def get_article_performance_detail(
     norm_url = normalize_url(article.published_url)
 
     # Fetch all page performance for this URL in date range
-    all_perf_query = select(PagePerformance).where(
-        and_(
-            PagePerformance.user_id == current_user.id,
-            PagePerformance.date >= start_date,
-            PagePerformance.date <= end_date,
+    all_perf_query = (
+        select(PagePerformance)
+        .where(
+            and_(
+                PagePerformance.user_id == current_user.id,
+                PagePerformance.date >= start_date,
+                PagePerformance.date <= end_date,
+            )
         )
-    ).order_by(PagePerformance.date)
+        .order_by(PagePerformance.date)
+    )
     all_perf_result = await db.execute(all_perf_query)
     all_rows = all_perf_result.scalars().all()
 
@@ -1224,7 +1244,9 @@ async def get_article_performance_detail(
         )
     )
     prev_perf_result = await db.execute(prev_perf_query)
-    prev_rows = [r for r in prev_perf_result.scalars().all() if normalize_url(r.page_url) == norm_url]
+    prev_rows = [
+        r for r in prev_perf_result.scalars().all() if normalize_url(r.page_url) == norm_url
+    ]
 
     # Build daily data
     daily_data = [
@@ -1242,7 +1264,9 @@ async def get_article_performance_detail(
     total_clicks = sum(r.clicks for r in current_rows)
     total_impressions = sum(r.impressions for r in current_rows)
     avg_ctr = sum(r.ctr for r in current_rows) / len(current_rows) if current_rows else 0.0
-    avg_position = sum(r.position for r in current_rows) / len(current_rows) if current_rows else 0.0
+    avg_position = (
+        sum(r.position for r in current_rows) / len(current_rows) if current_rows else 0.0
+    )
 
     prev_clicks = sum(r.clicks for r in prev_rows)
     prev_impressions = sum(r.impressions for r in prev_rows)
@@ -1277,8 +1301,8 @@ async def get_article_performance_detail(
 
 @router.get("/opportunities", response_model=ContentOpportunitiesResponse)
 async def get_content_opportunities(
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1343,9 +1367,7 @@ async def get_content_opportunities(
     prev_positions = {row.keyword: row.position for row in prev_result.all()}
 
     # Fetch existing articles to cross-reference
-    articles_query = select(Article.id, Article.keyword).where(
-        Article.user_id == current_user.id
-    )
+    articles_query = select(Article.id, Article.keyword).where(Article.user_id == current_user.id)
     articles_result = await db.execute(articles_query)
     article_keywords = {row.keyword.lower(): row.id for row in articles_result.all()}
 
@@ -1478,25 +1500,23 @@ async def suggest_content(
     found_kws = {kd["keyword"] for kd in keyword_data}
     for kw in request.keywords:
         if kw not in found_kws:
-            keyword_data.append({
-                "keyword": kw,
-                "clicks": 0,
-                "impressions": 0,
-                "ctr": 0.0,
-                "position": 0.0,
-            })
+            keyword_data.append(
+                {
+                    "keyword": kw,
+                    "clicks": 0,
+                    "impressions": 0,
+                    "ctr": 0.0,
+                    "position": 0.0,
+                }
+            )
 
     # Fetch existing article titles
-    articles_query = select(Article.title).where(
-        Article.user_id == current_user.id
-    )
+    articles_query = select(Article.title).where(Article.user_id == current_user.id)
     articles_result = await db.execute(articles_query)
     existing_titles = [row[0] for row in articles_result.all()]
 
     # Get user language preference
-    user_result = await db.execute(
-        select(User.language).where(User.id == current_user.id)
-    )
+    user_result = await db.execute(select(User.language).where(User.id == current_user.id))
     user_lang = user_result.scalar() or "en"
 
     # Call AI adapter
@@ -1508,7 +1528,7 @@ async def suggest_content(
             existing_articles=existing_titles,
             language=user_lang,
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate suggestions",
@@ -1523,7 +1543,7 @@ async def suggest_content(
             estimated_difficulty=s.get("estimated_difficulty", "medium"),
             estimated_word_count=s.get("estimated_word_count", 1500),
         )
-        for s in suggestions_data[:request.max_suggestions]
+        for s in suggestions_data[: request.max_suggestions]
     ]
 
     return ContentSuggestionsResponse(
@@ -1601,9 +1621,9 @@ async def get_content_health(
 async def list_decay_alerts(
     page: int = Query(default=1, ge=1, le=1000),  # ANA-24: cap page to prevent unbounded offset
     page_size: int = Query(default=20, ge=1, le=100),
-    alert_type: Optional[str] = None,
-    severity: Optional[str] = None,
-    is_resolved: Optional[bool] = None,
+    alert_type: str | None = None,
+    severity: str | None = None,
+    is_resolved: bool | None = None,
     sort_by: str = Query(default="created_at"),
     sort_order: str = Query(default="desc"),
     current_user: User = Depends(get_current_user),
@@ -1756,7 +1776,7 @@ async def resolve_alert(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
 
     alert.is_resolved = True
-    alert.resolved_at = datetime.now(timezone.utc)
+    alert.resolved_at = datetime.now(UTC)
     await db.commit()
     return {"message": "Alert resolved"}
 
@@ -1787,7 +1807,7 @@ async def mark_all_alerts_read(
         .where(
             and_(
                 ContentDecayAlert.user_id == current_user.id,
-                ContentDecayAlert.is_read == False,
+                not ContentDecayAlert.is_read,
             )
         )
         .values(is_read=True)
@@ -1818,12 +1838,8 @@ async def get_aeo_overview(
         good_count=data["good_count"],
         needs_work_count=data["needs_work_count"],
         score_distribution=data["score_distribution"],
-        top_articles=[
-            AEOArticleSummary(**a) for a in data["top_articles"]
-        ],
-        bottom_articles=[
-            AEOArticleSummary(**a) for a in data["bottom_articles"]
-        ],
+        top_articles=[AEOArticleSummary(**a) for a in data["top_articles"]],
+        bottom_articles=[AEOArticleSummary(**a) for a in data["bottom_articles"]],
     )
 
 
@@ -1834,8 +1850,8 @@ async def get_aeo_overview(
 
 @router.get("/revenue/overview", response_model=RevenueOverviewResponse)
 async def get_revenue_overview_endpoint(
-    start_date: Optional[date] = Query(None),
-    end_date: Optional[date] = Query(None),
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1848,8 +1864,8 @@ async def get_revenue_overview_endpoint(
 
 @router.get("/revenue/by-article", response_model=RevenueByArticleListResponse)
 async def get_revenue_by_article_endpoint(
-    start_date: Optional[date] = Query(None),
-    end_date: Optional[date] = Query(None),
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_user),
@@ -1864,8 +1880,8 @@ async def get_revenue_by_article_endpoint(
 
 @router.get("/revenue/by-keyword", response_model=RevenueByKeywordListResponse)
 async def get_revenue_by_keyword_endpoint(
-    start_date: Optional[date] = Query(None),
-    end_date: Optional[date] = Query(None),
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_user),
@@ -1978,9 +1994,7 @@ async def delete_conversion_goal(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found")
 
     # ANA-26: Delete associated ContentConversion records before deleting the goal
-    await db.execute(
-        delete(ContentConversion).where(ContentConversion.goal_id == goal_id)
-    )
+    await db.execute(delete(ContentConversion).where(ContentConversion.goal_id == goal_id))
     await db.delete(goal)
     await db.commit()
     return {"message": "Goal deleted"}

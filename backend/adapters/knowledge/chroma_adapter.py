@@ -8,7 +8,7 @@ import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import List, Optional, Dict, Any
+from typing import Any
 
 import chromadb
 
@@ -23,7 +23,7 @@ class Document:
 
     id: str
     content: str
-    metadata: Dict[str, Any]  # source_id, title, chunk_index, user_id, etc.
+    metadata: dict[str, Any]  # source_id, title, chunk_index, user_id, etc.
 
 
 @dataclass
@@ -32,7 +32,7 @@ class QueryResult:
 
     document_id: str
     content: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     score: float  # similarity score (0-1, higher is more similar)
 
 
@@ -57,9 +57,9 @@ class ChromaAdapter:
 
     def __init__(
         self,
-        host: Optional[str] = None,
-        port: Optional[int] = None,
-        collection_prefix: Optional[str] = None,
+        host: str | None = None,
+        port: int | None = None,
+        collection_prefix: str | None = None,
     ):
         """
         Initialize ChromaDB adapter with HTTP client.
@@ -83,7 +83,9 @@ class ChromaAdapter:
             logger.info(f"ChromaDB client connected to {self.host}:{self.port}")
         except Exception as e:
             logger.error(f"Failed to connect to ChromaDB: {e}")
-            raise ChromaDBConnectionError(f"Could not connect to ChromaDB at {self.host}:{self.port}: {e}")
+            raise ChromaDBConnectionError(
+                f"Could not connect to ChromaDB at {self.host}:{self.port}: {e}"
+            )
 
     def get_collection(self, user_id: str, project_id: str = "personal") -> chromadb.Collection:
         """
@@ -118,10 +120,10 @@ class ChromaAdapter:
     async def add_documents(
         self,
         user_id: str,
-        documents: List[Document],
-        embeddings: List[List[float]],
+        documents: list[Document],
+        embeddings: list[list[float]],
         project_id: str = "personal",
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Add documents with their embeddings to the collection.
 
@@ -153,10 +155,16 @@ class ChromaAdapter:
 
             # ChromaDB add is synchronous, run in executor
             await self._run_in_executor(
-                collection.add, ids=ids, documents=contents, embeddings=embeddings, metadatas=metadatas
+                collection.add,
+                ids=ids,
+                documents=contents,
+                embeddings=embeddings,
+                metadatas=metadatas,
             )
 
-            logger.info(f"Added {len(documents)} documents to collection for user {user_id} / project {project_id}")
+            logger.info(
+                f"Added {len(documents)} documents to collection for user {user_id} / project {project_id}"
+            )
             return ids
 
         except Exception as e:
@@ -166,11 +174,11 @@ class ChromaAdapter:
     async def query(
         self,
         user_id: str,
-        query_embedding: List[float],
+        query_embedding: list[float],
         n_results: int = 5,
-        filter_metadata: Optional[Dict] = None,
+        filter_metadata: dict | None = None,
         project_id: str = "personal",
-    ) -> List[QueryResult]:
+    ) -> list[QueryResult]:
         """
         Query similar documents using vector similarity.
 
@@ -215,14 +223,18 @@ class ChromaAdapter:
                         )
                     )
 
-            logger.debug(f"Query returned {len(query_results)} results for user {user_id} / project {project_id}")
+            logger.debug(
+                f"Query returned {len(query_results)} results for user {user_id} / project {project_id}"
+            )
             return query_results
 
         except Exception as e:
             logger.error(f"Failed to query collection: {e}")
             raise ChromaDBError(f"Query failed: {e}")
 
-    async def delete_document(self, user_id: str, document_id: str, project_id: str = "personal") -> bool:
+    async def delete_document(
+        self, user_id: str, document_id: str, project_id: str = "personal"
+    ) -> bool:
         """
         Delete a document from the collection.
 
@@ -240,14 +252,18 @@ class ChromaAdapter:
             # Delete is synchronous, run in executor
             await self._run_in_executor(collection.delete, ids=[document_id])
 
-            logger.info(f"Deleted document {document_id} from collection for user {user_id} / project {project_id}")
+            logger.info(
+                f"Deleted document {document_id} from collection for user {user_id} / project {project_id}"
+            )
             return True
 
         except Exception as e:
             logger.error(f"Failed to delete document {document_id}: {e}")
             return False
 
-    async def delete_by_source(self, user_id: str, source_id: str, project_id: str = "personal") -> int:
+    async def delete_by_source(
+        self, user_id: str, source_id: str, project_id: str = "personal"
+    ) -> int:
         """
         Delete all chunks from a source document.
 
@@ -263,11 +279,11 @@ class ChromaAdapter:
             collection = self.get_collection(user_id, project_id)
 
             # Delete by metadata filter
-            await self._run_in_executor(
-                collection.delete, where={"source_id": source_id}
-            )
+            await self._run_in_executor(collection.delete, where={"source_id": source_id})
 
-            logger.info(f"Deleted all documents with source_id={source_id} for user {user_id} / project {project_id}")
+            logger.info(
+                f"Deleted all documents with source_id={source_id} for user {user_id} / project {project_id}"
+            )
             # Note: ChromaDB doesn't return count of deleted items
             return 1  # Return 1 to indicate success
 
@@ -275,7 +291,9 @@ class ChromaAdapter:
             logger.error(f"Failed to delete documents by source {source_id}: {e}")
             return 0
 
-    async def get_collection_stats(self, user_id: str, project_id: str = "personal") -> Dict[str, Any]:
+    async def get_collection_stats(
+        self, user_id: str, project_id: str = "personal"
+    ) -> dict[str, Any]:
         """
         Get stats about a user/project collection.
 

@@ -4,20 +4,16 @@ Project invitation API routes.
 
 import logging
 import secrets
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from api.middleware.rate_limit import limiter
-
-logger = logging.getLogger(__name__)
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from adapters.email.resend_adapter import email_service
+from api.middleware.rate_limit import limiter
 from api.routes.auth import get_current_user
-from infrastructure.database.connection import get_db
 from api.schemas.project import (
     ProjectInvitationAcceptResponse,
     ProjectInvitationCreate,
@@ -26,6 +22,7 @@ from api.schemas.project import (
     ProjectInvitationResponse,
 )
 from infrastructure.config.settings import settings
+from infrastructure.database.connection import get_db
 from infrastructure.database.models import (
     InvitationStatus,
     Project,
@@ -34,6 +31,8 @@ from infrastructure.database.models import (
     ProjectMemberRole,
     User,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/projects", tags=["project-invitations"])
 
@@ -97,7 +96,7 @@ async def require_project_admin(
 @router.get("/{project_id}/invitations", response_model=ProjectInvitationListResponse)
 async def list_project_invitations(
     project_id: str,
-    status_filter: Optional[str] = None,
+    status_filter: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     project: Project = Depends(require_project_admin),
@@ -112,7 +111,10 @@ async def list_project_invitations(
     """
     VALID_INVITATION_STATUSES = {"pending", "accepted", "declined", "expired", "revoked"}
     if status_filter and status_filter not in VALID_INVITATION_STATUSES:
-        raise HTTPException(status_code=400, detail=f"Invalid status filter. Must be one of: {', '.join(sorted(VALID_INVITATION_STATUSES))}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status filter. Must be one of: {', '.join(sorted(VALID_INVITATION_STATUSES))}",
+        )
 
     # Build query
     query = select(ProjectInvitation).where(ProjectInvitation.project_id == project_id)
@@ -125,7 +127,11 @@ async def list_project_invitations(
     query = query.order_by(ProjectInvitation.created_at.desc())
 
     # Count total
-    count_query = select(func.count()).select_from(ProjectInvitation).where(ProjectInvitation.project_id == project_id)
+    count_query = (
+        select(func.count())
+        .select_from(ProjectInvitation)
+        .where(ProjectInvitation.project_id == project_id)
+    )
     if status_filter:
         count_query = count_query.where(ProjectInvitation.status == status_filter)
 
@@ -175,7 +181,11 @@ async def list_project_invitations(
     )
 
 
-@router.post("/{project_id}/invitations", response_model=ProjectInvitationResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{project_id}/invitations",
+    response_model=ProjectInvitationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_project_invitation(
     project_id: str,
     invitation: ProjectInvitationCreate,
@@ -202,9 +212,9 @@ async def create_project_invitation(
 
     # PROJ-27: use a live COUNT query instead of the potentially-stale in-memory list
     member_count_result = await db.execute(
-        select(func.count()).select_from(ProjectMember).where(
-            and_(ProjectMember.project_id == project.id, ProjectMember.deleted_at.is_(None))
-        )
+        select(func.count())
+        .select_from(ProjectMember)
+        .where(and_(ProjectMember.project_id == project.id, ProjectMember.deleted_at.is_(None)))
     )
     current_member_count = member_count_result.scalar_one()
     if current_member_count >= project.max_members:
@@ -261,7 +271,7 @@ async def create_project_invitation(
         role=invitation.role,
         token=token,
         status=InvitationStatus.PENDING.value,
-        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+        expires_at=datetime.now(UTC) + timedelta(days=7),
     )
 
     db.add(new_invitation)
@@ -345,7 +355,7 @@ async def revoke_project_invitation(
 
     # Update invitation
     invitation.status = InvitationStatus.REVOKED.value
-    invitation.revoked_at = datetime.now(timezone.utc)
+    invitation.revoked_at = datetime.now(UTC)
     invitation.revoked_by = current_user.id
 
     await db.commit()
@@ -353,7 +363,9 @@ async def revoke_project_invitation(
     return None
 
 
-@router.post("/{project_id}/invitations/{invitation_id}/resend", response_model=ProjectInvitationResponse)
+@router.post(
+    "/{project_id}/invitations/{invitation_id}/resend", response_model=ProjectInvitationResponse
+)
 async def resend_project_invitation(
     project_id: str,
     invitation_id: str,
@@ -393,7 +405,7 @@ async def resend_project_invitation(
         )
 
     # Reset expiration
-    invitation.expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+    invitation.expires_at = datetime.now(UTC) + timedelta(days=7)
     await db.commit()
     await db.refresh(invitation)
 
@@ -433,7 +445,11 @@ async def resend_project_invitation(
 # =============================================================================
 
 
-@router.get("/invitations/{token}", response_model=ProjectInvitationPublicResponse, tags=["public-invitations"])
+@router.get(
+    "/invitations/{token}",
+    response_model=ProjectInvitationPublicResponse,
+    tags=["public-invitations"],
+)
 @limiter.limit("20/minute")  # AUTH-12: prevent brute-force enumeration of invitation tokens
 async def get_invitation_details(
     request: Request,
@@ -482,8 +498,14 @@ async def get_invitation_details(
     )
 
 
-@router.post("/invitations/{token}/accept", response_model=ProjectInvitationAcceptResponse, tags=["public-invitations"])
-@limiter.limit("5/minute")  # AUTH-12, PROJ-44: tightened from 10/minute to reduce brute-force window
+@router.post(
+    "/invitations/{token}/accept",
+    response_model=ProjectInvitationAcceptResponse,
+    tags=["public-invitations"],
+)
+@limiter.limit(
+    "5/minute"
+)  # AUTH-12, PROJ-44: tightened from 10/minute to reduce brute-force window
 async def accept_invitation(
     request: Request,
     token: str,
@@ -508,7 +530,8 @@ async def accept_invitation(
     if not invitation:
         logger.warning(
             "Invalid or expired invitation token attempt from user %s: token=%s",
-            current_user.id, token[:8] + "..."  # truncate for safety
+            current_user.id,
+            token[:8] + "...",  # truncate for safety
         )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -577,14 +600,14 @@ async def accept_invitation(
         user_id=current_user.id,
         role=invitation.role,
         invited_by=invitation.invited_by,
-        joined_at=datetime.now(timezone.utc),
+        joined_at=datetime.now(UTC),
     )
 
     db.add(new_member)
 
     # Update invitation status
     invitation.status = InvitationStatus.ACCEPTED.value
-    invitation.accepted_at = datetime.now(timezone.utc)
+    invitation.accepted_at = datetime.now(UTC)
     invitation.accepted_by_user_id = current_user.id
 
     # Set user's current project to this project if they don't have one

@@ -4,16 +4,15 @@ import json
 import logging
 import re
 import sys
-from datetime import datetime, timezone
-
+from datetime import UTC, datetime
 
 # LOW-13: Patterns that may contain secrets or credentials — redacted before any log output
 _SENSITIVE_PATTERNS = [
-    (re.compile(r'(Authorization:\s*Bearer\s+)\S+', re.IGNORECASE), r'\1[REDACTED]'),
-    (re.compile(r'(api[_-]?key["\s:=]+)[^\s&"\']+', re.IGNORECASE), r'\1[REDACTED]'),
-    (re.compile(r'(password["\s:=]+)[^\s&"\']+', re.IGNORECASE), r'\1[REDACTED]'),
-    (re.compile(r'(secret["\s:=]+)[^\s&"\']+', re.IGNORECASE), r'\1[REDACTED]'),
-    (re.compile(r'sk-[a-zA-Z0-9]{20,}', re.IGNORECASE), '[REDACTED_API_KEY]'),
+    (re.compile(r"(Authorization:\s*Bearer\s+)\S+", re.IGNORECASE), r"\1[REDACTED]"),
+    (re.compile(r'(api[_-]?key["\s:=]+)[^\s&"\']+', re.IGNORECASE), r"\1[REDACTED]"),
+    (re.compile(r'(password["\s:=]+)[^\s&"\']+', re.IGNORECASE), r"\1[REDACTED]"),
+    (re.compile(r'(secret["\s:=]+)[^\s&"\']+', re.IGNORECASE), r"\1[REDACTED]"),
+    (re.compile(r"sk-[a-zA-Z0-9]{20,}", re.IGNORECASE), "[REDACTED_API_KEY]"),
 ]
 
 
@@ -34,13 +33,11 @@ class SensitiveDataFilter(logging.Filter):
             try:
                 if isinstance(record.args, tuple):
                     record.args = tuple(
-                        _redact(a) if isinstance(a, str) else a
-                        for a in record.args
+                        _redact(a) if isinstance(a, str) else a for a in record.args
                     )
                 elif isinstance(record.args, dict):
                     record.args = {
-                        k: (_redact(v) if isinstance(v, str) else v)
-                        for k, v in record.args.items()
+                        k: (_redact(v) if isinstance(v, str) else v) for k, v in record.args.items()
                     }
             except Exception:
                 pass
@@ -52,7 +49,7 @@ class JSONFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         log_entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -108,6 +105,8 @@ def setup_logging(json_output: bool = False, level: str = "INFO") -> None:
     root.addHandler(handler)
 
     # Quiet noisy libraries
-    logging.getLogger("uvicorn.access").setLevel(logging.INFO)  # LOGGING-02: INFO for production visibility
+    logging.getLogger("uvicorn.access").setLevel(
+        logging.INFO
+    )  # LOGGING-02: INFO for production visibility
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)

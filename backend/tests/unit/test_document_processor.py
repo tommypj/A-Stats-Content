@@ -9,37 +9,37 @@ Tests cover:
 - Error handling
 """
 
+from unittest.mock import Mock, patch
+
 import pytest
-from pathlib import Path
-from unittest.mock import Mock, patch, mock_open
-from io import BytesIO
 
 # Skip if processor not implemented yet
-pytest.importorskip("adapters.knowledge.document_processor", reason="Document processor not yet implemented")
+pytest.importorskip(
+    "adapters.knowledge.document_processor", reason="Document processor not yet implemented"
+)
 
 from adapters.knowledge.document_processor import (
+    DocumentProcessingError,
     DocumentProcessor,
     DocumentType,
     UnsupportedDocumentError,
-    DocumentProcessingError,
 )
 
 
-@pytest.mark.skip(reason="Tests written for earlier DocumentProcessor API; need rewrite to match current async API signatures")
+@pytest.mark.skip(
+    reason="Tests written for earlier DocumentProcessor API; need rewrite to match current async API signatures"
+)
 class TestDocumentTypeDetection:
     """Tests for document type detection."""
 
     @pytest.fixture
     def processor(self):
         """Create DocumentProcessor instance."""
-        return DocumentProcessor(
-            chunk_size=1000,
-            chunk_overlap=200
-        )
+        return DocumentProcessor(chunk_size=1000, chunk_overlap=200)
 
     def test_detect_type_pdf(self, processor):
         """Test PDF file detection."""
-        pdf_content = b'%PDF-1.4\n%\xe2\xe3\xcf\xd3'  # PDF magic bytes
+        pdf_content = b"%PDF-1.4\n%\xe2\xe3\xcf\xd3"  # PDF magic bytes
 
         file_type = processor.detect_type("document.pdf", pdf_content)
 
@@ -47,7 +47,7 @@ class TestDocumentTypeDetection:
 
     def test_detect_type_txt(self, processor):
         """Test plain text file detection."""
-        txt_content = b'This is plain text content.'
+        txt_content = b"This is plain text content."
 
         file_type = processor.detect_type("notes.txt", txt_content)
 
@@ -55,7 +55,7 @@ class TestDocumentTypeDetection:
 
     def test_detect_type_markdown(self, processor):
         """Test Markdown file detection."""
-        md_content = b'# Heading\n\nThis is markdown.'
+        md_content = b"# Heading\n\nThis is markdown."
 
         file_type = processor.detect_type("readme.md", md_content)
 
@@ -64,7 +64,7 @@ class TestDocumentTypeDetection:
     def test_detect_type_docx(self, processor):
         """Test DOCX file detection."""
         # DOCX files are ZIP archives with specific structure
-        docx_content = b'PK\x03\x04'  # ZIP magic bytes
+        docx_content = b"PK\x03\x04"  # ZIP magic bytes
 
         file_type = processor.detect_type("document.docx", docx_content)
 
@@ -72,7 +72,7 @@ class TestDocumentTypeDetection:
 
     def test_detect_type_html(self, processor):
         """Test HTML file detection."""
-        html_content = b'<!DOCTYPE html><html><body>Content</body></html>'
+        html_content = b"<!DOCTYPE html><html><body>Content</body></html>"
 
         file_type = processor.detect_type("page.html", html_content)
 
@@ -80,13 +80,15 @@ class TestDocumentTypeDetection:
 
     def test_detect_type_unknown_raises_error(self, processor):
         """Test that unknown file types raise an error."""
-        unknown_content = b'\x00\x01\x02\x03'  # Random binary
+        unknown_content = b"\x00\x01\x02\x03"  # Random binary
 
         with pytest.raises(UnsupportedDocumentError, match="Unsupported document type"):
             processor.detect_type("unknown.xyz", unknown_content)
 
 
-@pytest.mark.skip(reason="Tests written for earlier DocumentProcessor API; need rewrite to match current async API signatures")
+@pytest.mark.skip(
+    reason="Tests written for earlier DocumentProcessor API; need rewrite to match current async API signatures"
+)
 class TestTextChunking:
     """Tests for text chunking functionality."""
 
@@ -95,7 +97,7 @@ class TestTextChunking:
         """Create DocumentProcessor with specific chunk settings."""
         return DocumentProcessor(
             chunk_size=100,  # Small for testing
-            chunk_overlap=20
+            chunk_overlap=20,
         )
 
     def test_chunk_text_basic(self, processor):
@@ -148,7 +150,7 @@ class TestTextChunking:
         # Each chunk should ideally end with a sentence
         for chunk in chunks[:-1]:  # Exclude last chunk
             # Should end with punctuation or be near chunk_size limit
-            assert chunk.rstrip()[-1] in '.!?' or len(chunk) > 90
+            assert chunk.rstrip()[-1] in ".!?" or len(chunk) > 90
 
     def test_chunk_text_empty_input(self, processor):
         """Test chunking empty text."""
@@ -168,7 +170,9 @@ class TestTextChunking:
         assert len(chunks) == 0 or all(not chunk.strip() for chunk in chunks)
 
 
-@pytest.mark.skip(reason="Tests written for earlier DocumentProcessor API; need rewrite to match current async API signatures")
+@pytest.mark.skip(
+    reason="Tests written for earlier DocumentProcessor API; need rewrite to match current async API signatures"
+)
 class TestTextExtraction:
     """Tests for text extraction from various formats."""
 
@@ -179,7 +183,7 @@ class TestTextExtraction:
 
     def test_extract_text_txt(self, processor):
         """Test text extraction from plain text file."""
-        content = b'This is plain text content.\nWith multiple lines.\n'
+        content = b"This is plain text content.\nWith multiple lines.\n"
 
         text = processor.extract_text(content, DocumentType.TXT)
 
@@ -187,7 +191,7 @@ class TestTextExtraction:
 
     def test_extract_text_markdown(self, processor):
         """Test text extraction from Markdown file."""
-        content = b'# Main Heading\n\n## Subheading\n\nThis is **bold** text.\n'
+        content = b"# Main Heading\n\n## Subheading\n\nThis is **bold** text.\n"
 
         text = processor.extract_text(content, DocumentType.MARKDOWN)
 
@@ -195,7 +199,7 @@ class TestTextExtraction:
         assert "# Main Heading" in text
         assert "**bold**" in text
 
-    @patch('adapters.knowledge.document_processor.PyPDF2.PdfReader')
+    @patch("adapters.knowledge.document_processor.PyPDF2.PdfReader")
     def test_extract_text_pdf(self, mock_pdf_reader, processor):
         """Test text extraction from PDF file."""
         # Mock PDF reader
@@ -207,7 +211,7 @@ class TestTextExtraction:
         mock_reader.pages = [mock_page1, mock_page2]
         mock_pdf_reader.return_value = mock_reader
 
-        pdf_content = b'%PDF-1.4\nfake pdf content'
+        pdf_content = b"%PDF-1.4\nfake pdf content"
 
         text = processor.extract_text(pdf_content, DocumentType.PDF)
 
@@ -215,7 +219,7 @@ class TestTextExtraction:
         assert "Page 2 content" in text
         mock_pdf_reader.assert_called_once()
 
-    @patch('adapters.knowledge.document_processor.docx.Document')
+    @patch("adapters.knowledge.document_processor.docx.Document")
     def test_extract_text_docx(self, mock_docx, processor):
         """Test text extraction from DOCX file."""
         # Mock DOCX document
@@ -227,14 +231,14 @@ class TestTextExtraction:
         mock_doc.paragraphs = [mock_para1, mock_para2]
         mock_docx.return_value = mock_doc
 
-        docx_content = b'PK\x03\x04fake docx'
+        docx_content = b"PK\x03\x04fake docx"
 
         text = processor.extract_text(docx_content, DocumentType.DOCX)
 
         assert "First paragraph" in text
         assert "Second paragraph" in text
 
-    @patch('adapters.knowledge.document_processor.BeautifulSoup')
+    @patch("adapters.knowledge.document_processor.BeautifulSoup")
     def test_extract_text_html(self, mock_bs, processor):
         """Test text extraction from HTML file."""
         # Mock BeautifulSoup
@@ -242,7 +246,7 @@ class TestTextExtraction:
         mock_soup.get_text.return_value = "Extracted HTML text content."
         mock_bs.return_value = mock_soup
 
-        html_content = b'<html><body><p>Content</p></body></html>'
+        html_content = b"<html><body><p>Content</p></body></html>"
 
         text = processor.extract_text(html_content, DocumentType.HTML)
 
@@ -252,7 +256,7 @@ class TestTextExtraction:
     def test_extract_text_handles_encoding_errors(self, processor):
         """Test handling of encoding errors in text files."""
         # Invalid UTF-8 bytes
-        content = b'\xff\xfe Invalid encoding'
+        content = b"\xff\xfe Invalid encoding"
 
         # Should handle gracefully or raise specific error
         try:
@@ -263,18 +267,20 @@ class TestTextExtraction:
             # Or it raises our custom error
             pass
 
-    @patch('adapters.knowledge.document_processor.PyPDF2.PdfReader')
+    @patch("adapters.knowledge.document_processor.PyPDF2.PdfReader")
     def test_extract_text_pdf_error_handling(self, mock_pdf_reader, processor):
         """Test error handling for corrupted PDF."""
         mock_pdf_reader.side_effect = Exception("PDF parsing error")
 
-        pdf_content = b'%PDF-corrupted'
+        pdf_content = b"%PDF-corrupted"
 
         with pytest.raises(DocumentProcessingError, match="PDF parsing error"):
             processor.extract_text(pdf_content, DocumentType.PDF)
 
 
-@pytest.mark.skip(reason="Tests written for earlier DocumentProcessor API; need rewrite to match current async API signatures")
+@pytest.mark.skip(
+    reason="Tests written for earlier DocumentProcessor API; need rewrite to match current async API signatures"
+)
 class TestDocumentProcessing:
     """Tests for complete document processing workflow."""
 
@@ -283,7 +289,7 @@ class TestDocumentProcessing:
         """Create DocumentProcessor instance."""
         return DocumentProcessor(chunk_size=500, chunk_overlap=50)
 
-    @patch('adapters.knowledge.document_processor.PyPDF2.PdfReader')
+    @patch("adapters.knowledge.document_processor.PyPDF2.PdfReader")
     def test_process_file_success(self, mock_pdf_reader, processor):
         """Test complete file processing workflow."""
         # Mock PDF with substantial content
@@ -293,7 +299,7 @@ class TestDocumentProcessing:
         mock_reader.pages = [mock_page]
         mock_pdf_reader.return_value = mock_reader
 
-        pdf_content = b'%PDF-1.4\ntest'
+        pdf_content = b"%PDF-1.4\ntest"
         filename = "test.pdf"
 
         result = processor.process_file(filename, pdf_content)
@@ -308,7 +314,7 @@ class TestDocumentProcessing:
 
     def test_process_file_empty_document(self, processor):
         """Test processing of empty document."""
-        content = b''
+        content = b""
         filename = "empty.txt"
 
         with pytest.raises(DocumentProcessingError, match="empty"):
@@ -316,7 +322,7 @@ class TestDocumentProcessing:
 
     def test_process_file_extracts_metadata(self, processor):
         """Test that metadata is properly extracted."""
-        content = b'Sample text content for metadata test.'
+        content = b"Sample text content for metadata test."
         filename = "metadata_test.txt"
 
         result = processor.process_file(filename, content)
@@ -330,7 +336,7 @@ class TestDocumentProcessing:
 
     def test_process_file_chunks_have_metadata(self, processor):
         """Test that each chunk has associated metadata."""
-        content = b'Chunk metadata test. ' * 100
+        content = b"Chunk metadata test. " * 100
         filename = "chunks.txt"
 
         result = processor.process_file(filename, content)
@@ -344,7 +350,9 @@ class TestDocumentProcessing:
             assert chunk["source"] == filename
 
 
-@pytest.mark.skip(reason="Tests written for earlier DocumentProcessor API; need rewrite to match current async API signatures")
+@pytest.mark.skip(
+    reason="Tests written for earlier DocumentProcessor API; need rewrite to match current async API signatures"
+)
 class TestDocumentProcessorConfiguration:
     """Tests for DocumentProcessor configuration."""
 

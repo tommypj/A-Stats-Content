@@ -7,11 +7,10 @@ search performance data, keyword rankings, and page-level analytics.
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, date, timedelta, timezone
-from typing import List, Dict, Any, Optional
+from datetime import UTC, date, datetime, timedelta
+from typing import Any
 from urllib.parse import urlencode
 
-from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -24,16 +23,19 @@ logger = logging.getLogger(__name__)
 # Custom Exceptions
 class GSCAuthError(Exception):
     """Raised when Google Search Console authentication fails."""
+
     pass
 
 
 class GSCAPIError(Exception):
     """Raised when Google Search Console API returns an error."""
+
     pass
 
 
 class GSCQuotaError(Exception):
     """Raised when Google Search Console API quota is exceeded."""
+
     pass
 
 
@@ -46,7 +48,7 @@ class GSCCredentials:
     token_expiry: datetime
     site_url: str  # The verified property URL
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert credentials to dictionary format."""
         return {
             "access_token": self.access_token,
@@ -56,7 +58,7 @@ class GSCCredentials:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "GSCCredentials":
+    def from_dict(cls, data: dict[str, Any]) -> "GSCCredentials":
         """Create credentials from dictionary format."""
         return cls(
             access_token=data["access_token"],
@@ -85,9 +87,9 @@ class GSCAdapter:
 
     def __init__(
         self,
-        client_id: Optional[str] = None,
-        client_secret: Optional[str] = None,
-        redirect_uri: Optional[str] = None,
+        client_id: str | None = None,
+        client_secret: str | None = None,
+        redirect_uri: str | None = None,
     ):
         """
         Initialize Google Search Console adapter.
@@ -155,8 +157,7 @@ class GSCAdapter:
         """
         if not all([self.client_id, self.client_secret, self.redirect_uri]):
             raise GSCAuthError(
-                "Google OAuth credentials not configured. "
-                "Set all required credentials in settings."
+                "Google OAuth credentials not configured. Set all required credentials in settings."
             )
 
         try:
@@ -179,7 +180,7 @@ class GSCAdapter:
 
             # Calculate token expiry
             expires_in = tokens.get("expires_in", 3600)
-            token_expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+            token_expiry = datetime.now(UTC) + timedelta(seconds=expires_in)
 
             logger.info("Successfully exchanged code for tokens")
 
@@ -237,7 +238,7 @@ class GSCAdapter:
 
             # Calculate new token expiry
             expires_in = tokens.get("expires_in", 3600)
-            token_expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+            token_expiry = datetime.now(UTC) + timedelta(seconds=expires_in)
 
             logger.info("Successfully refreshed tokens")
 
@@ -274,8 +275,8 @@ class GSCAdapter:
             # Ensure token_expiry is timezone-aware for comparison
             token_expiry = credentials.token_expiry
             if token_expiry.tzinfo is None:
-                token_expiry = token_expiry.replace(tzinfo=timezone.utc)
-            if datetime.now(timezone.utc) >= token_expiry:
+                token_expiry = token_expiry.replace(tzinfo=UTC)
+            if datetime.now(UTC) >= token_expiry:
                 logger.info("Access token expired, refreshing...")
                 credentials = self.refresh_tokens(credentials)
 
@@ -302,7 +303,9 @@ class GSCAdapter:
             logger.error(f"Failed to create API service: {e}")
             raise GSCAuthError(f"Failed to authenticate with Google API: {e}")
 
-    def list_sites(self, credentials: GSCCredentials) -> tuple[List[Dict[str, Any]], "GSCCredentials"]:
+    def list_sites(
+        self, credentials: GSCCredentials
+    ) -> tuple[list[dict[str, Any]], "GSCCredentials"]:
         """
         List all verified sites/properties for the authenticated user.
 
@@ -321,7 +324,9 @@ class GSCAdapter:
             logger.info("Fetching verified sites from Google Search Console")
             response = service.sites().list().execute()
 
-            logger.info(f"GSC sites API raw response keys: {list(response.keys()) if response else 'None'}")
+            logger.info(
+                f"GSC sites API raw response keys: {list(response.keys()) if response else 'None'}"
+            )
             logger.info(f"GSC sites API raw response: {response}")
 
             sites = response.get("siteEntry", [])
@@ -344,9 +349,9 @@ class GSCAdapter:
         site_url: str,
         start_date: date,
         end_date: date,
-        dimensions: List[str],
+        dimensions: list[str],
         row_limit: int = 1000,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Fetch search analytics data from Google Search Console.
 
@@ -367,10 +372,7 @@ class GSCAdapter:
         try:
             service, updated_creds = self._get_service(credentials)
 
-            logger.info(
-                f"Fetching search analytics for {site_url} "
-                f"from {start_date} to {end_date}"
-            )
+            logger.info(f"Fetching search analytics for {site_url} from {start_date} to {end_date}")
 
             request_body = {
                 "startDate": start_date.isoformat(),
@@ -381,9 +383,7 @@ class GSCAdapter:
             }
 
             response = (
-                service.searchanalytics()
-                .query(siteUrl=site_url, body=request_body)
-                .execute()
+                service.searchanalytics().query(siteUrl=site_url, body=request_body).execute()
             )
 
             rows = response.get("rows", [])
@@ -405,7 +405,7 @@ class GSCAdapter:
         credentials: GSCCredentials,
         site_url: str,
         days: int = 28,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get keyword performance data (queries with clicks, impressions, CTR, position).
 
@@ -443,13 +443,15 @@ class GSCAdapter:
             keys = row.get("keys") or []
             if not keys:
                 continue
-            keywords.append({
-                "query": keys[0],  # First dimension is 'query'
-                "clicks": row["clicks"],
-                "impressions": row["impressions"],
-                "ctr": row["ctr"],
-                "position": row["position"],
-            })
+            keywords.append(
+                {
+                    "query": keys[0],  # First dimension is 'query'
+                    "clicks": row["clicks"],
+                    "impressions": row["impressions"],
+                    "ctr": row["ctr"],
+                    "position": row["position"],
+                }
+            )
 
         # Sort by clicks descending
         keywords.sort(key=lambda x: x["clicks"], reverse=True)
@@ -462,7 +464,7 @@ class GSCAdapter:
         credentials: GSCCredentials,
         site_url: str,
         days: int = 28,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get page-level performance metrics.
 
@@ -500,13 +502,15 @@ class GSCAdapter:
             keys = row.get("keys") or []
             if not keys:
                 continue
-            pages.append({
-                "page": keys[0],  # First dimension is 'page'
-                "clicks": row["clicks"],
-                "impressions": row["impressions"],
-                "ctr": row["ctr"],
-                "position": row["position"],
-            })
+            pages.append(
+                {
+                    "page": keys[0],  # First dimension is 'page'
+                    "clicks": row["clicks"],
+                    "impressions": row["impressions"],
+                    "ctr": row["ctr"],
+                    "position": row["position"],
+                }
+            )
 
         # Sort by clicks descending
         pages.sort(key=lambda x: x["clicks"], reverse=True)
@@ -519,7 +523,7 @@ class GSCAdapter:
         credentials: GSCCredentials,
         site_url: str,
         days: int = 28,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get daily aggregated statistics.
 
@@ -557,13 +561,15 @@ class GSCAdapter:
             keys = row.get("keys") or []
             if not keys:
                 continue
-            daily_stats.append({
-                "date": keys[0],  # First dimension is 'date'
-                "clicks": row["clicks"],
-                "impressions": row["impressions"],
-                "ctr": row["ctr"],
-                "position": row["position"],
-            })
+            daily_stats.append(
+                {
+                    "date": keys[0],  # First dimension is 'date'
+                    "clicks": row["clicks"],
+                    "impressions": row["impressions"],
+                    "ctr": row["ctr"],
+                    "position": row["position"],
+                }
+            )
 
         # Sort by date ascending
         daily_stats.sort(key=lambda x: x["date"])
@@ -576,7 +582,7 @@ class GSCAdapter:
         credentials: GSCCredentials,
         site_url: str,
         days: int = 28,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get performance breakdown by device type (mobile, desktop, tablet).
 
@@ -609,13 +615,15 @@ class GSCAdapter:
             keys = row.get("keys") or []
             if not keys:
                 continue
-            devices.append({
-                "device": keys[0],  # First dimension is 'device'
-                "clicks": row["clicks"],
-                "impressions": row["impressions"],
-                "ctr": row["ctr"],
-                "position": row["position"],
-            })
+            devices.append(
+                {
+                    "device": keys[0],  # First dimension is 'device'
+                    "clicks": row["clicks"],
+                    "impressions": row["impressions"],
+                    "ctr": row["ctr"],
+                    "position": row["position"],
+                }
+            )
 
         logger.info(f"Retrieved device breakdown with {len(devices)} device types")
         return devices
@@ -626,7 +634,7 @@ class GSCAdapter:
         site_url: str,
         days: int = 28,
         top_n: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get performance breakdown by country.
 
@@ -660,13 +668,15 @@ class GSCAdapter:
             keys = row.get("keys") or []
             if not keys:
                 continue
-            countries.append({
-                "country": keys[0],  # First dimension is 'country'
-                "clicks": row["clicks"],
-                "impressions": row["impressions"],
-                "ctr": row["ctr"],
-                "position": row["position"],
-            })
+            countries.append(
+                {
+                    "country": keys[0],  # First dimension is 'country'
+                    "clicks": row["clicks"],
+                    "impressions": row["impressions"],
+                    "ctr": row["ctr"],
+                    "position": row["position"],
+                }
+            )
 
         # Sort by clicks descending
         countries.sort(key=lambda x: x["clicks"], reverse=True)
@@ -677,9 +687,9 @@ class GSCAdapter:
 
 # Factory function for easy instantiation
 def create_gsc_adapter(
-    client_id: Optional[str] = None,
-    client_secret: Optional[str] = None,
-    redirect_uri: Optional[str] = None,
+    client_id: str | None = None,
+    client_secret: str | None = None,
+    redirect_uri: str | None = None,
 ) -> GSCAdapter:
     """
     Create a Google Search Console adapter instance.

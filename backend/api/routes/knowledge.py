@@ -5,43 +5,48 @@ Knowledge Vault API routes for document upload and RAG queries.
 import logging
 import math
 import os
-from pathlib import Path
 import time
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from uuid import uuid4
 
 from fastapi import (
     APIRouter,
     Depends,
-    HTTPException,
-    Request,
-    status,
-    Query,
-    UploadFile,
-    Form,
     File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
 )
-from api.middleware.rate_limit import limiter
-from sqlalchemy import select, func, and_, desc, delete
+from sqlalchemy import and_, delete, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.middleware.rate_limit import limiter
+from api.routes.auth import get_current_user
 from api.schemas.knowledge import (
-    SourceUploadResponse,
-    KnowledgeSourceResponse,
     KnowledgeSourceListResponse,
+    KnowledgeSourceResponse,
     KnowledgeSourceUpdateRequest,
+    KnowledgeStatsResponse,
     QueryRequest,
     QueryResponse,
-    SourceSnippet,
-    KnowledgeStatsResponse,
     ReprocessRequest,
     ReprocessResponse,
+    SourceSnippet,
+    SourceUploadResponse,
 )
-from api.routes.auth import get_current_user
 from api.utils import escape_like
 from infrastructure.database.connection import get_db
-from infrastructure.database.models import KnowledgeSource, KnowledgeChunk, KnowledgeQuery, User, SourceStatus
+from infrastructure.database.models import (
+    KnowledgeChunk,
+    KnowledgeQuery,
+    KnowledgeSource,
+    SourceStatus,
+    User,
+)
 from services import knowledge_processor as kp
 
 logger = logging.getLogger(__name__)
@@ -94,7 +99,7 @@ async def _process_document(
     This runs synchronously in the request handler — it is fast enough for
     files up to 10 MB without a background worker.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     source.status = SourceStatus.PROCESSING.value
     source.processing_started_at = now
     source.error_message = None
@@ -113,7 +118,9 @@ async def _process_document(
                 )
             else:
                 source.status = SourceStatus.FAILED.value
-                source.error_message = "The file appears to be empty or contains no extractable text."
+                source.error_message = (
+                    "The file appears to be empty or contains no extractable text."
+                )
             await db.commit()
             return
 
@@ -126,9 +133,7 @@ async def _process_document(
             return
 
         # 3. Delete any existing chunks for this source (reprocess scenario)
-        await db.execute(
-            delete(KnowledgeChunk).where(KnowledgeChunk.source_id == source.id)
-        )
+        await db.execute(delete(KnowledgeChunk).where(KnowledgeChunk.source_id == source.id))
 
         # 4. Persist new chunks
         chunk_objects = []
@@ -149,7 +154,7 @@ async def _process_document(
         source.chunk_count = len(chunks)
         source.char_count = len(text)
         source.status = SourceStatus.COMPLETED.value
-        source.processing_completed_at = datetime.now(timezone.utc)
+        source.processing_completed_at = datetime.now(UTC)
 
         await db.commit()
         logger.info(
@@ -170,15 +175,16 @@ async def _process_document(
 # Upload
 # ---------------------------------------------------------------------------
 
+
 @router.post("/upload", response_model=SourceUploadResponse)
 @limiter.limit("20/minute")  # KV-02: rate limit upload/query to prevent DoS
 async def upload_document(
     request: Request,
     file: UploadFile = File(...),
-    title: Optional[str] = Form(None),
-    description: Optional[str] = Form(None),
-    tags: Optional[str] = Form(None),  # comma-separated
-    project_id: Optional[str] = Form(None),
+    title: str | None = Form(None),
+    description: str | None = Form(None),
+    tags: str | None = Form(None),  # comma-separated
+    project_id: str | None = Form(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -244,7 +250,11 @@ async def upload_document(
         ) from exc
 
     # Create DB record
-    resolved_project_id = project_id if project_id else (current_user.current_project_id if current_user.current_project_id else None)
+    resolved_project_id = (
+        project_id
+        if project_id
+        else (current_user.current_project_id if current_user.current_project_id else None)
+    )
     source = KnowledgeSource(
         id=source_id,
         user_id=current_user.id,
@@ -287,13 +297,14 @@ async def upload_document(
 # List sources
 # ---------------------------------------------------------------------------
 
+
 @router.get("/sources", response_model=KnowledgeSourceListResponse)
 async def list_sources(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    status: Optional[str] = None,
-    search: Optional[str] = None,
-    file_type: Optional[str] = None,
+    status: str | None = None,
+    search: str | None = None,
+    file_type: str | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -358,6 +369,7 @@ async def list_sources(
 # Get single source
 # ---------------------------------------------------------------------------
 
+
 @router.get("/sources/{source_id}", response_model=KnowledgeSourceResponse)
 async def get_source(
     source_id: str,
@@ -373,7 +385,9 @@ async def get_source(
     )
     source = result.scalar_one_or_none()
     if not source:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge source not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge source not found"
+        )
 
     return KnowledgeSourceResponse(
         id=source.id,
@@ -399,6 +413,7 @@ async def get_source(
 # Update source metadata
 # ---------------------------------------------------------------------------
 
+
 @router.put("/sources/{source_id}", response_model=KnowledgeSourceResponse)
 async def update_source(
     source_id: str,
@@ -415,7 +430,9 @@ async def update_source(
     )
     source = result.scalar_one_or_none()
     if not source:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge source not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge source not found"
+        )
 
     for field, value in request.model_dump(exclude_unset=True).items():
         setattr(source, field, value)
@@ -447,6 +464,7 @@ async def update_source(
 # Delete source
 # ---------------------------------------------------------------------------
 
+
 @router.delete("/sources/{source_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_source(
     source_id: str,
@@ -464,23 +482,28 @@ async def delete_source(
     )
     source = result.scalar_one_or_none()
     if not source:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge source not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge source not found"
+        )
 
     # Delete chunks (cascade handles this, but be explicit)
-    await db.execute(
-        delete(KnowledgeChunk).where(KnowledgeChunk.source_id == source_id)
-    )
+    await db.execute(delete(KnowledgeChunk).where(KnowledgeChunk.source_id == source_id))
 
     # Delete on-disk file — KV-04: validate path resolves within storage dir before deletion.
     if source.file_url:
         from pathlib import Path
+
         try:
             resolved = Path(source.file_url).resolve()
             if resolved.is_relative_to(kp.KNOWLEDGE_STORAGE_DIR.resolve()):
                 kp.delete_file(source.file_url)
-                logger.info("Deleted knowledge source file: %s (source_id=%s)", source.file_url, source_id)  # KV-13
+                logger.info(
+                    "Deleted knowledge source file: %s (source_id=%s)", source.file_url, source_id
+                )  # KV-13
             else:
-                logger.warning("Skipping file deletion: path %s is outside storage dir", source.file_url)
+                logger.warning(
+                    "Skipping file deletion: path %s is outside storage dir", source.file_url
+                )
         except Exception as path_err:
             logger.warning("Invalid file path for deletion %s: %s", source.file_url, path_err)
 
@@ -491,6 +514,7 @@ async def delete_source(
 # ---------------------------------------------------------------------------
 # Query
 # ---------------------------------------------------------------------------
+
 
 @router.post("/query", response_model=QueryResponse)
 @limiter.limit("30/minute")  # KV-02: rate limit knowledge queries
@@ -555,9 +579,7 @@ async def query_knowledge(
     source_title_map = {s.id: s.title for s in sources}
 
     chunks_result = await db.execute(
-        select(KnowledgeChunk)
-        .where(KnowledgeChunk.source_id.in_(source_ids))
-        .limit(50)
+        select(KnowledgeChunk).where(KnowledgeChunk.source_id.in_(source_ids)).limit(50)
     )
     all_chunks = chunks_result.scalars().all()
 
@@ -611,7 +633,9 @@ async def query_knowledge(
                 "relevance_score": s.relevance_score,
             }
             for s in source_snippets
-        ] if source_snippets else None,
+        ]
+        if source_snippets
+        else None,
         query_time_ms=query_time_ms,
         chunks_retrieved=len(source_snippets),
         success=True,
@@ -631,6 +655,7 @@ async def query_knowledge(
 # ---------------------------------------------------------------------------
 # Stats
 # ---------------------------------------------------------------------------
+
 
 @router.get("/stats", response_model=KnowledgeStatsResponse)
 async def get_knowledge_stats(
@@ -669,13 +694,11 @@ async def get_knowledge_stats(
     # KV-03: KnowledgeQuery lacks project_id — query counts span all user projects.
     # TODO: Add project_id to KnowledgeQuery model + migration, then filter here.
     total_queries_result = await db.execute(
-        select(func.count(KnowledgeQuery.id)).where(
-            KnowledgeQuery.user_id == current_user.id
-        )
+        select(func.count(KnowledgeQuery.id)).where(KnowledgeQuery.user_id == current_user.id)
     )
     total_queries = total_queries_result.scalar() or 0
 
-    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    thirty_days_ago = datetime.now(UTC) - timedelta(days=30)
     recent_queries_result = await db.execute(
         select(func.count(KnowledgeQuery.id)).where(
             and_(
@@ -709,6 +732,7 @@ async def get_knowledge_stats(
 # Reprocess
 # ---------------------------------------------------------------------------
 
+
 @router.post("/sources/{source_id}/reprocess", response_model=ReprocessResponse)
 async def reprocess_source(
     source_id: str,
@@ -724,14 +748,18 @@ async def reprocess_source(
     # KV-08: Use with_for_update() to prevent race condition between ownership check
     # and chunk loading — ensures no concurrent reprocess can interleave
     result = await db.execute(
-        select(KnowledgeSource).where(
+        select(KnowledgeSource)
+        .where(
             KnowledgeSource.id == source_id,
             _build_ownership_filter(current_user),
-        ).with_for_update()
+        )
+        .with_for_update()
     )
     source = result.scalar_one_or_none()
     if not source:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge source not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge source not found"
+        )
 
     if source.status == SourceStatus.COMPLETED.value and not request.force:
         raise HTTPException(
@@ -753,6 +781,7 @@ async def reprocess_source(
         )
 
     from services.knowledge_processor import KNOWLEDGE_STORAGE_DIR
+
     resolved = Path(source.file_url).resolve()
     if not resolved.is_relative_to(KNOWLEDGE_STORAGE_DIR.resolve()):
         logger.error("File path outside storage directory: %s", source.file_url)

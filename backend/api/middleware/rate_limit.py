@@ -22,9 +22,9 @@ import ipaddress
 import logging
 import re
 
-from starlette.requests import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from starlette.requests import Request
 
 from infrastructure.config.settings import settings
 
@@ -82,6 +82,7 @@ def _get_real_ip(request: Request) -> str:
         if _is_valid_ip(candidate) and not _is_private_ip(candidate):
             return candidate
     return get_remote_address(request)
+
 
 # Rate limit configurations
 # Format: "count/period" where period can be: second, minute, hour, day

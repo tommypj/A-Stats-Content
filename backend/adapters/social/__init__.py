@@ -7,26 +7,24 @@ and Instagram using OAuth 2.0 authentication and platform-specific APIs.
 
 from .base import (
     BaseSocialAdapter,
-    SocialPlatform,
-    SocialCredentials,
-    PostResult,
     MediaUploadResult,
+    PostResult,
     SocialAdapterError,
-    SocialAuthError,
     SocialAPIError,
+    SocialAuthError,
+    SocialCredentials,
+    SocialPlatform,
     SocialRateLimitError,
     SocialValidationError,
 )
-from .twitter_adapter import TwitterAdapter
-from .linkedin_adapter import LinkedInAdapter
 from .facebook_adapter import FacebookAdapter
 from .instagram_adapter import InstagramAdapter
+from .linkedin_adapter import LinkedInAdapter
+from .twitter_adapter import TwitterAdapter
 
 
 def get_social_adapter(
-    platform: SocialPlatform,
-    mock_mode: bool = False,
-    **kwargs
+    platform: SocialPlatform, mock_mode: bool = False, **kwargs
 ) -> BaseSocialAdapter:
     """
     Factory function to get platform-specific social media adapter.
