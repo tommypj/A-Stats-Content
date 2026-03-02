@@ -22,12 +22,6 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 
-const tierColors = {
-  free: "bg-gray-100 text-gray-800",
-  starter: "bg-blue-100 text-blue-800",
-  professional: "bg-purple-100 text-purple-800",
-  enterprise: "bg-orange-100 text-orange-800",
-};
 
 const roleIcons = {
   owner: Crown,
@@ -219,10 +213,6 @@ export default function ProjectsPage() {
 
                     {/* Badges */}
                     <div className="flex items-center gap-2">
-                      <Badge className={tierColors[project.subscription_tier]}>
-                        {project.subscription_tier.charAt(0).toUpperCase() +
-                          project.subscription_tier.slice(1)}
-                      </Badge>
                       <div className="flex items-center gap-1 text-sm text-text-muted">
                         <FolderOpen className="h-3 w-3" />
                         <span>{project.member_count}</span>
