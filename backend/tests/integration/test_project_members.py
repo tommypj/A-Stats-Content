@@ -121,7 +121,7 @@ class TestAddProjectMember:
         self, async_client: AsyncClient, auth_headers: dict, project: dict, other_user: dict
     ):
         """OWNER should be able to add members to the project."""
-        payload = {"email": other_user["email"], "role": "member"}
+        payload = {"email": other_user["email"], "role": "editor"}
 
         response = await async_client.post(
             f"/api/v1/projects/{project['id']}/members", json=payload, headers=auth_headers
@@ -137,7 +137,7 @@ class TestAddProjectMember:
         self, async_client: AsyncClient, project_admin_auth: dict, project: dict, other_user: dict
     ):
         """ADMIN should be able to add members to the project."""
-        payload = {"email": other_user["email"], "role": "member"}
+        payload = {"email": other_user["email"], "role": "editor"}
 
         response = await async_client.post(
             f"/api/v1/projects/{project['id']}/members", json=payload, headers=project_admin_auth
@@ -150,7 +150,7 @@ class TestAddProjectMember:
         self, async_client: AsyncClient, project_member_auth: dict, project: dict, other_user: dict
     ):
         """MEMBER should NOT be able to add members."""
-        payload = {"email": other_user["email"], "role": "member"}
+        payload = {"email": other_user["email"], "role": "editor"}
 
         response = await async_client.post(
             f"/api/v1/projects/{project['id']}/members", json=payload, headers=project_member_auth
@@ -189,7 +189,7 @@ class TestAddProjectMember:
         self, async_client: AsyncClient, auth_headers: dict, project: dict, project_member: dict
     ):
         """Adding a user who is already a member should fail."""
-        payload = {"email": project_member["email"], "role": "member"}
+        payload = {"email": project_member["email"], "role": "editor"}
 
         response = await async_client.post(
             f"/api/v1/projects/{project['id']}/members", json=payload, headers=auth_headers
@@ -245,7 +245,7 @@ class TestUpdateMemberRole:
         project_viewer: dict,
     ):
         """MEMBER should NOT be able to update member roles."""
-        payload = {"role": "member"}
+        payload = {"role": "editor"}
 
         response = await async_client.put(
             f"/api/v1/projects/{project['id']}/members/{project_viewer['id']}",

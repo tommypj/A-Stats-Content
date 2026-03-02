@@ -31,7 +31,7 @@ class TestSendInvitation:
         self, async_client: AsyncClient, auth_headers: dict, project: dict
     ):
         """OWNER should be able to send project invitations."""
-        payload = {"email": "newmember@example.com", "role": "member"}
+        payload = {"email": "newmember@example.com", "role": "editor"}
 
         response = await async_client.post(
             f"/api/v1/projects/{project['id']}/invitations", json=payload, headers=auth_headers
@@ -40,7 +40,7 @@ class TestSendInvitation:
         assert response.status_code == 201
         data = response.json()
         assert data["email"] == "newmember@example.com"
-        assert data["role"] == "member"
+        assert data["role"] == "editor"
         assert data["status"] == "pending"
         assert "token" in data
         assert "expires_at" in data
@@ -65,7 +65,7 @@ class TestSendInvitation:
         self, async_client: AsyncClient, project_member_auth: dict, project: dict
     ):
         """MEMBER should NOT be able to send invitations."""
-        payload = {"email": "forbidden@example.com", "role": "member"}
+        payload = {"email": "forbidden@example.com", "role": "editor"}
 
         response = await async_client.post(
             f"/api/v1/projects/{project['id']}/invitations",
@@ -80,7 +80,7 @@ class TestSendInvitation:
         self, async_client: AsyncClient, auth_headers: dict, project: dict, project_member: dict
     ):
         """Cannot send invitation to existing project member."""
-        payload = {"email": project_member["email"], "role": "member"}
+        payload = {"email": project_member["email"], "role": "editor"}
 
         response = await async_client.post(
             f"/api/v1/projects/{project['id']}/invitations", json=payload, headers=auth_headers
@@ -97,7 +97,7 @@ class TestSendInvitation:
         # The "message" field is not part of ProjectInvitationCreate schema and will be ignored.
         payload = {
             "email": "custom@example.com",
-            "role": "member",
+            "role": "editor",
             "message": "Join us to collaborate on this project!",
         }
 
@@ -117,7 +117,7 @@ class TestSendInvitation:
         # Send first invitation
         response1 = await async_client.post(
             f"/api/v1/projects/{project['id']}/invitations",
-            json={"email": "user1@example.com", "role": "member"},
+            json={"email": "user1@example.com", "role": "editor"},
             headers=auth_headers,
         )
         token1 = response1.json()["token"]
@@ -125,7 +125,7 @@ class TestSendInvitation:
         # Send second invitation
         response2 = await async_client.post(
             f"/api/v1/projects/{project['id']}/invitations",
-            json={"email": "user2@example.com", "role": "member"},
+            json={"email": "user2@example.com", "role": "editor"},
             headers=auth_headers,
         )
         token2 = response2.json()["token"]
@@ -480,7 +480,7 @@ class TestInvitationEmailNotifications:
         self, async_client: AsyncClient, auth_headers: dict, project: dict, mock_email_service
     ):
         """Sending invitation should trigger email notification."""
-        payload = {"email": "notify@example.com", "role": "member"}
+        payload = {"email": "notify@example.com", "role": "editor"}
 
         await async_client.post(
             f"/api/v1/projects/{project['id']}/invitations", json=payload, headers=auth_headers
@@ -547,7 +547,7 @@ class TestInvitationValidation:
         self, async_client: AsyncClient, auth_headers: dict, project: dict
     ):
         """Invitations should expire after 7 days by default."""
-        payload = {"email": "expiry-test@example.com", "role": "member"}
+        payload = {"email": "expiry-test@example.com", "role": "editor"}
 
         response = await async_client.post(
             f"/api/v1/projects/{project['id']}/invitations", json=payload, headers=auth_headers
