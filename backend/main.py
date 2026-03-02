@@ -291,12 +291,15 @@ _MAX_BODY_SIZE = 5 * 1024 * 1024  # 5MB
 @app.middleware("http")
 async def limit_request_body_size(request: Request, call_next):
     if request.method in ("POST", "PUT", "PATCH"):
-        content_length = request.headers.get("content-length")
-        if content_length and int(content_length) > _MAX_BODY_SIZE:
-            return JSONResponse(
-                status_code=413,
-                content={"detail": "Request body too large (max 5MB)"},
-            )
+        # Skip size check for multipart uploads — those routes enforce their own limits
+        content_type = request.headers.get("content-type", "")
+        if not content_type.startswith("multipart/"):
+            content_length = request.headers.get("content-length")
+            if content_length and int(content_length) > _MAX_BODY_SIZE:
+                return JSONResponse(
+                    status_code=413,
+                    content={"detail": "Request body too large (max 5MB)"},
+                )
     return await call_next(request)
 
 
