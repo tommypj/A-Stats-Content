@@ -379,9 +379,9 @@ class TestCheckLimitUserLevel:
         assert result is False
 
     async def test_check_limit_user_unlimited_plan_returns_true(self):
-        """Enterprise user has no article cap (-1 = unlimited)."""
+        """Enterprise user well within their 300/month article cap."""
         user_id = str(uuid4())
-        mock_user = _make_user(user_id, tier="enterprise", articles_used=9999)
+        mock_user = _make_user(user_id, tier="enterprise", articles_used=50)
 
         db = _make_db_session()
         execute_result = MagicMock()
