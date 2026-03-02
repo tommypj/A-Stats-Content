@@ -464,14 +464,8 @@ async def login(
             detail="Invalid email or password",
         )
 
-    # AUTH-04: Reject inactive accounts (covers deleted_at soft-delete and any future statuses).
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is inactive",
-        )
-
-    # INFRA-AUTH-05: Block unverified (PENDING) users even if is_active is True
+    # AUTH-04: Check specific statuses first for informative error messages,
+    # then fall back to the generic is_active check for any other inactive state.
     if user.status == UserStatus.PENDING.value:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -488,6 +482,13 @@ async def login(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account has been deleted",
+        )
+
+    # Catch-all for any other inactive state (deleted_at soft-delete, future statuses).
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is inactive",
         )
 
     # Update login tracking
