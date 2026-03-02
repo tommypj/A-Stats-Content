@@ -215,7 +215,7 @@ class TestGenerateArticle:
                 "outline_id": outline.id,
             },
         )
-        assert response.status_code == 400
+        assert response.status_code == 422
         assert "no sections" in response.json()["detail"].lower()
 
     async def test_generate_article_ai_failure(
