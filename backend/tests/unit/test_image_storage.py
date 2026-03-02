@@ -283,7 +283,7 @@ class TestDownloadImage:
     @pytest.mark.asyncio
     async def test_download_image_success(self):
         """Test successful image download."""
-        test_url = "https://example.com/image.png"
+        test_url = "https://replicate.delivery/image.png"
         test_data = b"fake image data"
 
         mock_response = AsyncMock()
@@ -308,7 +308,7 @@ class TestDownloadImage:
     @pytest.mark.asyncio
     async def test_download_image_http_error(self):
         """Test handling of HTTP errors."""
-        test_url = "https://example.com/notfound.png"
+        test_url = "https://replicate.delivery/notfound.png"
 
         mock_response = AsyncMock()
         mock_response.status = 404
@@ -329,7 +329,7 @@ class TestDownloadImage:
     @pytest.mark.asyncio
     async def test_download_image_network_error(self):
         """Test handling of network errors."""
-        test_url = "https://example.com/image.png"
+        test_url = "https://replicate.delivery/image.png"
 
         import aiohttp
 
