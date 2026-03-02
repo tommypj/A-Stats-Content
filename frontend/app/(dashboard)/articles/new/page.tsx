@@ -45,16 +45,15 @@ function NewArticleContent() {
   const [voice, setVoice] = useState("second_person");
   const [listUsage, setListUsage] = useState("balanced");
   const [customInstructions, setCustomInstructions] = useState("");
-  const abortControllerRef = useRef<AbortController | null>(null);
   // FE-CONTENT-01: track mount status to prevent setState on unmounted component
   const mountedRef = useRef(true);
+  const pollingRef = useRef(false);
 
-  // FE-CONTENT-28: abort SSE stream on unmount
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      abortControllerRef.current?.abort();
+      pollingRef.current = false;
     };
   }, []);
 
@@ -85,7 +84,7 @@ function NewArticleContent() {
     setError("");
 
     try {
-      // This returns immediately with status "generating"
+      // Returns immediately with status "generating"
       const article = await api.articles.generate({
         outline_id: outline.id,
         tone: tone || undefined,
@@ -96,58 +95,47 @@ function NewArticleContent() {
         custom_instructions: customInstructions || undefined,
       });
 
-      // Open SSE stream — stays open until backend publishes completion/failure
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
+      // Poll GET /articles/{id} every 3s until completed/failed (max ~12 minutes)
+      pollingRef.current = true;
+      const MAX_POLLS = 240; // 240 × 3s = 12 minutes
+      let polls = 0;
 
-      const streamUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/articles/${article.id}/stream`;
+      while (pollingRef.current && mountedRef.current && polls < MAX_POLLS) {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        polls++;
 
-      const streamResponse = await fetch(streamUrl, {
-        credentials: "include", // Send HttpOnly auth cookie
-        signal: controller.signal,
-      });
+        if (!pollingRef.current || !mountedRef.current) break;
 
-      if (!streamResponse.ok || !streamResponse.body) {
-        throw new Error("Stream unavailable");
-      }
-
-      const reader = streamResponse.body.getReader();
-      const decoder = new TextDecoder();
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          if (!mountedRef.current) break;
-
-          const text = decoder.decode(value, { stream: true });
-          for (const line of text.split("\n")) {
-            if (line.startsWith("event: completed")) {
-              router.push(`/articles/${article.id}`);
-              return;
-            } else if (line.startsWith("event: failed")) {
+        try {
+          const updated = await api.articles.get(article.id);
+          if (updated.status === "completed" || updated.status === "published") {
+            router.push(`/articles/${article.id}`);
+            return;
+          }
+          if (updated.status === "failed") {
+            if (mountedRef.current) {
               setError("Article generation failed. Please try again.");
               setGenerating(false);
-              return;
-            } else if (line.startsWith("event: timeout") || line.startsWith("event: error")) {
-              setError("Generation is taking too long. Check your articles list for the result.");
-              setGenerating(false);
-              return;
             }
-            // ": keepalive" lines are ignored
+            return;
           }
+          // still "generating" — keep polling
+        } catch {
+          // Transient network error — keep polling
         }
-      } catch (err) {
-        if (!mountedRef.current) return;
-        if ((err as Error).name === "AbortError") return; // User navigated away
-        setError("Lost connection while generating. Check your articles list.");
+      }
+
+      if (mountedRef.current && polls >= MAX_POLLS) {
+        setError("Generation is taking longer than expected. Check your articles list for the result.");
         setGenerating(false);
-      } finally {
-        reader.releaseLock();
       }
     } catch (err) {
-      setError("Failed to start article generation. Please try again.");
-      setGenerating(false);
+      if (mountedRef.current) {
+        setError("Failed to start article generation. Please try again.");
+        setGenerating(false);
+      }
+    } finally {
+      pollingRef.current = false;
     }
   }
 
