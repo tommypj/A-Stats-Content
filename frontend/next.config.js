@@ -1,6 +1,22 @@
 const createNextIntlPlugin = require("next-intl/plugin");
 const { withSentryConfig } = require("@sentry/nextjs");
 
+// INFRA-M2: Validate NEXT_PUBLIC_API_URL at build time to catch misconfiguration early
+const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+if (!apiUrl) {
+  console.warn(
+    "\n  WARNING: NEXT_PUBLIC_API_URL is not set. " +
+    "All API calls will fall back to http://localhost:8000.\n" +
+    "  Set NEXT_PUBLIC_API_URL in your Vercel environment variables.\n"
+  );
+}
+if (apiUrl && apiUrl.includes("localhost") && process.env.VERCEL_ENV === "production") {
+  throw new Error(
+    "NEXT_PUBLIC_API_URL contains \"localhost\" but VERCEL_ENV is \"production\". " +
+    "Set NEXT_PUBLIC_API_URL to your Railway backend URL."
+  );
+}
+
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
 /** @type {import('next').NextConfig} */

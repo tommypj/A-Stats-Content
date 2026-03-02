@@ -19,10 +19,12 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useAuthStore } from "@/stores/auth";
 import { api, parseApiError, SubscriptionStatus, PlanInfo } from "@/lib/api";
+import { useRequireAuth } from "@/lib/auth";
 import { toast } from "sonner";
 
 export default function BillingSettingsPage() {
   const t = useTranslations("settings.billing");
+  const { isAuthenticated, isLoading: authLoading } = useRequireAuth();
   const router = useRouter();
   const { user } = useAuthStore();
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
@@ -170,6 +172,9 @@ export default function BillingSettingsPage() {
   };
 
   const currentPlan = getCurrentPlan();
+
+  if (authLoading) return null;
+  if (!isAuthenticated) return null;
 
   if (loading) {
     return (

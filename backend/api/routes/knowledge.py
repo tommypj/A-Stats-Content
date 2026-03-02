@@ -178,6 +178,7 @@ async def upload_document(
     title: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
     tags: Optional[str] = Form(None),  # comma-separated
+    project_id: Optional[str] = Form(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -243,10 +244,11 @@ async def upload_document(
         ) from exc
 
     # Create DB record
+    resolved_project_id = project_id if project_id else (current_user.current_project_id if current_user.current_project_id else None)
     source = KnowledgeSource(
         id=source_id,
         user_id=current_user.id,
-        project_id=current_user.current_project_id if current_user.current_project_id else None,
+        project_id=resolved_project_id,
         title=title,
         filename=file.filename,
         file_type=file_ext,
@@ -743,14 +745,13 @@ async def reprocess_source(
             detail="Source is currently being processed. Please wait.",
         )
 
-    # File must still exist on disk
-    if not source.file_url or not os.path.exists(source.file_url):
+    # KV-10: Validate file path BEFORE existence check to prevent path traversal
+    if not source.file_url:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Original file is no longer available on disk. Please re-upload the document.",
         )
 
-    # KV-10: Validate file path BEFORE opening/reading the file to prevent path traversal
     from services.knowledge_processor import KNOWLEDGE_STORAGE_DIR
     resolved = Path(source.file_url).resolve()
     if not resolved.is_relative_to(KNOWLEDGE_STORAGE_DIR.resolve()):
@@ -758,6 +759,13 @@ async def reprocess_source(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid file path",
+        )
+
+    # File must still exist on disk (path already validated above)
+    if not os.path.exists(source.file_url):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Original file is no longer available on disk. Please re-upload the document.",
         )
 
     # Read the stored file and reprocess (path validated above)

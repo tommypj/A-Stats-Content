@@ -120,6 +120,24 @@ class ReportTemplateResponse(BaseModel):
     created_at: datetime
 
 
+class ClientWorkspaceListResponse(BaseModel):
+    items: list[ClientWorkspaceResponse]
+    total: int
+
+
+class GeneratedReportListResponse(BaseModel):
+    items: list[GeneratedReportResponse]
+    total: int
+    page: int
+    page_size: int
+    pages: int
+
+
+class ReportTemplateListResponse(BaseModel):
+    items: list[ReportTemplateResponse]
+    total: int
+
+
 class GenerateReportRequest(BaseModel):
     client_workspace_id: str
     report_template_id: Optional[str] = None
@@ -275,7 +293,7 @@ async def delete_agency_profile(
 # ============================================================================
 
 
-@router.get("/clients", response_model=list[ClientWorkspaceResponse])
+@router.get("/clients", response_model=ClientWorkspaceListResponse)
 async def list_client_workspaces(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -289,7 +307,7 @@ async def list_client_workspaces(
         .order_by(ClientWorkspace.created_at.desc())
     )
     workspaces = result.scalars().all()
-    return list(workspaces)
+    return {"items": list(workspaces), "total": len(workspaces)}
 
 
 @router.post(
@@ -425,6 +443,7 @@ async def enable_client_portal(
 
     workspace.portal_access_token = secrets.token_urlsafe(48)  # 64-char base64 token
     workspace.is_portal_enabled = True
+    workspace.token_expires_at = datetime.now(timezone.utc) + timedelta(days=365)  # DB-M3: 1-year expiry
 
     await db.commit()
     await db.refresh(workspace)
@@ -454,7 +473,7 @@ async def disable_client_portal(
 # ============================================================================
 
 
-@router.get("/templates", response_model=list[ReportTemplateResponse])
+@router.get("/templates", response_model=ReportTemplateListResponse)
 async def list_report_templates(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -468,7 +487,7 @@ async def list_report_templates(
         .order_by(ReportTemplate.created_at.desc())
     )
     templates = result.scalars().all()
-    return list(templates)
+    return {"items": list(templates), "total": len(templates)}
 
 
 @router.post(
@@ -749,7 +768,7 @@ async def generate_report(
     return generated_report
 
 
-@router.get("/reports", response_model=list[GeneratedReportResponse])
+@router.get("/reports", response_model=GeneratedReportListResponse)
 async def list_generated_reports(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
@@ -778,6 +797,11 @@ async def list_generated_reports(
             )
         conditions.append(GeneratedReport.client_workspace_id == client_workspace_id)
 
+    count_result = await db.execute(
+        select(func.count(GeneratedReport.id)).where(and_(*conditions))
+    )
+    total = count_result.scalar() or 0
+
     result = await db.execute(
         select(GeneratedReport)
         .where(and_(*conditions))
@@ -786,7 +810,15 @@ async def list_generated_reports(
         .limit(page_size)
     )
     reports = result.scalars().all()
-    return list(reports)
+
+    pages = math.ceil(total / page_size) if total > 0 else 0
+    return {
+        "items": list(reports),
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "pages": pages,
+    }
 
 
 @router.get("/reports/{report_id}", response_model=GeneratedReportResponse)
@@ -876,6 +908,12 @@ async def get_portal_data(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Client portal is not enabled",
+        )
+    # DB-M3: reject expired portal tokens
+    if workspace.token_expires_at and workspace.token_expires_at < datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Portal link has expired",
         )
 
     # Fetch agency profile for branding

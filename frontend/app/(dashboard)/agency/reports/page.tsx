@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { FileText, ArrowLeft, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
@@ -98,12 +98,7 @@ export default function AgencyReportsPage() {
     });
   }, []);
 
-  useEffect(() => {
-    loadReports();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize]);
-
-  const loadReports = async () => {
+  const loadReports = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.agency.reports({ page, page_size: pageSize });
@@ -115,7 +110,11 @@ export default function AgencyReportsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize]);
+
+  useEffect(() => {
+    loadReports();
+  }, [loadReports]);
 
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);

@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, parseApiError } from "@/lib/api";
+import { useRequireAuth } from "@/lib/auth";
 
 const passwordSchema = z
   .object({
@@ -37,6 +38,7 @@ type PasswordFormData = z.infer<typeof passwordSchema>;
 
 export default function PasswordSettingsPage() {
   const t = useTranslations("settings.password");
+  const { isAuthenticated, isLoading: authLoading } = useRequireAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -50,6 +52,9 @@ export default function PasswordSettingsPage() {
   } = useForm<PasswordFormData>({
     resolver: zodResolver(passwordSchema),
   });
+
+  if (authLoading) return null;
+  if (!isAuthenticated) return null;
 
   const onSubmit = async (data: PasswordFormData) => {
     setIsLoading(true);

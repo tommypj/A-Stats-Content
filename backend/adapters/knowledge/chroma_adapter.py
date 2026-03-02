@@ -85,17 +85,24 @@ class ChromaAdapter:
             logger.error(f"Failed to connect to ChromaDB: {e}")
             raise ChromaDBConnectionError(f"Could not connect to ChromaDB at {self.host}:{self.port}: {e}")
 
-    def get_collection(self, user_id: str) -> chromadb.Collection:
+    def get_collection(self, user_id: str, project_id: str = "personal") -> chromadb.Collection:
         """
-        Get or create user-specific collection.
+        Get or create a project-scoped collection.
+
+        NOTE: The collection name was changed from ``{prefix}_{user_id}`` to
+        ``{prefix}_{user_id}_{project_id}`` to isolate per-project vector data
+        and prevent cross-tenant RAG leakage.  Existing collections stored
+        under the old name will not be found; they will be left in place and
+        new, empty collections will be created under the new name.
 
         Args:
-            user_id: User ID to create collection for
+            user_id: User ID
+            project_id: Project ID (use ``"personal"`` for personal/non-project sources)
 
         Returns:
             ChromaDB Collection instance
         """
-        collection_name = f"{self.collection_prefix}_{user_id}"
+        collection_name = f"{self.collection_prefix}_{user_id}_{project_id}"
 
         try:
             collection = self.client.get_or_create_collection(
@@ -109,7 +116,11 @@ class ChromaAdapter:
             raise ChromaDBError(f"Could not get collection: {e}")
 
     async def add_documents(
-        self, user_id: str, documents: List[Document], embeddings: List[List[float]]
+        self,
+        user_id: str,
+        documents: List[Document],
+        embeddings: List[List[float]],
+        project_id: str = "personal",
     ) -> List[str]:
         """
         Add documents with their embeddings to the collection.
@@ -118,6 +129,7 @@ class ChromaAdapter:
             user_id: User ID
             documents: List of documents to add
             embeddings: List of embedding vectors (must match documents length)
+            project_id: Project ID for collection isolation (default ``"personal"``)
 
         Returns:
             List of document IDs that were added
@@ -132,7 +144,7 @@ class ChromaAdapter:
             return []
 
         try:
-            collection = self.get_collection(user_id)
+            collection = self.get_collection(user_id, project_id)
 
             # Prepare data for ChromaDB
             ids = [doc.id for doc in documents]
@@ -144,7 +156,7 @@ class ChromaAdapter:
                 collection.add, ids=ids, documents=contents, embeddings=embeddings, metadatas=metadatas
             )
 
-            logger.info(f"Added {len(documents)} documents to collection for user {user_id}")
+            logger.info(f"Added {len(documents)} documents to collection for user {user_id} / project {project_id}")
             return ids
 
         except Exception as e:
@@ -157,6 +169,7 @@ class ChromaAdapter:
         query_embedding: List[float],
         n_results: int = 5,
         filter_metadata: Optional[Dict] = None,
+        project_id: str = "personal",
     ) -> List[QueryResult]:
         """
         Query similar documents using vector similarity.
@@ -166,6 +179,7 @@ class ChromaAdapter:
             query_embedding: Query embedding vector
             n_results: Number of results to return
             filter_metadata: Optional metadata filter (e.g., {"source_id": "document_123"})
+            project_id: Project ID for collection isolation (default ``"personal"``)
 
         Returns:
             List of query results sorted by similarity (most similar first)
@@ -174,7 +188,7 @@ class ChromaAdapter:
             ChromaDBError: If query fails
         """
         try:
-            collection = self.get_collection(user_id)
+            collection = self.get_collection(user_id, project_id)
 
             # Query is synchronous, run in executor
             results = await self._run_in_executor(
@@ -201,57 +215,59 @@ class ChromaAdapter:
                         )
                     )
 
-            logger.debug(f"Query returned {len(query_results)} results for user {user_id}")
+            logger.debug(f"Query returned {len(query_results)} results for user {user_id} / project {project_id}")
             return query_results
 
         except Exception as e:
             logger.error(f"Failed to query collection: {e}")
             raise ChromaDBError(f"Query failed: {e}")
 
-    async def delete_document(self, user_id: str, document_id: str) -> bool:
+    async def delete_document(self, user_id: str, document_id: str, project_id: str = "personal") -> bool:
         """
         Delete a document from the collection.
 
         Args:
             user_id: User ID
             document_id: Document ID to delete
+            project_id: Project ID for collection isolation (default ``"personal"``)
 
         Returns:
             True if deleted successfully, False otherwise
         """
         try:
-            collection = self.get_collection(user_id)
+            collection = self.get_collection(user_id, project_id)
 
             # Delete is synchronous, run in executor
             await self._run_in_executor(collection.delete, ids=[document_id])
 
-            logger.info(f"Deleted document {document_id} from collection for user {user_id}")
+            logger.info(f"Deleted document {document_id} from collection for user {user_id} / project {project_id}")
             return True
 
         except Exception as e:
             logger.error(f"Failed to delete document {document_id}: {e}")
             return False
 
-    async def delete_by_source(self, user_id: str, source_id: str) -> int:
+    async def delete_by_source(self, user_id: str, source_id: str, project_id: str = "personal") -> int:
         """
         Delete all chunks from a source document.
 
         Args:
             user_id: User ID
             source_id: Source document ID
+            project_id: Project ID for collection isolation (default ``"personal"``)
 
         Returns:
             Number of documents deleted
         """
         try:
-            collection = self.get_collection(user_id)
+            collection = self.get_collection(user_id, project_id)
 
             # Delete by metadata filter
             await self._run_in_executor(
                 collection.delete, where={"source_id": source_id}
             )
 
-            logger.info(f"Deleted all documents with source_id={source_id} for user {user_id}")
+            logger.info(f"Deleted all documents with source_id={source_id} for user {user_id} / project {project_id}")
             # Note: ChromaDB doesn't return count of deleted items
             return 1  # Return 1 to indicate success
 
@@ -259,44 +275,47 @@ class ChromaAdapter:
             logger.error(f"Failed to delete documents by source {source_id}: {e}")
             return 0
 
-    async def get_collection_stats(self, user_id: str) -> Dict[str, Any]:
+    async def get_collection_stats(self, user_id: str, project_id: str = "personal") -> Dict[str, Any]:
         """
-        Get stats about user's collection.
+        Get stats about a user/project collection.
 
         Args:
             user_id: User ID
+            project_id: Project ID for collection isolation (default ``"personal"``)
 
         Returns:
             Dictionary with collection statistics
         """
         try:
-            collection = self.get_collection(user_id)
+            collection = self.get_collection(user_id, project_id)
 
             # Count is synchronous, run in executor
             count = await self._run_in_executor(collection.count)
 
             return {
-                "collection_name": f"{self.collection_prefix}_{user_id}",
+                "collection_name": f"{self.collection_prefix}_{user_id}_{project_id}",
                 "document_count": count,
                 "user_id": user_id,
+                "project_id": project_id,
             }
 
         except Exception as e:
             logger.error(f"Failed to get collection stats: {e}")
             raise ChromaDBError(f"Could not get collection stats: {e}")
 
-    async def delete_collection(self, user_id: str) -> bool:
+    async def delete_collection(self, user_id: str, project_id: str = "personal") -> bool:
         """
-        Delete entire user collection.
+        Delete an entire project-scoped collection.
 
         Args:
             user_id: User ID
+            project_id: Project ID for collection isolation (default ``"personal"``)
 
         Returns:
             True if deleted successfully, False otherwise
         """
         try:
-            collection_name = f"{self.collection_prefix}_{user_id}"
+            collection_name = f"{self.collection_prefix}_{user_id}_{project_id}"
 
             # Delete is synchronous, run in executor
             await self._run_in_executor(self.client.delete_collection, name=collection_name)

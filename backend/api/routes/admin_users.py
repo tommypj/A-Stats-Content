@@ -8,7 +8,7 @@ from typing import Annotated, Optional
 from math import ceil
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, Header
-from sqlalchemy import select, func, or_, and_, desc, asc
+from sqlalchemy import select, func, or_, and_, desc, asc, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from infrastructure.database.connection import get_db
@@ -576,7 +576,7 @@ async def delete_user(
     else:
         # Hard delete: actually remove from database
         # Note: This will cascade delete related records based on foreign key constraints
-        await db.delete(user)
+        await db.execute(delete(User).where(User.id == user_id))
         await db.commit()
 
         message = "User hard deleted successfully (all data removed)"

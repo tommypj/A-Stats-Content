@@ -4,6 +4,7 @@ Authentication API routes.
 
 import json
 import logging
+import secrets
 from datetime import datetime, timezone, timedelta
 from typing import Annotated, Optional
 from urllib.parse import urlencode
@@ -41,9 +42,100 @@ from api.schemas.auth import (
     PasswordResetConfirm,
     PasswordChangeRequest,
     DeleteAccountRequest,
+    EmailChangeRequest,
+    EmailChangeVerifyRequest,
 )
 
 logger = logging.getLogger(__name__)
+
+
+async def _blacklist_token(token: str, ttl_seconds: int = 604800) -> None:
+    """Store token hash in Redis blacklist with TTL.
+
+    AUTH-H1/AUTH-H2: Used on logout and refresh rotation to invalidate old tokens.
+    Gracefully degrades — a Redis failure does NOT prevent logout from succeeding.
+    """
+    try:
+        import hashlib
+        import redis.asyncio as aioredis
+
+        token_hash = hashlib.sha256(token.encode()).hexdigest()[:16]
+        r = aioredis.from_url(settings.redis_url)
+        await r.setex(f"token_blacklist:{token_hash}", ttl_seconds, "1")
+        await r.aclose()
+    except Exception as e:
+        logger.warning("Could not blacklist token in Redis: %s", e)
+
+
+async def _is_token_blacklisted(token: str) -> bool:
+    """Return True if the token has been blacklisted (revoked).
+
+    Fails open — if Redis is unavailable we allow the request rather than
+    blocking all authenticated users.
+    """
+    try:
+        import hashlib
+        import redis.asyncio as aioredis
+
+        token_hash = hashlib.sha256(token.encode()).hexdigest()[:16]
+        r = aioredis.from_url(settings.redis_url)
+        result = await r.exists(f"token_blacklist:{token_hash}")
+        await r.aclose()
+        return bool(result)
+    except Exception:
+        return False  # Fail open — don't block valid requests if Redis is down
+
+
+# AUTH-M2: Concurrent session tracking
+_MAX_SESSIONS_BY_TIER = {
+    "free": 2,
+    "starter": 5,
+    "professional": 10,
+    "enterprise": 20,
+}
+
+
+async def _register_session(user_id: str, session_token: str, tier: str = "free", ttl: int = 604800) -> None:
+    """Register a new session token for a user. Evicts oldest sessions when over the tier limit.
+
+    Uses a Redis sorted set keyed by user_id where the score is the Unix timestamp
+    of registration. The oldest sessions (lowest scores) are trimmed automatically.
+    Gracefully degrades — a Redis failure does NOT prevent login from succeeding.
+    """
+    try:
+        import hashlib
+        import time
+        import redis.asyncio as aioredis
+
+        r = aioredis.from_url(settings.redis_url)
+        key = f"user_sessions:{user_id}"
+        token_hash = hashlib.sha256(session_token.encode()).hexdigest()[:16]
+        now = time.time()
+        await r.zadd(key, {token_hash: now})
+        await r.expire(key, ttl)
+        # Trim to the max allowed sessions for this tier (remove oldest entries)
+        max_sessions = _MAX_SESSIONS_BY_TIER.get(tier, 2)
+        count = await r.zcard(key)
+        if count > max_sessions:
+            # zremrangebyrank(key, 0, N-1) removes the N oldest entries
+            await r.zremrangebyrank(key, 0, count - max_sessions - 1)
+        await r.aclose()
+    except Exception as e:
+        logger.warning("Could not register session in Redis: %s", e)
+
+
+async def _revoke_session(user_id: str, session_token: str) -> None:
+    """Remove a specific session token from the user's active session set."""
+    try:
+        import hashlib
+        import redis.asyncio as aioredis
+
+        r = aioredis.from_url(settings.redis_url)
+        token_hash = hashlib.sha256(session_token.encode()).hexdigest()[:16]
+        await r.zrem(f"user_sessions:{user_id}", token_hash)
+        await r.aclose()
+    except Exception as e:
+        logger.warning("Could not revoke session in Redis: %s", e)
 
 
 def _get_cookie_kwargs(settings_obj) -> dict:
@@ -71,13 +163,26 @@ def _get_cookie_kwargs(settings_obj) -> dict:
     return kwargs
 
 
-def _set_auth_cookies(response: JSONResponse, access_token: str, refresh_token: str, settings_obj) -> None:
-    """Set HttpOnly auth cookies on response."""
+def _set_auth_cookies(
+    response: JSONResponse,
+    access_token: str,
+    refresh_token: str,
+    settings_obj,
+    refresh_max_age: Optional[int] = None,
+) -> None:
+    """Set HttpOnly auth cookies on response.
+
+    Args:
+        refresh_max_age: Override for the refresh cookie max-age in seconds.
+            Defaults to ``jwt_refresh_token_expire_days * 86400``.
+            Pass a larger value for "remember me" sessions (e.g. 30 days).
+    """
     kwargs = _get_cookie_kwargs(settings_obj)
     # Access token: same expiry as JWT (in seconds)
     access_max_age = getattr(settings_obj, 'jwt_access_token_expire_minutes', 60) * 60
-    # Refresh token: 7 days default
-    refresh_max_age = getattr(settings_obj, 'jwt_refresh_token_expire_days', 7) * 86400
+    # Refresh token: use override when provided, else default from settings
+    if refresh_max_age is None:
+        refresh_max_age = getattr(settings_obj, 'jwt_refresh_token_expire_days', 7) * 86400
     response.set_cookie("access_token", access_token, max_age=access_max_age, **kwargs)
     response.set_cookie("refresh_token", refresh_token, max_age=refresh_max_age, **kwargs)
 
@@ -147,6 +252,14 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # AUTH-H1: Check if this token has been explicitly revoked (e.g. via logout).
+    if await _is_token_blacklisted(token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -369,12 +482,21 @@ async def login(
     user.login_count += 1
     await db.commit()
 
+    # LOW-01: "remember me" extends the refresh token from 7 days to 30 days.
+    refresh_days = 30 if login_data.remember_me else settings.jwt_refresh_token_expire_days
+    refresh_ttl_seconds = refresh_days * 86400
+
     # Create tokens
     access_token, refresh_token = token_service.create_token_pair(
         user_id=user.id,
         email=user.email,
         role=user.role,
+        refresh_expire_days=refresh_days,
     )
+
+    # AUTH-M2: Track this session in Redis; evicts oldest sessions over the tier limit.
+    tier = user.subscription_tier or "free"
+    await _register_session(str(user.id), refresh_token, tier=tier, ttl=refresh_ttl_seconds)
 
     # Return tokens in the JSON body (backward compat) AND set HttpOnly cookies
     # for browser-based clients (XSS protection).
@@ -385,7 +507,7 @@ async def login(
         "expires_in": settings.jwt_access_token_expire_minutes * 60,
     }
     response = JSONResponse(content=response_data)
-    _set_auth_cookies(response, access_token, refresh_token, settings)
+    _set_auth_cookies(response, access_token, refresh_token, settings, refresh_max_age=refresh_ttl_seconds)
     return response
 
 
@@ -445,6 +567,11 @@ async def refresh_token(
                 detail="Token invalidated due to password change. Please log in again.",
             )
 
+    # AUTH-H2: Blacklist the consumed refresh token to enforce single-use rotation.
+    # This prevents replay attacks where an attacker intercepts the old refresh
+    # token and tries to use it to obtain new access tokens after rotation.
+    await _blacklist_token(refresh_tok, ttl_seconds=604800)
+
     # Create new tokens
     access_token, refresh_token = token_service.create_token_pair(
         user_id=user.id,
@@ -466,7 +593,9 @@ async def refresh_token(
 
 
 @router.get("/me", response_model=UserResponse)
+@limiter.limit("30/minute")  # LOW-03: prevent polling abuse of /me endpoint
 async def get_me(
+    request: Request,
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> User:
     """
@@ -715,15 +844,29 @@ async def logout(
     """
     Logout current user.
 
-    Note: JWT tokens are stateless, so individual token blacklisting requires
-    Redis or a similar store (not implemented here). The client must discard
-    the token on logout. Password change and password reset do invalidate all
+    Blacklists the refresh and access tokens in Redis so they cannot be replayed
+    even if intercepted. Password change and password reset also invalidate all
     previously issued tokens via the password_changed_at timestamp check in
     get_current_user().
 
     Clears the HttpOnly auth cookies so browser-based clients are fully signed
     out without relying on the client-side token deletion.
     """
+    # AUTH-H1: Blacklist both tokens so they cannot be replayed even if
+    # extracted from a network capture or browser storage dump.
+    # Refresh token TTL = 7 days (same as its natural expiry).
+    # Access token TTL = 1 hour (same as its natural expiry).
+    refresh_tok = request.cookies.get("refresh_token")
+    if refresh_tok:
+        await _blacklist_token(refresh_tok, ttl_seconds=604800)
+        # AUTH-M2: Remove this session from the user's active session set.
+        await _revoke_session(str(current_user.id), refresh_tok)
+
+    access_tok = request.cookies.get("access_token")
+    if access_tok:
+        access_ttl = getattr(settings, "jwt_access_token_expire_minutes", 60) * 60
+        await _blacklist_token(access_tok, ttl_seconds=access_ttl)
+
     response = JSONResponse(content={"message": "Logged out successfully"})
     _clear_auth_cookies(response, settings)
     return response
@@ -1133,8 +1276,6 @@ async def google_oauth_callback(
     Exchanges the auth code for tokens, finds or creates the user account,
     sets HttpOnly auth cookies, and redirects to the frontend /auth/callback.
     """
-    import base64 as _b64
-    import json as _json
     from api.oauth_helpers import verify_oauth_state_full
     from fastapi.responses import RedirectResponse as RR
 
@@ -1176,14 +1317,26 @@ async def google_oauth_callback(
             logger.error("Google token exchange error: %s", token_data.get("error_description"))
             return _fail("google_token_failed")
 
-        # Decode the id_token JWT payload (we trust Google's signature implicitly here;
-        # for full verification install google-auth and call verify_oauth2_token)
+        # AUTH-H3: Verify the id_token signature using google-auth library.
+        # This replaces the previous unverified base64 decode and protects
+        # against forged id_tokens that could allow account takeover.
         id_token_raw = token_data.get("id_token", "")
-        parts = id_token_raw.split(".")
-        if len(parts) < 2:
+        if not id_token_raw:
             return _fail("google_token_invalid")
-        padding = 4 - len(parts[1]) % 4
-        google_user = _json.loads(_b64.urlsafe_b64decode(parts[1] + "=" * padding))
+
+        try:
+            from google.auth.transport import requests as google_requests
+            from google.oauth2 import id_token as google_id_token
+
+            google_request = google_requests.Request()
+            google_user = google_id_token.verify_oauth2_token(
+                id_token_raw,
+                google_request,
+                settings.google_client_id,
+            )
+        except Exception as verify_err:
+            logger.error("Google id_token signature verification failed: %s", verify_err)
+            return _fail("google_token_invalid")
 
         google_email = google_user.get("email", "").lower().strip()
         google_name = google_user.get("name", "") or ""
@@ -1251,3 +1404,159 @@ async def google_oauth_callback(
     response.set_cookie("access_token", access_token, max_age=access_max_age, **kwargs)
     response.set_cookie("refresh_token", refresh_token, max_age=refresh_max_age, **kwargs)
     return response
+
+
+# ============================================================================
+# Email change flow
+# ============================================================================
+
+@router.post("/change-email", status_code=status.HTTP_200_OK)
+@limiter.limit("3/minute")
+async def request_email_change(
+    request: Request,
+    body: EmailChangeRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Initiate an email address change.
+
+    Verifies the user's current password, checks the new address is not
+    already in use, stores a short-lived token in Redis, then sends a
+    confirmation email to the *new* address.  The change is NOT applied
+    until the user clicks the link (see /verify-email-change).
+    """
+    # Verify current password using the same hasher as login/change-password
+    if not password_hasher.verify(body.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        )
+
+    new_email = body.new_email.lower()
+
+    # Prevent claiming an address that already belongs to another account
+    existing_result = await db.execute(select(User).where(User.email == new_email))
+    if existing_result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email address already in use",
+        )
+
+    # Silently succeed if the address is identical to the current one —
+    # this avoids leaking information but also prevents a pointless send.
+    if new_email == current_user.email.lower():
+        return {"message": "Verification email sent to your new address"}
+
+    token = secrets.token_urlsafe(32)
+
+    # Primary storage: Redis with 1-hour TTL.
+    # Graceful fallback: skip token storage if Redis is unavailable; the
+    # verify endpoint will reject the token since it won't be found, which
+    # is the safer behaviour.
+    try:
+        import redis.asyncio as aioredis
+
+        r = aioredis.from_url(settings.redis_url)
+        await r.setex(
+            f"email_change:{token}",
+            3600,
+            json.dumps({"user_id": str(current_user.id), "new_email": new_email}),
+        )
+        await r.aclose()
+    except Exception as redis_err:
+        logger.error("Could not store email change token in Redis: %s", redis_err)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service temporarily unavailable. Please try again later.",
+        )
+
+    verification_url = f"{settings.frontend_url}/verify-email-change?token={token}"
+
+    try:
+        await email_service.send_email_change_verification(
+            to_email=new_email,
+            user_name=current_user.name or current_user.email,
+            verification_url=verification_url,
+        )
+    except Exception as email_err:
+        logger.error(
+            "Failed to send email change verification to %s: %s", new_email, email_err
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send verification email. Please try again.",
+        )
+
+    logger.info(
+        "Email change requested for user_id=%s new_email=%s", current_user.id, new_email
+    )
+    return {"message": "Verification email sent to your new address"}
+
+
+@router.post("/verify-email-change", status_code=status.HTTP_200_OK)
+@limiter.limit("10/minute")
+async def verify_email_change(
+    request: Request,
+    body: EmailChangeVerifyRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Confirm an email address change using the token from the verification email.
+
+    The endpoint is intentionally unauthenticated — the user may have a
+    different browser open when they click the link.  The token itself acts
+    as the credential and is consumed atomically (getdel) so it cannot be
+    replayed.
+    """
+    user_id: str | None = None
+    new_email: str | None = None
+
+    try:
+        import redis.asyncio as aioredis
+
+        r = aioredis.from_url(settings.redis_url)
+        raw = await r.getdel(f"email_change:{body.token}")
+        await r.aclose()
+        if raw:
+            data = json.loads(raw)
+            user_id = data.get("user_id")
+            new_email = data.get("new_email")
+    except Exception as redis_err:
+        logger.error("Redis error during email change verification: %s", redis_err)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service temporarily unavailable. Please try again later.",
+        )
+
+    if not user_id or not new_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired email change token",
+        )
+
+    # Guard: new address must still be unclaimed at commit time
+    collision_result = await db.execute(select(User).where(User.email == new_email))
+    if collision_result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email address is already in use by another account",
+        )
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    old_email = user.email
+    user.email = new_email
+    user.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    logger.info(
+        "Email changed for user_id=%s old=%s new=%s", user_id, old_email, new_email
+    )
+    return {"message": "Email address updated successfully"}

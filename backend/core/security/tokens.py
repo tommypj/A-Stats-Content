@@ -79,18 +79,21 @@ class TokenService:
 
         return jwt.encode(payload, self._secret_key, algorithm=self._algorithm)
 
-    def create_refresh_token(self, user_id: str) -> str:
+    def create_refresh_token(self, user_id: str, expire_days: Optional[int] = None) -> str:
         """
         Create a refresh token.
 
         Args:
             user_id: User ID to encode in the token
+            expire_days: Override expiration in days. Defaults to the service-level
+                ``refresh_token_expire_days`` setting.
 
         Returns:
             Encoded JWT refresh token
         """
         now = datetime.now(timezone.utc)
-        expire = now + timedelta(days=self._refresh_token_expire_days)
+        days = expire_days if expire_days is not None else self._refresh_token_expire_days
+        expire = now + timedelta(days=days)
 
         payload = {
             "sub": user_id,
@@ -106,6 +109,7 @@ class TokenService:
         user_id: str,
         email: Optional[str] = None,
         role: Optional[str] = None,
+        refresh_expire_days: Optional[int] = None,
     ) -> tuple[str, str]:
         """
         Create both access and refresh tokens.
@@ -114,12 +118,14 @@ class TokenService:
             user_id: User ID to encode in the tokens
             email: Optional email to include in access token
             role: Optional role to include in access token
+            refresh_expire_days: Override refresh token expiry in days (e.g. 30 for
+                "remember me" sessions). Defaults to the service-level setting.
 
         Returns:
             Tuple of (access_token, refresh_token)
         """
         access_token = self.create_access_token(user_id, email, role)
-        refresh_token = self.create_refresh_token(user_id)
+        refresh_token = self.create_refresh_token(user_id, expire_days=refresh_expire_days)
         return access_token, refresh_token
 
     def decode_token(self, token: str) -> Optional[TokenPayload]:

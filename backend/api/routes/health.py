@@ -1,7 +1,8 @@
 """Health check endpoints."""
+import asyncio
 import logging
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,10 +33,13 @@ async def health_check():
 async def health_check_db(db: AsyncSession = Depends(get_db)):
     """Health check with database connectivity."""
     try:
-        # Test database connection
-        result = await db.execute(text("SELECT 1"))
+        # LOW-04: Wrap DB execute in timeout to prevent hanging health checks
+        result = await asyncio.wait_for(db.execute(text("SELECT 1")), timeout=5.0)
         result.scalar()
         db_status = "connected"
+    except asyncio.TimeoutError:
+        logger.error("Health check DB timeout")
+        db_status = "error: database timeout"
     except Exception as e:
         logger.error("Health check DB error: %s", str(e))
         db_status = "error: database check failed"
@@ -50,14 +54,49 @@ async def health_check_db(db: AsyncSession = Depends(get_db)):
     }
 
 
+@router.get("/health/redis")
+async def health_redis():
+    """INFRA-M1: Check Redis connectivity."""
+    try:
+        import redis.asyncio as aioredis
+        r = aioredis.from_url(settings.redis_url)
+        await asyncio.wait_for(r.ping(), timeout=3.0)
+        await r.aclose()
+        return {"status": "healthy", "service": "redis"}
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=503, detail="Redis timeout")
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Redis unavailable: {str(e)}")
+
+
 @router.get("/health/ready")
 async def readiness_check(db: AsyncSession = Depends(get_db)):
     """Kubernetes-style readiness probe."""
+    db_ok = False
     try:
-        await db.execute(text("SELECT 1"))
-        return {"ready": True}
+        # LOW-04: Apply timeout to DB check in readiness probe too
+        await asyncio.wait_for(db.execute(text("SELECT 1")), timeout=5.0)
+        db_ok = True
     except Exception:
-        return {"ready": False}
+        db_ok = False
+
+    # INFRA-M1: Check Redis too — app degrades significantly without it (rate limiting breaks)
+    redis_ok = False
+    try:
+        import redis.asyncio as aioredis
+        r = aioredis.from_url(settings.redis_url)
+        await asyncio.wait_for(r.ping(), timeout=2.0)
+        await r.aclose()
+        redis_ok = True
+    except Exception:
+        redis_ok = False
+
+    # DB is required; Redis degraded is tolerated (app still starts, but rate limiting may be per-process)
+    return {
+        "ready": db_ok,
+        "database": "ok" if db_ok else "unavailable",
+        "redis": "ok" if redis_ok else "degraded",
+    }
 
 
 @router.get("/health/live")

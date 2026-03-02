@@ -153,3 +153,16 @@ class DeleteAccountRequest(BaseModel):
     """Account deletion request schema."""
 
     confirmation: str = Field(..., description="Must equal 'DELETE MY ACCOUNT' to confirm")
+
+
+class EmailChangeRequest(BaseModel):
+    """Request body for initiating an email address change."""
+
+    new_email: EmailStr
+    current_password: str = Field(..., min_length=1)
+
+
+class EmailChangeVerifyRequest(BaseModel):
+    """Request body for confirming an email address change via token."""
+
+    token: str = Field(..., min_length=1)

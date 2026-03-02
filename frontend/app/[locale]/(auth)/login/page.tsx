@@ -51,7 +51,8 @@ export default function LoginPage() {
     try {
       // The login endpoint sets HttpOnly auth cookies via Set-Cookie.
       // We do not need to read or store tokens manually.
-      await api.auth.login(data.email, data.password);
+      // LOW-01: Pass rememberMe to extend the refresh token TTL to 30 days.
+      await api.auth.login(data.email, data.password, data.rememberMe);
 
       let user;
       try {
@@ -138,7 +139,6 @@ export default function LoginPage() {
 
         <div className="flex items-center justify-between">
           <label className="flex items-center gap-2 cursor-pointer">
-            {/* TODO: Use rememberMe to set token expiry */}
             <input
               type="checkbox"
               className="h-4 w-4 rounded border-surface-tertiary text-primary-500 focus:ring-primary-500"

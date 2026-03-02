@@ -56,11 +56,11 @@ class GSCConnection(Base, TimestampMixin):
     # Site being tracked
     site_url: Mapped[str] = mapped_column(String(500), nullable=False, index=True)
 
-    # OAuth tokens
-    # DB-02: TODO — encrypt GSC tokens at rest using the same encryption as SocialAccount.access_token_encrypted
-    # DB-07: TODO — Add token_updated_at column and rotate GSC tokens on each use
-    access_token: Mapped[str] = mapped_column(Text, nullable=False)
-    refresh_token: Mapped[str] = mapped_column(Text, nullable=False)
+    # OAuth tokens — stored encrypted (Fernet via core.security.encryption).
+    # DB-H1: Renamed from access_token/refresh_token to match SocialAccount convention.
+    # Migration 038 renames these columns in the database.
+    access_token_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    refresh_token_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
     token_expiry: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )

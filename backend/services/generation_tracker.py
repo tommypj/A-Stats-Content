@@ -168,8 +168,9 @@ class GenerationTracker:
         """Check if the project (or user) can generate more of this resource type.
         Returns True if allowed, False if limit reached.
 
-        Uses DB-based checks only. Fails open on error to avoid blocking
-        users due to transient issues.
+        Uses DB-based checks only. Fails CLOSED on error (returns False) to
+        protect billing — a transient DB error should not silently grant unlimited
+        generation.  Both the user-level and project-level paths deny on exception.
         """
         if not project_id:
             # Check user-level limits for personal workspace
@@ -183,7 +184,10 @@ class GenerationTracker:
                 )
                 user = user_result.scalar_one_or_none()
                 if not user:
-                    return True  # Fail open — unknown user
+                    # User row not found — this is an invalid auth state;
+                    # deny generation rather than silently allowing it.
+                    logger.warning("User %s not found during limit check — denying", user_id)
+                    return False
 
                 # Reset monthly counters if we've crossed into a new month
                 await self._reset_user_usage_if_needed(user)
@@ -213,8 +217,8 @@ class GenerationTracker:
                 }
                 usage_field = ALLOWED_USAGE_FIELDS.get(resource_type)
                 if not usage_field:
-                    logger.warning("Unknown resource_type '%s' for limit check", resource_type)
-                    return True  # Fail open for unknown types
+                    logger.warning("Unknown resource_type '%s' for limit check — denying", resource_type)
+                    return False  # API-M1: deny unknown resource types (fail closed)
                 current_usage = getattr(user, usage_field, 0) or 0
 
                 return current_usage < limit

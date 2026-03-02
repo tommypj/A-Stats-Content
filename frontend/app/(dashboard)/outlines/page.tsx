@@ -454,7 +454,10 @@ export default function OutlinesPage() {
                   </div>
 
                   <Link href={`/outlines/${outline.id}`} className="block group">
-                    <h3 className="font-medium text-text-primary group-hover:text-primary-600 line-clamp-2 mb-2">
+                    <h3
+                      className="font-medium text-text-primary group-hover:text-primary-600 line-clamp-2 mb-2"
+                      title={outline.title}
+                    >
                       {outline.title}
                     </h3>
 
@@ -688,8 +691,7 @@ function CreateOutlineModal({
               >
                 Cancel
               </Button>
-              <Button type="submit" className="flex-1">
-                <Sparkles className="h-4 w-4 mr-2" />
+              <Button type="submit" className="flex-1" disabled={loading} isLoading={loading}>
                 Generate Outline
               </Button>
             </div>

@@ -404,10 +404,18 @@ export default function ArticlesPage() {
               New Article
             </Button>
           ) : (
-            <Button disabled title="Article limit reached">
-              <Plus className="h-4 w-4 mr-2" />
-              Limit Reached
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button disabled title="Article limit reached">
+                <Plus className="h-4 w-4 mr-2" />
+                Limit Reached
+              </Button>
+              <button
+                onClick={() => router.push("/settings/billing")}
+                className="text-sm font-medium text-primary-600 hover:text-primary-700 underline"
+              >
+                Upgrade now
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -564,7 +572,10 @@ export default function ArticlesPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start gap-2 mb-2">
                       <Link href={`/articles/${article.id}`} className="group flex-1">
-                        <h3 className="font-medium text-text-primary group-hover:text-primary-600 line-clamp-1">
+                        <h3
+                          className="font-medium text-text-primary group-hover:text-primary-600 line-clamp-1"
+                          title={article.title}
+                        >
                           {article.title}
                         </h3>
                       </Link>
@@ -608,6 +619,7 @@ export default function ArticlesPage() {
                         onClick={() => handleDelete(article.id)}
                         className="p-1.5 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors"
                         title="Delete article"
+                        aria-label="Delete article"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

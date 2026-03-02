@@ -12,6 +12,7 @@ import { api, parseApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/stores/auth";
+import { useRequireAuth } from "@/lib/auth";
 
 const profileSchema = z.object({
   name: z.string().min(1).max(255),
@@ -22,8 +23,16 @@ type ProfileFormData = z.infer<typeof profileSchema>;
 
 export default function ProfileSettingsPage() {
   const t = useTranslations("settings.profile");
+  const { isAuthenticated, isLoading: authLoading } = useRequireAuth();
   const { user, setUser } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
+
+  // Email change form state
+  const [showEmailChangeForm, setShowEmailChangeForm] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [emailChangePassword, setEmailChangePassword] = useState("");
+  const [emailChangeSending, setEmailChangeSending] = useState(false);
+  const [emailChangeSent, setEmailChangeSent] = useState(false);
 
   const {
     register,
@@ -36,6 +45,9 @@ export default function ProfileSettingsPage() {
       email: user?.email || "",
     },
   });
+
+  if (authLoading) return null;
+  if (!isAuthenticated) return null;
 
   const onSubmit = async (data: ProfileFormData) => {
     setIsLoading(true);
@@ -51,6 +63,20 @@ export default function ProfileSettingsPage() {
       toast.error(parseApiError(error).message || "Failed to update profile");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleEmailChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmailChangeSending(true);
+    try {
+      await api.auth.changeEmail(newEmail, emailChangePassword);
+      setEmailChangeSent(true);
+      setEmailChangePassword("");
+    } catch (err) {
+      toast.error(parseApiError(err).message);
+    } finally {
+      setEmailChangeSending(false);
     }
   };
 
@@ -102,7 +128,7 @@ export default function ProfileSettingsPage() {
           label={t("email")}
           type="email"
           disabled
-          helperText="Email cannot be changed"
+          helperText="Email cannot be changed here"
           {...register("email")}
         />
 
@@ -113,6 +139,66 @@ export default function ProfileSettingsPage() {
           </Button>
         </div>
       </form>
+
+      {/* Email change — kept outside the profile form to avoid nested <form> elements */}
+      <div className="px-6 pb-6 border-t border-surface-tertiary pt-6">
+        <h4 className="text-sm font-medium text-text-primary mb-4">Change Email Address</h4>
+        {!showEmailChangeForm ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setShowEmailChangeForm(true);
+              setEmailChangeSent(false);
+            }}
+          >
+            Change email
+          </Button>
+        ) : (
+          <form onSubmit={handleEmailChange} className="space-y-3 max-w-sm">
+            <Input
+              label="New email address"
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              required
+              autoComplete="email"
+            />
+            <Input
+              label="Current password"
+              type="password"
+              value={emailChangePassword}
+              onChange={(e) => setEmailChangePassword(e.target.value)}
+              required
+              autoComplete="current-password"
+            />
+            <div className="flex gap-2">
+              <Button type="submit" size="sm" isLoading={emailChangeSending}>
+                Send verification
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowEmailChangeForm(false);
+                  setEmailChangeSent(false);
+                  setNewEmail("");
+                  setEmailChangePassword("");
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+            {emailChangeSent && (
+              <p className="text-sm text-green-600">
+                Verification email sent! Check your new inbox.
+              </p>
+            )}
+          </form>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useTranslations } from "next-intl";
-import { Sparkles } from "lucide-react";
 
 export default function AuthLayout({
   children,
@@ -17,9 +17,7 @@ export default function AuthLayout({
       <div className="hidden lg:flex lg:w-1/2 bg-primary-950 relative flex-col justify-between p-12">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-primary-700 flex items-center justify-center">
-            <Sparkles className="h-4 w-4 text-cream-200" />
-          </div>
+          <Image src="/icon.png" alt="A-Stats" width={32} height={32} className="rounded-lg" />
           <span className="font-display text-xl font-semibold text-cream-100">
             {t("appName")}
           </span>

@@ -1,5 +1,7 @@
 """Application settings and configuration."""
 import json
+import logging as _logging
+import os
 import secrets
 from functools import lru_cache
 from typing import Optional
@@ -187,23 +189,54 @@ class Settings(BaseSettings):
         app refuses to start unless explicit, strong secrets are provided
         via environment variables.
         """
-        if self.environment in ("production", "staging"):
-            if len(self.secret_key) < 32:
-                raise ValueError("SECRET_KEY must be set to at least 32 characters in production!")
-            if len(self.jwt_secret_key) < 32:
-                raise ValueError("JWT_SECRET_KEY must be set to at least 32 characters in production!")
-            if not self.anthropic_api_key:
-                raise ValueError("ANTHROPIC_API_KEY is required in production!")
-            if not self.lemonsqueezy_api_key:
-                raise ValueError("LEMONSQUEEZY_API_KEY is required in production!")
-            if not self.lemonsqueezy_webhook_secret:
-                raise ValueError("LEMONSQUEEZY_WEBHOOK_SECRET is required in production!")
-            if not self.resend_api_key:
-                raise ValueError("RESEND_API_KEY is required in production!")
+        # INFRA-C1: Detect Railway/production infra even when ENVIRONMENT was not explicitly set
+        railway_env = os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_SERVICE_NAME")
+        if railway_env and self.environment == "development":
+            _logging.getLogger(__name__).critical(
+                "RAILWAY environment detected but ENVIRONMENT is not set to 'production'. "
+                "Set ENVIRONMENT=production in Railway variables to enable security validation."
+            )
+            # Force production validation when on Railway
+            effective_env = "production"
+        else:
+            effective_env = self.environment
+
+        if effective_env not in ("production", "staging"):
+            return  # dev/test: skip validation
+
+        # At this point effective_env is "production" or "staging"
+        if len(self.secret_key) < 32:
+            raise ValueError("SECRET_KEY must be set to at least 32 characters in production!")
+        if len(self.jwt_secret_key) < 32:
+            raise ValueError("JWT_SECRET_KEY must be set to at least 32 characters in production!")
+        if not self.anthropic_api_key:
+            raise ValueError("ANTHROPIC_API_KEY is required in production!")
+        if not self.lemonsqueezy_api_key:
+            raise ValueError("LEMONSQUEEZY_API_KEY is required in production!")
+        if not self.lemonsqueezy_webhook_secret:
+            raise ValueError("LEMONSQUEEZY_WEBHOOK_SECRET is required in production!")
+        if not self.resend_api_key:
+            raise ValueError("RESEND_API_KEY is required in production!")
+
+        # INFRA-M3: Validate all LemonSqueezy variant IDs are set in production
+        ls_variant_fields = [
+            ("LEMONSQUEEZY_VARIANT_STARTER_MONTHLY", self.lemonsqueezy_variant_starter_monthly),
+            ("LEMONSQUEEZY_VARIANT_STARTER_YEARLY", self.lemonsqueezy_variant_starter_yearly),
+            ("LEMONSQUEEZY_VARIANT_PROFESSIONAL_MONTHLY", self.lemonsqueezy_variant_professional_monthly),
+            ("LEMONSQUEEZY_VARIANT_PROFESSIONAL_YEARLY", self.lemonsqueezy_variant_professional_yearly),
+            ("LEMONSQUEEZY_VARIANT_ENTERPRISE_MONTHLY", self.lemonsqueezy_variant_enterprise_monthly),
+            ("LEMONSQUEEZY_VARIANT_ENTERPRISE_YEARLY", self.lemonsqueezy_variant_enterprise_yearly),
+        ]
+        missing_variants = [name for name, val in ls_variant_fields if not val]
+        if missing_variants:
+            _logging.getLogger(__name__).warning(
+                "INFRA-M3: LemonSqueezy variant IDs not configured: %s. "
+                "Subscription checkout will fail for these plans.",
+                ", ".join(missing_variants),
+            )
 
         # INFRA-10: OAuth redirect URIs should be https:// non-localhost in production
-        if self.environment == "production":
-            import logging as _logging
+        if effective_env == "production":
             from urllib.parse import urlparse as _urlparse
             _localhost_hosts = {"localhost", "127.0.0.1", "0.0.0.0", "::1"}
             for _uri_name, _uri_val in [
@@ -227,7 +260,6 @@ class Settings(BaseSettings):
                 )
 
             # INFRA-12: Warn about potential connection pool exhaustion
-            import logging as _logging
             _pool_total = self.db_pool_size * self.workers + self.db_max_overflow * self.workers
             if _pool_total > 200:
                 _logging.getLogger(__name__).warning(
@@ -236,6 +268,22 @@ class Settings(BaseSettings):
                     "Verify your DB allows this many connections.",
                     self.workers, self.db_pool_size, self.db_max_overflow, _pool_total,
                 )
+
+            # INFRA-H1: Warn if any OAuth redirect URI contains localhost in production
+            _oauth_uris = [
+                ("GOOGLE_REDIRECT_URI", self.google_redirect_uri),
+                ("GOOGLE_AUTH_REDIRECT_URI", self.google_auth_redirect_uri),
+                ("TWITTER_REDIRECT_URI", getattr(self, "twitter_redirect_uri", None)),
+                ("LINKEDIN_REDIRECT_URI", getattr(self, "linkedin_redirect_uri", None)),
+                ("FACEBOOK_REDIRECT_URI", getattr(self, "facebook_redirect_uri", None)),
+            ]
+            for _name, _uri in _oauth_uris:
+                if _uri and "localhost" in _uri:
+                    _logging.getLogger(__name__).warning(
+                        "INFRA-H1: OAuth redirect URI %s contains 'localhost' in production: %s. "
+                        "Update this to the production domain.",
+                        _name, _uri,
+                    )
 
 
 @lru_cache

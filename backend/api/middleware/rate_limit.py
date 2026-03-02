@@ -106,6 +106,14 @@ if not settings.redis_url:
     logger.warning(
         "Rate limiter using in-memory storage — not suitable for multi-worker production"
     )
+    # INFRA-H2: In production, escalate to CRITICAL when Redis is unavailable for rate limiting
+    if settings.environment == "production":
+        logger.critical(
+            "CRITICAL: Rate limiter cannot connect to Redis in production. "
+            "Global rate limiting is NOT active. Set REDIS_URL in environment variables."
+            # Uncomment to hard-fail on startup instead of warning:
+            # raise RuntimeError("Redis required for production rate limiting")
+        )
 
 limiter = Limiter(
     key_func=_get_real_ip,

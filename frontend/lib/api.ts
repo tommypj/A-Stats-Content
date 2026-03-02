@@ -281,11 +281,11 @@ export const api = {
 
   // Auth
   auth: {
-    login: (email: string, password: string) =>
+    login: (email: string, password: string, rememberMe?: boolean) =>
       apiRequest<{ access_token: string; refresh_token: string; token_type: string; expires_in: number }>({
         method: "POST",
         url: "/auth/login",
-        data: { email, password },
+        data: { email, password, remember_me: rememberMe ?? false },
       }),
     register: (data: { email: string; password: string; name: string }) =>
       apiRequest<{ id: string; email: string }>({
@@ -346,6 +346,18 @@ export const api = {
         method: "DELETE",
         url: "/auth/account",
         data: { confirmation: "DELETE MY ACCOUNT" },
+      }),
+    changeEmail: (newEmail: string, currentPassword: string) =>
+      apiRequest<{ message: string }>({
+        method: "POST",
+        url: "/auth/change-email",
+        data: { new_email: newEmail, current_password: currentPassword },
+      }),
+    verifyEmailChange: (token: string) =>
+      apiRequest<{ message: string }>({
+        method: "POST",
+        url: "/auth/verify-email-change",
+        data: { token },
       }),
     uploadAvatar: async (file: File) => {
       const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];

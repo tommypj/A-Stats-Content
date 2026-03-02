@@ -275,10 +275,11 @@ class ArticleRevision(Base):
         nullable=False,
         index=True,
     )
-    created_by: Mapped[str] = mapped_column(
+    created_by: Mapped[Optional[str]] = mapped_column(
         UUID(as_uuid=False),
-        ForeignKey("users.id"),
-        nullable=False,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     # Snapshot content

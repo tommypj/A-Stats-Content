@@ -247,7 +247,7 @@ export default function ComposePage() {
             >
               Cancel
             </Button>
-            <Button type="submit" isLoading={submitting}>
+            <Button type="submit" disabled={submitting} isLoading={submitting}>
               {submitting ? "Publishing..." : "Schedule Post"}
             </Button>
           </div>

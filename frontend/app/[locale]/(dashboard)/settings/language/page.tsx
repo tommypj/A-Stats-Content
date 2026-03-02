@@ -6,12 +6,17 @@ import { Check } from "lucide-react";
 import { clsx } from "clsx";
 
 import { locales, localeNames, localeFlags, type Locale } from "@/i18n/config";
+import { useRequireAuth } from "@/lib/auth";
 
 export default function LanguageSettingsPage() {
   const t = useTranslations("settings.language");
+  const { isAuthenticated, isLoading: authLoading } = useRequireAuth();
   const currentLocale = useLocale();
   const router = useRouter();
   const pathname = usePathname();
+
+  if (authLoading) return null;
+  if (!isAuthenticated) return null;
 
   const handleLanguageChange = (newLocale: Locale) => {
     // Replace the current locale in the path with the new one

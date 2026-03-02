@@ -8,6 +8,7 @@ import { CheckCircle, XCircle, Loader2, ExternalLink, AlertCircle } from "lucide
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, parseApiError } from "@/lib/api";
+import { useRequireAuth } from "@/lib/auth";
 
 interface Integration {
   id: string;
@@ -19,6 +20,7 @@ interface Integration {
 
 export default function IntegrationsSettingsPage() {
   const t = useTranslations("settings.integrations");
+  const { isAuthenticated, isLoading: authLoading } = useRequireAuth();
 
   // WordPress connection state
   const [wpConnected, setWpConnected] = useState(false);
@@ -144,6 +146,9 @@ export default function IntegrationsSettingsPage() {
     );
     toast.success("Integration disconnected");
   };
+
+  if (authLoading) return null;
+  if (!isAuthenticated) return null;
 
   return (
     <div className="space-y-6">

@@ -1037,6 +1037,22 @@ export default function ArticleEditorPage() {
     };
   }, [content, article, title, metaDescription, keyword]);
 
+  // LOW-16: Warn before leaving the page when there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      const currentSnapshot = JSON.stringify({ content, title, metaDescription, keyword });
+      const hasUnsaved =
+        lastSavedSnapshotRef.current !== null &&
+        currentSnapshot !== lastSavedSnapshotRef.current;
+      if (hasUnsaved) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [content, title, metaDescription, keyword]);
+
   function handlePublishToWordPress() {
     if (!wpConnected) {
       toast.error("Please connect to WordPress first", {
@@ -1572,8 +1588,8 @@ export default function ArticleEditorPage() {
                 size="sm"
                 onClick={() => handleImprove("seo")}
                 disabled={improving}
+                isLoading={improving}
               >
-                {improving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
                 Improve SEO
               </Button>
               <Button
@@ -1581,8 +1597,8 @@ export default function ArticleEditorPage() {
                 size="sm"
                 onClick={() => handleImprove("readability")}
                 disabled={improving}
+                isLoading={improving}
               >
-                {improving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
                 Improve Readability
               </Button>
               <Button
@@ -1590,8 +1606,8 @@ export default function ArticleEditorPage() {
                 size="sm"
                 onClick={() => handleImprove("engagement")}
                 disabled={improving}
+                isLoading={improving}
               >
-                {improving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
                 Boost Engagement
               </Button>
             </div>

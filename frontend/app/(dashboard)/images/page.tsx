@@ -518,6 +518,7 @@ export default function ImagesPage() {
                       <div className="absolute top-2 right-2">
                         <button
                           onClick={() => setActiveMenu(activeMenu === image.id ? null : image.id)}
+                          aria-label="Image actions"
                           className="p-1.5 rounded-lg bg-white/90 hover:bg-white shadow-sm backdrop-blur-sm"
                         >
                           <MoreVertical className="h-4 w-4 text-text-muted" />

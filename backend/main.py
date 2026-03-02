@@ -28,27 +28,35 @@ settings = get_settings()
 
 # Sentry error tracking — initialised at module level so startup errors are captured too
 if settings.sentry_dsn:
-    import sentry_sdk
-    from sentry_sdk.integrations.fastapi import FastApiIntegration
-    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
-    from sentry_sdk.integrations.redis import RedisIntegration
-    from sentry_sdk.integrations.logging import LoggingIntegration
     import logging as _logging
+    # LOW-12: Validate DSN format before initializing to surface misconfiguration early
+    _dsn = settings.sentry_dsn
+    if not _dsn.startswith("https://") or "@sentry.io" not in _dsn:
+        logger.warning(
+            "LOW-12: SENTRY_DSN appears malformed: %s. Sentry will not be initialized.",
+            _dsn[:30],
+        )
+    else:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+        from sentry_sdk.integrations.redis import RedisIntegration
+        from sentry_sdk.integrations.logging import LoggingIntegration
 
-    sentry_sdk.init(
-        dsn=settings.sentry_dsn,
-        environment=settings.environment,
-        integrations=[
-            FastApiIntegration(transaction_style="url"),
-            SqlalchemyIntegration(),
-            RedisIntegration(),
-            LoggingIntegration(level=_logging.INFO, event_level=_logging.ERROR),
-        ],
-        traces_sample_rate=0.1 if settings.is_production else 1.0,
-        profiles_sample_rate=0.05 if settings.is_production else 0.0,
-        send_default_pii=False,
-    )
-    logger.info("Sentry error tracking initialised (env=%s)", settings.environment)
+        sentry_sdk.init(
+            dsn=_dsn,
+            environment=settings.environment,
+            integrations=[
+                FastApiIntegration(transaction_style="url"),
+                SqlalchemyIntegration(),
+                RedisIntegration(),
+                LoggingIntegration(level=_logging.INFO, event_level=_logging.ERROR),
+            ],
+            traces_sample_rate=0.1 if settings.is_production else 1.0,
+            profiles_sample_rate=0.05 if settings.is_production else 0.0,
+            send_default_pii=False,
+        )
+        logger.info("Sentry error tracking initialised (env=%s)", settings.environment)
 
 
 @asynccontextmanager
@@ -136,6 +144,19 @@ async def lifespan(app: FastAPI):
             )
             # Do not raise — allow startup to proceed, but alert loudly
 
+    # INFRA-C2: Validate CORS origins match FRONTEND_URL to prevent credential leakage
+    from urllib.parse import urlparse as _urlparse
+    _frontend_host = _urlparse(settings.frontend_url).netloc if settings.frontend_url else None
+    if _frontend_host and settings.environment == "production":
+        for _origin in settings.cors_origins_list:
+            _origin_host = _urlparse(_origin).netloc
+            if _origin_host and _origin_host != _frontend_host and not _origin_host.endswith("." + _frontend_host):
+                logger.warning(
+                    "INFRA-C2: CORS origin '%s' does not match FRONTEND_URL host '%s'. "
+                    "This may allow credential leakage to unintended origins.",
+                    _origin, _frontend_host,
+                )
+
     # Initialize Redis post queue (optional)
     logger.info("Connecting to Redis for post queue...")
     await post_queue.connect()
@@ -154,6 +175,43 @@ async def lifespan(app: FastAPI):
 
     cleanup_task = asyncio.create_task(_task_queue_cleanup_loop(), name="tq-cleanup")
 
+    # LOW-08: Start daily cleanup of ContentDecayAlert records older than 90 days.
+    # Runs once at startup (to clear any backlog), then every 24 hours thereafter.
+    async def _decay_alert_cleanup_loop():
+        from datetime import datetime, timezone, timedelta
+        from sqlalchemy import delete as _sa_delete
+        from infrastructure.database.models.analytics import ContentDecayAlert
+
+        async def _run_cleanup():
+            try:
+                async with async_session_maker() as _db:
+                    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+                    result = await _db.execute(
+                        _sa_delete(ContentDecayAlert).where(
+                            ContentDecayAlert.created_at < cutoff
+                        )
+                    )
+                    await _db.commit()
+                    deleted = result.rowcount
+                    if deleted:
+                        logger.info(
+                            "LOW-08: Cleaned up %d ContentDecayAlert records older than 90 days",
+                            deleted,
+                        )
+            except Exception as _cleanup_err:
+                logger.warning("LOW-08: decay alert cleanup failed: %s", _cleanup_err)
+
+        # Run once at startup to clear any backlog
+        await _run_cleanup()
+
+        while True:
+            await asyncio.sleep(86400)  # 24 hours
+            await _run_cleanup()
+
+    decay_alert_cleanup_task = asyncio.create_task(
+        _decay_alert_cleanup_loop(), name="decay-alert-cleanup"
+    )
+
     logger.info("Application started successfully!")
 
     yield
@@ -165,6 +223,13 @@ async def lifespan(app: FastAPI):
     cleanup_task.cancel()
     try:
         await cleanup_task
+    except asyncio.CancelledError:
+        pass
+
+    # Stop decay alert cleanup loop
+    decay_alert_cleanup_task.cancel()
+    try:
+        await decay_alert_cleanup_task
     except asyncio.CancelledError:
         pass
 

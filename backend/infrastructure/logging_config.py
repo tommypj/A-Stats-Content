@@ -2,8 +2,49 @@
 
 import json
 import logging
+import re
 import sys
 from datetime import datetime, timezone
+
+
+# LOW-13: Patterns that may contain secrets or credentials — redacted before any log output
+_SENSITIVE_PATTERNS = [
+    (re.compile(r'(Authorization:\s*Bearer\s+)\S+', re.IGNORECASE), r'\1[REDACTED]'),
+    (re.compile(r'(api[_-]?key["\s:=]+)[^\s&"\']+', re.IGNORECASE), r'\1[REDACTED]'),
+    (re.compile(r'(password["\s:=]+)[^\s&"\']+', re.IGNORECASE), r'\1[REDACTED]'),
+    (re.compile(r'(secret["\s:=]+)[^\s&"\']+', re.IGNORECASE), r'\1[REDACTED]'),
+    (re.compile(r'sk-[a-zA-Z0-9]{20,}', re.IGNORECASE), '[REDACTED_API_KEY]'),
+]
+
+
+def _redact(value: str) -> str:
+    """Apply all sensitive-data patterns to a string and return the redacted result."""
+    for pattern, replacement in _SENSITIVE_PATTERNS:
+        value = pattern.sub(replacement, value)
+    return value
+
+
+class SensitiveDataFilter(logging.Filter):
+    """Redacts Bearer tokens, API keys, passwords, and secrets from log records."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.msg, str):
+            record.msg = _redact(record.msg)
+        if record.args:
+            try:
+                if isinstance(record.args, tuple):
+                    record.args = tuple(
+                        _redact(a) if isinstance(a, str) else a
+                        for a in record.args
+                    )
+                elif isinstance(record.args, dict):
+                    record.args = {
+                        k: (_redact(v) if isinstance(v, str) else v)
+                        for k, v in record.args.items()
+                    }
+            except Exception:
+                pass
+        return True
 
 
 class JSONFormatter(logging.Formatter):
@@ -59,6 +100,10 @@ def setup_logging(json_output: bool = False, level: str = "INFO") -> None:
                 datefmt="%Y-%m-%d %H:%M:%S",
             )
         )
+
+    # LOW-13: Attach the sensitive-data filter so all log records are scrubbed
+    sensitive_filter = SensitiveDataFilter()
+    root.addFilter(sensitive_filter)
 
     root.addHandler(handler)
 

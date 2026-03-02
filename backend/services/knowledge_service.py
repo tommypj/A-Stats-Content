@@ -56,6 +56,7 @@ class KnowledgeService:
         user_id: str,
         file_path: str,
         db: AsyncSession,
+        project_id: Optional[str] = None,
     ) -> bool:
         """
         Process a document: extract text, chunk, embed, store in ChromaDB.
@@ -67,6 +68,9 @@ class KnowledgeService:
             user_id: User ID (for ChromaDB collection isolation)
             file_path: Path to the uploaded file
             db: Database session
+            project_id: Project ID for ChromaDB collection isolation.
+                        Falls back to the source record's ``project_id`` field,
+                        then to ``"personal"`` for backward compatibility.
 
         Returns:
             True if processing succeeded, False otherwise
@@ -81,6 +85,9 @@ class KnowledgeService:
             if not source:
                 logger.error(f"KnowledgeSource {source_id} not found")
                 return False
+
+            # Resolve project_id: caller-supplied → source record → "personal" fallback
+            resolved_project_id = project_id or getattr(source, "project_id", None) or "personal"
 
             # 2. Update status to 'processing'
             source.status = SourceStatus.PROCESSING.value
@@ -133,6 +140,7 @@ class KnowledgeService:
                 user_id=user_id,
                 documents=chroma_docs,
                 embeddings=embeddings,
+                project_id=resolved_project_id,
             )
 
             logger.info(f"Stored {len(chunks)} chunks in ChromaDB")
@@ -182,6 +190,7 @@ class KnowledgeService:
         source_ids: Optional[List[str]] = None,
         max_results: int = 5,
         db: Optional[AsyncSession] = None,
+        project_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         RAG query: embed query, retrieve chunks, generate answer.
@@ -192,6 +201,8 @@ class KnowledgeService:
             source_ids: Optional list of source IDs to filter by
             max_results: Maximum number of chunks to retrieve
             db: Optional database session for logging queries
+            project_id: Project ID for ChromaDB collection isolation.
+                        Uses ``"personal"`` when omitted.
 
         Returns:
             Dictionary with:
@@ -200,6 +211,7 @@ class KnowledgeService:
                 - sources: List of source chunks used
                 - query_time_ms: Time taken to process query
         """
+        resolved_project_id = project_id or "personal"
         start_time = time.time()
 
         try:
@@ -220,6 +232,7 @@ class KnowledgeService:
                 query_embedding=query_embedding,
                 n_results=max_results,
                 filter_metadata=filter_metadata,
+                project_id=resolved_project_id,
             )
 
             logger.info(f"Retrieved {len(results)} chunks for query")
@@ -338,6 +351,7 @@ Answer:"""
         source_id: str,
         user_id: str,
         db: AsyncSession,
+        project_id: Optional[str] = None,
     ) -> bool:
         """
         Delete a source from DB and ChromaDB.
@@ -346,6 +360,9 @@ Answer:"""
             source_id: ID of the KnowledgeSource to delete
             user_id: User ID (for verification and ChromaDB)
             db: Database session
+            project_id: Project ID for ChromaDB collection isolation.
+                        Falls back to the source record's ``project_id`` field,
+                        then to ``"personal"`` for backward compatibility.
 
         Returns:
             True if deletion succeeded, False otherwise
@@ -364,8 +381,15 @@ Answer:"""
                 logger.warning(f"KnowledgeSource {source_id} not found for user {user_id}")
                 return False
 
+            # Resolve project_id: caller-supplied → source record → "personal" fallback
+            resolved_project_id = project_id or getattr(source, "project_id", None) or "personal"
+
             # 2. Delete chunks from ChromaDB
-            await self.chroma.delete_by_source(user_id=user_id, source_id=source_id)
+            await self.chroma.delete_by_source(
+                user_id=user_id,
+                source_id=source_id,
+                project_id=resolved_project_id,
+            )
 
             logger.info(f"Deleted chunks from ChromaDB for source {source_id}")
 
@@ -396,6 +420,7 @@ Answer:"""
         self,
         user_id: str,
         db: AsyncSession,
+        project_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Get statistics about a user's knowledge vault.
@@ -403,6 +428,8 @@ Answer:"""
         Args:
             user_id: User ID
             db: Database session
+            project_id: Project ID for ChromaDB collection isolation.
+                        Uses ``"personal"`` when omitted.
 
         Returns:
             Dictionary with statistics
@@ -426,7 +453,8 @@ Answer:"""
             total_chars = row.chars
 
             # Get ChromaDB stats
-            chroma_stats = await self.chroma.get_collection_stats(user_id)
+            resolved_project_id = project_id or "personal"
+            chroma_stats = await self.chroma.get_collection_stats(user_id, resolved_project_id)
 
             # Get query count via SQL aggregate
             query_result = await db.execute(

@@ -219,8 +219,8 @@ async def gsc_oauth_callback(
 
         if existing_connection:
             # Update existing connection
-            existing_connection.access_token = encrypted_access_token
-            existing_connection.refresh_token = encrypted_refresh_token
+            existing_connection.access_token_encrypted = encrypted_access_token
+            existing_connection.refresh_token_encrypted = encrypted_refresh_token
             existing_connection.token_expiry = credentials.token_expiry
             existing_connection.is_active = True
             existing_connection.connected_at = datetime.now(timezone.utc)
@@ -231,8 +231,8 @@ async def gsc_oauth_callback(
                 user_id=current_user.id,
                 project_id=current_user.current_project_id,
                 site_url="",  # Will be set when user selects a site
-                access_token=encrypted_access_token,
-                refresh_token=encrypted_refresh_token,
+                access_token_encrypted=encrypted_access_token,
+                refresh_token_encrypted=encrypted_refresh_token,
                 token_expiry=credentials.token_expiry,
                 connected_at=datetime.now(timezone.utc),
                 is_active=True,
@@ -323,10 +323,10 @@ async def get_gsc_sites(
 
         # Decrypt the stored tokens
         decrypted_access_token = decrypt_credential(
-            connection.access_token, settings.secret_key
+            connection.access_token_encrypted, settings.secret_key
         )
         decrypted_refresh_token = decrypt_credential(
-            connection.refresh_token, settings.secret_key
+            connection.refresh_token_encrypted, settings.secret_key
         )
 
         logger.info("GSC list_sites: tokens decrypted successfully")
@@ -346,7 +346,7 @@ async def get_gsc_sites(
         # If tokens were refreshed, save them back to the database
         if updated_creds.access_token != decrypted_access_token:
             logger.info("GSC tokens were refreshed, saving back to database")
-            connection.access_token = encrypt_credential(
+            connection.access_token_encrypted = encrypt_credential(
                 updated_creds.access_token, settings.secret_key
             )
             connection.token_expiry = updated_creds.token_expiry
@@ -434,10 +434,10 @@ async def sync_gsc_data(
 
         # Decrypt the stored tokens
         decrypted_access_token = decrypt_credential(
-            connection.access_token, settings.secret_key
+            connection.access_token_encrypted, settings.secret_key
         )
         decrypted_refresh_token = decrypt_credential(
-            connection.refresh_token, settings.secret_key
+            connection.refresh_token_encrypted, settings.secret_key
         )
 
         # Create credentials object
@@ -458,7 +458,7 @@ async def sync_gsc_data(
         if datetime.now(timezone.utc) >= token_expiry:
             try:
                 credentials = gsc_adapter.refresh_tokens(credentials)
-                connection.access_token = encrypt_credential(credentials.access_token, settings.secret_key)
+                connection.access_token_encrypted = encrypt_credential(credentials.access_token, settings.secret_key)
                 connection.token_expiry = credentials.token_expiry
                 await db.commit()
                 logger.info("GSC token refreshed and persisted for user %s", current_user.id)
@@ -757,8 +757,8 @@ async def get_device_breakdown(
     from adapters.search.gsc_adapter import GSCAdapter, GSCCredentials
     from core.security.encryption import decrypt_credential
 
-    decrypted_access_token = decrypt_credential(connection.access_token, settings.secret_key)
-    decrypted_refresh_token = decrypt_credential(connection.refresh_token, settings.secret_key)
+    decrypted_access_token = decrypt_credential(connection.access_token_encrypted, settings.secret_key)
+    decrypted_refresh_token = decrypt_credential(connection.refresh_token_encrypted, settings.secret_key)
 
     credentials = GSCCredentials(
         access_token=decrypted_access_token,
@@ -791,8 +791,8 @@ async def get_country_breakdown(
     from adapters.search.gsc_adapter import GSCAdapter, GSCCredentials
     from core.security.encryption import decrypt_credential
 
-    decrypted_access_token = decrypt_credential(connection.access_token, settings.secret_key)
-    decrypted_refresh_token = decrypt_credential(connection.refresh_token, settings.secret_key)
+    decrypted_access_token = decrypt_credential(connection.access_token_encrypted, settings.secret_key)
+    decrypted_refresh_token = decrypt_credential(connection.refresh_token_encrypted, settings.secret_key)
 
     credentials = GSCCredentials(
         access_token=decrypted_access_token,

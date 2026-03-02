@@ -149,18 +149,21 @@ async def process_bulk_outline_job(
             writing_style = template_config.get("writing_style") or brand_voice.get("writing_style", "editorial")
             custom_instructions = template_config.get("custom_instructions") or brand_voice.get("custom_instructions", "")
 
+            # LOW-05: sanitize keyword before passing to AI and before storing in DB
+            safe_keyword = content_ai_service._sanitize_prompt_input(item.keyword or "", 100)
+
             # Log start
             gen_log = await tracker.log_start(
                 user_id=user_id,
                 project_id=job.project_id,
                 resource_type="outline",
                 resource_id=outline_id,
-                input_metadata={"keyword": item.keyword, "bulk_job_id": job_id},
+                input_metadata={"keyword": safe_keyword, "bulk_job_id": job_id},
             )
 
             # Generate outline
             generated = await content_ai_service.generate_outline(
-                keyword=item.keyword or "",
+                keyword=safe_keyword,
                 tone=tone,
                 target_audience=target_audience,
                 word_count_target=word_count,
@@ -175,7 +178,7 @@ async def process_bulk_outline_job(
                 user_id=user_id,
                 project_id=job.project_id,
                 title=generated.title,
-                keyword=item.keyword or "",
+                keyword=safe_keyword,
                 target_audience=target_audience,
                 tone=tone,
                 sections=[

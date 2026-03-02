@@ -484,6 +484,16 @@ async def retry_failed_items(
             detail="Job is already processing. Wait for it to complete before retrying.",
         )
 
+    # BULK-H2: Check usage limits before allowing retry
+    from services.generation_tracker import GenerationTracker
+    tracker = GenerationTracker(db)
+    can_generate = await tracker.check_limit(str(current_user.id), "article")
+    if not can_generate:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Monthly generation limit reached. Upgrade your plan to continue.",
+        )
+
     # BULK-07: Prevent retry when there are no failed items (avoids corrupting completed jobs).
     if job.failed_items == 0:
         raise HTTPException(

@@ -113,6 +113,12 @@ class ClientWorkspace(Base, TimestampMixin):
     portal_access_token: Mapped[Optional[str]] = mapped_column(
         String(255), nullable=True, unique=True, index=True
     )
+    token_expires_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=None,
+        comment="Portal token expiry. NULL means token does not expire (legacy).",
+    )
 
     # Feature gating (list of enabled feature keys)
     allowed_features: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)

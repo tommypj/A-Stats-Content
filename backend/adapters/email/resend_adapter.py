@@ -124,6 +124,39 @@ class ResendEmailService:
             logger.error("Failed to send welcome email: %s", e)
             return False
 
+    async def send_email_change_verification(
+        self,
+        to_email: str,
+        user_name: str,
+        verification_url: str,
+    ) -> bool:
+        """
+        Send email change verification to the new address.
+
+        Args:
+            to_email: The new email address to send the verification to
+            user_name: User's name for personalisation
+            verification_url: Full URL with token for the user to click
+
+        Returns:
+            True if sent successfully, False otherwise
+        """
+        if not settings.resend_api_key:
+            logger.info("[DEV] Email change verification for %s: %s", to_email, verification_url)
+            return True
+
+        try:
+            await asyncio.to_thread(resend.Emails.send, {
+                "from": self._from_email,
+                "to": to_email,
+                "subject": "Confirm your new email address – A-Stats",
+                "html": self._get_email_change_html(user_name, verification_url),
+            })
+            return True
+        except Exception as e:
+            logger.error("Failed to send email change verification email: %s", e)
+            return False
+
     async def send_project_invitation_email(
         self,
         to_email: str,
@@ -362,6 +395,53 @@ class ResendEmailService:
                 <p style="color: #8B8BA7; font-size: 12px; text-align: center;">
                     This invitation will expire in 7 days.<br>
                     If you didn't expect this invitation, you can safely ignore this email.
+                </p>
+            </div>
+        </body>
+        </html>
+        """
+
+
+    def _get_email_change_html(self, user_name: str, verification_url: str) -> str:
+        """Generate email change verification HTML."""
+        safe_name = html_escape(user_name or "")
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #FFF8F0; padding: 40px 20px;">
+            <div style="max-width: 560px; margin: 0 auto; background: white; border-radius: 16px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                <div style="text-align: center; margin-bottom: 32px;">
+                    <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #ed8f73, #da7756); border-radius: 12px; margin: 0 auto;"></div>
+                    <h1 style="color: #1A1A2E; font-size: 24px; margin: 16px 0 0;">A-Stats Content</h1>
+                </div>
+
+                <h2 style="color: #1A1A2E; font-size: 20px; margin-bottom: 16px;">Confirm your new email address</h2>
+
+                <p style="color: #4A4A68; line-height: 1.6; margin-bottom: 24px;">
+                    Hi {safe_name},<br><br>
+                    We received a request to change the email address on your A-Stats account.
+                    Click the button below to confirm this is your new address.
+                </p>
+
+                <div style="text-align: center; margin: 32px 0;">
+                    <a href="{verification_url}" style="display: inline-block; background: #da7756; color: white; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 500;">
+                        Confirm New Email
+                    </a>
+                </div>
+
+                <p style="color: #8B8BA7; font-size: 14px; line-height: 1.6;">
+                    If you didn't request an email change, you can safely ignore this email.
+                    Your email address will remain unchanged.
+                </p>
+
+                <hr style="border: none; border-top: 1px solid #F1F3F5; margin: 32px 0;">
+
+                <p style="color: #8B8BA7; font-size: 12px; text-align: center;">
+                    This link will expire in 1 hour.
                 </p>
             </div>
         </body>

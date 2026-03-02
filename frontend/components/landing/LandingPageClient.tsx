@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -311,7 +312,7 @@ export default function LandingPageClient() {
           <div className="flex h-16 items-center justify-between">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary-400 to-primary-600 shadow-sm" />
+              <Image src="/icon.png" alt="A-Stats" width={32} height={32} className="rounded-lg" />
               <span className="font-display text-xl font-semibold text-text-primary">
                 A-Stats
               </span>
@@ -941,7 +942,7 @@ export default function LandingPageClient() {
             {/* Brand */}
             <div>
               <div className="flex items-center gap-2.5 mb-4">
-                <div className="h-7 w-7 rounded-md bg-gradient-to-br from-primary-400 to-primary-600" />
+                <Image src="/icon.png" alt="A-Stats" width={28} height={28} className="rounded-md" />
                 <span className="font-display text-lg font-semibold">
                   A-Stats
                 </span>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -49,6 +50,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { KeyboardShortcutsDialog } from "@/components/ui/keyboard-shortcuts-dialog";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
 
 // Tier hierarchy: higher number = higher plan
 const TIER_ORDER: Record<string, number> = {
@@ -420,9 +422,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           {/* Logo */}
           <div className="flex h-16 items-center justify-between px-4 border-b border-primary-800">
             <Link href="/dashboard" className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-primary-700 flex items-center justify-center">
-                <Sparkles className="h-4 w-4 text-cream-200" />
-              </div>
+              <Image src="/icon.png" alt="A-Stats" width={32} height={32} className="rounded-lg" />
               <div>
                 <span className="font-display text-lg font-semibold text-cream-100">
                   A-Stats
@@ -791,6 +791,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
         {/* Page content */}
         <main id="main-content" className="p-4 lg:p-8 overflow-x-hidden">
+          <Breadcrumb />
           <ErrorBoundary>{children}</ErrorBoundary>
         </main>
       </div>

@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { useRequireAuth } from "@/lib/auth";
 
 interface NotificationSetting {
   key: string;
@@ -13,12 +14,16 @@ interface NotificationSetting {
 
 export default function NotificationsSettingsPage() {
   const t = useTranslations("settings.notifications");
+  const { isAuthenticated, isLoading: authLoading } = useRequireAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [settings, setSettings] = useState<NotificationSetting[]>([
     { key: "marketing", enabled: false },
     { key: "product", enabled: true },
     { key: "security", enabled: true },
   ]);
+
+  if (authLoading) return null;
+  if (!isAuthenticated) return null;
 
   const toggleSetting = (key: string) => {
     setSettings((prev) =>

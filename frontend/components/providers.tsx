@@ -2,7 +2,9 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { useState, ReactNode } from "react";
+import { useState, ReactNode, Suspense } from "react";
+import { PosthogProvider } from "./providers/posthog-provider";
+import { PosthogPageview } from "./providers/posthog-pageview";
 
 interface ProvidersProps {
   children: ReactNode;
@@ -27,9 +29,15 @@ export function Providers({ children }: ProvidersProps) {
   );
 
   return (
-    <QueryClientProvider client={queryClient}>
-      {children}
-      <ReactQueryDevtools initialIsOpen={false} />
-    </QueryClientProvider>
+    <PosthogProvider>
+      {/* PosthogPageview uses useSearchParams — must be wrapped in Suspense */}
+      <Suspense fallback={null}>
+        <PosthogPageview />
+      </Suspense>
+      <QueryClientProvider client={queryClient}>
+        {children}
+        <ReactQueryDevtools initialIsOpen={false} />
+      </QueryClientProvider>
+    </PosthogProvider>
   );
 }
