@@ -38,11 +38,11 @@ class TestListProjectMembers:
 
         assert response.status_code == 200
         data = response.json()
-        assert "items" in data
-        assert len(data["items"]) >= 1
+        assert "members" in data
+        assert len(data["members"]) >= 1
 
         # Owner should be in the list
-        owner = next((m for m in data["items"] if m["role"] == "owner"), None)
+        owner = next((m for m in data["members"] if m["role"] == "owner"), None)
         assert owner is not None
 
     @pytest.mark.asyncio
@@ -55,7 +55,7 @@ class TestListProjectMembers:
         )
 
         assert response.status_code == 200
-        members = response.json()["items"]
+        members = response.json()["members"]
         for member in members:
             assert "id" in member
             assert "user_id" in member
@@ -130,7 +130,7 @@ class TestAddProjectMember:
         assert response.status_code == 201
         data = response.json()
         assert data["email"] == other_user["email"]
-        assert data["role"] == "member"
+        assert data["role"] == "editor"
 
     @pytest.mark.asyncio
     async def test_add_member_as_admin(
@@ -264,7 +264,7 @@ class TestUpdateMemberRole:
         members_response = await async_client.get(
             f"/api/v1/projects/{project['id']}/members", headers=project_admin_auth
         )
-        owner = next(m for m in members_response.json()["items"] if m["role"] == "owner")
+        owner = next(m for m in members_response.json()["members"] if m["role"] == "owner")
 
         payload = {"role": "admin"}
 
@@ -310,7 +310,7 @@ class TestRemoveMember:
         members_response = await async_client.get(
             f"/api/v1/projects/{project['id']}/members", headers=auth_headers
         )
-        member_ids = [m["id"] for m in members_response.json()["items"]]
+        member_ids = [m["id"] for m in members_response.json()["members"]]
         assert project_member["id"] not in member_ids
 
     @pytest.mark.asyncio
@@ -354,7 +354,7 @@ class TestRemoveMember:
         members_response = await async_client.get(
             f"/api/v1/projects/{project['id']}/members", headers=project_admin_auth
         )
-        owner = next(m for m in members_response.json()["items"] if m["role"] == "owner")
+        owner = next(m for m in members_response.json()["members"] if m["role"] == "owner")
 
         response = await async_client.delete(
             f"/api/v1/projects/{project['id']}/members/{owner['id']}", headers=project_admin_auth
@@ -463,7 +463,7 @@ class TestTransferOwnership:
         members_response = await async_client.get(
             f"/api/v1/projects/{project['id']}/members", headers=auth_headers
         )
-        members = members_response.json()["items"]
+        members = members_response.json()["members"]
 
         new_owner = next(m for m in members if m["user_id"] == project_admin["user_id"])
         assert new_owner["role"] == "owner"

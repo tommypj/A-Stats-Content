@@ -64,6 +64,8 @@ def _make_user(
     user.images_generated_this_month = 0
     # Set a future reset date so _reset_user_usage_if_needed is a no-op
     user.usage_reset_date = datetime(2099, 1, 1, tzinfo=UTC)
+    # Ensure subscription_expires is None so the expiry check is bypassed
+    user.subscription_expires = None
     return user
 
 

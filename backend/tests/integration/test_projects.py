@@ -126,7 +126,7 @@ class TestListProjects:
         projects = response.json()["projects"]
         for t in projects:
             assert "current_user_role" in t
-            assert t["current_user_role"] in ["owner", "admin", "member", "viewer"]
+            assert t["current_user_role"] in ["owner", "admin", "editor", "viewer"]
 
     @pytest.mark.asyncio
     async def test_list_projects_supports_pagination(
