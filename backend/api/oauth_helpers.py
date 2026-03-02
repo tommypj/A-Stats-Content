@@ -41,7 +41,7 @@ def _prune_expired_states() -> None:
         del _oauth_states[k]
 
 
-async def store_oauth_state(state: str, user_id: str, platform: str = "") -> None:
+async def store_oauth_state(state: str, user_id: str, platform: str = "", **extra) -> None:
     """Store OAuth state in Redis with a 10-minute TTL.
 
     Falls back to an in-memory dict when Redis is not reachable so that
@@ -50,8 +50,11 @@ async def store_oauth_state(state: str, user_id: str, platform: str = "") -> Non
     ``platform`` is stored alongside ``user_id`` so that the callback can
     validate the redirect came back on the same platform it was initiated for
     (SM-06: prevents cross-platform state reuse attacks).
+
+    Additional keyword arguments (e.g. ``code_verifier`` for Twitter PKCE)
+    are serialised into the same payload and returned by verify_oauth_state_full.
     """
-    data = json.dumps({"user_id": str(user_id), "platform": platform})
+    data = json.dumps({"user_id": str(user_id), "platform": platform, **extra})
     try:
         import redis.asyncio as aioredis
         r = aioredis.from_url(settings.redis_url)

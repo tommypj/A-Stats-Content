@@ -3,6 +3,8 @@ Social media scheduling API routes.
 """
 
 import asyncio
+import base64
+import hashlib
 import json
 import secrets
 import time
@@ -143,9 +145,9 @@ async def initiate_connection(
             detail=f"Unsupported platform: {platform}. Supported: {', '.join([p.value for p in Platform])}",
         )
 
-    # Generate CSRF state token — store platform alongside user_id (SM-06)
+    # Generate CSRF state token (SM-06); stored per-platform below
+    # (Twitter needs code_verifier stored alongside state for PKCE)
     state = secrets.token_urlsafe(32)
-    await _store_oauth_state(state, str(current_user.id), platform=platform)
 
     if platform in ("facebook", "instagram"):
         if not settings.facebook_app_id or not settings.facebook_app_secret:
@@ -153,6 +155,7 @@ async def initiate_connection(
                 status_code=status.HTTP_501_NOT_IMPLEMENTED,
                 detail="Facebook/Instagram integration is not configured. Please set FACEBOOK_APP_ID and FACEBOOK_APP_SECRET.",
             )
+        await _store_oauth_state(state, str(current_user.id), platform=platform)
 
         # Instagram business accounts need additional scopes to access the
         # linked IG account via the Facebook Graph API.
@@ -169,10 +172,55 @@ async def initiate_connection(
             "response_type": "code",
         })
         authorization_url = f"https://www.facebook.com/v21.0/dialog/oauth?{params}"
+
+    elif platform == "twitter":
+        if not settings.twitter_client_id or not settings.twitter_client_secret:
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail="Twitter integration is not configured. Please set TWITTER_CLIENT_ID and TWITTER_CLIENT_SECRET.",
+            )
+        # PKCE — generate code_verifier and code_challenge (S256)
+        code_verifier = secrets.token_urlsafe(64)
+        code_challenge = (
+            base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode()).digest())
+            .rstrip(b"=")
+            .decode()
+        )
+        # Store code_verifier alongside state so we can use it in the callback
+        await _store_oauth_state(
+            state, str(current_user.id), platform=platform, code_verifier=code_verifier
+        )
+        params = urlencode({
+            "response_type": "code",
+            "client_id": settings.twitter_client_id,
+            "redirect_uri": settings.twitter_redirect_uri,
+            "scope": "tweet.read tweet.write users.read offline.access",
+            "state": state,
+            "code_challenge": code_challenge,
+            "code_challenge_method": "S256",
+        })
+        authorization_url = f"https://twitter.com/i/oauth2/authorize?{params}"
+
+    elif platform == "linkedin":
+        if not settings.linkedin_client_id or not settings.linkedin_client_secret:
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail="LinkedIn integration is not configured. Please set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET.",
+            )
+        await _store_oauth_state(state, str(current_user.id), platform=platform)
+        params = urlencode({
+            "response_type": "code",
+            "client_id": settings.linkedin_client_id,
+            "redirect_uri": settings.linkedin_redirect_uri,
+            "scope": "openid profile email w_member_social",
+            "state": state,
+        })
+        authorization_url = f"https://www.linkedin.com/oauth/v2/authorization?{params}"
+
     else:
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail=f"OAuth for {platform} is not yet implemented. Currently supported: facebook, instagram.",
+            detail=f"OAuth for {platform} is not yet implemented.",
         )
 
     # TODO: Move state token to httpOnly cookie for better CSRF protection (requires frontend update)  # SM-35
@@ -264,6 +312,30 @@ async def oauth_callback(
             return RedirectResponse(
                 url=f"{frontend_callback}?error=token_exchange_failed&platform={platform}"
             )
+
+    elif platform == "twitter":
+        code_verifier = state_data.get("code_verifier", "")
+        if not code_verifier:
+            return RedirectResponse(
+                url=f"{frontend_callback}?error=missing_code_verifier&platform={platform}"
+            )
+        try:
+            tokens, profile = await _twitter_exchange_and_profile(code, code_verifier)
+        except (httpx.HTTPError, ValueError, KeyError) as e:
+            logger.warning("Twitter OAuth exchange failed: %s", e)
+            return RedirectResponse(
+                url=f"{frontend_callback}?error=token_exchange_failed&platform={platform}"
+            )
+
+    elif platform == "linkedin":
+        try:
+            tokens, profile = await _linkedin_exchange_and_profile(code)
+        except (httpx.HTTPError, ValueError, KeyError) as e:
+            logger.warning("LinkedIn OAuth exchange failed: %s", e)
+            return RedirectResponse(
+                url=f"{frontend_callback}?error=token_exchange_failed&platform={platform}"
+            )
+
     else:
         return RedirectResponse(
             url=f"{frontend_callback}?error=unsupported_platform&platform={platform}"
@@ -271,6 +343,10 @@ async def oauth_callback(
 
     # Encrypt tokens
     access_token_encrypted = encrypt_credential(tokens.get("access_token", ""), settings.secret_key)
+    refresh_token_raw = tokens.get("refresh_token")
+    refresh_token_encrypted = (
+        encrypt_credential(refresh_token_raw, settings.secret_key) if refresh_token_raw else None
+    )
     platform_user_id = profile.get("id", "")
 
     # Check if account already exists for this user + platform + platform_user_id
@@ -287,6 +363,7 @@ async def oauth_callback(
 
     if existing_account:
         existing_account.access_token_encrypted = access_token_encrypted
+        existing_account.refresh_token_encrypted = refresh_token_encrypted
         existing_account.token_expires_at = tokens.get("expires_at")
         existing_account.platform_username = profile.get("username")
         existing_account.platform_display_name = profile.get("display_name")
@@ -304,6 +381,7 @@ async def oauth_callback(
             platform_display_name=profile.get("display_name"),
             profile_image_url=profile.get("profile_image"),
             access_token_encrypted=access_token_encrypted,
+            refresh_token_encrypted=refresh_token_encrypted,
             token_expires_at=tokens.get("expires_at"),
             is_active=True,
             last_verified_at=datetime.now(timezone.utc),
@@ -437,6 +515,113 @@ async def _facebook_exchange_and_profile(code: str) -> tuple[dict, dict]:
             "username": me_data.get("name", ""),
             "display_name": me_data.get("name", ""),
             "profile_image": picture_url,
+        }
+        return tokens, profile
+
+
+async def _twitter_exchange_and_profile(code: str, code_verifier: str) -> tuple[dict, dict]:
+    """Exchange Twitter OAuth 2.0 PKCE code for tokens and fetch user profile."""
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        # Step 1: Exchange code for access + refresh tokens
+        credentials = base64.b64encode(
+            f"{settings.twitter_client_id}:{settings.twitter_client_secret}".encode()
+        ).decode()
+        token_resp = await client.post(
+            "https://api.twitter.com/2/oauth2/token",
+            headers={
+                "Authorization": f"Basic {credentials}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": settings.twitter_redirect_uri,
+                "code_verifier": code_verifier,
+            },
+        )
+        if token_resp.status_code != 200:
+            logger.warning("Twitter token exchange failed: %s", token_resp.text)
+            raise ValueError(f"Twitter token exchange failed: {token_resp.status_code}")
+
+        token_data = token_resp.json()
+        access_token = token_data.get("access_token", "")
+        refresh_token = token_data.get("refresh_token")
+        expires_in = token_data.get("expires_in")
+        expires_at = None
+        if expires_in:
+            from datetime import timedelta
+            expires_at = datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))
+
+        # Step 2: Fetch user profile
+        me_resp = await client.get(
+            "https://api.twitter.com/2/users/me",
+            headers={"Authorization": f"Bearer {access_token}"},
+            params={"user.fields": "name,username,profile_image_url"},
+        )
+        if me_resp.status_code != 200:
+            raise ValueError(f"Twitter profile fetch failed: {me_resp.status_code}")
+
+        me_data = me_resp.json().get("data", {})
+        tokens = {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "expires_at": expires_at,
+        }
+        profile = {
+            "id": me_data.get("id", ""),
+            "username": me_data.get("username", ""),
+            "display_name": me_data.get("name", ""),
+            "profile_image": me_data.get("profile_image_url", "").replace("_normal", ""),
+        }
+        return tokens, profile
+
+
+async def _linkedin_exchange_and_profile(code: str) -> tuple[dict, dict]:
+    """Exchange LinkedIn OAuth 2.0 code for tokens and fetch user profile via OpenID Connect."""
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        # Step 1: Exchange code for access token
+        token_resp = await client.post(
+            "https://www.linkedin.com/oauth/v2/accessToken",
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": settings.linkedin_redirect_uri,
+                "client_id": settings.linkedin_client_id,
+                "client_secret": settings.linkedin_client_secret,
+            },
+        )
+        if token_resp.status_code != 200:
+            logger.warning("LinkedIn token exchange failed: %s", token_resp.text)
+            raise ValueError(f"LinkedIn token exchange failed: {token_resp.status_code}")
+
+        token_data = token_resp.json()
+        access_token = token_data.get("access_token", "")
+        expires_in = token_data.get("expires_in")
+        expires_at = None
+        if expires_in:
+            from datetime import timedelta
+            expires_at = datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))
+
+        # Step 2: Fetch profile via OpenID Connect userinfo endpoint
+        me_resp = await client.get(
+            "https://api.linkedin.com/v2/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if me_resp.status_code != 200:
+            raise ValueError(f"LinkedIn profile fetch failed: {me_resp.status_code}")
+
+        me_data = me_resp.json()
+        tokens = {
+            "access_token": access_token,
+            "refresh_token": None,  # LinkedIn doesn't issue refresh tokens by default
+            "expires_at": expires_at,
+        }
+        profile = {
+            "id": me_data.get("sub", ""),  # OpenID Connect subject = LinkedIn member ID
+            "username": me_data.get("email", ""),
+            "display_name": me_data.get("name", ""),
+            "profile_image": me_data.get("picture", ""),
         }
         return tokens, profile
 
