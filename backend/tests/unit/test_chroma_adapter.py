@@ -6,12 +6,171 @@ Tests cover:
 - Document operations (add, query, delete)
 - Metadata filtering
 - Error handling
+- CHROMA-C1 legacy collection fallback
 """
 
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from uuid import uuid4
 
 import pytest
+
+pytestmark = pytest.mark.asyncio
+
+
+# ---------------------------------------------------------------------------
+# CHROMA-C1 legacy fallback tests
+# ---------------------------------------------------------------------------
+
+
+def _make_adapter(new_col_count: int, legacy_col_count: int, query_results: dict):
+    """
+    Build a ChromaAdapter whose ChromaDB client is fully mocked.
+
+    new_col_count   — documents in the project-scoped new collection
+    legacy_col_count — documents in the legacy {prefix}_{user_id} collection
+    query_results   — raw ChromaDB query dict returned by whichever collection is used
+    """
+    new_collection = Mock()
+    new_collection.count = Mock(return_value=new_col_count)
+    new_collection.query = Mock(return_value=query_results)
+
+    legacy_collection = Mock()
+    legacy_collection.count = Mock(return_value=legacy_col_count)
+    legacy_collection.query = Mock(return_value=query_results)
+
+    mock_client = Mock()
+    mock_client.heartbeat = Mock()
+    # get_or_create_collection → new collection
+    mock_client.get_or_create_collection = Mock(return_value=new_collection)
+    # get_collection → legacy collection (or raises if not found)
+    if legacy_col_count > 0:
+        mock_client.get_collection = Mock(return_value=legacy_collection)
+    else:
+        mock_client.get_collection = Mock(side_effect=Exception("Collection not found"))
+
+    with patch(
+        "adapters.knowledge.chroma_adapter.chromadb.HttpClient",
+        return_value=mock_client,
+    ):
+        from adapters.knowledge.chroma_adapter import ChromaAdapter
+        adapter = ChromaAdapter(
+            host="localhost", port=8000, collection_prefix="kv"
+        )
+
+    return adapter, new_collection, legacy_collection
+
+
+_EMPTY_RESULTS = {
+    "ids": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]]
+}
+
+_MOCK_RESULTS = {
+    "ids": [["doc1"]],
+    "documents": [["Legacy document content"]],
+    "metadatas": [[{"source_id": "src1"}]],
+    "distances": [[0.1]],
+}
+
+
+class TestLegacyFallback:
+    """
+    Verify the CHROMA-C1 migration fallback:
+
+    - New (project-scoped) collection empty + legacy has docs  → query legacy
+    - New collection has docs                                  → query new only
+    - New collection empty, legacy also empty                  → return no results
+    - _try_get_legacy_collection returns None when not found   → no error raised
+    """
+
+    async def test_falls_back_to_legacy_when_new_collection_empty(self):
+        """query() uses the legacy collection when the new one has 0 documents."""
+        adapter, new_col, legacy_col = _make_adapter(
+            new_col_count=0,
+            legacy_col_count=5,
+            query_results=_MOCK_RESULTS,
+        )
+
+        results = await adapter.query(
+            user_id="user-1",
+            query_embedding=[0.1, 0.2, 0.3],
+            n_results=5,
+        )
+
+        assert len(results) == 1
+        assert results[0].content == "Legacy document content"
+        # The legacy collection's query method should have been called
+        legacy_col.query.assert_called_once()
+        # The new collection's query method should NOT have been called
+        new_col.query.assert_not_called()
+
+    async def test_uses_new_collection_when_it_has_documents(self):
+        """query() uses the new project-scoped collection when it has documents."""
+        adapter, new_col, legacy_col = _make_adapter(
+            new_col_count=3,
+            legacy_col_count=5,
+            query_results=_MOCK_RESULTS,
+        )
+
+        results = await adapter.query(
+            user_id="user-1",
+            query_embedding=[0.1, 0.2, 0.3],
+            n_results=5,
+        )
+
+        assert len(results) == 1
+        new_col.query.assert_called_once()
+        legacy_col.query.assert_not_called()
+
+    async def test_returns_empty_when_both_collections_empty(self):
+        """query() returns [] when both new and legacy collections are empty."""
+        adapter, new_col, legacy_col = _make_adapter(
+            new_col_count=0,
+            legacy_col_count=0,
+            query_results=_EMPTY_RESULTS,
+        )
+
+        results = await adapter.query(
+            user_id="user-1",
+            query_embedding=[0.1, 0.2, 0.3],
+            n_results=5,
+        )
+
+        assert results == []
+
+    async def test_try_get_legacy_collection_returns_none_when_not_found(self):
+        """_try_get_legacy_collection returns None when the legacy collection is absent."""
+        adapter, _, _ = _make_adapter(
+            new_col_count=0, legacy_col_count=0, query_results=_EMPTY_RESULTS
+        )
+        # client.get_collection already raises for legacy_col_count=0
+        result = adapter._try_get_legacy_collection("user-999")
+        assert result is None
+
+    async def test_get_collection_stats_includes_legacy_count(self):
+        """get_collection_stats() adds legacy docs to the total when new collection is empty."""
+        adapter, _, _ = _make_adapter(
+            new_col_count=0,
+            legacy_col_count=42,
+            query_results=_EMPTY_RESULTS,
+        )
+
+        stats = await adapter.get_collection_stats(user_id="user-1", project_id="personal")
+
+        assert stats["document_count"] == 42
+        assert stats["legacy_docs"] == 42
+
+    async def test_get_collection_stats_no_legacy_key_when_new_has_docs(self):
+        """get_collection_stats() legacy_docs is 0 when the new collection has documents."""
+        adapter, _, _ = _make_adapter(
+            new_col_count=10,
+            legacy_col_count=5,
+            query_results=_EMPTY_RESULTS,
+        )
+
+        stats = await adapter.get_collection_stats(user_id="user-1", project_id="personal")
+
+        assert stats["document_count"] == 10
+        assert stats["legacy_docs"] == 0
 
 # Skip if adapter not implemented yet
 pytest.importorskip(

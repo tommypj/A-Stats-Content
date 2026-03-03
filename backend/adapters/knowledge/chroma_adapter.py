@@ -87,15 +87,29 @@ class ChromaAdapter:
                 f"Could not connect to ChromaDB at {self.host}:{self.port}: {e}"
             )
 
+    def _legacy_collection_name(self, user_id: str) -> str:
+        """Pre-CHROMA-C1 collection name: single bucket per user, no project scope."""
+        return f"{self.collection_prefix}_{user_id}"
+
+    def _try_get_legacy_collection(self, user_id: str) -> "chromadb.Collection | None":
+        """
+        Return the legacy (pre-CHROMA-C1) collection if it exists and has documents,
+        otherwise return None.  Never raises.
+        """
+        try:
+            col = self.client.get_collection(name=self._legacy_collection_name(user_id))
+            if col.count() > 0:
+                return col
+        except Exception:
+            pass
+        return None
+
     def get_collection(self, user_id: str, project_id: str = "personal") -> chromadb.Collection:
         """
         Get or create a project-scoped collection.
 
-        NOTE: The collection name was changed from ``{prefix}_{user_id}`` to
-        ``{prefix}_{user_id}_{project_id}`` to isolate per-project vector data
-        and prevent cross-tenant RAG leakage.  Existing collections stored
-        under the old name will not be found; they will be left in place and
-        new, empty collections will be created under the new name.
+        Collection names follow the scheme ``{prefix}_{user_id}_{project_id}``.
+        Use ``"personal"`` for the personal workspace.
 
         Args:
             user_id: User ID
@@ -197,6 +211,24 @@ class ChromaAdapter:
         """
         try:
             collection = self.get_collection(user_id, project_id)
+
+            # CHROMA-C1 migration fallback: if the new project-scoped collection
+            # is empty, transparently fall back to the legacy per-user collection
+            # so existing knowledge bases keep working until sources are re-processed.
+            new_count = await self._run_in_executor(collection.count)
+            if new_count == 0:
+                legacy = await self._run_in_executor(
+                    self._try_get_legacy_collection, user_id
+                )
+                if legacy is not None:
+                    logger.warning(
+                        "Collection %r_%s_%s is empty — falling back to legacy "
+                        "collection %r (%d docs). Re-process knowledge sources to migrate.",
+                        self.collection_prefix, user_id, project_id,
+                        self._legacy_collection_name(user_id),
+                        legacy.count(),
+                    )
+                    collection = legacy
 
             # Query is synchronous, run in executor
             results = await self._run_in_executor(
@@ -306,15 +338,25 @@ class ChromaAdapter:
         """
         try:
             collection = self.get_collection(user_id, project_id)
-
-            # Count is synchronous, run in executor
             count = await self._run_in_executor(collection.count)
+
+            # If new collection is empty, report legacy count so callers know
+            # data exists but needs re-processing.
+            legacy_count = 0
+            if count == 0:
+                legacy = await self._run_in_executor(
+                    self._try_get_legacy_collection, user_id
+                )
+                if legacy is not None:
+                    legacy_count = await self._run_in_executor(legacy.count)
 
             return {
                 "collection_name": f"{self.collection_prefix}_{user_id}_{project_id}",
-                "document_count": count,
+                "document_count": count + legacy_count,
                 "user_id": user_id,
                 "project_id": project_id,
+                # Present so callers can show a migration hint in the UI
+                "legacy_docs": legacy_count,
             }
 
         except Exception as e:
