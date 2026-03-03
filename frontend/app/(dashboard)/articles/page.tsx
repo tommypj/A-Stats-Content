@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -105,7 +105,39 @@ export default function ArticlesPage() {
     },
   ]);
 
-  // FE-CONTENT-30: TODO — persist search/filter/pagination state in URL params using useSearchParams
+  // Persist search/filter/pagination state in URL (FE-CONTENT-30)
+  const isFirstRender = useRef(true);
+
+  // Read URL params on first mount and restore state
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const urlPage = Number(params.get("page") || 1);
+    const urlSearch = params.get("search") || "";
+    const urlStatus = params.get("status") || "";
+    const urlFilter = (params.get("filter") as ContentFilter) || "all";
+    if (urlSearch) setSearchKeyword(urlSearch);
+    if (urlStatus) setStatusFilter(urlStatus);
+    if (urlFilter !== "all") setContentFilter(urlFilter);
+    if (urlPage > 1) setPage(urlPage);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sync URL whenever filters/page change — skip the very first render so we don't wipe URL params
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams();
+    if (debouncedKeyword) params.set("search", debouncedKeyword);
+    if (statusFilter) params.set("status", statusFilter);
+    if (contentFilter !== "all") params.set("filter", contentFilter);
+    if (page > 1) params.set("page", String(page));
+    const qs = params.toString();
+    router.replace(qs ? `?${qs}` : window.location.pathname, { scroll: false });
+  }, [debouncedKeyword, statusFilter, contentFilter, page, router]);
 
   // Debounce search keyword — reset to page 1 when keyword changes
   useEffect(() => {

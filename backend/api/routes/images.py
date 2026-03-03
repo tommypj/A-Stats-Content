@@ -296,6 +296,8 @@ async def list_images(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     article_id: str | None = None,
+    prompt: str | None = Query(None, max_length=200),
+    style: str | None = Query(None, max_length=50),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -316,6 +318,10 @@ async def list_images(
     # Apply filters
     if article_id:
         query = query.where(GeneratedImage.article_id == article_id)
+    if prompt:
+        query = query.where(GeneratedImage.prompt.ilike(f"%{prompt}%"))
+    if style:
+        query = query.where(GeneratedImage.style == style)
 
     # Count total
     count_query = select(func.count()).select_from(query.subquery())

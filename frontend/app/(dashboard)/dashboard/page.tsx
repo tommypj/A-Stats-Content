@@ -20,6 +20,7 @@ import {
   Activity,
 } from "lucide-react";
 import { api, Article, Outline, PlanInfo, UserResponse, ContentHealthSummary } from "@/lib/api";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 
 const quickActions = [
@@ -330,8 +331,38 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+      <div className="space-y-8 animate-in">
+        {/* Header skeleton */}
+        <div>
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-72 mt-2" />
+        </div>
+        {/* Stats grid skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="card p-5">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-10 w-10 rounded-xl" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+              <Skeleton className="h-7 w-14 mt-4" />
+              <Skeleton className="h-4 w-28 mt-1" />
+            </div>
+          ))}
+        </div>
+        {/* Content sections skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {[1, 2].map((i) => (
+            <div key={i} className="card p-5">
+              <Skeleton className="h-6 w-36 mb-4" />
+              <div className="space-y-3">
+                {[1, 2, 3].map((j) => (
+                  <Skeleton key={j} className="h-14 w-full rounded-lg" />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

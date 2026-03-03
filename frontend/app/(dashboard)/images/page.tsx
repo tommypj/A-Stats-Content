@@ -100,7 +100,12 @@ export default function ImagesPage() {
   const loadImages = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.images.list({ page, page_size: pageSize });
+      const response = await api.images.list({
+        page,
+        page_size: pageSize,
+        ...(debouncedSearch ? { prompt: debouncedSearch } : {}),
+        ...(styleFilter ? { style: styleFilter } : {}),
+      });
       setImages(response.items);
       setTotalCount(response.total);
       setTotalPages(Math.ceil(response.total / pageSize));
@@ -109,7 +114,7 @@ export default function ImagesPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize]);
+  }, [page, pageSize, debouncedSearch, styleFilter]);
 
   useEffect(() => {
     loadImages();
@@ -129,31 +134,17 @@ export default function ImagesPage() {
     checkWpConnection();
   }, []);
 
-  // Client-side filtering applied after load
-  const filteredImages = useMemo(() => images.filter((img) => {
-    const matchesSearch =
-      debouncedSearch === "" ||
-      img.prompt.toLowerCase().includes(debouncedSearch.toLowerCase());
-    const matchesStyle =
-      styleFilter === "" ||
-      (img.style ?? "").toLowerCase() === styleFilter.toLowerCase();
-    return matchesSearch && matchesStyle;
-  }), [images, debouncedSearch, styleFilter]);
+  // Server-side filtering — images already filtered by API
+  const filteredImages = images;
 
   // Collect unique styles from the current page for the dropdown
   const availableStyles = useMemo(() => Array.from(
     new Set(images.map((img) => img.style).filter((s): s is string => Boolean(s)))
   ).sort(), [images]);
 
-  // When filters are active the visible count is the filtered set; otherwise use server total
-  const isFiltering = debouncedSearch !== "" || styleFilter !== "";
-  const displayTotal = isFiltering ? filteredImages.length : totalCount;
-
-  // Items shown on this page (filtered)
-  const pageStart = isFiltering ? 1 : (page - 1) * pageSize + 1;
-  const pageEnd = isFiltering
-    ? filteredImages.length
-    : Math.min(page * pageSize, totalCount);
+  const displayTotal = totalCount;
+  const pageStart = (page - 1) * pageSize + 1;
+  const pageEnd = Math.min(page * pageSize, totalCount);
 
   function handleDelete(id: string) {
     setActiveMenu(null);

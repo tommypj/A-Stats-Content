@@ -310,6 +310,9 @@ export default function AnalyticsPage() {
                 Last synced: {new Date(lastSync).toLocaleDateString("en-US")}
               </span>
             )}
+            <span className="ml-2 text-xs text-text-tertiary">
+              · GSC data typically lags 2–3 days
+            </span>
           </p>
         </div>
         <div className="flex items-center gap-3">

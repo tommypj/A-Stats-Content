@@ -589,7 +589,7 @@ export const api = {
 
   // Images
   images: {
-    list: (params?: { page?: number; page_size?: number; project_id?: string }) =>
+    list: (params?: { page?: number; page_size?: number; project_id?: string; prompt?: string; style?: string }) =>
       apiRequest<{ items: GeneratedImage[]; total: number }>({
         url: "/images",
         params,
@@ -1315,9 +1315,10 @@ export const api = {
 
   // Notifications
   notifications: {
-    generationStatus: () =>
+    generationStatus: (params?: { page?: number; page_size?: number; hours?: number }) =>
       apiRequest<GenerationStatusResponse>({
         url: "/notifications/generation-status",
+        params,
       }),
   },
 
@@ -2914,6 +2915,10 @@ export interface GenerationNotification {
 
 export interface GenerationStatusResponse {
   notifications: GenerationNotification[];
+  total?: number;
+  page?: number;
+  page_size?: number;
+  has_more?: boolean;
 }
 
 /**

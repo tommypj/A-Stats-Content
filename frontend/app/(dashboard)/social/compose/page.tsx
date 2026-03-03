@@ -317,6 +317,7 @@ export default function ComposePage() {
                       />
                       <button
                         type="button"
+                        aria-label="Remove media"
                         onClick={() => handleRemoveMedia(index)}
                         className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                       >

@@ -198,6 +198,9 @@ function NotificationBell() {
   const [notifications, setNotifications] = useState<GenerationNotification[]>([]);
   const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Load seen IDs from localStorage on mount
@@ -218,10 +221,16 @@ function NotificationBell() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
-  const fetchNotifications = useCallback(async () => {
+  const fetchNotifications = useCallback(async (pg = 1) => {
     try {
-      const data = await api.notifications.generationStatus();
-      setNotifications(data.notifications);
+      const data = await api.notifications.generationStatus({ page: pg, page_size: 10 });
+      if (pg === 1) {
+        setNotifications(data.notifications);
+      } else {
+        setNotifications((prev) => [...prev, ...data.notifications]);
+      }
+      setHasMore(data.has_more ?? false);
+      setPage(pg);
     } catch {
       // Silent fail — polling is best-effort
     }
@@ -229,10 +238,10 @@ function NotificationBell() {
 
   // Initial fetch + 30-second polling interval (pauses when tab is hidden)
   useEffect(() => {
-    fetchNotifications();
+    fetchNotifications(1);
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") {
-        fetchNotifications();
+        fetchNotifications(1);
       }
     }, 30_000);
     return () => clearInterval(interval);
@@ -240,15 +249,25 @@ function NotificationBell() {
 
   const unseenCount = notifications.filter((n) => !seenIds.has(n.id)).length;
 
+  function markAllRead() {
+    const newSeen = new Set(seenIds);
+    notifications.forEach((n) => newSeen.add(n.id));
+    setSeenIds(newSeen);
+    saveSeenIds(newSeen);
+  }
+
   function handleOpen() {
     setOpen((prev) => !prev);
     if (!open) {
-      // Mark all current notifications as seen when opening
-      const newSeen = new Set(seenIds);
-      notifications.forEach((n) => newSeen.add(n.id));
-      setSeenIds(newSeen);
-      saveSeenIds(newSeen);
+      // Auto-mark all as seen when opening
+      markAllRead();
     }
+  }
+
+  async function handleLoadMore() {
+    setLoadingMore(true);
+    await fetchNotifications(page + 1);
+    setLoadingMore(false);
   }
 
   function handleNotificationClick(n: GenerationNotification) {
@@ -276,10 +295,16 @@ function NotificationBell() {
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-surface-tertiary">
             <span className="text-sm font-semibold text-text-primary">Recent Generations</span>
-            {notifications.length > 0 && (
-              <span className="text-xs text-text-secondary">
-                {notifications.length} item{notifications.length === 1 ? "" : "s"}
-              </span>
+            {unseenCount > 0 && (
+              <button
+                onClick={markAllRead}
+                className="text-xs text-primary-500 hover:text-primary-600 transition-colors"
+              >
+                Mark all read
+              </button>
+            )}
+            {unseenCount === 0 && notifications.length > 0 && (
+              <span className="text-xs text-text-tertiary">All read</span>
             )}
           </div>
 
@@ -293,34 +318,51 @@ function NotificationBell() {
               </p>
             </div>
           ) : (
-            <ul className="max-h-72 overflow-y-auto divide-y divide-surface-tertiary">
-              {notifications.map((n) => (
-                <li key={n.id}>
-                  <button
-                    onClick={() => handleNotificationClick(n)}
-                    className="w-full flex items-start gap-3 px-4 py-3 hover:bg-surface-secondary transition-colors text-left"
-                  >
-                    {/* Status icon */}
-                    {n.status === "completed" ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
-                    ) : (
-                      <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
-                    )}
+            <>
+              <ul className="max-h-72 overflow-y-auto divide-y divide-surface-tertiary">
+                {notifications.map((n) => (
+                  <li key={n.id}>
+                    <button
+                      onClick={() => handleNotificationClick(n)}
+                      className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-surface-secondary transition-colors text-left ${
+                        !seenIds.has(n.id) ? "bg-primary-50/40" : ""
+                      }`}
+                    >
+                      {/* Status icon */}
+                      {n.status === "completed" ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                      )}
 
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">
-                        {typeLabel(n.type)} {n.status}
-                      </p>
-                      <p className="text-sm text-text-primary truncate mt-0.5">{n.title}</p>
-                      <p className="text-xs text-text-tertiary mt-0.5">
-                        {formatRelativeTime(n.timestamp)}
-                      </p>
-                    </div>
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">
+                          {typeLabel(n.type)} {n.status}
+                        </p>
+                        <p className="text-sm text-text-primary truncate mt-0.5">{n.title}</p>
+                        <p className="text-xs text-text-tertiary mt-0.5">
+                          {formatRelativeTime(n.timestamp)}
+                        </p>
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+
+              {/* Load more */}
+              {hasMore && (
+                <div className="px-4 py-2 border-t border-surface-tertiary">
+                  <button
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className="w-full text-xs text-primary-500 hover:text-primary-600 transition-colors py-1 disabled:opacity-50"
+                  >
+                    {loadingMore ? "Loading…" : "Load more"}
                   </button>
-                </li>
-              ))}
-            </ul>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

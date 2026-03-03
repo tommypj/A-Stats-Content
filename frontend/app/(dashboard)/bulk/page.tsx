@@ -229,7 +229,7 @@ export default function BulkContentPage() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold text-text-primary">Recent Jobs</h2>
-          <Button onClick={loadData} variant="ghost" size="sm">
+          <Button onClick={loadData} variant="ghost" size="sm" aria-label="Refresh jobs">
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>

@@ -25,7 +25,7 @@ export default function SocialDashboard() {
   const [stats, setStats] = useState({
     scheduled: 0,
     postedThisWeek: 0,
-    totalEngagement: 0,
+    totalPosted: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -58,7 +58,7 @@ export default function SocialDashboard() {
       setStats({
         scheduled,
         postedThisWeek,
-        totalEngagement: 0, // Would need analytics endpoint
+        totalPosted: recentRes.total,
       });
     } catch (error) {
       toast.error("Failed to load dashboard data");
@@ -179,9 +179,9 @@ export default function SocialDashboard() {
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-text-secondary">Connected Accounts</p>
+              <p className="text-sm text-text-secondary">Total Posts</p>
               <p className="text-3xl font-bold text-text-primary mt-1">
-                {accounts.filter((a) => a.is_connected).length}
+                {stats.totalPosted}
               </p>
             </div>
             <div className="h-12 w-12 bg-blue-500/10 rounded-xl flex items-center justify-center">

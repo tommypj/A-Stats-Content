@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import and_, func, select
 from sqlalchemy import update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import contains_eager, selectinload
 
 from api.deps_project import (
     get_project_by_id,
@@ -172,22 +172,40 @@ async def list_projects(
 
     Returns projects with the user's role in each project.
     """
-    # Get all project memberships for user
-    stmt = (
-        select(ProjectMember)
-        .where(
-            and_(
-                ProjectMember.user_id == current_user.id,
-                ProjectMember.deleted_at.is_(None),
-            )
-        )
-        .options(selectinload(ProjectMember.project))
+    # SQL-level filter: active memberships in non-deleted projects
+    base_where = and_(
+        ProjectMember.user_id == current_user.id,
+        ProjectMember.deleted_at.is_(None),
+        Project.deleted_at.is_(None),
     )
 
-    result = await db.execute(stmt)
-    memberships = result.scalars().all()
+    # Count total at SQL level (no Python-side filtering needed)
+    total_stmt = (
+        select(func.count())
+        .select_from(ProjectMember)
+        .join(Project, ProjectMember.project_id == Project.id)
+        .where(base_where)
+    )
+    total = (await db.execute(total_stmt)).scalar() or 0
 
-    # Batch-fetch member counts for all projects in one query
+    if total == 0:
+        return ProjectListResponse(projects=[], total=0, page=page, page_size=page_size, total_pages=0)
+
+    # Paginated membership fetch with eager-loaded project (no N+1)
+    offset = (page - 1) * page_size
+    stmt = (
+        select(ProjectMember)
+        .join(Project, ProjectMember.project_id == Project.id)
+        .where(base_where)
+        .options(contains_eager(ProjectMember.project))
+        .order_by(Project.created_at.desc())
+        .offset(offset)
+        .limit(page_size)
+    )
+    result = await db.execute(stmt)
+    memberships = result.scalars().unique().all()
+
+    # Batch-fetch member counts for the paginated set only
     project_ids = [m.project_id for m in memberships]
     counts: dict = {}
     if project_ids:
@@ -202,17 +220,11 @@ async def list_projects(
         count_result = await db.execute(count_stmt)
         counts = {row.project_id: row.cnt for row in count_result}
 
-    all_projects_with_roles = []
+    projects_with_roles = []
     for membership in memberships:
         project = membership.project
-
-        # Skip deleted projects
-        if project.deleted_at is not None:
-            continue
-
         member_count = counts.get(project.id, 0)
-
-        all_projects_with_roles.append(
+        projects_with_roles.append(
             {
                 "id": project.id,
                 "name": project.name,
@@ -230,13 +242,9 @@ async def list_projects(
             }
         )
 
-    total = len(all_projects_with_roles)
-    total_pages = math.ceil(total / page_size) if total > 0 else 0
-    offset = (page - 1) * page_size
-    paginated = all_projects_with_roles[offset : offset + page_size]
-
+    total_pages = math.ceil(total / page_size)
     return ProjectListResponse(
-        projects=paginated,
+        projects=projects_with_roles,
         total=total,
         page=page,
         page_size=page_size,
@@ -260,24 +268,37 @@ async def get_current_project(
             is_personal_workspace=True,
         )
 
-    # Get project
-    stmt = select(Project).where(
-        and_(
-            Project.id == current_user.current_project_id,
-            Project.deleted_at.is_(None),
+    # Single query: project + current user's role (2 queries total, down from 3)
+    stmt = (
+        select(Project, ProjectMember.role)
+        .join(
+            ProjectMember,
+            and_(
+                ProjectMember.project_id == Project.id,
+                ProjectMember.user_id == current_user.id,
+                ProjectMember.deleted_at.is_(None),
+            ),
+        )
+        .where(
+            and_(
+                Project.id == current_user.current_project_id,
+                Project.deleted_at.is_(None),
+            )
         )
     )
     result = await db.execute(stmt)
-    project = result.scalar_one_or_none()
+    row = result.one_or_none()
 
-    if not project:
+    if not row:
         return CurrentProjectResponse(
             project=None,
             is_personal_workspace=True,
         )
 
-    # Count members
-    count_stmt = (
+    project, user_role = row
+
+    # Member count (remaining second query)
+    count_result = await db.execute(
         select(func.count())
         .select_from(ProjectMember)
         .where(
@@ -287,19 +308,7 @@ async def get_current_project(
             )
         )
     )
-    count_result = await db.execute(count_stmt)
-    member_count = count_result.scalar()
-
-    # Get user's role in this project
-    role_stmt = select(ProjectMember.role).where(
-        and_(
-            ProjectMember.project_id == project.id,
-            ProjectMember.user_id == current_user.id,
-            ProjectMember.deleted_at.is_(None),
-        )
-    )
-    role_result = await db.execute(role_stmt)
-    user_role = role_result.scalar()
+    member_count = count_result.scalar() or 0
 
     response = ProjectResponse.model_validate(project)
     response.member_count = member_count

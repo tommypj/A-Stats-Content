@@ -43,7 +43,17 @@ export default function AccountsPage() {
   };
 
   const handleConnect = async (platform: SocialPlatform) => {
-    // FE-SM-07: TODO — check if account already connected before redirecting to OAuth
+    // Prevent duplicate connections — warn if an active account already exists
+    const existing = accounts.find(
+      (a) => a.platform === platform && a.is_connected
+    );
+    if (existing) {
+      setError(
+        `A ${platform} account (@${existing.username || existing.display_name}) is already connected. Disconnect it first to reconnect.`
+      );
+      return;
+    }
+
     try {
       setConnectingPlatform(platform);
       setError(null);

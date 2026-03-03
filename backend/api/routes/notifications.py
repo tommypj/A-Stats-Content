@@ -20,18 +20,26 @@ router = APIRouter(prefix="/notifications", tags=["Notifications"])
 async def get_generation_status(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    page: int = 1,
+    page_size: int = 10,
+    hours: int = 24,
 ):
-    """Check for recently completed or failed generations (last 5 minutes).
+    """Check for recently completed or failed generations.
 
     Returns a flat list of notification objects for articles, outlines, and
-    images that transitioned to 'completed' or 'failed' within the past 5
-    minutes.  The list is sorted by updated_at descending and capped at 10
-    entries.
+    images that transitioned to 'completed' or 'failed' within the past
+    ``hours`` hours (default 24).  The list is sorted by updated_at descending
+    and paginated with ``page``/``page_size`` parameters.
     """
     from infrastructure.database.models import Article, GeneratedImage, Outline
     from infrastructure.database.models.content import ContentStatus
 
-    five_min_ago = datetime.now(UTC) - timedelta(minutes=5)
+    # Clamp inputs
+    hours = max(1, min(hours, 168))  # 1 hour to 7 days
+    page = max(1, page)
+    page_size = max(1, min(page_size, 50))
+
+    cutoff = datetime.now(UTC) - timedelta(hours=hours)
 
     # Articles that completed / failed recently
     articles_result = await db.execute(
@@ -44,10 +52,10 @@ async def get_generation_status(
         .where(
             Article.user_id == current_user.id,
             Article.status.in_([ContentStatus.COMPLETED.value, ContentStatus.FAILED.value]),
-            Article.updated_at >= five_min_ago,
+            Article.updated_at >= cutoff,
         )
         .order_by(Article.updated_at.desc())
-        .limit(10)
+        .limit(page_size * page + 1)  # +1 to detect has_more
     )
 
     # Outlines that completed / failed recently
@@ -61,10 +69,10 @@ async def get_generation_status(
         .where(
             Outline.user_id == current_user.id,
             Outline.status.in_([ContentStatus.COMPLETED.value, ContentStatus.FAILED.value]),
-            Outline.updated_at >= five_min_ago,
+            Outline.updated_at >= cutoff,
         )
         .order_by(Outline.updated_at.desc())
-        .limit(10)
+        .limit(page_size * page + 1)
     )
 
     # Images that completed / failed recently
@@ -78,10 +86,10 @@ async def get_generation_status(
         .where(
             GeneratedImage.user_id == current_user.id,
             GeneratedImage.status.in_([ContentStatus.COMPLETED.value, ContentStatus.FAILED.value]),
-            GeneratedImage.updated_at >= five_min_ago,
+            GeneratedImage.updated_at >= cutoff,
         )
         .order_by(GeneratedImage.updated_at.desc())
-        .limit(10)
+        .limit(page_size * page + 1)
     )
 
     notifications = []
@@ -135,13 +143,24 @@ async def get_generation_status(
             }
         )
 
-    # Sort all notifications by timestamp descending
+    # Sort all notifications by timestamp descending, then paginate
     notifications.sort(
         key=lambda x: x["timestamp"] or "",
         reverse=True,
     )
 
-    return {"notifications": notifications[:10]}
+    total = len(notifications)
+    offset = (page - 1) * page_size
+    page_items = notifications[offset : offset + page_size]
+    has_more = total > page * page_size
+
+    return {
+        "notifications": page_items,
+        "total": min(total, page_size * page),  # total seen so far
+        "page": page,
+        "page_size": page_size,
+        "has_more": has_more,
+    }
 
 
 @router.get("/tasks/{task_id}/status", tags=["Tasks"])
