@@ -515,12 +515,6 @@ function AiAnswerPreview({ title, content, keyword, url }: AiAnswerPreviewProps)
   );
 }
 
-function getSeoScoreColor(score: number) {
-  if (score >= 80) return "text-green-600 bg-green-100";
-  if (score >= 60) return "text-yellow-600 bg-yellow-100";
-  return "text-red-600 bg-red-100";
-}
-
 // ---------------------------------------------------------------------------
 // Live SEO Score Panel — client-side, no API calls, debounced 500 ms
 // ---------------------------------------------------------------------------
@@ -545,9 +539,11 @@ function getLiveScoreLabel(score: number): string {
 
 interface LiveSeoPanelProps {
   seoScore: SEOScore;
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }
 
-function LiveSeoPanel({ seoScore }: LiveSeoPanelProps) {
+function LiveSeoPanel({ seoScore, onRefresh, refreshing }: LiveSeoPanelProps) {
   const [expanded, setExpanded] = useState(true);
 
   const { overall, checks } = seoScore;
@@ -561,15 +557,15 @@ function LiveSeoPanel({ seoScore }: LiveSeoPanelProps) {
 
   return (
     <Card className="p-4">
-      {/* Collapsible header */}
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center justify-between text-left"
-      >
-        <div className="flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-text-secondary" />
-          <span className="font-medium text-text-primary text-sm">Live SEO Score</span>
+      {/* Header row */}
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="flex items-center gap-2 text-left flex-1 min-w-0"
+        >
+          <TrendingUp className="h-4 w-4 text-text-secondary flex-shrink-0" />
+          <span className="font-medium text-text-primary text-sm">SEO Score</span>
           <span
             className={clsx(
               "text-xs font-semibold px-1.5 py-0.5 rounded-full",
@@ -582,13 +578,23 @@ function LiveSeoPanel({ seoScore }: LiveSeoPanelProps) {
           >
             {overall}
           </span>
-        </div>
-        {expanded ? (
-          <ChevronUp className="h-4 w-4 text-text-muted flex-shrink-0" />
-        ) : (
-          <ChevronDown className="h-4 w-4 text-text-muted flex-shrink-0" />
+          {expanded ? (
+            <ChevronUp className="h-4 w-4 text-text-muted flex-shrink-0 ml-auto" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-text-muted flex-shrink-0 ml-auto" />
+          )}
+        </button>
+        {onRefresh && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onRefresh(); }}
+            title="Save SEO score to your article record"
+            className="ml-2 p-1 rounded hover:bg-surface-secondary transition-colors flex-shrink-0"
+          >
+            <RefreshCw className={clsx("h-3.5 w-3.5 text-text-muted", refreshing && "animate-spin")} />
+          </button>
         )}
-      </button>
+      </div>
 
       {expanded && (
         <div className="mt-4 space-y-4">
@@ -664,11 +670,17 @@ function LiveSeoPanel({ seoScore }: LiveSeoPanelProps) {
                   )}
                   <span
                     className={clsx(
-                      "text-xs leading-snug",
+                      "text-xs leading-snug flex-1",
                       check.passed ? "text-text-secondary" : "text-text-primary font-medium"
                     )}
                   >
                     {check.label}
+                  </span>
+                  <span className={clsx(
+                    "text-xs font-mono flex-shrink-0",
+                    check.passed ? "text-green-600" : "text-text-muted"
+                  )}>
+                    {check.passed ? `+${check.points}` : `0/${check.points}`}
                   </span>
                 </div>
                 {/* Tip shown only for failed checks */}
@@ -906,14 +918,18 @@ export default function ArticleEditorPage() {
     }
   }
 
+  const [analyzingSeo, setAnalyzingSeo] = useState(false);
+
   async function handleAnalyzeSeo() {
     if (!article) return;
-
+    setAnalyzingSeo(true);
     try {
       const updated = await api.articles.analyzeSeo(article.id);
       setArticle(updated);
     } catch (error) {
       toast.error("SEO analysis failed. Please try again.");
+    } finally {
+      setAnalyzingSeo(false);
     }
   }
 
@@ -1631,37 +1647,12 @@ export default function ArticleEditorPage() {
             keyword={keyword}
           />
 
-          {/* Live SEO Score — updates as the user types (debounced 500 ms) */}
-          <LiveSeoPanel seoScore={liveSeoScore} />
-
-          {/* SEO Score */}
-          <Card className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-medium text-text-primary">SEO Score</h3>
-              <Button variant="ghost" size="sm" onClick={handleAnalyzeSeo}>
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {article.seo_score !== undefined ? (
-              <div className="text-center">
-                <div className={clsx("inline-flex items-center justify-center w-20 h-20 rounded-full text-2xl font-bold", getSeoScoreColor(article.seo_score))}>
-                  {Math.round(article.seo_score)}
-                </div>
-                <p className="text-sm text-text-secondary mt-2">
-                  {article.seo_score >= 80
-                    ? "Great SEO optimization!"
-                    : article.seo_score >= 60
-                    ? "Good, but can be improved"
-                    : "Needs improvement"}
-                </p>
-              </div>
-            ) : (
-              <p className="text-sm text-text-muted text-center py-4">
-                Click refresh to analyze SEO
-              </p>
-            )}
-          </Card>
+          {/* SEO Score — live as-you-type, refresh button stores to backend */}
+          <LiveSeoPanel
+            seoScore={liveSeoScore}
+            onRefresh={handleAnalyzeSeo}
+            refreshing={analyzingSeo}
+          />
 
           {/* AEO Score */}
           <Card className="p-4">
