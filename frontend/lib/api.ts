@@ -2710,23 +2710,25 @@ export interface AdminImageListResponse {
 export interface AdminAuditQueryParams {
   page?: number;
   page_size?: number;
-  user_id?: string;
+  admin_user_id?: string;
+  target_id?: string;
+  target_type?: string;
   action?: string;
-  resource_type?: string;
-  start_date?: string;
-  end_date?: string;
+  date_from?: string;
+  date_to?: string;
 }
 
 export interface AdminAuditLog {
   id: string;
-  user_id: string;
-  user_email: string;
+  admin_user_id: string | null;
+  admin_user: { id: string; email: string; name: string } | null;
   action: string;
-  resource_type: string;
-  resource_id?: string;
-  ip_address?: string;
-  user_agent?: string;
-  details?: Record<string, unknown>;
+  target_type: string | null;
+  target_id: string | null;
+  description: string;
+  metadata: Record<string, unknown> | null;
+  ip_address: string | null;
+  user_agent: string | null;
   created_at: string;
 }
 

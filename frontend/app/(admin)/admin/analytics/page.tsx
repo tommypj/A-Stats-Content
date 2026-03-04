@@ -282,7 +282,7 @@ export default function AdminAnalyticsPage() {
                         {creator.user_name}
                       </p>
                       <p className="text-xs text-text-muted">
-                        ID: {creator.user_id.substring(0, 8)}...
+                        ID: {creator.user_id?.substring(0, 8) ?? "—"}...
                       </p>
                     </td>
                     <td className="px-4 py-3 text-right font-medium text-text-primary">

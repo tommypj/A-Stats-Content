@@ -269,7 +269,7 @@ export default function AdminOutlinesPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-text-secondary">
-                        {outline.user_id.substring(0, 8)}...
+                        {outline.user_id?.substring(0, 8) ?? "—"}...
                       </td>
                       <td className="px-4 py-3">
                         <span

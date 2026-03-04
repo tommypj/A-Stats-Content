@@ -30,7 +30,7 @@ export default function AdminAuditLogsPage() {
         page,
         page_size: pageSize,
         action: actionFilter === "all" ? undefined : actionFilter,
-        resource_type: resourceFilter === "all" ? undefined : resourceFilter,
+        target_type: resourceFilter === "all" ? undefined : resourceFilter,
       };
       const response = await api.admin.auditLogs(params);
       setLogs(response.logs);
@@ -192,10 +192,10 @@ export default function AdminAuditLogsPage() {
                         <td className="px-4 py-3">
                           <div>
                             <p className="font-medium text-text-primary text-sm">
-                              {log.user_email}
+                              {log.admin_user?.email ?? "—"}
                             </p>
                             <p className="text-xs text-text-muted">
-                              {log.user_id.substring(0, 8)}...
+                              {log.admin_user?.id?.substring(0, 8) ?? "system"}...
                             </p>
                           </div>
                         </td>
@@ -211,11 +211,11 @@ export default function AdminAuditLogsPage() {
                         <td className="px-4 py-3">
                           <div>
                             <p className="text-sm font-medium text-text-primary">
-                              {log.resource_type}
+                              {log.target_type ?? "—"}
                             </p>
-                            {log.resource_id && (
+                            {log.target_id && (
                               <p className="text-xs text-text-muted">
-                                ID: {log.resource_id.substring(0, 12)}...
+                                ID: {log.target_id.substring(0, 12)}...
                               </p>
                             )}
                           </div>
@@ -241,13 +241,13 @@ export default function AdminAuditLogsPage() {
                                   </p>
                                 </div>
                               </div>
-                              {log.details && Object.keys(log.details).length > 0 && (
+                              {log.metadata && Object.keys(log.metadata).length > 0 && (
                                 <div>
                                   <h4 className="text-xs font-medium text-text-secondary uppercase mb-1">
                                     Details
                                   </h4>
                                   <pre className="text-xs bg-white p-3 rounded-lg border border-surface-tertiary overflow-x-auto">
-                                    {JSON.stringify(log.details, null, 2)}
+                                    {JSON.stringify(log.metadata, null, 2)}
                                   </pre>
                                 </div>
                               )}

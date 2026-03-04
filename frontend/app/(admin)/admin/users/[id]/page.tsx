@@ -60,7 +60,8 @@ export default function AdminUserDetailPage() {
   const fetchAuditLogs = async () => {
     try {
       const response = await api.admin.auditLogs({
-        user_id: userId,
+        target_id: userId,
+        target_type: "user",
         page_size: 10,
       });
       setAuditLogs(response.logs);
