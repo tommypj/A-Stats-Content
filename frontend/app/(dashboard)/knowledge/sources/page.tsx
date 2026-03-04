@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Upload, Search, Filter, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -31,42 +31,83 @@ export default function SourcesPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [pageSize] = useState(12);
-
+  // Track previous statuses to detect transitions; also keep current filter
+  // values accessible inside the polling callback without re-creating it.
+  const prevStatusesRef = useRef<Record<string, string>>({});
+  const filtersRef = useRef({ page, pageSize, statusFilter, searchQuery });
   useEffect(() => {
-    loadSources();
-  }, [page, statusFilter]);
+    filtersRef.current = { page, pageSize, statusFilter, searchQuery };
+  });
 
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (page === 1) {
-        loadSources();
-      } else {
-        setPage(1);
-      }
-    }, 500);
+  const applyResponse = useCallback(
+    (items: KnowledgeSource[], total: number) => {
+      const prev = prevStatusesRef.current;
+      items.forEach((s) => {
+        if (prev[s.id] && prev[s.id] !== "completed" && s.status === "completed") {
+          toast.success(`"${s.title}" indexed and ready`);
+        }
+        if (prev[s.id] && prev[s.id] !== "failed" && s.status === "failed") {
+          toast.error(`"${s.title}" failed to index`);
+        }
+      });
+      prevStatusesRef.current = Object.fromEntries(items.map((s) => [s.id, s.status]));
+      setSources(items);
+      setTotal(total);
+    },
+    []
+  );
 
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  async function loadSources() {
+  async function loadSources(silent = false) {
+    const { page, pageSize, statusFilter, searchQuery } = filtersRef.current;
     try {
-      setIsLoading(true);
+      if (!silent) setIsLoading(true);
       const response = await api.knowledge.sources({
         page,
         page_size: pageSize,
         status: statusFilter === "all" ? undefined : statusFilter,
         search: searchQuery || undefined,
       });
-      setSources(response.items);
-      setTotal(response.total);
+      applyResponse(response.items, response.total);
     } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to load sources");
+      if (!silent) {
+        const apiError = parseApiError(error);
+        toast.error(apiError.message || "Failed to load sources");
+      }
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }
+
+  // Reload when page or status filter changes (immediate)
+  useEffect(() => {
+    loadSources();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, statusFilter]);
+
+  // Debounce search — reset to page 1 when query changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (page === 1) {
+        loadSources();
+      } else {
+        setPage(1); // page change triggers the effect above
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
+
+  // Poll every 5 s while any source is pending/processing
+  useEffect(() => {
+    const hasActive = sources.some(
+      (s) => s.status === "pending" || s.status === "processing"
+    );
+    if (!hasActive) return;
+
+    const interval = setInterval(() => loadSources(true), 5000);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sources]);
 
   const handleRefresh = () => {
     loadSources();

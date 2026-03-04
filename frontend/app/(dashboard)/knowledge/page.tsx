@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -28,27 +28,53 @@ export default function KnowledgePage() {
   const [recentSources, setRecentSources] = useState<KnowledgeSource[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  // Track previous source statuses so we can detect completed transitions
+  const prevStatusesRef = useRef<Record<string, string>>({});
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
+  const loadData = useCallback(async (silent = false) => {
     try {
-      setIsLoading(true);
+      if (!silent) setIsLoading(true);
       const [statsData, sourcesResponse] = await Promise.all([
         api.knowledge.stats(),
         api.knowledge.sources({ page: 1, page_size: 5 }),
       ]);
       setStats(statsData);
-      setRecentSources(sourcesResponse.items);
+
+      // Detect processing → completed transitions and toast
+      const incoming = sourcesResponse.items;
+      const prev = prevStatusesRef.current;
+      incoming.forEach((s) => {
+        if (prev[s.id] && prev[s.id] !== "completed" && s.status === "completed") {
+          toast.success(`"${s.title}" indexed and ready`);
+        }
+      });
+      prevStatusesRef.current = Object.fromEntries(incoming.map((s) => [s.id, s.status]));
+
+      setRecentSources(incoming);
     } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to load knowledge vault data");
+      if (!silent) {
+        const apiError = parseApiError(error);
+        toast.error(apiError.message || "Failed to load knowledge vault data");
+      }
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Poll every 5 s while any source is pending/processing
+  useEffect(() => {
+    const hasActive = recentSources.some(
+      (s) => s.status === "pending" || s.status === "processing"
+    );
+    if (!hasActive) return;
+
+    const interval = setInterval(() => loadData(true), 5000);
+    return () => clearInterval(interval);
+  }, [recentSources, loadData]);
 
   const handleQuickQuery = (query: string) => {
     router.push(`/knowledge/query?q=${encodeURIComponent(query)}`);
