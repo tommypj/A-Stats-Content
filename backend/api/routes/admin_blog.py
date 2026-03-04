@@ -10,11 +10,13 @@ import re
 from datetime import UTC, datetime
 from math import ceil
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
+from pydantic import BaseModel
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from adapters.ai.anthropic_adapter import AnthropicAdapter
 from api.deps_admin import get_current_admin_user
 from api.middleware.rate_limit import limiter
 from api.routes.blog import _post_to_detail as _public_post_to_detail
@@ -549,3 +551,57 @@ async def admin_delete_tag(
     await db.execute(delete(BlogPostTag).where(BlogPostTag.tag_id == tag_id))
     await db.delete(tag)
     await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# AI Content Generation
+# ---------------------------------------------------------------------------
+
+
+class BlogGenerateRequest(BaseModel):
+    title: str
+    keyword: str | None = None
+    tone: str = "professional"
+    target_audience: str | None = None
+    word_count: int = 800
+
+
+class BlogGenerateResponse(BaseModel):
+    content_html: str
+
+
+@router.post("/generate-content", response_model=BlogGenerateResponse)
+@limiter.limit("10/minute")
+async def admin_generate_blog_content(
+    request: Request,
+    body: BlogGenerateRequest,
+    admin_user: User = Depends(get_current_admin_user),
+):
+    """Generate HTML blog post content using AI given a title and optional keyword."""
+    keyword_line = f"Target keyword: {body.keyword}\n" if body.keyword else ""
+    audience_line = f"Target audience: {body.target_audience}\n" if body.target_audience else ""
+
+    prompt = f"""Write a high-quality blog post in HTML format.
+
+Title: {body.title}
+{keyword_line}{audience_line}Tone: {body.tone}
+Approximate word count: {body.word_count}
+
+Requirements:
+- Return only valid HTML content (no <html>/<head>/<body> wrapper tags)
+- Use <h2> and <h3> for section headings
+- Use <p> for paragraphs
+- Use <ul>/<ol> and <li> for lists where appropriate
+- Use <strong> and <em> for emphasis
+- Write in a {body.tone} tone
+- Include an introduction, 3-5 main sections, and a conclusion
+- Do not include the title as an <h1> (it will be added separately)
+- Do not add any markdown, only HTML tags
+- Naturally include the keyword throughout if provided
+
+Output only the HTML content, nothing else."""
+
+    adapter = AnthropicAdapter()
+    content_html = await adapter.generate_text(prompt, max_tokens=4000, temperature=0.7)
+
+    return BlogGenerateResponse(content_html=content_html)

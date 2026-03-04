@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Minus } from "lucide-react";
+import { Plus, Minus, Sparkles, Loader2 } from "lucide-react";
 import { api, parseApiError } from "@/lib/api";
 import type { BlogCategory, BlogTag } from "@/lib/api";
 
@@ -26,6 +26,10 @@ export default function AdminNewBlogPostPage() {
   const [categories, setCategories] = useState<BlogCategory[]>([]);
   const [tags, setTags] = useState<BlogTag[]>([]);
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [aiKeyword, setAiKeyword] = useState("");
+  const [aiTone, setAiTone] = useState("professional");
+  const [aiWordCount, setAiWordCount] = useState("800");
 
   // Form fields
   const [title, setTitle] = useState("");
@@ -77,6 +81,28 @@ export default function AdminNewBlogPostPage() {
         acceptedAnswer: { "@type": "Answer", text: f.answer },
       })),
     };
+  };
+
+  const handleGenerate = async () => {
+    if (!title.trim()) {
+      toast.error("Enter a title first");
+      return;
+    }
+    try {
+      setGenerating(true);
+      const result = await api.admin.blog.generateContent({
+        title: title.trim(),
+        keyword: aiKeyword || undefined,
+        tone: aiTone,
+        word_count: parseInt(aiWordCount) || 800,
+      });
+      setContentHtml(result.content_html);
+      toast.success("Content generated!");
+    } catch (err) {
+      toast.error(parseApiError(err).message);
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const handleSave = async (publish: boolean) => {
@@ -146,6 +172,64 @@ export default function AdminNewBlogPostPage() {
                 placeholder="url-friendly-slug"
                 className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
+            </div>
+
+            {/* AI Generation */}
+            <div className="border border-primary-200 bg-primary-50 rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary-600" />
+                <span className="text-sm font-semibold text-primary-700">Generate with AI</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-1">
+                  <label className="block text-xs font-medium text-text-secondary mb-1">Target Keyword</label>
+                  <input
+                    type="text"
+                    value={aiKeyword}
+                    onChange={e => setAiKeyword(e.target.value)}
+                    placeholder="e.g. SEO tips 2025"
+                    className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-text-secondary mb-1">Tone</label>
+                  <select
+                    value={aiTone}
+                    onChange={e => setAiTone(e.target.value)}
+                    className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                  >
+                    <option value="professional">Professional</option>
+                    <option value="conversational">Conversational</option>
+                    <option value="educational">Educational</option>
+                    <option value="persuasive">Persuasive</option>
+                    <option value="friendly">Friendly</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-text-secondary mb-1">Word Count</label>
+                  <select
+                    value={aiWordCount}
+                    onChange={e => setAiWordCount(e.target.value)}
+                    className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                  >
+                    <option value="500">~500 words</option>
+                    <option value="800">~800 words</option>
+                    <option value="1200">~1200 words</option>
+                    <option value="2000">~2000 words</option>
+                  </select>
+                </div>
+              </div>
+              <button
+                onClick={handleGenerate}
+                disabled={generating || !title.trim()}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50"
+              >
+                {generating ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</>
+                ) : (
+                  <><Sparkles className="h-4 w-4" /> Generate Content</>
+                )}
+              </button>
             </div>
 
             <div>

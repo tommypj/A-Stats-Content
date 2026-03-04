@@ -1257,6 +1257,13 @@ export const api = {
             url: `/admin/blog/tags/${id}`,
           }),
       },
+      generateContent: (data: { title: string; keyword?: string; tone?: string; target_audience?: string; word_count?: number }) =>
+        apiRequest<{ content_html: string }>({
+          method: "POST",
+          url: "/admin/blog/generate-content",
+          data,
+          timeout: AI_TIMEOUT,
+        }),
     },
   },
 
