@@ -118,7 +118,7 @@ export default function AdminAnalyticsPage() {
           <p className="text-sm text-text-muted">Total Users</p>
           {userAnalytics && (
             <p className="text-xs text-green-600 mt-2">
-              +{userAnalytics.new_users} new
+              +{userAnalytics.signup_trends.reduce((s, t) => s + t.signups, 0)} new (period)
             </p>
           )}
         </div>
@@ -135,7 +135,7 @@ export default function AdminAnalyticsPage() {
           <p className="text-sm text-text-muted">Total Articles</p>
           {contentAnalytics && (
             <p className="text-xs text-text-muted mt-2">
-              Avg: {contentAnalytics.avg_articles_per_user.toFixed(1)} per user
+              {contentAnalytics.total_outlines.toLocaleString()} outlines
             </p>
           )}
         </div>
@@ -147,12 +147,12 @@ export default function AdminAnalyticsPage() {
             </div>
           </div>
           <h3 className="text-2xl font-bold text-text-primary mb-1">
-            {loading ? "—" : `$${revenueAnalytics?.total_revenue.toLocaleString()}`}
+            {loading ? "—" : `$${revenueAnalytics?.current_mrr.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
           </h3>
-          <p className="text-sm text-text-muted">Total Revenue</p>
+          <p className="text-sm text-text-muted">Monthly Recurring Revenue</p>
           {revenueAnalytics && (
             <p className="text-xs text-text-muted mt-2">
-              MRR: ${revenueAnalytics.monthly_recurring_revenue.toLocaleString()}
+              ARR: ${revenueAnalytics.current_arr.toLocaleString(undefined, { maximumFractionDigits: 0 })}
             </p>
           )}
         </div>
@@ -164,12 +164,12 @@ export default function AdminAnalyticsPage() {
             </div>
           </div>
           <h3 className="text-2xl font-bold text-text-primary mb-1">
-            {loading ? "—" : `${userAnalytics?.retention_rate.toFixed(1)}%`}
+            {loading ? "—" : `${userAnalytics?.retention_metrics.day_30_retention.toFixed(1)}%`}
           </h3>
-          <p className="text-sm text-text-muted">Retention Rate</p>
-          {revenueAnalytics && (
+          <p className="text-sm text-text-muted">30-Day Retention</p>
+          {userAnalytics && (
             <p className="text-xs text-text-muted mt-2">
-              LTV: ${revenueAnalytics.lifetime_value.toFixed(0)}
+              7-day: {userAnalytics.retention_metrics.day_7_retention.toFixed(1)}%
             </p>
           )}
         </div>
@@ -186,8 +186,8 @@ export default function AdminAnalyticsPage() {
             <div className="h-[300px] flex items-center justify-center">
               <div className="h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
             </div>
-          ) : userAnalytics && userAnalytics.users_by_month.length > 0 ? (
-            <UserGrowthChart data={userAnalytics.users_by_month} />
+          ) : userAnalytics && userAnalytics.signup_trends.length > 0 ? (
+            <UserGrowthChart data={userAnalytics.signup_trends.map(t => ({ month: t.date, count: t.signups }))} />
           ) : (
             <div className="h-[300px] flex items-center justify-center">
               <p className="text-text-muted">No data available</p>
@@ -204,8 +204,8 @@ export default function AdminAnalyticsPage() {
             <div className="h-[300px] flex items-center justify-center">
               <div className="h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
             </div>
-          ) : contentAnalytics && contentAnalytics.content_by_month.length > 0 ? (
-            <ContentChart data={contentAnalytics.content_by_month} />
+          ) : contentAnalytics && contentAnalytics.content_trends.length > 0 ? (
+            <ContentChart data={contentAnalytics.content_trends.map(t => ({ month: t.date, articles: t.articles, outlines: t.outlines, images: t.images }))} />
           ) : (
             <div className="h-[300px] flex items-center justify-center">
               <p className="text-text-muted">No data available</p>
@@ -222,8 +222,8 @@ export default function AdminAnalyticsPage() {
             <div className="h-[300px] flex items-center justify-center">
               <div className="h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
             </div>
-          ) : revenueAnalytics && revenueAnalytics.revenue_by_month.length > 0 ? (
-            <RevenueChart data={revenueAnalytics.revenue_by_month} />
+          ) : revenueAnalytics && revenueAnalytics.monthly_revenue.length > 0 ? (
+            <RevenueChart data={revenueAnalytics.monthly_revenue.map(m => ({ month: m.month, revenue: m.revenue }))} />
           ) : (
             <div className="h-[300px] flex items-center justify-center">
               <p className="text-text-muted">No data available</p>
@@ -240,8 +240,8 @@ export default function AdminAnalyticsPage() {
             <div className="h-[300px] flex items-center justify-center">
               <div className="h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
             </div>
-          ) : userAnalytics && userAnalytics.users_by_tier.length > 0 ? (
-            <SubscriptionChart data={userAnalytics.users_by_tier} />
+          ) : revenueAnalytics && revenueAnalytics.subscription_distribution.length > 0 ? (
+            <SubscriptionChart data={revenueAnalytics.subscription_distribution.map(d => ({ tier: d.tier, count: d.count }))} />
           ) : (
             <div className="h-[300px] flex items-center justify-center">
               <p className="text-text-muted">No data available</p>
@@ -251,7 +251,7 @@ export default function AdminAnalyticsPage() {
       </div>
 
       {/* Top Creators */}
-      {contentAnalytics && contentAnalytics.top_creators.length > 0 && (
+      {contentAnalytics && contentAnalytics.top_users.length > 0 && (
         <div className="bg-white rounded-xl border border-surface-tertiary p-6">
           <h2 className="text-lg font-semibold text-text-primary mb-4">
             Top Content Creators
@@ -272,21 +272,21 @@ export default function AdminAnalyticsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-surface-tertiary">
-                {contentAnalytics.top_creators.map((creator, index) => (
+                {contentAnalytics.top_users.map((creator, index) => (
                   <tr key={creator.user_id} className="hover:bg-surface-secondary">
                     <td className="px-4 py-3 text-sm text-text-secondary">
                       #{index + 1}
                     </td>
                     <td className="px-4 py-3">
                       <p className="font-medium text-text-primary">
-                        {creator.user_name}
+                        {creator.name}
                       </p>
                       <p className="text-xs text-text-muted">
-                        ID: {creator.user_id ? `${creator.user_id.substring(0, 8)}...` : "—"}
+                        {creator.email}
                       </p>
                     </td>
                     <td className="px-4 py-3 text-right font-medium text-text-primary">
-                      {creator.article_count}
+                      {creator.articles_count}
                     </td>
                   </tr>
                 ))}

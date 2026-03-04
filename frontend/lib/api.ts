@@ -2637,31 +2637,48 @@ export interface AdminAnalyticsParams {
 }
 
 export interface AdminUserAnalytics {
+  signup_trends: Array<{ date: string; signups: number; verified: number }>;
+  retention_metrics: {
+    day_1_retention: number;
+    day_7_retention: number;
+    day_30_retention: number;
+  };
+  conversion_metrics: {
+    free_to_starter: number;
+    free_to_professional: number;
+    free_to_enterprise: number;
+    overall_conversion_rate: number;
+  };
+  geographic_distribution: Array<{ country_code: string; country_name: string; user_count: number; percentage: number }>;
   total_users: number;
-  new_users: number;
-  active_users: number;
-  churned_users: number;
-  users_by_tier: Array<{ tier: string; count: number }>;
-  users_by_month: Array<{ month: string; count: number }>;
-  retention_rate: number;
 }
 
 export interface AdminContentAnalytics {
+  content_trends: Array<{ date: string; articles: number; outlines: number; images: number }>;
+  top_users: Array<{
+    user_id: string;
+    email: string;
+    name: string;
+    articles_count: number;
+    outlines_count: number;
+    images_count: number;
+    total_content: number;
+    subscription_tier: string;
+  }>;
+  article_status_breakdown: Array<{ status: string; count: number; percentage: number }>;
+  outline_status_breakdown: Array<{ status: string; count: number; percentage: number }>;
   total_articles: number;
   total_outlines: number;
   total_images: number;
-  content_by_month: Array<{ month: string; articles: number; outlines: number; images: number }>;
-  top_creators: Array<{ user_id: string; user_name: string; article_count: number }>;
-  avg_articles_per_user: number;
 }
 
 export interface AdminRevenueAnalytics {
-  total_revenue: number;
-  monthly_recurring_revenue: number;
-  average_revenue_per_user: number;
-  revenue_by_month: Array<{ month: string; revenue: number }>;
-  revenue_by_tier: Array<{ tier: string; revenue: number; count: number }>;
-  lifetime_value: number;
+  monthly_revenue: Array<{ month: string; revenue: number; new_subscriptions: number; churned_subscriptions: number }>;
+  subscription_distribution: Array<{ tier: string; count: number; percentage: number; monthly_value: number }>;
+  churn_indicators: Array<{ month: string; churned_count: number; churn_rate: number }>;
+  current_mrr: number;
+  current_arr: number;
+  revenue_growth_rate: number;
 }
 
 export interface AdminSystemAnalytics {
@@ -2683,8 +2700,40 @@ export interface AdminContentQueryParams {
   end_date?: string;
 }
 
+export interface AdminArticleAuthorInfo {
+  user_id: string;
+  email: string;
+  name: string;
+  subscription_tier: string;
+}
+
+export interface AdminArticleListItem {
+  id: string;
+  title: string;
+  keyword: string;
+  status: string;
+  word_count: number;
+  seo_score: number | null;
+  created_at: string;
+  updated_at: string;
+  published_at: string | null;
+  author: AdminArticleAuthorInfo;
+}
+
+export interface AdminOutlineListItem {
+  id: string;
+  title: string;
+  keyword: string;
+  status: string;
+  word_count_target: number;
+  section_count: number;
+  created_at: string;
+  updated_at: string;
+  author: AdminArticleAuthorInfo;
+}
+
 export interface AdminArticleListResponse {
-  items: Article[];
+  items: AdminArticleListItem[];
   total: number;
   page: number;
   page_size: number;
@@ -2692,7 +2741,7 @@ export interface AdminArticleListResponse {
 }
 
 export interface AdminOutlineListResponse {
-  items: Outline[];
+  items: AdminOutlineListItem[];
   total: number;
   page: number;
   page_size: number;

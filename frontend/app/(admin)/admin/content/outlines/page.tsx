@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { api, parseApiError } from "@/lib/api";
-import type { Outline, AdminContentQueryParams } from "@/lib/api";
+import type { AdminOutlineListItem, AdminContentQueryParams } from "@/lib/api";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Search, Trash2, Eye, ChevronLeft, ChevronRight, FileCheck } from "lucide-react";
 import Link from "next/link";
 
 export default function AdminOutlinesPage() {
-  const [outlines, setOutlines] = useState<Outline[]>([]);
+  const [outlines, setOutlines] = useState<AdminOutlineListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -269,7 +269,7 @@ export default function AdminOutlinesPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-text-secondary">
-                        {outline.user_id ? `${outline.user_id.substring(0, 8)}...` : "—"}
+                        {outline.author.user_id ? `${outline.author.user_id.substring(0, 8)}...` : "—"}
                       </td>
                       <td className="px-4 py-3">
                         <span
@@ -287,7 +287,7 @@ export default function AdminOutlinesPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-text-secondary">
-                        {outline.sections.length}
+                        {outline.section_count}
                       </td>
                       <td className="px-4 py-3 text-sm text-text-secondary">
                         {new Date(outline.created_at).toLocaleDateString()}

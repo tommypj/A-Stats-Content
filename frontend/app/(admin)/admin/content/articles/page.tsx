@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import { api, parseApiError } from "@/lib/api";
 import { toast } from "sonner";
-import type { Article, AdminContentQueryParams } from "@/lib/api";
+import type { AdminArticleListItem, AdminContentQueryParams } from "@/lib/api";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Search, Trash2, Eye, ChevronLeft, ChevronRight, FileText } from "lucide-react";
 import Link from "next/link";
 
 export default function AdminArticlesPage() {
-  const [articles, setArticles] = useState<Article[]>([]);
+  const [articles, setArticles] = useState<AdminArticleListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -270,7 +270,7 @@ export default function AdminArticlesPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-text-secondary">
-                        {article.user_id ? `${article.user_id.substring(0, 8)}...` : "—"}
+                        {article.author.user_id ? `${article.author.user_id.substring(0, 8)}...` : "—"}
                       </td>
                       <td className="px-4 py-3">
                         <span

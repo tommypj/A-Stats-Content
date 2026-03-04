@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Fragment } from "react";
 import { api, parseApiError } from "@/lib/api";
 import type { AdminAuditLog, AdminAuditQueryParams } from "@/lib/api";
 import { Search, ChevronDown, ChevronRight, ChevronLeft, Filter } from "lucide-react";
@@ -176,9 +176,8 @@ export default function AdminAuditLogsPage() {
                 </thead>
                 <tbody className="divide-y divide-surface-tertiary">
                   {logs.map((log) => (
-                    <>
+                    <Fragment key={log.id}>
                       <tr
-                        key={log.id}
                         className="hover:bg-surface-secondary cursor-pointer"
                         onClick={() => toggleRow(log.id)}
                       >
@@ -255,7 +254,7 @@ export default function AdminAuditLogsPage() {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
