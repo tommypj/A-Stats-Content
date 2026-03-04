@@ -20,6 +20,8 @@ import {
   Image as ImageIcon,
   Sparkles,
   Bell,
+  Rss,
+  Tag,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { api } from "@/lib/api";
@@ -36,6 +38,14 @@ const navigation = [
       { name: "Articles", href: "/admin/content/articles", icon: FileText },
       { name: "Outlines", href: "/admin/content/outlines", icon: FileCheck },
       { name: "Images", href: "/admin/content/images", icon: ImageIcon },
+    ],
+  },
+  {
+    name: "Blog",
+    icon: Rss,
+    submenu: [
+      { name: "Posts", href: "/admin/blog", icon: FileText },
+      { name: "Categories", href: "/admin/blog/categories", icon: Tag },
     ],
   },
   { name: "Analytics", href: "/admin/analytics", icon: BarChart3 },

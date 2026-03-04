@@ -1,5 +1,6 @@
 User-agent: *
 Allow: /
+Allow: /*/blog
 
 Disallow: /admin
 Disallow: /api/
@@ -16,3 +17,5 @@ Disallow: /*/billing
 Disallow: /*/bulk
 Disallow: /*/agency
 Disallow: /*/portal
+
+Sitemap: https://a-stats.app/sitemap.xml

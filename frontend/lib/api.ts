@@ -1178,6 +1178,86 @@ export const api = {
           data: {},
         }),
     },
+    blog: {
+      posts: {
+        list: (params?: { page?: number; page_size?: number; status?: string; category_id?: string; search?: string }) =>
+          apiRequest<AdminBlogPostListResponse>({
+            url: "/admin/blog/posts",
+            params,
+          }),
+        get: (id: string) =>
+          apiRequest<BlogPostDetail>({
+            url: `/admin/blog/posts/${id}`,
+          }),
+        create: (data: AdminBlogPostCreate) =>
+          apiRequest<BlogPostDetail>({
+            method: "POST",
+            url: "/admin/blog/posts",
+            data,
+          }),
+        update: (id: string, data: AdminBlogPostUpdate) =>
+          apiRequest<BlogPostDetail>({
+            method: "PATCH",
+            url: `/admin/blog/posts/${id}`,
+            data,
+          }),
+        delete: (id: string) =>
+          apiRequest<void>({
+            method: "DELETE",
+            url: `/admin/blog/posts/${id}`,
+          }),
+        publish: (id: string) =>
+          apiRequest<BlogPostDetail>({
+            method: "POST",
+            url: `/admin/blog/posts/${id}/publish`,
+          }),
+        unpublish: (id: string) =>
+          apiRequest<BlogPostDetail>({
+            method: "POST",
+            url: `/admin/blog/posts/${id}/unpublish`,
+          }),
+      },
+      categories: {
+        list: () =>
+          apiRequest<BlogCategory[]>({
+            url: "/admin/blog/categories",
+          }),
+        create: (data: { name: string; slug?: string; description?: string }) =>
+          apiRequest<BlogCategory>({
+            method: "POST",
+            url: "/admin/blog/categories",
+            data,
+          }),
+        update: (id: string, data: { name?: string; slug?: string; description?: string }) =>
+          apiRequest<BlogCategory>({
+            method: "PATCH",
+            url: `/admin/blog/categories/${id}`,
+            data,
+          }),
+        delete: (id: string) =>
+          apiRequest<void>({
+            method: "DELETE",
+            url: `/admin/blog/categories/${id}`,
+          }),
+      },
+      tags: {
+        list: () =>
+          apiRequest<BlogTag[]>({
+            url: "/admin/blog/tags",
+          }),
+        create: (data: { name: string; slug?: string }) =>
+          apiRequest<BlogTag>({
+            method: "POST",
+            url: "/admin/blog/tags",
+            data,
+          }),
+        delete: (id: string) =>
+          apiRequest<void>({
+            method: "DELETE",
+            url: `/admin/blog/tags/${id}`,
+          }),
+      },
+    },
   },
 
   // Projects (Multi-tenancy)
@@ -1433,6 +1513,27 @@ export const api = {
     portal: (token: string) =>
       apiRequest<PortalData>({
         url: `/agency/portal/${token}`,
+      }),
+  },
+
+  // Public Blog
+  blog: {
+    list: (params?: { page?: number; page_size?: number; category_slug?: string; tag_slug?: string; search?: string }) =>
+      apiRequest<BlogPostListResponse>({
+        url: "/blog/posts",
+        params,
+      }),
+    getBySlug: (slug: string) =>
+      apiRequest<BlogPostDetail>({
+        url: `/blog/posts/${slug}`,
+      }),
+    categories: () =>
+      apiRequest<BlogCategory[]>({
+        url: "/blog/categories",
+      }),
+    tags: () =>
+      apiRequest<BlogTag[]>({
+        url: "/blog/tags",
       }),
   },
 };
@@ -2984,4 +3085,104 @@ export interface TaskStatus {
   error: string | null;
   created_at: string;
   completed_at: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Blog types
+// ---------------------------------------------------------------------------
+
+export interface BlogCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  post_count: number;
+}
+
+export interface BlogTag {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface BlogPostCard {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt?: string;
+  meta_description?: string;
+  featured_image_url?: string;
+  featured_image_alt?: string;
+  category?: BlogCategory;
+  tags: BlogTag[];
+  author_name?: string;
+  published_at?: string;
+  reading_time_minutes: number;
+}
+
+export interface BlogPostDetail extends BlogPostCard {
+  content_html?: string;
+  schema_faq?: Record<string, unknown>;
+  og_image_url?: string;
+  meta_title?: string;
+  status?: "draft" | "published";
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface BlogPostListResponse {
+  items: BlogPostCard[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+export interface AdminBlogPostListItem {
+  id: string;
+  slug: string;
+  title: string;
+  status: "draft" | "published";
+  category_name?: string;
+  author_name?: string;
+  published_at?: string;
+  created_at: string;
+}
+
+export interface AdminBlogPostListResponse {
+  items: AdminBlogPostListItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+export interface AdminBlogPostCreate {
+  title: string;
+  slug?: string;
+  meta_title?: string;
+  meta_description?: string;
+  excerpt?: string;
+  content_html?: string;
+  featured_image_url?: string;
+  featured_image_alt?: string;
+  og_image_url?: string;
+  category_id?: string;
+  tag_ids?: string[];
+  schema_faq?: Record<string, unknown>;
+}
+
+export interface AdminBlogPostUpdate {
+  title?: string;
+  slug?: string;
+  meta_title?: string;
+  meta_description?: string;
+  excerpt?: string;
+  content_html?: string;
+  featured_image_url?: string;
+  featured_image_alt?: string;
+  og_image_url?: string;
+  category_id?: string;
+  tag_ids?: string[];
+  schema_faq?: Record<string, unknown>;
 }

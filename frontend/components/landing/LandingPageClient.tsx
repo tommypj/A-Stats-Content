@@ -561,7 +561,7 @@ export default function LandingPageClient() {
                 { label: "Features", href: "#features" },
                 { label: "How It Works", href: "#how-it-works" },
                 { label: "Pricing", href: "#pricing" },
-                { label: "Blog", href: "#blog" },
+                { label: "Blog", href: "/blog" },
               ].map((link) => (
                 <Link
                   key={link.label}
@@ -609,7 +609,7 @@ export default function LandingPageClient() {
                 { label: "Features", href: "#features" },
                 { label: "How It Works", href: "#how-it-works" },
                 { label: "Pricing", href: "#pricing" },
-                { label: "Blog", href: "#blog" },
+                { label: "Blog", href: "/blog" },
               ].map((link) => (
                 <Link
                   key={link.label}

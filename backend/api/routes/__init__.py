@@ -7,7 +7,9 @@ from .admin_analytics import router as admin_analytics_router
 from .admin_content import router as admin_content_router
 from .admin_generations import router as admin_generations_router
 from .admin_users import router as admin_users_router
+from .admin_blog import router as admin_blog_router
 from .agency import router as agency_router
+from .blog import router as blog_router
 from .analytics import router as analytics_router
 from .articles import router as articles_router
 from .auth import router as auth_router
@@ -47,6 +49,8 @@ api_router.include_router(projects_router)
 api_router.include_router(notifications_router)
 api_router.include_router(bulk_router)
 api_router.include_router(agency_router)
+api_router.include_router(blog_router)
+api_router.include_router(admin_blog_router)
 
 # Future routes will be added here:
 # api_router.include_router(content_router, prefix="/content", tags=["Content"])
