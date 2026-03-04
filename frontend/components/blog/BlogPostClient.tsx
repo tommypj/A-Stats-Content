@@ -7,9 +7,11 @@ import { Twitter, Linkedin, Facebook, Link2, Calendar, Clock } from "lucide-reac
 import { toast } from "sonner";
 import type { BlogPostCard, BlogPostDetail } from "@/lib/api";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 interface BlogPostClientProps {
   post: BlogPostDetail;
-  relatedPosts: BlogPostCard[];
+  relatedPosts?: BlogPostCard[];
 }
 
 function formatDate(dateStr: string | undefined): string {
@@ -57,12 +59,11 @@ function ShareButton({
 }
 
 // ---------------------------------------------------------------------------
-// Related post item (compact row)
+// Related post item
 // ---------------------------------------------------------------------------
 function RelatedPostItem({ post }: { post: BlogPostCard }) {
   return (
     <Link href={`/blog/${post.slug}`} className="flex items-start gap-3 group">
-      {/* Thumbnail */}
       <div className="relative w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-surface-secondary">
         {post.featured_image_url ? (
           <Image
@@ -78,7 +79,6 @@ function RelatedPostItem({ post }: { post: BlogPostCard }) {
           </div>
         )}
       </div>
-      {/* Text */}
       <div className="flex-1 min-w-0">
         {post.published_at && (
           <p className="flex items-center gap-1 text-[11px] text-text-muted mb-1">
@@ -108,23 +108,41 @@ function TagPill({ name }: { name: string }) {
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-export default function BlogPostClient({ post, relatedPosts }: BlogPostClientProps) {
+export default function BlogPostClient({ post, relatedPosts: initialRelated = [] }: BlogPostClientProps) {
   const [shareUrl, setShareUrl] = useState(`https://a-stats.app/en/blog/${post.slug}`);
+  const [relatedPosts, setRelatedPosts] = useState<BlogPostCard[]>(initialRelated);
 
   useEffect(() => {
     setShareUrl(window.location.href);
   }, []);
+
+  // Client-side fetch of related posts if none passed from server
+  useEffect(() => {
+    if (initialRelated.length > 0) return;
+    if (!post.category?.slug) return;
+    fetch(
+      `${API_URL}/api/v1/blog/posts?category_slug=${encodeURIComponent(post.category.slug)}&page_size=4`
+    )
+      .then((r) => r.json())
+      .then((data) => {
+        const filtered = (data.items as BlogPostCard[])
+          .filter((p) => p.slug !== post.slug)
+          .slice(0, 3);
+        setRelatedPosts(filtered);
+      })
+      .catch(() => {});
+  }, [post.slug, post.category?.slug, initialRelated.length]);
 
   const copyLink = () => {
     navigator.clipboard.writeText(shareUrl).then(() => toast.success("Link copied!"));
   };
 
   return (
-    <div className="lg:grid lg:grid-cols-[1fr_300px] lg:gap-12 xl:gap-16">
+    <div className="flex gap-12">
       {/* ================================================================
-          LEFT — Article
+          LEFT — Article (flex-1)
           ================================================================ */}
-      <article>
+      <article className="flex-1 min-w-0">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-1.5 text-xs text-text-muted mb-6 flex-wrap">
           <Link href="/" className="hover:text-primary-600 transition-colors">Home</Link>
@@ -162,27 +180,23 @@ export default function BlogPostClient({ post, relatedPosts }: BlogPostClientPro
 
         {/* Meta row */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-text-muted mb-8 pb-6 border-b border-surface-tertiary">
-          {/* Author */}
           {post.author_name && (
             <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-full bg-primary-600 flex items-center justify-center flex-shrink-0">
+              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center flex-shrink-0 shadow-sm">
                 <span className="text-white text-xs font-bold">{authorInitial(post.author_name)}</span>
               </div>
               <span className="font-medium text-text-secondary">{post.author_name}</span>
             </div>
           )}
-          {/* Category (inline) */}
           {post.category && (
-            <span className="hidden sm:inline text-text-muted">
-              in <span className="font-medium text-text-secondary">{post.category.name}</span>
+            <span className="hidden sm:inline px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-100">
+              {post.category.name}
             </span>
           )}
-          {/* Read time */}
           <span className="flex items-center gap-1">
             <Clock className="h-3.5 w-3.5" />
             {post.reading_time_minutes} min read
           </span>
-          {/* Date */}
           {post.published_at && (
             <span className="flex items-center gap-1">
               <Calendar className="h-3.5 w-3.5" />
@@ -191,38 +205,44 @@ export default function BlogPostClient({ post, relatedPosts }: BlogPostClientPro
           )}
         </div>
 
-        {/* Hero image */}
+        {/* Hero image — full width below meta */}
         {post.featured_image_url && (
-          <div className="relative aspect-[3/2] rounded-2xl overflow-hidden mb-8 bg-surface-secondary">
-            <Image
-              src={post.featured_image_url}
-              alt={post.featured_image_alt || post.title}
-              fill
-              className="object-cover"
-              priority
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 60vw, 700px"
-            />
+          <div className="w-full mb-10">
+            <div className="relative w-full overflow-hidden rounded-2xl bg-surface-secondary">
+              <Image
+                src={post.featured_image_url}
+                alt={post.featured_image_alt || post.title}
+                width={1200}
+                height={630}
+                className="w-full object-cover max-h-[480px]"
+                priority
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 65vw, 760px"
+              />
+            </div>
           </div>
         )}
 
         {/* Article body */}
         {post.content_html && (
           <div
-            className="prose prose-sm sm:prose lg:prose-base max-w-none
+            className="prose prose-lg max-w-none
               prose-headings:font-bold prose-headings:text-text-primary
               prose-h2:text-2xl prose-h2:mt-10 prose-h2:mb-4
               prose-h3:text-xl prose-h3:mt-8 prose-h3:mb-3
-              prose-p:text-text-secondary prose-p:leading-relaxed
+              prose-p:text-text-secondary prose-p:leading-relaxed prose-p:mb-4
               prose-a:text-primary-600 prose-a:no-underline hover:prose-a:underline
               prose-strong:text-text-primary
               prose-li:text-text-secondary
-              prose-blockquote:border-primary-500 prose-blockquote:text-text-secondary
-              prose-code:text-primary-700 prose-code:bg-primary-50 prose-code:rounded prose-code:px-1"
+              prose-blockquote:border-l-4 prose-blockquote:border-primary-500
+              prose-blockquote:bg-primary-50 prose-blockquote:px-6 prose-blockquote:py-4
+              prose-blockquote:rounded-r-xl prose-blockquote:not-italic
+              prose-img:rounded-xl prose-img:shadow-md
+              prose-code:bg-surface-secondary prose-code:text-primary-700 prose-code:px-1.5 prose-code:rounded prose-code:text-sm"
             dangerouslySetInnerHTML={{ __html: post.content_html }}
           />
         )}
 
-        {/* Tags (mobile — shown below content, above mobile sidebar) */}
+        {/* Tags — mobile (below content) */}
         {post.tags.length > 0 && (
           <div className="lg:hidden mt-10 pt-6 border-t border-surface-tertiary">
             <p className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">Tags</p>
@@ -234,10 +254,10 @@ export default function BlogPostClient({ post, relatedPosts }: BlogPostClientPro
       </article>
 
       {/* ================================================================
-          RIGHT — Sticky Sidebar
+          RIGHT — Sticky Sidebar (~320px)
           ================================================================ */}
-      <aside className="mt-10 lg:mt-0">
-        <div className="lg:sticky lg:top-8 space-y-8">
+      <aside className="hidden lg:block w-80 flex-shrink-0">
+        <div className="sticky top-8 space-y-6">
 
           {/* Share on Social Media */}
           <div className="bg-surface border border-surface-tertiary rounded-2xl p-5">
@@ -289,17 +309,6 @@ export default function BlogPostClient({ post, relatedPosts }: BlogPostClientPro
             </div>
           )}
 
-          {/* Tags repeated at bottom (if many tags) */}
-          {post.tags.length > 4 && (
-            <div className="bg-surface-secondary rounded-2xl p-5">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
-                Explore Topics
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {post.tags.map((tag) => <TagPill key={tag.id} name={tag.name} />)}
-              </div>
-            </div>
-          )}
         </div>
       </aside>
     </div>
