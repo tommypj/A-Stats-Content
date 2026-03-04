@@ -386,10 +386,10 @@ export default function AdminUserDetailPage() {
                   <div className="text-sm text-text-primary font-medium">
                     {log.action}
                   </div>
-                  {log.resource_type && (
+                  {log.target_type && (
                     <div className="text-xs text-text-muted mt-1">
-                      {log.resource_type}
-                      {log.resource_id && ` • ${log.resource_id.slice(0, 8)}`}
+                      {log.target_type}
+                      {log.target_id && ` • ${log.target_id.slice(0, 8)}`}
                     </div>
                   )}
                 </div>
