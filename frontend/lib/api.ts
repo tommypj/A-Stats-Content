@@ -1044,19 +1044,19 @@ export const api = {
           url: `/admin/users/${id}`,
         }),
       update: (id: string, data: AdminUpdateUserInput) =>
-        apiRequest<AdminUserDetail>({
+        apiRequest<{ success: boolean; message: string; user: AdminUserDetail }>({
           method: "PUT",
           url: `/admin/users/${id}`,
           data,
         }),
       suspend: (id: string, reason: string) =>
-        apiRequest<AdminUserDetail>({
+        apiRequest<{ success: boolean; message: string; user: AdminUserDetail }>({
           method: "POST",
           url: `/admin/users/${id}/suspend`,
           data: { reason },
         }),
       unsuspend: (id: string) =>
-        apiRequest<AdminUserDetail>({
+        apiRequest<{ success: boolean; message: string; user: AdminUserDetail }>({
           method: "POST",
           url: `/admin/users/${id}/unsuspend`,
         }),
@@ -1076,7 +1076,7 @@ export const api = {
       bulkSuspend: async (userIds: string[], reason: string) => {
         const results = await Promise.all(
           userIds.map((id) =>
-            apiRequest<AdminUserDetail>({
+            apiRequest<{ success: boolean }>({
               method: "POST",
               url: `/admin/users/${id}/suspend`,
               data: { reason },

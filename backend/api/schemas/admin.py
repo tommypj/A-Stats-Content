@@ -360,6 +360,13 @@ class UserDetailResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None = None
+    # Computed convenience fields for the frontend
+    is_suspended: bool = False
+    suspension_reason: str | None = None
+    total_articles: int = 0
+    total_outlines: int = 0
+    total_images: int = 0
+    storage_used_mb: float = 0.0
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -373,9 +380,12 @@ class UserListItemResponse(BaseModel):
     role: str
     status: str
     subscription_tier: str
+    subscription_status: str = "active"
     email_verified: bool
     last_login: datetime | None = None
     created_at: datetime
+    # Computed convenience field for the frontend
+    is_suspended: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

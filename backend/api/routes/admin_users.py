@@ -143,6 +143,13 @@ def build_user_detail_response(user: User) -> UserDetailResponse:
         created_at=user.created_at,
         updated_at=user.updated_at,
         deleted_at=user.deleted_at,
+        # Convenience fields consumed by the frontend
+        is_suspended=user.status == "suspended",
+        suspension_reason=user.suspended_reason,
+        total_articles=user.articles_generated_this_month or 0,
+        total_outlines=user.outlines_generated_this_month or 0,
+        total_images=user.images_generated_this_month or 0,
+        storage_used_mb=0.0,
     )
 
 
@@ -243,9 +250,11 @@ async def list_users(
                 role=user.role,
                 status=user.status,
                 subscription_tier=user.subscription_tier,
+                subscription_status=user.subscription_status,
                 email_verified=user.email_verified,
                 last_login=user.last_login,
                 created_at=user.created_at,
+                is_suspended=user.status == "suspended",
             )
             for user in users
         ],
