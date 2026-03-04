@@ -136,6 +136,7 @@ export default function ImagesPage() {
 
   // Server-side filtering — images already filtered by API
   const filteredImages = images;
+  const isFiltering = !!(debouncedSearch || styleFilter);
 
   // Collect unique styles from the current page for the dropdown
   const availableStyles = useMemo(() => Array.from(
