@@ -42,9 +42,9 @@ export default function PublicFooter() {
             <ul className="space-y-2.5">
               {[
                 { label: "Blog", href: "/blog" },
-                { label: "Documentation", href: "#" },
-                { label: "Help Center", href: "#" },
-                { label: "API Reference", href: "#" },
+                { label: "Documentation", href: "/en/docs" },
+                { label: "Help Center", href: "/en/docs/getting-started/quick-start" },
+                { label: "API Reference", href: "/en/docs" },
               ].map(({ label, href }) => (
                 <li key={label}>
                   <Link href={href} className="text-sm text-primary-200/60 hover:text-white transition-colors">

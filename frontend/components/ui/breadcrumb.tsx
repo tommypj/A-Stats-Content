@@ -40,6 +40,16 @@ const PATH_LABELS: Record<string, string> = {
   language: "Language",
   "content-calendar": "Content Calendar",
   "keyword-research": "Keyword Research",
+  "getting-started": "Getting Started",
+  "content-generation": "Content Generation",
+  seo: "SEO",
+  "social-media": "Social Media",
+  "knowledge-vault": "Knowledge Vault",
+  "projects-and-teams": "Projects & Teams",
+  "agency-mode": "Agency Mode",
+  "billing-and-plans": "Billing & Plans",
+  "account-and-settings": "Account & Settings",
+  docs: "Documentation",
 };
 
 export function Breadcrumb() {

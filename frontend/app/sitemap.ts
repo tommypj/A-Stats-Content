@@ -1,4 +1,5 @@
 import { MetadataRoute } from "next";
+import { DOC_CATEGORIES } from "@/lib/docs";
 
 const baseUrl = "https://a-stats.app";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -95,5 +96,31 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }));
 
-  return [...staticRoutes, ...categoryRoutes, ...postRoutes];
+  // Documentation routes
+  const docsIndexRoute: MetadataRoute.Sitemap = [
+    {
+      url: `${baseUrl}/en/docs`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
+  ];
+
+  const docsCategoryRoutes: MetadataRoute.Sitemap = DOC_CATEGORIES.map(cat => ({
+    url: `${baseUrl}/en/docs/${cat.slug}`,
+    lastModified: new Date(),
+    changeFrequency: "weekly" as const,
+    priority: 0.6,
+  }));
+
+  const docsArticleRoutes: MetadataRoute.Sitemap = DOC_CATEGORIES.flatMap(cat =>
+    cat.articles.map(article => ({
+      url: `${baseUrl}/en/docs/${cat.slug}/${article.slug}`,
+      lastModified: new Date(),
+      changeFrequency: "monthly" as const,
+      priority: 0.7,
+    }))
+  );
+
+  return [...staticRoutes, ...docsIndexRoute, ...docsCategoryRoutes, ...docsArticleRoutes, ...categoryRoutes, ...postRoutes];
 }
