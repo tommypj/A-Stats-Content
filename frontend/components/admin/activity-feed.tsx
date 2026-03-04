@@ -111,15 +111,15 @@ export function ActivityFeed({ activities, loading }: ActivityFeedProps) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-text-primary">
-                    {activity.user_email || "System"}
+                    {activity.admin_user?.email || "System"}
                     <span className="text-text-secondary font-normal ml-1">
                       {activity.action.replace(".", " ").replace("_", " ")}
                     </span>
                   </p>
-                  {activity.resource_type && (
+                  {activity.target_type && (
                     <p className="text-xs text-text-muted mt-0.5">
-                      {activity.resource_type}
-                      {activity.resource_id && ` #${activity.resource_id.slice(0, 8)}`}
+                      {activity.target_type}
+                      {activity.target_id && ` #${activity.target_id.slice(0, 8)}`}
                     </p>
                   )}
                   <p className="text-xs text-text-muted mt-1">
