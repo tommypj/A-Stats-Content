@@ -11,8 +11,6 @@ import {
   Check,
   Share2,
   BookOpen,
-  Menu,
-  X,
   Plus,
   ChevronRight,
   Zap,
@@ -22,6 +20,8 @@ import {
   CreditCard,
   ShieldCheck,
 } from "lucide-react";
+import PublicNav from "./PublicNav";
+import PublicFooter from "./PublicFooter";
 
 /* ───────────────────────── Scroll-reveal hook ───────────────────────── */
 
@@ -538,107 +538,12 @@ const integrations = [
 /* ───────────────────────── Page Component ───────────────────────── */
 
 export default function LandingPageClient() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [yearlyBilling, setYearlyBilling] = useState(false);
 
   return (
     <div className="min-h-screen bg-surface overflow-x-hidden">
       {/* ─── 1. Navigation ─── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/70 backdrop-blur-xl border-b border-surface-tertiary/60">
-        <div className="page-container">
-          <div className="flex h-16 items-center justify-between">
-            {/* Logo */}
-            <Link href="/" className="flex items-center gap-2.5">
-              <Image src="/icon.png" alt="A-Stats" width={32} height={32} className="rounded-lg" />
-              <span className="font-display text-xl font-semibold text-text-primary">
-                A-Stats
-              </span>
-            </Link>
-
-            {/* Desktop links */}
-            <div className="hidden md:flex items-center gap-8">
-              {[
-                { label: "Features", href: "#features" },
-                { label: "How It Works", href: "#how-it-works" },
-                { label: "Pricing", href: "#pricing" },
-                { label: "Blog", href: "/blog" },
-              ].map((link) => (
-                <Link
-                  key={link.label}
-                  href={link.href}
-                  className="text-sm text-text-secondary hover:text-text-primary transition-colors"
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </div>
-
-            {/* Desktop CTA */}
-            <div className="hidden md:flex items-center gap-4">
-              <Link
-                href="/login"
-                className="text-sm text-text-secondary hover:text-text-primary transition-colors"
-              >
-                Sign In
-              </Link>
-              <Link href="/register" className="btn-primary text-sm">
-                Get Started Free
-              </Link>
-            </div>
-
-            {/* Mobile menu button */}
-            <button
-              className="md:hidden p-2 text-text-secondary hover:text-text-primary"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-label="Toggle menu"
-            >
-              {mobileMenuOpen ? (
-                <X className="h-5 w-5" />
-              ) : (
-                <Menu className="h-5 w-5" />
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile drawer */}
-        {mobileMenuOpen && (
-          <div className="md:hidden bg-white/95 backdrop-blur-xl border-b border-surface-tertiary animate-in">
-            <div className="page-container py-4 flex flex-col gap-3">
-              {[
-                { label: "Features", href: "#features" },
-                { label: "How It Works", href: "#how-it-works" },
-                { label: "Pricing", href: "#pricing" },
-                { label: "Blog", href: "/blog" },
-              ].map((link) => (
-                <Link
-                  key={link.label}
-                  href={link.href}
-                  className="text-sm text-text-secondary hover:text-text-primary py-2"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {link.label}
-                </Link>
-              ))}
-              <hr className="border-surface-tertiary" />
-              <Link
-                href="/login"
-                className="text-sm text-text-secondary py-2"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Sign In
-              </Link>
-              <Link
-                href="/register"
-                className="btn-primary text-sm text-center"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Get Started Free
-              </Link>
-            </div>
-          </div>
-        )}
-      </nav>
+      <PublicNav />
 
       {/* ─── 2. Hero Section ─── */}
       <section className="pt-28 pb-20 lg:pt-36 lg:pb-28">
@@ -1130,109 +1035,7 @@ export default function LandingPageClient() {
       </section>
 
       {/* ─── 11. Footer ─── */}
-      <footer className="py-16 bg-primary-950 text-white">
-        <div className="page-container">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
-            {/* Brand */}
-            <div>
-              <div className="flex items-center gap-2.5 mb-4">
-                <Image src="/icon.png" alt="A-Stats" width={28} height={28} className="rounded-md" />
-                <span className="font-display text-lg font-semibold">
-                  A-Stats
-                </span>
-              </div>
-              <p className="text-sm text-primary-200/60 leading-relaxed">
-                AI-powered content creation and SEO platform for modern
-                creators.
-              </p>
-            </div>
-
-            {/* Product */}
-            <div>
-              <h4 className="text-sm font-semibold mb-4 text-primary-100">
-                Product
-              </h4>
-              <ul className="space-y-2.5">
-                {["Features", "Pricing", "Integrations", "Changelog"].map(
-                  (l) => (
-                    <li key={l}>
-                      <Link
-                        href="#"
-                        className="text-sm text-primary-200/60 hover:text-white transition-colors"
-                      >
-                        {l}
-                      </Link>
-                    </li>
-                  )
-                )}
-              </ul>
-            </div>
-
-            {/* Resources */}
-            <div>
-              <h4 className="text-sm font-semibold mb-4 text-primary-100">
-                Resources
-              </h4>
-              <ul className="space-y-2.5">
-                {["Blog", "Documentation", "Help Center", "API Reference"].map(
-                  (l) => (
-                    <li key={l}>
-                      <Link
-                        href="#"
-                        className="text-sm text-primary-200/60 hover:text-white transition-colors"
-                      >
-                        {l}
-                      </Link>
-                    </li>
-                  )
-                )}
-              </ul>
-            </div>
-
-            {/* Legal */}
-            <div>
-              <h4 className="text-sm font-semibold mb-4 text-primary-100">
-                Legal
-              </h4>
-              <ul className="space-y-2.5">
-                {[
-                  { label: "Privacy Policy", href: "/legal/privacy" },
-                  { label: "Terms of Service", href: "/legal/terms" },
-                  { label: "Cookie Policy", href: "/legal/cookies" },
-                ].map(({ label, href }) => (
-                  <li key={label}>
-                    <Link
-                      href={href}
-                      className="text-sm text-primary-200/60 hover:text-white transition-colors"
-                    >
-                      {label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          {/* Bottom bar */}
-          <div className="border-t border-primary-800 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-primary-200/40">
-              &copy; {new Date().getFullYear()} A-Stats. All rights reserved.
-            </p>
-            <div className="flex items-center gap-4">
-              {/* Social icon placeholders */}
-              {["X", "Li", "Gh"].map((icon) => (
-                <Link
-                  key={icon}
-                  href="#"
-                  className="h-8 w-8 rounded-full bg-primary-800/50 flex items-center justify-center text-xs text-primary-200/60 hover:bg-primary-700 hover:text-white transition-colors"
-                >
-                  {icon}
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }
