@@ -32,7 +32,7 @@ from api.schemas.blog import (
 )
 from api.utils import escape_like
 from infrastructure.database.connection import get_db
-from infrastructure.database.models.admin import AdminAuditLog, AuditAction, AuditTargetType
+from infrastructure.database.models.admin import AdminAuditLog
 from infrastructure.database.models.blog import (
     BlogCategory,
     BlogPost,

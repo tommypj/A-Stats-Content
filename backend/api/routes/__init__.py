@@ -4,16 +4,16 @@ from fastapi import APIRouter
 
 from .admin_alerts import router as admin_alerts_router
 from .admin_analytics import router as admin_analytics_router
+from .admin_blog import router as admin_blog_router
 from .admin_content import router as admin_content_router
 from .admin_generations import router as admin_generations_router
 from .admin_users import router as admin_users_router
-from .admin_blog import router as admin_blog_router
 from .agency import router as agency_router
-from .blog import router as blog_router
 from .analytics import router as analytics_router
 from .articles import router as articles_router
 from .auth import router as auth_router
 from .billing import router as billing_router
+from .blog import router as blog_router
 from .bulk import router as bulk_router
 from .health import router as health_router
 from .images import router as images_router

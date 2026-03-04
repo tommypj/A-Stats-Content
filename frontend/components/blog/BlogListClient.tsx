@@ -24,7 +24,6 @@ export default function BlogListClient({
   totalPages: initialTotalPages,
 }: BlogListClientProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [posts, setPosts] = useState<BlogPostCard[]>(initialPosts);
   const [total, setTotal] = useState(initialTotal);

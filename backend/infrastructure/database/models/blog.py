@@ -7,7 +7,6 @@ Admins own and manage all blog content.
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Optional
 from uuid import uuid4
 
 from sqlalchemy import (
@@ -18,7 +17,6 @@ from sqlalchemy import (
     PrimaryKeyConstraint,
     String,
     Text,
-    func,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -176,12 +174,12 @@ class BlogPost(Base, TimestampMixin):
     )
 
     # Relationships
-    author: Mapped[Optional["User"]] = relationship(
+    author: Mapped["User | None"] = relationship(
         "User",
         foreign_keys=[author_id],
         lazy="joined",
     )
-    category: Mapped[Optional[BlogCategory]] = relationship(
+    category: Mapped[BlogCategory | None] = relationship(
         "BlogCategory",
         back_populates="posts",
         lazy="joined",
