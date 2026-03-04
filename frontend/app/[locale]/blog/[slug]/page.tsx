@@ -2,11 +2,26 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import BlogPostClient from "@/components/blog/BlogPostClient";
-import type { BlogPostDetail } from "@/lib/api";
+import type { BlogPostCard, BlogPostDetail } from "@/lib/api";
 
 export const revalidate = 300;
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+async function fetchRelatedPosts(categorySlug: string | undefined, excludeSlug: string): Promise<BlogPostCard[]> {
+  try {
+    const params = new URLSearchParams({ page_size: "3" });
+    if (categorySlug) params.set("category_slug", categorySlug);
+    const res = await fetch(`${API_URL}/api/v1/blog/posts?${params}`, {
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.items as BlogPostCard[]).filter((p) => p.slug !== excludeSlug);
+  } catch {
+    return [];
+  }
+}
 
 async function fetchPost(slug: string): Promise<BlogPostDetail | null> {
   try {
@@ -143,7 +158,10 @@ export default async function BlogPostPage({
     notFound();
   }
 
-  const jsonLd = buildJsonLd(post);
+  const [jsonLd, relatedPosts] = await Promise.all([
+    Promise.resolve(buildJsonLd(post)),
+    fetchRelatedPosts(post.category?.slug, slug),
+  ]);
 
   return (
     <>
@@ -152,9 +170,9 @@ export default async function BlogPostPage({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <div className="min-h-screen bg-surface">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <Suspense>
-            <BlogPostClient post={post} />
+            <BlogPostClient post={post} relatedPosts={relatedPosts} />
           </Suspense>
         </div>
       </div>
