@@ -270,7 +270,7 @@ export default function AdminArticlesPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-text-secondary">
-                        {article.user_id?.substring(0, 8) ?? "—"}...
+                        {article.user_id ? `${article.user_id.substring(0, 8)}...` : "—"}
                       </td>
                       <td className="px-4 py-3">
                         <span

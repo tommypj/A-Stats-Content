@@ -389,7 +389,7 @@ export default function AdminUserDetailPage() {
                   {log.target_type && (
                     <div className="text-xs text-text-muted mt-1">
                       {log.target_type}
-                      {log.target_id && ` • ${log.target_id.slice(0, 8)}`}
+                      {log.target_id && ` • ${log.target_id?.slice(0, 8)}`}
                     </div>
                   )}
                 </div>

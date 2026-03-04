@@ -215,7 +215,7 @@ export default function AdminAuditLogsPage() {
                             </p>
                             {log.target_id && (
                               <p className="text-xs text-text-muted">
-                                ID: {log.target_id.substring(0, 12)}...
+                                ID: {log.target_id?.substring(0, 12)}...
                               </p>
                             )}
                           </div>
