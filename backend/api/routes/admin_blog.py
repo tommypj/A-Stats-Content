@@ -10,13 +10,13 @@ import re
 from datetime import UTC, datetime
 from math import ceil
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from adapters.ai.anthropic_adapter import AnthropicAdapter
+from adapters.ai.anthropic_adapter import content_ai_service
 from api.deps_admin import get_current_admin_user
 from api.middleware.rate_limit import limiter
 from api.routes.blog import _post_to_detail as _public_post_to_detail
@@ -601,7 +601,6 @@ Requirements:
 
 Output only the HTML content, nothing else."""
 
-    adapter = AnthropicAdapter()
-    content_html = await adapter.generate_text(prompt, max_tokens=4000, temperature=0.7)
+    content_html = await content_ai_service.generate_text(prompt, max_tokens=4000, temperature=0.7)
 
     return BlogGenerateResponse(content_html=content_html)
