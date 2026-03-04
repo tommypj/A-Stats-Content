@@ -70,6 +70,234 @@ function RevealSection({
   );
 }
 
+/* ───────────────────────── Mockup components ───────────────────────── */
+
+function HeroMockup() {
+  return (
+    <div className="relative pl-4 pt-6 pr-4 pb-6">
+      {/* WordPress badge — top left */}
+      <div className="absolute top-0 left-0 z-10 bg-white rounded-xl shadow-soft border border-surface-tertiary px-3 py-2 flex items-center gap-2">
+        <div className="h-6 w-6 rounded flex items-center justify-center text-white text-xs font-bold" style={{ backgroundColor: "#21759B" }}>W</div>
+        <div>
+          <div className="text-xs font-semibold text-text-primary leading-none">WordPress</div>
+          <div className="text-xs text-green-500 leading-none mt-0.5">Connected</div>
+        </div>
+      </div>
+
+      {/* Main article card */}
+      <div className="bg-white rounded-2xl shadow-[0_4px_32px_rgba(0,0,0,0.10)] border border-surface-tertiary overflow-hidden">
+        {/* Editor header */}
+        <div className="flex items-center justify-between px-4 py-3 bg-surface-secondary border-b border-surface-tertiary">
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-green-400" />
+            <span className="text-xs font-medium text-text-primary">Article Ready</span>
+          </div>
+          <span className="text-xs text-text-muted">2,847 words · ~11 min read</span>
+        </div>
+
+        {/* Content */}
+        <div className="p-5">
+          <div className="inline-flex items-center gap-1.5 text-xs bg-primary-50 text-primary-600 px-2.5 py-1 rounded-full mb-3 font-medium">
+            Keyword: seo best practices 2026
+          </div>
+          <h4 className="text-sm font-bold text-text-primary mb-2 leading-snug">
+            10 Best SEO Practices for 2026: A Complete Guide
+          </h4>
+          <div className="space-y-1.5 mb-3">
+            <div className="h-1.5 w-full rounded-full bg-surface-tertiary" />
+            <div className="h-1.5 w-11/12 rounded-full bg-surface-tertiary" />
+            <div className="h-1.5 w-4/5 rounded-full bg-surface-tertiary" />
+          </div>
+          <div className="text-xs font-semibold text-text-primary mb-1.5">1. Optimize for Search Intent</div>
+          <div className="space-y-1.5 mb-4">
+            <div className="h-1.5 w-full rounded-full bg-surface-tertiary" />
+            <div className="h-1.5 w-10/12 rounded-full bg-surface-tertiary" />
+          </div>
+          {/* Score + CTA */}
+          <div className="flex items-center gap-4 pt-3 border-t border-surface-tertiary">
+            <div className="flex-1">
+              <div className="flex justify-between text-xs mb-1.5">
+                <span className="text-text-muted">SEO Score</span>
+                <span className="font-semibold text-primary-600">94 / 100</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-surface-tertiary overflow-hidden">
+                <div className="h-full w-[94%] rounded-full bg-gradient-to-r from-primary-400 to-primary-500" />
+              </div>
+            </div>
+            <div className="text-xs bg-primary-500 text-white px-3 py-1.5 rounded-lg font-medium whitespace-nowrap">
+              Publish →
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* AEO score — bottom right */}
+      <div className="absolute -bottom-2 -right-2 z-10 bg-primary-950 rounded-2xl shadow-soft p-4 text-center">
+        <div className="flex items-center gap-1 mb-1 justify-center">
+          <Zap className="h-3 w-3 text-primary-400" />
+          <span className="text-xs text-primary-300 font-medium">AEO Score</span>
+        </div>
+        <div className="text-3xl font-bold text-primary-400 leading-none mb-1">82</div>
+        <div className="text-xs text-primary-300">
+          <span className="text-green-400 font-semibold">+12</span> this month
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ContentGenMockup() {
+  return (
+    <div className="aspect-[4/3] rounded-2xl bg-gradient-to-br from-primary-50 via-cream-100 to-terra-400/10 p-4 flex items-center justify-center">
+      <div className="w-full bg-white/80 backdrop-blur-sm rounded-xl shadow-soft border border-surface-tertiary overflow-hidden">
+        <div className="flex items-center justify-between px-3 py-2.5 bg-surface-secondary border-b border-surface-tertiary">
+          <span className="text-xs font-semibold text-text-primary">New Article</span>
+          <div className="flex items-center gap-1.5">
+            <div className="h-1.5 w-1.5 rounded-full bg-yellow-400 animate-pulse" />
+            <span className="text-xs text-yellow-600 font-medium">Generating…</span>
+          </div>
+        </div>
+        <div className="p-3 space-y-2.5">
+          {/* Keyword input */}
+          <div className="rounded-lg border border-primary-300 bg-primary-50/60 px-2.5 py-1.5 text-xs text-primary-700 font-medium">
+            content marketing strategy for startups
+          </div>
+          {/* Steps */}
+          <div className="flex items-center gap-1.5">
+            {[
+              { label: "Outline", done: true },
+              { label: "Article", active: true },
+              { label: "Images", pending: true },
+            ].map((step, i) => (
+              <div key={step.label} className="flex items-center gap-1.5">
+                <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                  step.done ? "bg-green-100 text-green-700" :
+                  step.active ? "bg-yellow-100 text-yellow-700" :
+                  "bg-surface-tertiary text-text-muted"
+                }`}>
+                  {step.done && <Check className="h-2.5 w-2.5" />}
+                  {step.label}
+                </div>
+                {i < 2 && <div className="h-px w-2 bg-surface-tertiary" />}
+              </div>
+            ))}
+          </div>
+          {/* Outline preview */}
+          <div className="space-y-1">
+            {[
+              { text: "Introduction", active: true },
+              { text: "What is Content Marketing?", active: false },
+              { text: "5 Key Strategies", active: false },
+              { text: "Case Studies & Examples", active: false },
+            ].map((h) => (
+              <div key={h.text} className={`flex items-center gap-1.5 text-xs ${h.active ? "text-text-primary font-medium" : "text-text-muted"}`}>
+                <div className={`h-1 w-1 rounded-full flex-shrink-0 ${h.active ? "bg-primary-500" : "bg-surface-tertiary"}`} />
+                {h.text}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SeoAnalyticsMockup() {
+  return (
+    <div className="aspect-[4/3] rounded-2xl bg-gradient-to-br from-primary-50 via-cream-100 to-terra-400/10 p-4 flex items-center justify-center">
+      <div className="w-full bg-white/80 backdrop-blur-sm rounded-xl shadow-soft border border-surface-tertiary overflow-hidden">
+        <div className="flex items-center justify-between px-3 py-2.5 bg-surface-secondary border-b border-surface-tertiary">
+          <span className="text-xs font-semibold text-text-primary">SEO Analytics</span>
+          <div className="flex items-center gap-1 text-xs text-green-600 font-medium">
+            <div className="h-1.5 w-1.5 rounded-full bg-green-400" />
+            GSC Live
+          </div>
+        </div>
+        <div className="p-3 space-y-2.5">
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-1.5">
+            {[
+              { label: "Impressions", value: "18.4K" },
+              { label: "Clicks", value: "1,203" },
+              { label: "Avg. Pos.", value: "6.2" },
+            ].map((s) => (
+              <div key={s.label} className="text-center p-1.5 rounded-lg bg-surface-secondary">
+                <div className="text-sm font-bold text-text-primary">{s.value}</div>
+                <div className="text-xs text-text-muted leading-tight">{s.label}</div>
+              </div>
+            ))}
+          </div>
+          {/* Rankings */}
+          <div className="space-y-1.5">
+            {[
+              { kw: "content marketing strategy", pos: 4, up: true },
+              { kw: "seo article generator", pos: 7, up: true },
+              { kw: "ai content creation", pos: 12, up: false },
+            ].map((r) => (
+              <div key={r.kw} className="flex items-center justify-between text-xs">
+                <span className="text-text-secondary truncate">{r.kw}</span>
+                <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                  <span className={`font-semibold ${r.pos <= 5 ? "text-green-600" : r.pos <= 10 ? "text-yellow-600" : "text-text-muted"}`}>#{r.pos}</span>
+                  <span className={r.up ? "text-green-500" : "text-text-muted"}>
+                    {r.up ? "↑" : "→"}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SocialMediaMockup() {
+  return (
+    <div className="aspect-[4/3] rounded-2xl bg-gradient-to-br from-primary-50 via-cream-100 to-terra-400/10 p-4 flex items-center justify-center">
+      <div className="w-full bg-white/80 backdrop-blur-sm rounded-xl shadow-soft border border-surface-tertiary overflow-hidden">
+        <div className="flex items-center justify-between px-3 py-2.5 bg-surface-secondary border-b border-surface-tertiary">
+          <span className="text-xs font-semibold text-text-primary">Social Scheduler</span>
+          <div className="flex items-center gap-1">
+            {[["in", "#0077B5"], ["𝕏", "#000"], ["f", "#1877F2"]].map(([l, c]) => (
+              <div key={l} style={{ backgroundColor: c }} className="h-5 w-5 rounded text-white flex items-center justify-center font-bold text-[10px] leading-none">
+                {l}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="p-3 space-y-2.5">
+          {/* Post preview */}
+          <div className="rounded-lg border border-surface-tertiary p-2.5 bg-white">
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className="h-6 w-6 rounded-full bg-primary-100 flex items-center justify-center text-xs font-bold text-primary-600 flex-shrink-0">A</div>
+              <div>
+                <div className="text-xs font-semibold text-text-primary leading-none">A-Stats</div>
+                <div className="text-xs text-text-muted leading-none mt-0.5">Today · 2:00 PM</div>
+              </div>
+            </div>
+            <p className="text-xs text-text-secondary leading-relaxed">
+              Just published: &quot;10 Best SEO Practices for 2026&quot; 🚀 Our AI-generated article hit page 1 in 3 weeks...
+            </p>
+          </div>
+          {/* Platform row */}
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-text-muted">Posting to 3 platforms</span>
+            <span className="text-primary-600 font-medium">View Calendar →</span>
+          </div>
+          {/* Queue */}
+          <div className="flex gap-1.5">
+            {["Mon", "Tue", "Wed", "Thu", "Fri"].map((d, i) => (
+              <div key={d} className={`flex-1 rounded py-1 text-center text-xs font-medium ${i < 2 ? "bg-primary-100 text-primary-600" : i === 2 ? "bg-primary-500 text-white" : "bg-surface-tertiary text-text-muted"}`}>
+                {d}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ───────────────────────── Data ───────────────────────── */
 
 const features = [
@@ -298,6 +526,15 @@ const faqs = [
   },
 ];
 
+const integrations = [
+  { name: "WordPress", abbr: "W", bg: "#21759B" },
+  { name: "Google Search Console", abbr: "G", bg: "#4285F4" },
+  { name: "LinkedIn", abbr: "in", bg: "#0077B5" },
+  { name: "X (Twitter)", abbr: "𝕏", bg: "#000000" },
+  { name: "Facebook", abbr: "f", bg: "#1877F2" },
+  { name: "Claude AI", abbr: "◆", bg: "#7C3AED" },
+];
+
 /* ───────────────────────── Page Component ───────────────────────── */
 
 export default function LandingPageClient() {
@@ -414,13 +651,13 @@ export default function LandingPageClient() {
                 <span>AI-Powered Content & SEO Platform</span>
               </div>
               <h1 className="hero-animate-delay-1 text-4xl md:text-5xl lg:text-6xl font-display font-bold text-text-primary leading-[1.1] tracking-tight">
-                Create Content That{" "}
-                <span className="gradient-text">Ranks</span>
+                Rank on Google.{" "}
+                <span className="gradient-text">Get Cited by AI.</span>
               </h1>
               <p className="hero-animate-delay-2 mt-6 text-lg text-text-secondary max-w-lg leading-relaxed">
-                From keyword to published article — generate SEO-optimized
-                content, images, and social posts with AI. Then track
-                performance, all in one platform.
+                From keyword to published article — AI-generated content that
+                ranks on Google <em>and</em> gets cited by ChatGPT, Perplexity,
+                and Google AI Overviews. All from one platform.
               </p>
               <div className="hero-animate-delay-3 mt-8 flex flex-col sm:flex-row gap-4">
                 <Link
@@ -454,66 +691,32 @@ export default function LandingPageClient() {
               </div>
             </div>
 
-            {/* Right — decorative visual */}
+            {/* Right — product mockup */}
             <div className="hero-animate-delay-2 relative hidden lg:block">
-              <div className="relative aspect-[4/3] rounded-2xl overflow-hidden">
-                {/* Background gradient card */}
-                <div className="absolute inset-0 bg-gradient-to-br from-primary-100 via-cream-100 to-terra-400/20 rounded-2xl" />
-                {/* Floating elements */}
-                <div className="absolute top-8 left-8 right-8 bg-white/80 backdrop-blur-sm rounded-xl p-5 shadow-soft">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="h-3 w-3 rounded-full bg-primary-400" />
-                    <div className="h-2 w-24 rounded-full bg-surface-tertiary" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="h-2 w-full rounded-full bg-surface-tertiary" />
-                    <div className="h-2 w-5/6 rounded-full bg-surface-tertiary" />
-                    <div className="h-2 w-4/6 rounded-full bg-surface-tertiary" />
-                  </div>
-                </div>
-                <div className="absolute bottom-8 right-8 bg-white/80 backdrop-blur-sm rounded-xl p-4 shadow-soft">
-                  <div className="flex items-center gap-2 text-sm text-primary-600 font-medium">
-                    <BarChart3 className="h-4 w-4" />
-                    <span>SEO Score: 94</span>
-                  </div>
-                  <div className="mt-2 h-2 w-32 rounded-full bg-surface-tertiary overflow-hidden">
-                    <div className="h-full w-[94%] rounded-full bg-gradient-to-r from-primary-400 to-primary-500" />
-                  </div>
-                </div>
-                <div className="absolute bottom-8 left-8 bg-white/80 backdrop-blur-sm rounded-lg p-3 shadow-soft">
-                  <div className="flex items-center gap-2 text-xs text-terra-600 font-medium">
-                    <Sparkles className="h-3.5 w-3.5" />
-                    AI Writing...
-                  </div>
-                </div>
-              </div>
+              <HeroMockup />
             </div>
           </div>
         </div>
       </section>
 
-      {/* ─── 3. Social Proof Bar ─── */}
-      <section className="py-12 bg-surface-secondary border-y border-surface-tertiary/50">
+      {/* ─── 3. Integrations Bar ─── */}
+      <section className="py-10 bg-white border-y border-surface-tertiary/50">
         <div className="page-container">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 text-center">
-            <div className="flex flex-col items-center gap-2">
-              <CreditCard className="h-6 w-6 text-primary-500" />
-              <span className="text-sm font-medium text-text-secondary">
-                No credit card required
-              </span>
-            </div>
-            <div className="flex flex-col items-center gap-2">
-              <ShieldCheck className="h-6 w-6 text-primary-500" />
-              <span className="text-sm font-medium text-text-secondary">
-                Cancel anytime
-              </span>
-            </div>
-            <div className="flex flex-col items-center gap-2">
-              <Clock className="h-6 w-6 text-primary-500" />
-              <span className="text-sm font-medium text-text-secondary">
-                Setup in under 5 minutes
-              </span>
-            </div>
+          <p className="text-center text-xs font-semibold text-text-muted uppercase tracking-widest mb-7">
+            Works with the tools you already use
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-6 lg:gap-10">
+            {integrations.map(({ name, abbr, bg }) => (
+              <div key={name} className="flex items-center gap-2.5 text-text-secondary">
+                <div
+                  className="h-7 w-7 rounded-md flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                  style={{ backgroundColor: bg }}
+                >
+                  {abbr}
+                </div>
+                <span className="text-sm font-medium">{name}</span>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -596,58 +799,49 @@ export default function LandingPageClient() {
       {/* ─── 6. Feature Showcase (alternating rows) ─── */}
       <section className="py-20 lg:py-28 bg-white">
         <div className="page-container space-y-24">
-          {showcases.map((item, i) => (
-            <div
-              key={item.title}
-              className={`grid lg:grid-cols-2 gap-12 lg:gap-16 items-center ${
-                i % 2 === 1 ? "lg:[direction:rtl]" : ""
-              }`}
-            >
-              {/* Text */}
-              <RevealSection
-                direction={i % 2 === 0 ? "left" : "right"}
-                className={i % 2 === 1 ? "lg:[direction:ltr]" : ""}
+          {showcases.map((item, i) => {
+            const Visual = i === 0 ? ContentGenMockup : i === 1 ? SeoAnalyticsMockup : SocialMediaMockup;
+            return (
+              <div
+                key={item.title}
+                className={`grid lg:grid-cols-2 gap-12 lg:gap-16 items-center ${
+                  i % 2 === 1 ? "lg:[direction:rtl]" : ""
+                }`}
               >
-                <h3 className="text-2xl md:text-3xl font-display font-bold text-text-primary mb-4">
-                  {item.title}
-                </h3>
-                <p className="text-text-secondary leading-relaxed mb-6">
-                  {item.description}
-                </p>
-                <ul className="space-y-3">
-                  {item.bullets.map((b) => (
-                    <li
-                      key={b}
-                      className="flex items-start gap-3 text-sm text-text-secondary"
-                    >
-                      <ChevronRight className="h-4 w-4 text-primary-500 mt-0.5 flex-shrink-0" />
-                      {b}
-                    </li>
-                  ))}
-                </ul>
-              </RevealSection>
+                {/* Text */}
+                <RevealSection
+                  direction={i % 2 === 0 ? "left" : "right"}
+                  className={i % 2 === 1 ? "lg:[direction:ltr]" : ""}
+                >
+                  <h3 className="text-2xl md:text-3xl font-display font-bold text-text-primary mb-4">
+                    {item.title}
+                  </h3>
+                  <p className="text-text-secondary leading-relaxed mb-6">
+                    {item.description}
+                  </p>
+                  <ul className="space-y-3">
+                    {item.bullets.map((b) => (
+                      <li
+                        key={b}
+                        className="flex items-start gap-3 text-sm text-text-secondary"
+                      >
+                        <ChevronRight className="h-4 w-4 text-primary-500 mt-0.5 flex-shrink-0" />
+                        {b}
+                      </li>
+                    ))}
+                  </ul>
+                </RevealSection>
 
-              {/* Decorative visual */}
-              <RevealSection
-                direction={i % 2 === 0 ? "right" : "left"}
-                className={i % 2 === 1 ? "lg:[direction:ltr]" : ""}
-              >
-                <div className="aspect-[4/3] rounded-2xl bg-gradient-to-br from-primary-50 via-cream-100 to-terra-400/10 flex items-center justify-center">
-                  <div className="w-3/4 bg-white/60 backdrop-blur-sm rounded-xl p-6 shadow-soft">
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="h-3 w-3 rounded-full bg-primary-400" />
-                      <div className="h-2 w-20 rounded-full bg-surface-tertiary" />
-                    </div>
-                    <div className="space-y-2">
-                      <div className="h-2 w-full rounded-full bg-surface-tertiary" />
-                      <div className="h-2 w-5/6 rounded-full bg-surface-tertiary" />
-                      <div className="h-2 w-3/5 rounded-full bg-surface-tertiary" />
-                    </div>
-                  </div>
-                </div>
-              </RevealSection>
-            </div>
-          ))}
+                {/* Feature mockup */}
+                <RevealSection
+                  direction={i % 2 === 0 ? "right" : "left"}
+                  className={i % 2 === 1 ? "lg:[direction:ltr]" : ""}
+                >
+                  <Visual />
+                </RevealSection>
+              </div>
+            );
+          })}
         </div>
       </section>
 
