@@ -5,6 +5,7 @@ Provides endpoints for admins to create, edit, publish, and delete blog posts,
 categories, and tags. All mutating operations are logged to AdminAuditLog.
 """
 
+import asyncio
 import logging
 import markdown
 import re
@@ -669,18 +670,35 @@ async def admin_generate_blog_content(
     content_html = re.sub(r"<h1(\s[^>]*)?>", r"<h2\1>", content_html)
     content_html = content_html.replace("</h1>", "</h2>")
 
-    # Step 3b: Flag statistics that need editorial verification
-    flagged_stats = _extract_flagged_stats(content_html)
+    # Steps 3b + 4 run in parallel: regex stat scan + AI fact-check + image prompt
+    regex_flags = _extract_flagged_stats(content_html)
 
-    # Step 4: Generate image prompt from article content
-    try:
-        image_prompt = await content_ai_service.generate_image_prompt(
-            title=body.title,
-            content=article.content,
-            keyword=keyword,
-        )
-    except Exception:
-        image_prompt = None
+    async def _fact_check() -> list[str]:
+        try:
+            return await content_ai_service.fact_check_content(article.content)
+        except Exception:
+            return []
+
+    async def _image_prompt() -> str | None:
+        try:
+            return await content_ai_service.generate_image_prompt(
+                title=body.title,
+                content=article.content,
+                keyword=keyword,
+            )
+        except Exception:
+            return None
+
+    ai_flags, image_prompt = await asyncio.gather(_fact_check(), _image_prompt())
+
+    # Merge regex + AI flags, deduplicate
+    seen: set[str] = {re.sub(r"\s+", " ", s).strip() for s in regex_flags}
+    flagged_stats = list(regex_flags)
+    for claim in ai_flags:
+        normalized = re.sub(r"\s+", " ", claim).strip()
+        if normalized not in seen:
+            seen.add(normalized)
+            flagged_stats.append(claim)
 
     return BlogGenerateResponse(
         content_html=content_html,

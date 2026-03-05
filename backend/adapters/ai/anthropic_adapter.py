@@ -294,6 +294,7 @@ Respond in JSON format:
             lambda: self._client.messages.create(
                 model=self._model,
                 max_tokens=self._max_tokens,
+                temperature=0.4,
                 system=self._get_system_prompt(
                     writing_style=writing_style,
                     voice=voice,
@@ -520,6 +521,7 @@ META_DESCRIPTION: [A compelling 150-160 character meta description that MUST inc
                 lambda: self._client.messages.create(
                     model=self._model,
                     max_tokens=_max_tokens_capture,  # noqa: B023
+                    temperature=0.3,
                     system=self._get_system_prompt(
                         writing_style=writing_style,
                         voice=voice,
@@ -883,6 +885,54 @@ Respond with ONLY the image prompt, nothing else."""
         )
 
         return message.content[0].text.strip()
+
+    async def fact_check_content(self, content: str) -> list[str]:
+        """
+        Self-review pass: ask the AI to list any specific statistics,
+        data points, or cited claims in the content that it is not
+        highly confident are accurate.
+
+        Returns a list of potentially unreliable claim strings.
+        Uses temperature=0.0 for deterministic output and haiku-class
+        model to keep cost low.
+        """
+        if not self._client:
+            return []
+
+        # Limit input to keep cost low — first 6000 chars covers most articles
+        excerpt = content[:6000]
+
+        prompt = f"""You are a fact-checking assistant. Review the article excerpt below and list every specific statistic, percentage, numerical claim, or cited study that you are NOT highly confident is accurate.
+
+Be strict — if you are unsure whether a specific number or source attribution is correct, list it.
+
+For each uncertain claim, output it as a single line starting with "- ".
+If the article contains NO specific statistics or uncertain factual claims, output only: NONE
+
+Article:
+{excerpt}
+
+Uncertain claims (one per line, or NONE):"""
+
+        message = await _retry_with_backoff(
+            lambda: self._client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=512,
+                temperature=0.0,
+                messages=[{"role": "user", "content": prompt}],
+            )
+        )
+
+        response = message.content[0].text.strip()
+        if not response or response.upper() == "NONE":
+            return []
+
+        claims: list[str] = []
+        for line in response.splitlines():
+            line = line.strip().lstrip("- ").strip()
+            if line and len(line) > 10:
+                claims.append(line)
+        return claims
 
     async def generate_content_suggestions(
         self,
