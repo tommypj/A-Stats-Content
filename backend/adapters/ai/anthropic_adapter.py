@@ -190,13 +190,13 @@ CRITICAL RULES:
 5. Include specific examples, analogies, and scenarios rather than generic advice.
 6. Do NOT start multiple consecutive paragraphs with the same word or structure.
 7. Avoid filler phrases like "In conclusion", "It's important to note that", "As mentioned above".
-8. When citing research or studies, be specific — name the institution, year, or researcher when possible. Do not say "studies show" without attribution. Format all statistics as "X% (Source, Year)" — e.g., "62% of marketers report better engagement from structured content (HubSpot, 2025)".
+8. STATISTICS AND CITATIONS — CRITICAL: NEVER fabricate or invent specific statistics, percentages, or numerical claims. You do not have real-time data access. Only include a statistic if you are highly confident it is a widely-known, verifiable fact. When uncertain, use qualitative language instead (e.g., "a growing body of research suggests", "industry surveys consistently find", "the majority of"). When you DO include a specific figure, append [VERIFY] immediately after the citation so the editor knows to fact-check it before publishing — format: "X% (Source, Year) [VERIFY]". NEVER attribute a statistic to a specific organization (APA, LinkedIn, HubSpot, etc.) unless you are highly confident that organization published that exact figure.
 9. GRAMMAR AND LANGUAGE QUALITY: Use impeccable grammar throughout. Ensure subject-verb agreement, correct tense consistency, proper use of articles (a/an/the), correct prepositions, and natural sentence flow. Every sentence must be grammatically correct and publication-ready.
 10. STRUCTURE FOR AI SEARCH VISIBILITY (non-negotiable):
     - The FIRST 1-2 sentences under every H2 heading must be an "Answer Capsule" — a 20-25 word direct answer to that section's implied question that stands alone without surrounding context.
     - Keep each sub-section between 120-180 words — the optimal range for AI retrieval engines (Google AI Overviews, Perplexity, ChatGPT) to extract and cite content.
     - Every article MUST end with a "Frequently Asked Questions" H2 section containing 5-7 real user questions with 40-60 word self-contained answers.
-    - Format statistics as "X% (Source, Year)" — never use vague claims without attribution."""
+    - If including a statistic, always append [VERIFY] for editorial fact-checking. NEVER fabricate specific numbers or attribute data to organizations unless you are highly confident the figure is accurate."""
 
     @staticmethod
     def _sanitize_prompt_input(text: str | None, max_length: int) -> str:
@@ -465,7 +465,7 @@ Under each H2 heading, follow this sequence:
 a) **Answer Capsule** (REQUIRED FIRST — no exceptions): 1-2 sentences, 20-25 words, that directly answer the section's implied question. Must stand alone without surrounding context.
 b) **Context Block**: Expand to 120-180 words total for the section, adding supporting data, examples, or evidence
 c) **Supporting element**: a list, table, or example as appropriate to the section content
-d) **Statistics**: format ALL data as "X% (Source, Year)" — e.g., "Pages with structured headings receive 70% more AI citations (Averi AI, 2026)"
+d) **Statistics**: ONLY include statistics you are highly confident are accurate. Mark every specific figure with [VERIFY] for editorial review — e.g., "62% of marketers report better engagement (HubSpot, 2025) [VERIFY]". Prefer qualitative claims ("research consistently shows", "the majority of", "industry data suggests") over precise numbers you are not certain about. NEVER invent percentages or attribute data to organizations unless you are certain they published it.
 
 {format_guidelines}
 

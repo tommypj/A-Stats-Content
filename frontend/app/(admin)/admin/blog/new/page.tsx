@@ -40,6 +40,7 @@ export default function AdminNewBlogPostPage() {
   const [aiCustomInstructions, setAiCustomInstructions] = useState("");
   const [aiLanguage, setAiLanguage] = useState("en");
   const [imagePrompt, setImagePrompt] = useState("");
+  const [flaggedStats, setFlaggedStats] = useState<string[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Form fields
@@ -114,6 +115,7 @@ export default function AdminNewBlogPostPage() {
       setContentHtml(result.content_html);
       if (result.meta_description && !metaDescription) setMetaDescription(result.meta_description);
       if (result.image_prompt) setImagePrompt(result.image_prompt);
+      setFlaggedStats(result.flagged_stats || []);
       toast.success("Content generated!");
     } catch (err) {
       toast.error(parseApiError(err).message);
@@ -382,6 +384,29 @@ export default function AdminNewBlogPostPage() {
                 </div>
               )}
             </div>
+
+            {flaggedStats.length > 0 && (
+              <div className="border border-amber-300 bg-amber-50 rounded-lg p-4">
+                <div className="flex items-start gap-2">
+                  <svg className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-semibold text-amber-800">Statistics require verification</p>
+                    <p className="text-xs text-amber-700 mt-1">
+                      The AI may have generated unverified or fabricated statistics. Fact-check each item below before publishing — remove or correct any figures you cannot confirm.
+                    </p>
+                    <ul className="mt-2 space-y-1">
+                      {flaggedStats.map((stat, i) => (
+                        <li key={i} className="text-xs text-amber-900 bg-amber-100 rounded px-2 py-1 font-mono break-words">
+                          {stat}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-text-primary mb-1">Content (HTML)</label>

@@ -1269,7 +1269,7 @@ export const api = {
         custom_instructions?: string;
         language?: string;
       }) =>
-        apiRequest<{ content_html: string; meta_description?: string; suggested_title?: string; image_prompt?: string }>({
+        apiRequest<{ content_html: string; meta_description?: string; suggested_title?: string; image_prompt?: string; flagged_stats?: string[] }>({
           method: "POST",
           url: "/admin/blog/generate-content",
           data,

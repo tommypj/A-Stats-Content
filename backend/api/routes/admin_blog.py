@@ -56,6 +56,36 @@ router = APIRouter(prefix="/admin/blog", tags=["Admin - Blog"])
 # ---------------------------------------------------------------------------
 
 
+def _extract_flagged_stats(html: str) -> list[str]:
+    """Scan generated HTML for statistical claims that need editorial verification."""
+    plain = re.sub(r"<[^>]+>", " ", html)
+    plain = re.sub(r"\s+", " ", plain).strip()
+
+    flagged: list[str] = []
+
+    # Percentage with parenthetical citation — "X% (Source, Year)"
+    for m in re.finditer(r"([^.]*?\d+(?:\.\d+)?%\s*\([^)]{2,60}\)[^.]*\.?)", plain):
+        flagged.append(m.group(1).strip())
+
+    # "N in N" or "N out of N" ratio claims near a parenthetical
+    for m in re.finditer(r"([^.]*?\d+\s+(?:in|out of)\s+\d+[^.]*\([^)]{2,60}\)[^.]*\.?)", plain):
+        flagged.append(m.group(1).strip())
+
+    # Anything the AI self-tagged with [VERIFY]
+    for m in re.finditer(r"([^.]*?\[VERIFY\][^.]*\.?)", plain):
+        flagged.append(m.group(1).strip())
+
+    # Deduplicate preserving order
+    seen: set[str] = set()
+    unique: list[str] = []
+    for item in flagged:
+        normalized = re.sub(r"\s+", " ", item).strip()
+        if normalized not in seen:
+            seen.add(normalized)
+            unique.append(normalized)
+    return unique
+
+
 def _slugify(text: str) -> str:
     """Generate a URL-safe slug from text."""
     slug = text.lower().strip()
@@ -578,6 +608,7 @@ class BlogGenerateResponse(BaseModel):
     meta_description: str | None = None
     suggested_title: str | None = None
     image_prompt: str | None = None
+    flagged_stats: list[str] = []
 
 
 @router.post("/generate-content", response_model=BlogGenerateResponse)
@@ -638,6 +669,9 @@ async def admin_generate_blog_content(
     content_html = re.sub(r"<h1(\s[^>]*)?>", r"<h2\1>", content_html)
     content_html = content_html.replace("</h1>", "</h2>")
 
+    # Step 3b: Flag statistics that need editorial verification
+    flagged_stats = _extract_flagged_stats(content_html)
+
     # Step 4: Generate image prompt from article content
     try:
         image_prompt = await content_ai_service.generate_image_prompt(
@@ -653,6 +687,7 @@ async def admin_generate_blog_content(
         meta_description=outline.meta_description or None,
         suggested_title=outline.title or None,
         image_prompt=image_prompt,
+        flagged_stats=flagged_stats,
     )
 
 
