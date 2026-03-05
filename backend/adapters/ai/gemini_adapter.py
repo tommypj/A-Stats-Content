@@ -128,14 +128,16 @@ class GeminiFlashService:
             config=types.GenerateContentConfig(
                 temperature=0.1,
                 max_output_tokens=max_tokens,
+                # Gemini 2.5-flash is a thinking model — disable thinking for structured
+                # JSON output so all token budget goes to the actual response, not reasoning.
+                thinking_config=types.ThinkingConfig(thinking_budget=0),
             ),
         )
         try:
             raw = response.text or ""
         except Exception as text_err:
-            logger.warning("Gemini response.text raised: %s | candidates: %s", text_err, response.candidates)
+            logger.warning("Gemini response.text raised: %s", text_err)
             raw = ""
-        logger.info("Gemini raw response (%d chars): %r", len(raw), raw[:300])
         return self._extract_json(raw)
 
     async def analyze_serp(self, keyword: str, language: str = "en") -> SERPAnalysis:
