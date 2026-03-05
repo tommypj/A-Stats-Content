@@ -634,6 +634,10 @@ async def admin_generate_blog_content(
         extensions=["extra", "toc"],
     )
 
+    # Normalize: demote any <h1> to <h2> — the page already has an <h1> (the post title)
+    content_html = re.sub(r"<h1(\s[^>]*)?>", r"<h2\1>", content_html)
+    content_html = content_html.replace("</h1>", "</h2>")
+
     # Step 4: Generate image prompt from article content
     try:
         image_prompt = await content_ai_service.generate_image_prompt(

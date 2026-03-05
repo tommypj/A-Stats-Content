@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useState } from "react";
-import { Twitter, Linkedin, Facebook, Link2, Calendar, Clock } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Twitter, Linkedin, Facebook, Link2, Calendar, Clock, Mail, List } from "lucide-react";
 import { toast } from "sonner";
 import type { BlogPostCard, BlogPostDetail } from "@/lib/api";
 
@@ -28,7 +28,51 @@ function authorInitial(name: string | undefined): string {
 }
 
 // ---------------------------------------------------------------------------
-// Share button — outlined circle with icon
+// Table of Contents helpers
+// ---------------------------------------------------------------------------
+interface TocHeading {
+  id: string;
+  text: string;
+  level: 2 | 3;
+}
+
+function extractHeadings(html: string): TocHeading[] {
+  const headings: TocHeading[] = [];
+  const seen = new Map<string, number>();
+  const regex = /<h([23])[^>]*>([\s\S]*?)<\/h[23]>/gi;
+  let match;
+  while ((match = regex.exec(html)) !== null) {
+    const level = parseInt(match[1]) as 2 | 3;
+    const text = match[2].replace(/<[^>]+>/g, "").trim();
+    if (!text) continue;
+    let id = text
+      .toLowerCase()
+      .replace(/[^\w\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .slice(0, 80);
+    // deduplicate
+    const count = seen.get(id) ?? 0;
+    seen.set(id, count + 1);
+    if (count > 0) id = `${id}-${count}`;
+    headings.push({ id, text, level });
+  }
+  return headings;
+}
+
+function injectHeadingIds(html: string, headings: TocHeading[]): string {
+  let idx = 0;
+  return html.replace(/<h([23])([^>]*)>([\s\S]*?)<\/h[23]>/gi, (_, level, attrs, content) => {
+    if (idx >= headings.length) return _;
+    const { id } = headings[idx++];
+    // Don't double-inject if id already present
+    if (/\bid=/.test(attrs)) return _;
+    return `<h${level}${attrs} id="${id}">${content}</h${level}>`;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Share button
 // ---------------------------------------------------------------------------
 function ShareButton({
   href,
@@ -106,6 +150,71 @@ function TagPill({ name }: { name: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Table of Contents component
+// ---------------------------------------------------------------------------
+function TableOfContents({ headings }: { headings: TocHeading[] }) {
+  const [open, setOpen] = useState(false);
+
+  if (headings.length < 2) return null;
+
+  return (
+    <>
+      {/* Desktop — in sidebar (rendered there) */}
+      {/* Mobile — collapsible above article */}
+      <div className="lg:hidden mb-8 border border-surface-tertiary rounded-xl overflow-hidden">
+        <button
+          onClick={() => setOpen(v => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 bg-surface-secondary text-sm font-semibold text-text-primary"
+        >
+          <span className="flex items-center gap-2"><List className="h-4 w-4" /> Table of Contents</span>
+          <span className="text-text-muted text-xs">{open ? "▲" : "▼"}</span>
+        </button>
+        {open && (
+          <nav className="px-4 py-3 space-y-2">
+            {headings.map((h) => (
+              <a
+                key={h.id}
+                href={`#${h.id}`}
+                onClick={() => setOpen(false)}
+                className={`block text-sm text-text-secondary hover:text-primary-600 transition-colors leading-snug ${
+                  h.level === 3 ? "pl-4 text-xs" : ""
+                }`}
+              >
+                {h.text}
+              </a>
+            ))}
+          </nav>
+        )}
+      </div>
+    </>
+  );
+}
+
+function TableOfContentsSidebar({ headings }: { headings: TocHeading[] }) {
+  if (headings.length < 2) return null;
+  return (
+    <div className="bg-surface border border-surface-tertiary rounded-2xl p-5">
+      <h3 className="text-sm font-bold text-text-primary mb-3 flex items-center gap-2">
+        <List className="h-4 w-4" /> Table of Contents
+      </h3>
+      <nav className="space-y-2">
+        {headings.map((h) => (
+          <a
+            key={h.id}
+            href={`#${h.id}`}
+            className={`block text-sm text-text-secondary hover:text-primary-600 transition-colors leading-snug ${
+              h.level === 3 ? "pl-3 text-xs text-text-muted" : "font-medium"
+            }`}
+          >
+            {h.text}
+          </a>
+        ))}
+      </nav>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 export default function BlogPostClient({ post, relatedPosts: initialRelated = [] }: BlogPostClientProps) {
@@ -136,6 +245,16 @@ export default function BlogPostClient({ post, relatedPosts: initialRelated = []
   const copyLink = () => {
     navigator.clipboard.writeText(shareUrl).then(() => toast.success("Link copied!"));
   };
+
+  // Extract headings and inject IDs into content
+  const { processedHtml, headings } = useMemo(() => {
+    if (!post.content_html) return { processedHtml: "", headings: [] };
+    const extracted = extractHeadings(post.content_html);
+    return {
+      processedHtml: injectHeadingIds(post.content_html, extracted),
+      headings: extracted,
+    };
+  }, [post.content_html]);
 
   return (
     <div className="flex gap-12">
@@ -227,8 +346,11 @@ export default function BlogPostClient({ post, relatedPosts: initialRelated = []
           </div>
         )}
 
+        {/* Mobile ToC */}
+        <TableOfContents headings={headings} />
+
         {/* Article body */}
-        {post.content_html && (
+        {processedHtml && (
           <div
             className="prose prose-lg max-w-none
               prose-headings:font-bold prose-headings:text-text-primary
@@ -243,7 +365,7 @@ export default function BlogPostClient({ post, relatedPosts: initialRelated = []
               prose-blockquote:rounded-r-xl prose-blockquote:not-italic
               prose-img:rounded-xl prose-img:shadow-md
               prose-code:bg-surface-secondary prose-code:text-primary-700 prose-code:px-1.5 prose-code:rounded prose-code:text-sm"
-            dangerouslySetInnerHTML={{ __html: post.content_html }}
+            dangerouslySetInnerHTML={{ __html: processedHtml }}
           />
         )}
 
@@ -263,6 +385,9 @@ export default function BlogPostClient({ post, relatedPosts: initialRelated = []
           ================================================================ */}
       <aside className="hidden lg:block w-80 flex-shrink-0">
         <div className="sticky top-8 space-y-6">
+
+          {/* Table of Contents */}
+          <TableOfContentsSidebar headings={headings} />
 
           {/* Share on Social Media */}
           <div className="bg-surface border border-surface-tertiary rounded-2xl p-5">
@@ -286,6 +411,12 @@ export default function BlogPostClient({ post, relatedPosts: initialRelated = []
               >
                 <Facebook className="h-4 w-4" />
               </ShareButton>
+              <ShareButton
+                href={`mailto:?subject=${encodeURIComponent(post.title)}&body=${encodeURIComponent(shareUrl)}`}
+                label="Share via email"
+              >
+                <Mail className="h-4 w-4" />
+              </ShareButton>
               <ShareButton onClick={copyLink} label="Copy link">
                 <Link2 className="h-4 w-4" />
               </ShareButton>
@@ -304,14 +435,16 @@ export default function BlogPostClient({ post, relatedPosts: initialRelated = []
 
           {/* Related Blogs */}
           {relatedPosts.length > 0 && (
-            <div className="bg-surface border border-surface-tertiary rounded-2xl p-5">
-              <h3 className="text-sm font-bold text-text-primary mb-4">Related Blogs</h3>
-              <div className="space-y-4">
-                {relatedPosts.map((related) => (
-                  <RelatedPostItem key={related.id} post={related} />
-                ))}
+            <section aria-labelledby="related-posts-heading">
+              <div className="bg-surface border border-surface-tertiary rounded-2xl p-5">
+                <h3 id="related-posts-heading" className="text-sm font-bold text-text-primary mb-4">Related Blogs</h3>
+                <div className="space-y-4">
+                  {relatedPosts.map((related) => (
+                    <RelatedPostItem key={related.id} post={related} />
+                  ))}
+                </div>
               </div>
-            </div>
+            </section>
           )}
 
         </div>
