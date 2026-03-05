@@ -72,8 +72,9 @@ class GeminiFlashService:
         """Strip markdown code fences and control characters from response text."""
         text = re.sub(r"^```(?:json)?\s*", "", text.strip())
         text = re.sub(r"\s*```$", "", text.strip())
-        # Remove literal control characters that break json.loads (keep \n \r \t)
-        text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
+        # Remove ALL literal control characters — json.loads doesn't need structural
+        # newlines and literal \n inside JSON string values is invalid per spec.
+        text = re.sub(r"[\x00-\x1f\x7f]", "", text)
         return text.strip()
 
     async def _call_with_grounding(self, prompt: str, max_tokens: int = 2048) -> str:
