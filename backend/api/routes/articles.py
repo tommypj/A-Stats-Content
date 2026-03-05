@@ -469,23 +469,38 @@ async def _run_article_generation(
                 logger.warning("SEO analysis failed for article %s: %s", article_id, seo_err)
                 article.seo_analysis = {"is_proofread": is_proofread}
 
-            # Generate image prompt (with 30s timeout)
-            try:
-                image_prompt = await asyncio.wait_for(
-                    content_ai_service.generate_image_prompt(
-                        title=outline_title,
-                        content=generated.content,
-                        keyword=outline_keyword,
-                    ),
-                    timeout=30.0,
-                )
+            # Generate image prompt + AI fact-check in parallel (both capped at 30s)
+            async def _get_image_prompt() -> str | None:
+                try:
+                    return await asyncio.wait_for(
+                        content_ai_service.generate_image_prompt(
+                            title=outline_title,
+                            content=generated.content,
+                            keyword=outline_keyword,
+                        ),
+                        timeout=30.0,
+                    )
+                except Exception as _e:
+                    logger.warning("Failed to generate image prompt for article %s: %s", article_id, _e)
+                    return None
+
+            async def _get_flagged_stats() -> list[str]:
+                try:
+                    return await asyncio.wait_for(
+                        content_ai_service.fact_check_content(generated.content),
+                        timeout=30.0,
+                    )
+                except Exception as _e:
+                    logger.warning("Fact-check failed for article %s: %s", article_id, _e)
+                    return []
+
+            image_prompt, flagged_stats = await asyncio.gather(
+                _get_image_prompt(), _get_flagged_stats()
+            )
+            if image_prompt:
                 article.image_prompt = image_prompt
-            except (TimeoutError, Exception) as img_err:
-                logger.warning(
-                    "Failed to generate image prompt for article %s: %s",
-                    article_id,
-                    img_err,
-                )
+            if flagged_stats:
+                article.seo_analysis = {**(article.seo_analysis or {}), "flagged_stats": flagged_stats}
 
             # Log successful generation and increment usage (single commit)
             duration_ms = int((time.time() - start_time) * 1000)

@@ -1412,6 +1412,30 @@ export default function ArticleEditorPage() {
         </div>
       </div>
 
+      {/* Flagged statistics warning — shown when AI fact-check detected uncertain claims */}
+      {Array.isArray(seo?.flagged_stats) && (seo.flagged_stats as string[]).length > 0 && (
+        <div className="border border-amber-300 bg-amber-50 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <svg className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-800">Statistics require verification before publishing</p>
+              <p className="text-xs text-amber-700 mt-1">
+                Our AI fact-check detected the following claims that may be inaccurate or unverified. Review each one and correct or remove any figures you cannot confirm with a reliable source.
+              </p>
+              <ul className="mt-2 space-y-1">
+                {(seo.flagged_stats as string[]).map((stat: string, i: number) => (
+                  <li key={i} className="text-xs text-amber-900 bg-amber-100 rounded px-2 py-1 font-mono break-words">
+                    {stat}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-3 min-w-0">
         {/* Main Editor */}
         <div className="lg:col-span-2 space-y-4 min-w-0">
