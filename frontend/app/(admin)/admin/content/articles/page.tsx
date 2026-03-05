@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { api, parseApiError } from "@/lib/api";
 import { toast } from "sonner";
-import type { AdminArticleListItem, AdminContentQueryParams } from "@/lib/api";
+import type { AdminArticleListItem, AdminContentQueryParams, BlogCategory, BlogTag } from "@/lib/api";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Search, Trash2, Eye, ChevronLeft, ChevronRight, FileText } from "lucide-react";
+import { Search, Trash2, Eye, ChevronLeft, ChevronRight, FileText, Rss } from "lucide-react";
 import Link from "next/link";
 
 export default function AdminArticlesPage() {
@@ -19,6 +19,14 @@ export default function AdminArticlesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string } | null>(null);
+
+  // Push to Blog state
+  const [pushArticle, setPushArticle] = useState<AdminArticleListItem | null>(null);
+  const [blogCategories, setBlogCategories] = useState<BlogCategory[]>([]);
+  const [blogTags, setBlogTags] = useState<BlogTag[]>([]);
+  const [pushCategoryId, setPushCategoryId] = useState("");
+  const [pushTagIds, setPushTagIds] = useState<string[]>([]);
+  const [pushing, setPushing] = useState(false);
 
   const pageSize = 20;
 
@@ -90,6 +98,42 @@ export default function AdminArticlesPage() {
       title: `Delete ${count} Article${count !== 1 ? "s" : ""}`,
       message: `Delete ${count} selected article${count !== 1 ? "s" : ""}? This action cannot be undone.`,
     });
+  };
+
+  const openPushModal = async (article: AdminArticleListItem) => {
+    setPushArticle(article);
+    setPushCategoryId("");
+    setPushTagIds([]);
+    if (blogCategories.length === 0) {
+      try {
+        const [cats, tgs] = await Promise.all([
+          api.admin.blog.categories.list(),
+          api.admin.blog.tags.list(),
+        ]);
+        setBlogCategories(cats);
+        setBlogTags(tgs);
+      } catch {
+        // non-blocking
+      }
+    }
+  };
+
+  const handlePushToBlog = async () => {
+    if (!pushArticle) return;
+    try {
+      setPushing(true);
+      await api.admin.blog.fromArticle({
+        article_id: pushArticle.id,
+        category_id: pushCategoryId || undefined,
+        tag_ids: pushTagIds,
+      });
+      setPushArticle(null);
+      toast.success("Article pushed to blog as draft!");
+    } catch (err) {
+      toast.error(parseApiError(err).message);
+    } finally {
+      setPushing(false);
+    }
   };
 
   const toggleSelect = (id: string) => {
@@ -304,6 +348,15 @@ export default function AdminArticlesPage() {
                           >
                             <Eye className="h-4 w-4 text-text-secondary" />
                           </Link>
+                          {article.status === "completed" || article.status === "published" ? (
+                            <button
+                              onClick={() => openPushModal(article)}
+                              className="p-1 rounded hover:bg-primary-50"
+                              title="Push to Blog"
+                            >
+                              <Rss className="h-4 w-4 text-primary-600" />
+                            </button>
+                          ) : null}
                           <button
                             onClick={() => handleDelete(article.id)}
                             disabled={deleting}
@@ -345,6 +398,70 @@ export default function AdminArticlesPage() {
           </>
         )}
       </div>
+
+      {/* Push to Blog modal */}
+      {pushArticle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <h2 className="text-lg font-bold text-text-primary">Push to Blog</h2>
+            <p className="text-sm text-text-secondary">
+              Publish <span className="font-medium">&ldquo;{pushArticle.title}&rdquo;</span> to the blog as a draft. The article&apos;s content and featured image will be copied automatically.
+            </p>
+
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-1">Category (optional)</label>
+              <select
+                value={pushCategoryId}
+                onChange={e => setPushCategoryId(e.target.value)}
+                className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="">No category</option>
+                {blogCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+
+            {blogTags.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">Tags (optional)</label>
+                <div className="flex flex-wrap gap-2">
+                  {blogTags.map(t => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setPushTagIds(prev =>
+                        prev.includes(t.id) ? prev.filter(id => id !== t.id) : [...prev, t.id]
+                      )}
+                      className={`px-2 py-1 text-xs rounded-full border transition-colors ${
+                        pushTagIds.includes(t.id)
+                          ? "bg-primary-600 text-white border-primary-600"
+                          : "bg-surface text-text-secondary border-surface-tertiary hover:border-primary-400"
+                      }`}
+                    >
+                      {t.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setPushArticle(null)}
+                className="px-4 py-2 border border-surface-tertiary rounded-lg text-sm font-medium text-text-primary hover:bg-surface-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePushToBlog}
+                disabled={pushing}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50"
+              >
+                {pushing ? "Pushing..." : "Push to Blog"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

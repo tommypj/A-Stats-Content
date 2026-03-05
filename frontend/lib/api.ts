@@ -1257,12 +1257,35 @@ export const api = {
             url: `/admin/blog/tags/${id}`,
           }),
       },
-      generateContent: (data: { title: string; keyword?: string; tone?: string; target_audience?: string; word_count?: number }) =>
-        apiRequest<{ content_html: string }>({
+      generateContent: (data: {
+        title: string;
+        keyword?: string;
+        tone?: string;
+        target_audience?: string;
+        word_count?: number;
+        writing_style?: string;
+        voice?: string;
+        list_usage?: string;
+        custom_instructions?: string;
+        language?: string;
+      }) =>
+        apiRequest<{ content_html: string; meta_description?: string; suggested_title?: string; image_prompt?: string }>({
           method: "POST",
           url: "/admin/blog/generate-content",
           data,
           timeout: AI_TIMEOUT,
+        }),
+      fromArticle: (data: {
+        article_id: string;
+        category_id?: string;
+        tag_ids?: string[];
+        featured_image_url?: string;
+        featured_image_alt?: string;
+      }) =>
+        apiRequest<BlogPostDetail>({
+          method: "POST",
+          url: "/admin/blog/posts/from-article",
+          data,
         }),
     },
   },

@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Minus, ExternalLink, Loader2, Sparkles, Trash2 } from "lucide-react";
+import { Plus, Minus, ExternalLink, Loader2, Sparkles, Trash2, Image as ImageIcon } from "lucide-react";
 import { api, parseApiError } from "@/lib/api";
 import type { BlogCategory, BlogPostDetail, BlogTag } from "@/lib/api";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -35,6 +35,7 @@ export default function AdminEditBlogPostPage() {
   const params = useParams();
   const postId = params.id as string;
   const router = useRouter();
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [post, setPost] = useState<BlogPostDetail | null>(null);
   const [categories, setCategories] = useState<BlogCategory[]>([]);
@@ -42,10 +43,20 @@ export default function AdminEditBlogPostPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [generatingImage, setGeneratingImage] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // AI controls
   const [aiKeyword, setAiKeyword] = useState("");
   const [aiTone, setAiTone] = useState("professional");
-  const [aiWordCount, setAiWordCount] = useState("800");
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [aiWordCount, setAiWordCount] = useState("1200");
+  const [aiWritingStyle, setAiWritingStyle] = useState("balanced");
+  const [aiVoice, setAiVoice] = useState("second_person");
+  const [aiListUsage, setAiListUsage] = useState("balanced");
+  const [aiCustomInstructions, setAiCustomInstructions] = useState("");
+  const [aiLanguage, setAiLanguage] = useState("en");
+  const [imagePrompt, setImagePrompt] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Form fields
   const [title, setTitle] = useState("");
@@ -96,6 +107,7 @@ export default function AdminEditBlogPostPage() {
 
   useEffect(() => {
     loadPost();
+    return () => { if (pollRef.current) clearTimeout(pollRef.current); };
   }, [loadPost]);
 
   const toggleTag = (id: string) => {
@@ -134,14 +146,65 @@ export default function AdminEditBlogPostPage() {
         title: title.trim(),
         keyword: aiKeyword || undefined,
         tone: aiTone,
-        word_count: parseInt(aiWordCount) || 800,
+        word_count: parseInt(aiWordCount) || 1200,
+        writing_style: aiWritingStyle,
+        voice: aiVoice,
+        list_usage: aiListUsage,
+        custom_instructions: aiCustomInstructions || undefined,
+        language: aiLanguage,
       });
       setContentHtml(result.content_html);
+      if (result.meta_description && !metaDescription) setMetaDescription(result.meta_description);
+      if (result.image_prompt) setImagePrompt(result.image_prompt);
       toast.success("Content generated!");
     } catch (err) {
       toast.error(parseApiError(err).message);
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const pollImageStatus = (imageId: string) => {
+    pollRef.current = setTimeout(async () => {
+      try {
+        const img = await api.images.get(imageId);
+        if (img.status === "completed" && img.url) {
+          setFeaturedImageUrl(img.url);
+          setFeaturedImageAlt(imagePrompt.slice(0, 120));
+          setGeneratingImage(false);
+          toast.success("Image generated!");
+        } else if (img.status === "failed") {
+          setGeneratingImage(false);
+          toast.error("Image generation failed");
+        } else {
+          pollImageStatus(imageId);
+        }
+      } catch {
+        setGeneratingImage(false);
+        toast.error("Image polling error");
+      }
+    }, 3000);
+  };
+
+  const handleGenerateImage = async () => {
+    if (!imagePrompt.trim()) {
+      toast.error("Generate content first to get an image prompt");
+      return;
+    }
+    try {
+      setGeneratingImage(true);
+      const img = await api.images.generate({ prompt: imagePrompt });
+      if (img.status === "completed" && img.url) {
+        setFeaturedImageUrl(img.url);
+        setFeaturedImageAlt(imagePrompt.slice(0, 120));
+        setGeneratingImage(false);
+        toast.success("Image generated!");
+      } else {
+        pollImageStatus(img.id);
+      }
+    } catch (err) {
+      setGeneratingImage(false);
+      toast.error(parseApiError(err).message);
     }
   };
 
@@ -203,13 +266,8 @@ export default function AdminEditBlogPostPage() {
     }
   };
 
-  if (loading) {
-    return <div className="p-8 text-center text-text-secondary">Loading...</div>;
-  }
-
-  if (!post) {
-    return <div className="p-8 text-center text-text-secondary">Post not found.</div>;
-  }
+  if (loading) return <div className="p-8 text-center text-text-secondary">Loading...</div>;
+  if (!post) return <div className="p-8 text-center text-text-secondary">Post not found.</div>;
 
   return (
     <div>
@@ -284,10 +342,20 @@ export default function AdminEditBlogPostPage() {
 
             {/* AI Generation */}
             <div className="border border-primary-200 bg-primary-50 rounded-lg p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-primary-600" />
-                <span className="text-sm font-semibold text-primary-700">Generate with AI</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary-600" />
+                  <span className="text-sm font-semibold text-primary-700">Generate with AI</span>
+                </div>
+                <button
+                  onClick={() => setShowAdvanced(v => !v)}
+                  className="text-xs text-primary-600 hover:text-primary-800 underline underline-offset-2"
+                >
+                  {showAdvanced ? "Hide advanced" : "Advanced options"}
+                </button>
               </div>
+
+              {/* Basic row */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-1">
                   <label className="block text-xs font-medium text-text-secondary mb-1">Target Keyword</label>
@@ -301,11 +369,7 @@ export default function AdminEditBlogPostPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-text-secondary mb-1">Tone</label>
-                  <select
-                    value={aiTone}
-                    onChange={e => setAiTone(e.target.value)}
-                    className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
-                  >
+                  <select value={aiTone} onChange={e => setAiTone(e.target.value)} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
                     <option value="professional">Professional</option>
                     <option value="conversational">Conversational</option>
                     <option value="educational">Educational</option>
@@ -315,18 +379,68 @@ export default function AdminEditBlogPostPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-text-secondary mb-1">Word Count</label>
-                  <select
-                    value={aiWordCount}
-                    onChange={e => setAiWordCount(e.target.value)}
-                    className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
-                  >
-                    <option value="500">~500 words</option>
+                  <select value={aiWordCount} onChange={e => setAiWordCount(e.target.value)} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
                     <option value="800">~800 words</option>
                     <option value="1200">~1200 words</option>
-                    <option value="2000">~2000 words</option>
+                    <option value="1800">~1800 words</option>
+                    <option value="2500">~2500 words</option>
                   </select>
                 </div>
               </div>
+
+              {/* Advanced options */}
+              {showAdvanced && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-primary-200">
+                  <div>
+                    <label className="block text-xs font-medium text-text-secondary mb-1">Writing Style</label>
+                    <select value={aiWritingStyle} onChange={e => setAiWritingStyle(e.target.value)} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+                      <option value="balanced">Balanced</option>
+                      <option value="storytelling">Storytelling</option>
+                      <option value="listicle">Listicle</option>
+                      <option value="how_to">How-to</option>
+                      <option value="academic">Academic</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-text-secondary mb-1">Voice</label>
+                    <select value={aiVoice} onChange={e => setAiVoice(e.target.value)} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+                      <option value="second_person">Second person (you/your)</option>
+                      <option value="first_person">First person (I/we)</option>
+                      <option value="third_person">Third person</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-text-secondary mb-1">List Usage</label>
+                    <select value={aiListUsage} onChange={e => setAiListUsage(e.target.value)} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+                      <option value="balanced">Balanced</option>
+                      <option value="minimal">Minimal (prose-heavy)</option>
+                      <option value="extensive">Extensive (list-heavy)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-text-secondary mb-1">Language</label>
+                    <select value={aiLanguage} onChange={e => setAiLanguage(e.target.value)} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+                      <option value="en">English</option>
+                      <option value="es">Spanish</option>
+                      <option value="fr">French</option>
+                      <option value="de">German</option>
+                      <option value="it">Italian</option>
+                      <option value="pt">Portuguese</option>
+                    </select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-medium text-text-secondary mb-1">Custom Instructions</label>
+                    <textarea
+                      value={aiCustomInstructions}
+                      onChange={e => setAiCustomInstructions(e.target.value)}
+                      placeholder="e.g. Include real examples, mention our product A-Stats..."
+                      rows={2}
+                      className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                    />
+                  </div>
+                </div>
+              )}
+
               <button
                 onClick={handleGenerate}
                 disabled={generating}
@@ -338,6 +452,40 @@ export default function AdminEditBlogPostPage() {
                   <><Sparkles className="h-4 w-4" /> Generate Content</>
                 )}
               </button>
+
+              {/* Image generation */}
+              {imagePrompt && (
+                <div className="border-t border-primary-200 pt-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4 text-primary-600" />
+                    <span className="text-xs font-semibold text-primary-700">AI Image</span>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-text-secondary mb-1">Image Prompt</label>
+                    <textarea
+                      value={imagePrompt}
+                      onChange={e => setImagePrompt(e.target.value)}
+                      rows={2}
+                      className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                    />
+                  </div>
+                  {featuredImageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={featuredImageUrl} alt="Generated" className="w-full max-h-40 object-cover rounded-lg" />
+                  )}
+                  <button
+                    onClick={handleGenerateImage}
+                    disabled={generatingImage}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-primary-300 text-primary-700 rounded-lg text-xs font-medium hover:bg-primary-50 disabled:opacity-50"
+                  >
+                    {generatingImage ? (
+                      <><Loader2 className="h-3 w-3 animate-spin" /> Generating image...</>
+                    ) : (
+                      <><ImageIcon className="h-3 w-3" /> {featuredImageUrl ? "Regenerate Image" : "Generate Image"}</>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
 
             <div>
@@ -355,10 +503,7 @@ export default function AdminEditBlogPostPage() {
           <div className="bg-surface border border-surface-tertiary rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-text-primary">FAQ Schema (optional)</h3>
-              <button
-                onClick={addFaq}
-                className="inline-flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700"
-              >
+              <button onClick={addFaq} className="inline-flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700">
                 <Plus className="h-3 w-3" /> Add Q&A
               </button>
             </div>
@@ -397,15 +542,9 @@ export default function AdminEditBlogPostPage() {
           {/* Category */}
           <div className="bg-surface border border-surface-tertiary rounded-xl p-4">
             <label className="block text-sm font-medium text-text-primary mb-2">Category</label>
-            <select
-              value={categoryId}
-              onChange={e => setCategoryId(e.target.value)}
-              className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
+            <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
               <option value="">No category</option>
-              {categories.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
 
@@ -479,6 +618,10 @@ export default function AdminEditBlogPostPage() {
                 className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
+            {featuredImageUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={featuredImageUrl} alt="Preview" className="w-full h-32 object-cover rounded-lg" />
+            )}
             <div>
               <label className="block text-xs font-medium text-text-secondary mb-1">Alt Text</label>
               <input

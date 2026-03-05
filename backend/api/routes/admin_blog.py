@@ -6,6 +6,7 @@ categories, and tags. All mutating operations are logged to AdminAuditLog.
 """
 
 import logging
+import markdown
 import re
 from datetime import UTC, datetime
 from math import ceil
@@ -42,6 +43,7 @@ from infrastructure.database.models.blog import (
     BlogPostTag,
     BlogTag,
 )
+from infrastructure.database.models.content import Article, GeneratedImage
 from infrastructure.database.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -563,11 +565,19 @@ class BlogGenerateRequest(BaseModel):
     keyword: str | None = None
     tone: str = "professional"
     target_audience: str | None = None
-    word_count: int = 800
+    word_count: int = 1200
+    writing_style: str = "balanced"
+    voice: str = "second_person"
+    list_usage: str = "balanced"
+    custom_instructions: str | None = None
+    language: str = "en"
 
 
 class BlogGenerateResponse(BaseModel):
     content_html: str
+    meta_description: str | None = None
+    suggested_title: str | None = None
+    image_prompt: str | None = None
 
 
 @router.post("/generate-content", response_model=BlogGenerateResponse)
@@ -577,30 +587,157 @@ async def admin_generate_blog_content(
     body: BlogGenerateRequest,
     admin_user: User = Depends(get_current_admin_user),
 ):
-    """Generate HTML blog post content using AI given a title and optional keyword."""
-    keyword_line = f"Target keyword: {body.keyword}\n" if body.keyword else ""
-    audience_line = f"Target audience: {body.target_audience}\n" if body.target_audience else ""
+    """Generate full-quality blog post content using the article generation pipeline."""
+    keyword = body.keyword or body.title
 
-    prompt = f"""Write a high-quality blog post in HTML format.
+    # Step 1: Generate outline sections from keyword
+    outline = await content_ai_service.generate_outline(
+        keyword=keyword,
+        target_audience=body.target_audience,
+        tone=body.tone,
+        word_count_target=body.word_count,
+        language=body.language,
+        writing_style=body.writing_style,
+        voice=body.voice,
+        list_usage=body.list_usage,
+        custom_instructions=body.custom_instructions,
+    )
 
-Title: {body.title}
-{keyword_line}{audience_line}Tone: {body.tone}
-Approximate word count: {body.word_count}
+    sections = [
+        {
+            "heading": s.heading,
+            "subheadings": s.subheadings,
+            "notes": s.notes,
+            "word_count_target": s.word_count_target,
+        }
+        for s in outline.sections
+    ]
 
-Requirements:
-- Return only valid HTML content (no <html>/<head>/<body> wrapper tags)
-- Use <h2> and <h3> for section headings
-- Use <p> for paragraphs
-- Use <ul>/<ol> and <li> for lists where appropriate
-- Use <strong> and <em> for emphasis
-- Write in a {body.tone} tone
-- Include an introduction, 3-5 main sections, and a conclusion
-- Do not include the title as an <h1> (it will be added separately)
-- Do not add any markdown, only HTML tags
-- Naturally include the keyword throughout if provided
+    # Step 2: Generate full article using the same pipeline as user articles
+    article = await content_ai_service.generate_article(
+        title=body.title,
+        keyword=keyword,
+        sections=sections,
+        tone=body.tone,
+        target_audience=body.target_audience,
+        writing_style=body.writing_style,
+        voice=body.voice,
+        list_usage=body.list_usage,
+        custom_instructions=body.custom_instructions,
+        word_count_target=body.word_count,
+        language=body.language,
+    )
 
-Output only the HTML content, nothing else."""
+    # Step 3: Convert markdown to HTML
+    content_html = markdown.markdown(
+        article.content,
+        extensions=["extra", "toc"],
+    )
 
-    content_html = await content_ai_service.generate_text(prompt, max_tokens=4000, temperature=0.7)
+    # Step 4: Generate image prompt from article content
+    try:
+        image_prompt = await content_ai_service.generate_image_prompt(
+            title=body.title,
+            content=article.content,
+            keyword=keyword,
+        )
+    except Exception:
+        image_prompt = None
 
-    return BlogGenerateResponse(content_html=content_html)
+    return BlogGenerateResponse(
+        content_html=content_html,
+        meta_description=outline.meta_description or None,
+        suggested_title=outline.title or None,
+        image_prompt=image_prompt,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Push Article to Blog
+# ---------------------------------------------------------------------------
+
+
+class FromArticleRequest(BaseModel):
+    article_id: str
+    category_id: str | None = None
+    tag_ids: list[str] = []
+    featured_image_url: str | None = None
+    featured_image_alt: str | None = None
+
+
+@router.post("/posts/from-article", response_model=BlogPostDetail, status_code=status.HTTP_201_CREATED)
+@limiter.limit("20/minute")
+async def admin_post_from_article(
+    request: Request,
+    body: FromArticleRequest,
+    admin_user: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a blog post draft from an existing user-generated article."""
+    # Fetch article
+    result = await db.execute(
+        select(Article).where(Article.id == body.article_id, Article.deleted_at.is_(None))
+    )
+    article = result.scalar_one_or_none()
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+    if not article.content_html:
+        raise HTTPException(status_code=422, detail="Article has no generated content yet")
+
+    # Resolve featured image: prefer explicitly passed URL, then article's featured image
+    featured_img_url = body.featured_image_url
+    featured_img_alt = body.featured_image_alt
+    if not featured_img_url and article.featured_image_id:
+        img_result = await db.execute(
+            select(GeneratedImage).where(
+                GeneratedImage.id == article.featured_image_id,
+                GeneratedImage.status == "completed",
+            )
+        )
+        img = img_result.scalar_one_or_none()
+        if img and img.url:
+            featured_img_url = img.url
+            featured_img_alt = img.alt_text or article.title
+
+    # Generate unique slug
+    slug = _slugify(article.title)
+    existing = (await db.execute(select(BlogPost).where(BlogPost.slug == slug))).scalar_one_or_none()
+    if existing:
+        slug = f"{slug}-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
+
+    post = BlogPost(
+        slug=slug,
+        title=article.title,
+        meta_description=article.meta_description,
+        content_html=article.content_html,
+        status=BlogPostStatus.DRAFT,
+        featured_image_url=featured_img_url,
+        featured_image_alt=featured_img_alt,
+        author_id=admin_user.id,
+        author_name=admin_user.name or admin_user.email,
+        category_id=body.category_id,
+    )
+    db.add(post)
+    await db.flush()
+
+    if body.tag_ids:
+        await _sync_tags(db, post, body.tag_ids)
+
+    await db.commit()
+    await db.refresh(post)
+
+    result = await db.execute(
+        select(BlogPost)
+        .where(BlogPost.id == post.id)
+        .options(
+            selectinload(BlogPost.post_tags).selectinload(BlogPostTag.tag),
+            selectinload(BlogPost.category),
+        )
+    )
+    post = result.scalar_one()
+
+    await _log_audit(db, admin_user, "blog_post_from_article", post.id, {
+        "title": post.title,
+        "article_id": body.article_id,
+    })
+    return _post_to_detail(post)
