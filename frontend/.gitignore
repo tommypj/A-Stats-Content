@@ -1,1 +1,4 @@
 .vercel
+
+# Generated docs content (copied from content/docs/ at build time)
+public/docs-content/

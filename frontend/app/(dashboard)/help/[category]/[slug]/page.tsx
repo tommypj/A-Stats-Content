@@ -19,7 +19,7 @@ export default function HelpArticlePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/docs-content/${categorySlug}/${articleSlug}.md`)
+    fetch(`/docs-content/${categorySlug}/${articleSlug}.md`)
       .then((res) => {
         if (!res.ok) throw new Error("Not found");
         return res.text();
