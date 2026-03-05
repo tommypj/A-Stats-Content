@@ -3,6 +3,9 @@ Google Gemini Flash adapter for SERP analysis and research.
 
 Uses Google Search grounding to retrieve real data — eliminates hallucinated
 statistics by grounding all responses in live Google Search results.
+
+Uses the new `google-genai` SDK (google.genai) — the old `google-generativeai`
+package is deprecated and no longer receives updates.
 """
 
 import asyncio
@@ -40,7 +43,8 @@ class GeminiFlashService:
     """Google Gemini Flash service for SERP analysis and research with Google Search grounding."""
 
     def __init__(self) -> None:
-        self._genai = None
+        self._client = None
+        self._types = None
         self._model_name = settings.gemini_model
 
         if not settings.gemini_api_key:
@@ -48,20 +52,21 @@ class GeminiFlashService:
             return
 
         try:
-            import google.generativeai as genai  # type: ignore[import]
+            from google import genai  # type: ignore[import]
+            from google.genai import types  # type: ignore[import]
 
-            genai.configure(api_key=settings.gemini_api_key)
-            self._genai = genai
+            self._client = genai.Client(api_key=settings.gemini_api_key)
+            self._types = types
             logger.info("Gemini Flash service initialized (model: %s)", self._model_name)
         except ImportError:
             logger.warning(
-                "google-generativeai package not installed — Gemini steps will be skipped. "
-                "Run: pip install google-generativeai"
+                "google-genai package not installed — Gemini steps will be skipped. "
+                "Run: pip install google-genai"
             )
 
     def is_available(self) -> bool:
         """Return True if Gemini is configured and the package is installed."""
-        return self._genai is not None
+        return self._client is not None
 
     def _strip_code_fences(self, text: str) -> str:
         """Strip markdown code fences from response text."""
@@ -69,30 +74,19 @@ class GeminiFlashService:
         text = re.sub(r"\s*```$", "", text.strip())
         return text.strip()
 
-    def _call_sync(self, prompt: str, max_tokens: int = 2048) -> str:
-        """Synchronous Gemini call with Google Search grounding (run in executor)."""
-        genai = self._genai
-        model = genai.GenerativeModel(
-            model_name=self._model_name,
-            tools=["google_search_retrieval"],
-        )
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(
+    async def _call_with_grounding(self, prompt: str, max_tokens: int = 2048) -> str:
+        """Call Gemini with Google Search grounding using the async client."""
+        types = self._types
+        response = await self._client.aio.models.generate_content(
+            model=self._model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                tools=[types.Tool(google_search=types.GoogleSearch())],
                 temperature=0.1,
                 max_output_tokens=max_tokens,
             ),
         )
-        return response.text
-
-    async def _call_with_grounding(self, prompt: str, max_tokens: int = 2048) -> str:
-        """Async wrapper: runs sync Gemini SDK call in a thread pool executor."""
-        loop = asyncio.get_running_loop()
-        text = await loop.run_in_executor(
-            None,
-            lambda: self._call_sync(prompt, max_tokens),
-        )
-        return self._strip_code_fences(text)
+        return self._strip_code_fences(response.text)
 
     async def analyze_serp(self, keyword: str, language: str = "en") -> SERPAnalysis:
         """Analyze Google SERP for a keyword using Gemini with Search grounding."""
