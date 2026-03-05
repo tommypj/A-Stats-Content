@@ -4,7 +4,7 @@
   "outputDirectory": ".next",
   "redirects": [
     {
-      "source": "/(.*)",
+      "source": "/:path*",
       "has": [{ "type": "host", "value": "docs.astats.app" }],
       "destination": "https://a-stats.app/en/docs/:path*",
       "permanent": true
