@@ -68,14 +68,50 @@ class GeminiFlashService:
         """Return True if Gemini is configured and the package is installed."""
         return self._client is not None
 
-    def _strip_code_fences(self, text: str) -> str:
-        """Strip markdown code fences and control characters from response text."""
-        text = re.sub(r"^```(?:json)?\s*", "", text.strip())
-        text = re.sub(r"\s*```$", "", text.strip())
-        # Remove ALL literal control characters — json.loads doesn't need structural
-        # newlines and literal \n inside JSON string values is invalid per spec.
-        text = re.sub(r"[\x00-\x1f\x7f]", "", text)
-        return text.strip()
+    def _extract_json(self, text: str) -> str:
+        """Extract a JSON object from Gemini's response text.
+
+        Gemini with search grounding often adds preamble text, citation markers
+        like [1] [2], and trailing attribution lines around the JSON block.
+        This method robustly extracts just the JSON object.
+        """
+        # Strip all control characters (including literal newlines in strings)
+        text = re.sub(r"[\x00-\x1f\x7f]", " ", text)
+        # Strip markdown code fences
+        text = re.sub(r"```(?:json)?", "", text)
+        # Remove grounding citation markers like [1], [2], [1,2], etc.
+        text = re.sub(r"\[\d+(?:,\s*\d+)*\]", "", text)
+
+        # Extract the outermost JSON object { ... }
+        start = text.find("{")
+        if start == -1:
+            return text.strip()
+
+        depth = 0
+        end = start
+        in_string = False
+        escape_next = False
+        for i, ch in enumerate(text[start:], start):
+            if escape_next:
+                escape_next = False
+                continue
+            if ch == "\\" and in_string:
+                escape_next = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    end = i + 1
+                    break
+
+        return text[start:end].strip()
 
     async def _call_with_grounding(self, prompt: str, max_tokens: int = 2048) -> str:
         """Call Gemini with Google Search grounding using the async client."""
@@ -89,7 +125,7 @@ class GeminiFlashService:
                 max_output_tokens=max_tokens,
             ),
         )
-        return self._strip_code_fences(response.text)
+        return self._extract_json(response.text)
 
     async def analyze_serp(self, keyword: str, language: str = "en") -> SERPAnalysis:
         """Analyze Google SERP for a keyword using Gemini with Search grounding."""
