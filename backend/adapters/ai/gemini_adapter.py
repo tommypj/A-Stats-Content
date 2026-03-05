@@ -113,19 +113,46 @@ class GeminiFlashService:
 
         return text[start:end].strip()
 
-    async def _call_with_grounding(self, prompt: str, max_tokens: int = 2048) -> str:
-        """Call Gemini with Google Search grounding using the async client."""
+    async def _call_gemini(self, prompt: str, max_tokens: int = 2048, use_grounding: bool = True) -> str:
+        """Call Gemini, with optional Google Search grounding.
+
+        Tries grounded call first; if the response contains no JSON object,
+        falls back to an ungrounded call (which reliably outputs clean JSON).
+        """
         types = self._types
+        config_grounded = types.GenerateContentConfig(
+            tools=[types.Tool(google_search=types.GoogleSearch())],
+            temperature=0.1,
+            max_output_tokens=max_tokens,
+        )
+        config_plain = types.GenerateContentConfig(
+            temperature=0.1,
+            max_output_tokens=max_tokens,
+        )
+
+        if use_grounding:
+            try:
+                response = await self._client.aio.models.generate_content(
+                    model=self._model_name,
+                    contents=prompt,
+                    config=config_grounded,
+                )
+                raw = response.text or ""
+                extracted = self._extract_json(raw)
+                if extracted:
+                    return extracted
+                # Grounded response had no JSON — fall through to plain call
+                logger.debug("Grounded Gemini response had no JSON, retrying without grounding")
+            except Exception as e:
+                logger.debug("Grounded Gemini call failed (%s), retrying without grounding", e)
+
+        # Plain call (no grounding) — reliably outputs clean JSON
         response = await self._client.aio.models.generate_content(
             model=self._model_name,
             contents=prompt,
-            config=types.GenerateContentConfig(
-                tools=[types.Tool(google_search=types.GoogleSearch())],
-                temperature=0.1,
-                max_output_tokens=max_tokens,
-            ),
+            config=config_plain,
         )
-        return self._extract_json(response.text)
+        return self._extract_json(response.text or "")
 
     async def analyze_serp(self, keyword: str, language: str = "en") -> SERPAnalysis:
         """Analyze Google SERP for a keyword using Gemini with Search grounding."""
@@ -153,7 +180,7 @@ Return ONLY valid JSON, no markdown fences, no explanation. Language context: {l
 
         try:
             raw = await asyncio.wait_for(
-                self._call_with_grounding(prompt, max_tokens=1024),
+                self._call_gemini(prompt, max_tokens=1024),
                 timeout=20.0,
             )
             data = json.loads(raw)
@@ -191,7 +218,7 @@ Return ONLY valid JSON, no markdown fences, no explanation. Language context: {l
 
         try:
             raw = await asyncio.wait_for(
-                self._call_with_grounding(prompt, max_tokens=1024),
+                self._call_gemini(prompt, max_tokens=1024),
                 timeout=20.0,
             )
             data = json.loads(raw)
@@ -242,7 +269,7 @@ Return ONLY valid JSON, no markdown fences."""
 
         try:
             raw = await asyncio.wait_for(
-                self._call_with_grounding(prompt, max_tokens=512),
+                self._call_gemini(prompt, max_tokens=512),
                 timeout=15.0,
             )
             return json.loads(raw)
