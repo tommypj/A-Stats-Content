@@ -140,6 +140,7 @@ const navigation: NavItem[] = [
       { name: "Branding", href: "/agency/branding", icon: Globe },
     ],
   },
+  { name: "Help & Docs", href: "/help", icon: BookOpen },
 ];
 
 // ---------------------------------------------------------------------------
@@ -809,6 +810,14 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
             {/* Top-right actions: keyboard shortcuts + notification bell + user avatar */}
             <div className="flex items-center gap-2">
+              <Link
+                href="/help"
+                title="Help & Docs"
+                aria-label="Help & Documentation"
+                className="p-2 rounded-xl text-text-muted hover:bg-surface-secondary hover:text-text-primary transition-colors"
+              >
+                <BookOpen className="h-5 w-5" />
+              </Link>
               <button
                 onClick={() => setShowShortcutsDialog(true)}
                 title="Keyboard shortcuts (Ctrl+/)"
