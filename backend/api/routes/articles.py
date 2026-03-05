@@ -398,22 +398,24 @@ async def _run_article_generation(
             )
             await db.commit()  # Commit the log entry
 
-            generated = await asyncio.wait_for(
-                content_ai_service.generate_article(
-                    title=outline_title,
+            from services.content_pipeline import content_pipeline
+
+            pipeline_result = await asyncio.wait_for(
+                content_pipeline.run_full_pipeline(
                     keyword=outline_keyword,
-                    sections=outline_sections,
+                    title=outline_title,
                     tone=outline_tone,
                     target_audience=outline_target_audience,
+                    word_count_target=word_count_target,
+                    language=language,
                     writing_style=writing_style,
                     voice=voice,
                     list_usage=list_usage,
                     custom_instructions=custom_instructions,
-                    word_count_target=word_count_target,
-                    language=language,
                 ),
-                timeout=540.0,  # 9 min hard limit — non-English articles generate 7000+ tokens and can take 8+ min
+                timeout=600.0,  # 10 min hard limit — covers SERP+research+outline+article
             )
+            generated = pipeline_result.article
 
             # Grammar proofreading pass
             is_proofread = False
@@ -451,10 +453,10 @@ async def _run_article_generation(
             article.meta_description = generated.meta_description
             article.word_count = generated.word_count
             article.read_time = calculate_read_time(generated.content)
-            article.ai_model = settings.anthropic_model
+            article.ai_model = " + ".join(dict.fromkeys(pipeline_result.models_used.values()))
             article.status = ContentStatus.COMPLETED.value
 
-            # Run SEO analysis
+            # Run SEO analysis (merge with SERP alignment data from pipeline)
             try:
                 seo_result = analyze_seo(
                     generated.content,
@@ -463,51 +465,32 @@ async def _run_article_generation(
                     generated.meta_description,
                 )
                 seo_result["is_proofread"] = is_proofread
+                if pipeline_result.serp_seo:
+                    seo_result.update(pipeline_result.serp_seo)
                 article.seo_score = seo_result["score"]
                 article.seo_analysis = seo_result
             except Exception as seo_err:
                 logger.warning("SEO analysis failed for article %s: %s", article_id, seo_err)
-                article.seo_analysis = {"is_proofread": is_proofread}
+                article.seo_analysis = {
+                    "is_proofread": is_proofread,
+                    **(pipeline_result.serp_seo or {}),
+                }
 
-            # Generate image prompt + AI fact-check in parallel (both capped at 30s)
-            async def _get_image_prompt() -> str | None:
-                try:
-                    return await asyncio.wait_for(
-                        content_ai_service.generate_image_prompt(
-                            title=outline_title,
-                            content=generated.content,
-                            keyword=outline_keyword,
-                        ),
-                        timeout=30.0,
-                    )
-                except Exception as _e:
-                    logger.warning("Failed to generate image prompt for article %s: %s", article_id, _e)
-                    return None
-
-            async def _get_flagged_stats() -> list[str]:
-                try:
-                    return await asyncio.wait_for(
-                        content_ai_service.fact_check_content(generated.content),
-                        timeout=30.0,
-                    )
-                except Exception as _e:
-                    logger.warning("Fact-check failed for article %s: %s", article_id, _e)
-                    return []
-
-            image_prompt, flagged_stats = await asyncio.gather(
-                _get_image_prompt(), _get_flagged_stats()
-            )
-            if image_prompt:
-                article.image_prompt = image_prompt
-            if flagged_stats:
-                article.seo_analysis = {**(article.seo_analysis or {}), "flagged_stats": flagged_stats}
+            # Apply pipeline image prompt and flagged stats (already computed in parallel)
+            if pipeline_result.image_prompt:
+                article.image_prompt = pipeline_result.image_prompt
+            if pipeline_result.flagged_stats:
+                article.seo_analysis = {
+                    **(article.seo_analysis or {}),
+                    "flagged_stats": pipeline_result.flagged_stats,
+                }
 
             # Log successful generation and increment usage (single commit)
             duration_ms = int((time.time() - start_time) * 1000)
             if gen_log is not None:
                 await tracker.log_success(
                     log_id=gen_log.id,
-                    ai_model=settings.anthropic_model,
+                    ai_model=article.ai_model,
                     duration_ms=duration_ms,
                 )
             await db.commit()

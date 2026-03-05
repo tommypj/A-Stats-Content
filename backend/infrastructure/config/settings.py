@@ -166,7 +166,16 @@ class Settings(BaseSettings):
 
     # Embeddings
     embedding_model: str = "text-embedding-3-small"  # OpenAI model
-    openai_api_key: str | None = None  # For embeddings
+    openai_api_key: str | None = None  # For embeddings and outline generation
+    openai_outline_model: str = "gpt-4o-mini"  # Model for structured outline generation
+
+    # Gemini (SERP analysis, research, SEO check)
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-2.0-flash"
+
+    # Pipeline feature flags
+    enable_serp_analysis: bool = True  # Set False to skip SERP (e.g. bulk jobs)
+    enable_research_step: bool = True
 
     # Storage
     storage_type: str = "local"  # local, s3

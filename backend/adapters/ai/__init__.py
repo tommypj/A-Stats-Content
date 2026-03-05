@@ -1,5 +1,5 @@
 # AI Adapters
-# Anthropic, Replicate integrations
+# Anthropic, Gemini, OpenAI, Replicate integrations
 
 from .anthropic_adapter import (
     AnthropicContentService,
@@ -8,6 +8,8 @@ from .anthropic_adapter import (
     OutlineSection,
     content_ai_service,
 )
+from .gemini_adapter import GeminiFlashService, ResearchData, SERPAnalysis, gemini_service
+from .openai_adapter import OpenAIOutlineService, openai_outline_service
 from .replicate_adapter import (
     GeneratedImage,
     ReplicateImageService,
@@ -20,6 +22,12 @@ __all__ = [
     "GeneratedOutline",
     "GeneratedArticle",
     "OutlineSection",
+    "GeminiFlashService",
+    "SERPAnalysis",
+    "ResearchData",
+    "gemini_service",
+    "OpenAIOutlineService",
+    "openai_outline_service",
     "ReplicateImageService",
     "image_ai_service",
     "GeneratedImage",

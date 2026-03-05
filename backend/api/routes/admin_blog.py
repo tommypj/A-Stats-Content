@@ -5,7 +5,6 @@ Provides endpoints for admins to create, edit, publish, and delete blog posts,
 categories, and tags. All mutating operations are logged to AdminAuditLog.
 """
 
-import asyncio
 import logging
 import markdown
 import re
@@ -18,7 +17,6 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from adapters.ai.anthropic_adapter import content_ai_service
 from api.deps_admin import get_current_admin_user
 from api.middleware.rate_limit import limiter
 from api.routes.blog import _post_to_detail as _public_post_to_detail
@@ -55,36 +53,6 @@ router = APIRouter(prefix="/admin/blog", tags=["Admin - Blog"])
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _extract_flagged_stats(html: str) -> list[str]:
-    """Scan generated HTML for statistical claims that need editorial verification."""
-    plain = re.sub(r"<[^>]+>", " ", html)
-    plain = re.sub(r"\s+", " ", plain).strip()
-
-    flagged: list[str] = []
-
-    # Percentage with parenthetical citation — "X% (Source, Year)"
-    for m in re.finditer(r"([^.]*?\d+(?:\.\d+)?%\s*\([^)]{2,60}\)[^.]*\.?)", plain):
-        flagged.append(m.group(1).strip())
-
-    # "N in N" or "N out of N" ratio claims near a parenthetical
-    for m in re.finditer(r"([^.]*?\d+\s+(?:in|out of)\s+\d+[^.]*\([^)]{2,60}\)[^.]*\.?)", plain):
-        flagged.append(m.group(1).strip())
-
-    # Anything the AI self-tagged with [VERIFY]
-    for m in re.finditer(r"([^.]*?\[VERIFY\][^.]*\.?)", plain):
-        flagged.append(m.group(1).strip())
-
-    # Deduplicate preserving order
-    seen: set[str] = set()
-    unique: list[str] = []
-    for item in flagged:
-        normalized = re.sub(r"\s+", " ", item).strip()
-        if normalized not in seen:
-            seen.add(normalized)
-            unique.append(normalized)
-    return unique
 
 
 def _slugify(text: str) -> str:
@@ -619,50 +587,27 @@ async def admin_generate_blog_content(
     body: BlogGenerateRequest,
     admin_user: User = Depends(get_current_admin_user),
 ):
-    """Generate full-quality blog post content using the article generation pipeline."""
+    """Generate full-quality blog post content using the multi-model article generation pipeline."""
+    from services.content_pipeline import content_pipeline
+
     keyword = body.keyword or body.title
 
-    # Step 1: Generate outline sections from keyword
-    outline = await content_ai_service.generate_outline(
+    pipeline_result = await content_pipeline.run_full_pipeline(
         keyword=keyword,
-        target_audience=body.target_audience,
-        tone=body.tone,
-        word_count_target=body.word_count,
-        language=body.language,
-        writing_style=body.writing_style,
-        voice=body.voice,
-        list_usage=body.list_usage,
-        custom_instructions=body.custom_instructions,
-    )
-
-    sections = [
-        {
-            "heading": s.heading,
-            "subheadings": s.subheadings,
-            "notes": s.notes,
-            "word_count_target": s.word_count_target,
-        }
-        for s in outline.sections
-    ]
-
-    # Step 2: Generate full article using the same pipeline as user articles
-    article = await content_ai_service.generate_article(
         title=body.title,
-        keyword=keyword,
-        sections=sections,
         tone=body.tone,
         target_audience=body.target_audience,
+        word_count_target=body.word_count,
+        language=body.language,
         writing_style=body.writing_style,
         voice=body.voice,
         list_usage=body.list_usage,
         custom_instructions=body.custom_instructions,
-        word_count_target=body.word_count,
-        language=body.language,
     )
 
-    # Step 3: Convert markdown to HTML
+    # Convert markdown to HTML
     content_html = markdown.markdown(
-        article.content,
+        pipeline_result.article.content,
         extensions=["extra", "toc"],
     )
 
@@ -670,42 +615,12 @@ async def admin_generate_blog_content(
     content_html = re.sub(r"<h1(\s[^>]*)?>", r"<h2\1>", content_html)
     content_html = content_html.replace("</h1>", "</h2>")
 
-    # Steps 3b + 4 run in parallel: regex stat scan + AI fact-check + image prompt
-    regex_flags = _extract_flagged_stats(content_html)
-
-    async def _fact_check() -> list[str]:
-        try:
-            return await content_ai_service.fact_check_content(article.content)
-        except Exception:
-            return []
-
-    async def _image_prompt() -> str | None:
-        try:
-            return await content_ai_service.generate_image_prompt(
-                title=body.title,
-                content=article.content,
-                keyword=keyword,
-            )
-        except Exception:
-            return None
-
-    ai_flags, image_prompt = await asyncio.gather(_fact_check(), _image_prompt())
-
-    # Merge regex + AI flags, deduplicate
-    seen: set[str] = {re.sub(r"\s+", " ", s).strip() for s in regex_flags}
-    flagged_stats = list(regex_flags)
-    for claim in ai_flags:
-        normalized = re.sub(r"\s+", " ", claim).strip()
-        if normalized not in seen:
-            seen.add(normalized)
-            flagged_stats.append(claim)
-
     return BlogGenerateResponse(
         content_html=content_html,
-        meta_description=outline.meta_description or None,
-        suggested_title=outline.title or None,
-        image_prompt=image_prompt,
-        flagged_stats=flagged_stats,
+        meta_description=pipeline_result.outline.meta_description or None,
+        suggested_title=pipeline_result.outline.title or None,
+        image_prompt=pipeline_result.image_prompt,
+        flagged_stats=pipeline_result.flagged_stats,
     )
 
 

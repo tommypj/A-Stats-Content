@@ -71,7 +71,7 @@ async def process_bulk_outline_job(
     Process a bulk outline generation job.
     Generates outlines one by one for each pending item.
     """
-    from adapters.ai.anthropic_adapter import content_ai_service
+    from services.content_pipeline import content_pipeline
     from services.generation_tracker import GenerationTracker
 
     # Fetch job — with_for_update prevents concurrent workers from double-processing (BULK-29)
@@ -158,7 +158,9 @@ async def process_bulk_outline_job(
             )
 
             # LOW-05: sanitize keyword before passing to AI and before storing in DB
-            safe_keyword = content_ai_service._sanitize_prompt_input(item.keyword or "", 100)
+            from adapters.ai.anthropic_adapter import content_ai_service as _claude
+
+            safe_keyword = _claude._sanitize_prompt_input(item.keyword or "", 100)
 
             # Log start
             gen_log = await tracker.log_start(
@@ -169,8 +171,8 @@ async def process_bulk_outline_job(
                 input_metadata={"keyword": safe_keyword, "bulk_job_id": job_id},
             )
 
-            # Generate outline
-            generated = await content_ai_service.generate_outline(
+            # Generate outline via pipeline (with_serp=False keeps bulk fast)
+            generated = await content_pipeline.run_outline_only(
                 keyword=safe_keyword,
                 tone=tone,
                 target_audience=target_audience,
@@ -178,6 +180,7 @@ async def process_bulk_outline_job(
                 language=language,
                 writing_style=writing_style,
                 custom_instructions=custom_instructions,
+                with_serp=False,
             )
 
             # Create outline record

@@ -14,11 +14,11 @@ interface Phase {
 
 const PHASES: Record<GenerationType, Phase[]> = {
   article: [
-    { label: "Analyzing your outline", icon: Search, duration: 8 },
-    { label: "Researching topic & keywords", icon: BookOpen, duration: 12 },
-    { label: "Writing introduction & structure", icon: PenTool, duration: 25 },
-    { label: "Generating section content", icon: Feather, duration: 35 },
-    { label: "Polishing & optimizing for SEO", icon: Sparkles, duration: 25 },
+    { label: "Analyzing SERP & competition", icon: Search, duration: 10 },
+    { label: "Researching facts & data", icon: BookOpen, duration: 10 },
+    { label: "Building outline structure", icon: PenTool, duration: 12 },
+    { label: "Writing article content", icon: Feather, duration: 50 },
+    { label: "Fact-checking & polishing", icon: Sparkles, duration: 20 },
     { label: "Finalizing article", icon: FileCheck, duration: 999 },
   ],
   outline: [
@@ -39,10 +39,10 @@ const PHASES: Record<GenerationType, Phase[]> = {
 
 const TIPS: Record<GenerationType, string[]> = {
   article: [
-    "AI-generated articles typically take 60\u201390 seconds",
-    "The article will follow your outline structure exactly",
+    "AI-generated articles typically take 90\u2013120 seconds",
+    "Real Google Search data is used to ground facts and statistics",
+    "The outline is built from live SERP competition analysis",
     "You can edit and refine the content after generation",
-    "SEO keywords are woven in naturally throughout",
   ],
   outline: [
     "Outlines usually generate in 15\u201330 seconds",

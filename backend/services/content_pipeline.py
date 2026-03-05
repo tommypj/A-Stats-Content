@@ -1,0 +1,381 @@
+"""
+Mixed AI Content Generation Pipeline.
+
+Orchestrates a 6-step multi-model pipeline:
+  1. SERP Analysis  → Gemini Flash 2.0 with Google Search grounding
+  2. Research       → Gemini Flash 2.0 with Google Search grounding
+  3. Outline        → GPT-4o mini with Structured Outputs (fallback: Claude)
+  4. Article        → Claude Sonnet 4.6 (publication-quality prose)
+  5. SEO vs SERP    → Gemini Flash (lightweight — parallel)
+  6. Fact-check     → Claude Haiku (lightweight — parallel with 5)
+
+Graceful degradation: if Gemini or OpenAI keys are absent, the pipeline
+falls back to the all-Claude path transparently.
+"""
+
+import asyncio
+import logging
+import re
+from dataclasses import dataclass, field
+
+from adapters.ai.anthropic_adapter import GeneratedArticle, GeneratedOutline, content_ai_service
+from adapters.ai.gemini_adapter import ResearchData, SERPAnalysis, gemini_service
+from adapters.ai.openai_adapter import openai_outline_service
+from infrastructure.config.settings import settings
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Result dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class PipelineResult:
+    """Full result from running the content generation pipeline."""
+
+    outline: GeneratedOutline
+    article: GeneratedArticle
+    serp_analysis: SERPAnalysis | None = None
+    research_data: ResearchData | None = None
+    image_prompt: str | None = None
+    flagged_stats: list[str] = field(default_factory=list)
+    serp_seo: dict = field(default_factory=dict)
+    models_used: dict[str, str] = field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
+# Shared helper (moved here from admin_blog.py to avoid duplication)
+# ---------------------------------------------------------------------------
+
+
+def _extract_flagged_stats(html: str) -> list[str]:
+    """Scan generated HTML for statistical claims that need editorial verification."""
+    plain = re.sub(r"<[^>]+>", " ", html)
+    plain = re.sub(r"\s+", " ", plain).strip()
+
+    flagged: list[str] = []
+
+    # Percentage with parenthetical citation — "X% (Source, Year)"
+    for m in re.finditer(r"([^.]*?\d+(?:\.\d+)?%\s*\([^)]{2,60}\)[^.]*\.?)", plain):
+        flagged.append(m.group(1).strip())
+
+    # "N in N" or "N out of N" ratio claims near a parenthetical
+    for m in re.finditer(
+        r"([^.]*?\d+\s+(?:in|out of)\s+\d+[^.]*\([^)]{2,60}\)[^.]*\.?)", plain
+    ):
+        flagged.append(m.group(1).strip())
+
+    # Anything the AI self-tagged with [VERIFY]
+    for m in re.finditer(r"([^.]*?\[VERIFY\][^.]*\.?)", plain):
+        flagged.append(m.group(1).strip())
+
+    # Deduplicate preserving order
+    seen: set[str] = set()
+    unique: list[str] = []
+    for item in flagged:
+        normalized = re.sub(r"\s+", " ", item).strip()
+        if normalized not in seen:
+            seen.add(normalized)
+            unique.append(normalized)
+    return unique
+
+
+# ---------------------------------------------------------------------------
+# Pipeline class
+# ---------------------------------------------------------------------------
+
+
+class ContentPipeline:
+    """Orchestrates the multi-model content generation pipeline."""
+
+    async def _get_outline(
+        self,
+        keyword: str,
+        serp_analysis: SERPAnalysis | None,
+        research_data: ResearchData | None,
+        tone: str,
+        target_audience: str | None,
+        word_count_target: int,
+        language: str,
+        writing_style: str,
+        voice: str,
+        list_usage: str,
+        custom_instructions: str | None,
+    ) -> tuple[GeneratedOutline, str]:
+        """Generate outline via OpenAI (Structured Outputs), falling back to Claude on error.
+
+        Returns (outline, model_name_used).
+        """
+        if openai_outline_service.is_available():
+            try:
+                outline = await asyncio.wait_for(
+                    openai_outline_service.generate_outline(
+                        keyword=keyword,
+                        serp_analysis=serp_analysis,
+                        research_data=research_data,
+                        tone=tone,
+                        target_audience=target_audience,
+                        word_count_target=word_count_target,
+                        language=language,
+                        writing_style=writing_style,
+                        voice=voice,
+                        list_usage=list_usage,
+                        custom_instructions=custom_instructions,
+                    ),
+                    timeout=60.0,
+                )
+                logger.info("Outline generated via OpenAI (%s)", settings.openai_outline_model)
+                return outline, settings.openai_outline_model
+            except Exception as e:
+                logger.warning(
+                    "OpenAI outline failed (%s), falling back to Claude: %s", type(e).__name__, e
+                )
+
+        # Claude fallback
+        outline = await content_ai_service.generate_outline(
+            keyword=keyword,
+            target_audience=target_audience,
+            tone=tone,
+            word_count_target=word_count_target,
+            language=language,
+            writing_style=writing_style,
+            voice=voice,
+            list_usage=list_usage,
+            custom_instructions=custom_instructions,
+        )
+        logger.info("Outline generated via Claude (fallback)")
+        return outline, settings.anthropic_model
+
+    async def run_full_pipeline(
+        self,
+        keyword: str,
+        title: str,
+        tone: str = "professional",
+        target_audience: str | None = None,
+        word_count_target: int = 1500,
+        language: str = "en",
+        writing_style: str = "balanced",
+        voice: str = "second_person",
+        list_usage: str = "balanced",
+        custom_instructions: str | None = None,
+    ) -> PipelineResult:
+        """Run the full 6-step multi-model pipeline.
+
+        Steps 1+2 run in parallel (Gemini SERP + research).
+        Step 3: outline via OpenAI (fallback Claude).
+        Step 4: article via Claude (enriched with research context).
+        Steps 5+6+7 run in parallel (SERP SEO check + AI fact-check + image prompt).
+        """
+        models_used: dict[str, str] = {}
+
+        # ----------------------------------------------------------------
+        # Steps 1 + 2: SERP analysis + research (parallel, both Gemini)
+        # ----------------------------------------------------------------
+        serp_analysis: SERPAnalysis | None = None
+        research_data: ResearchData | None = None
+
+        if gemini_service.is_available() and settings.enable_serp_analysis:
+            tasks = []
+            if settings.enable_serp_analysis:
+                tasks.append(gemini_service.analyze_serp(keyword, language))
+            if settings.enable_research_step:
+                tasks.append(gemini_service.research_topic(keyword, language))
+
+            if tasks:
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                idx = 0
+                if settings.enable_serp_analysis:
+                    r = results[idx]
+                    idx += 1
+                    if isinstance(r, SERPAnalysis):
+                        serp_analysis = r
+                        models_used["serp"] = settings.gemini_model
+                if settings.enable_research_step and idx < len(results):
+                    r = results[idx]
+                    if isinstance(r, ResearchData):
+                        research_data = r
+                        models_used["research"] = settings.gemini_model
+
+        # ----------------------------------------------------------------
+        # Step 3: Outline generation
+        # ----------------------------------------------------------------
+        outline, outline_model = await self._get_outline(
+            keyword=keyword,
+            serp_analysis=serp_analysis,
+            research_data=research_data,
+            tone=tone,
+            target_audience=target_audience,
+            word_count_target=word_count_target,
+            language=language,
+            writing_style=writing_style,
+            voice=voice,
+            list_usage=list_usage,
+            custom_instructions=custom_instructions,
+        )
+        models_used["outline"] = outline_model
+
+        # ----------------------------------------------------------------
+        # Step 4: Article generation (Claude) — enriched with research
+        # ----------------------------------------------------------------
+        enriched_instructions = custom_instructions or ""
+        if research_data and (research_data.key_facts or research_data.statistics):
+            facts_block = ""
+            if research_data.key_facts:
+                facts_block += "\n\nVerified facts to incorporate naturally:\n" + "\n".join(
+                    f"- {f}" for f in research_data.key_facts[:6]
+                )
+            if research_data.statistics:
+                facts_block += "\n\nReal statistics to cite (include the source):\n" + "\n".join(
+                    f"- {s}" for s in research_data.statistics[:5]
+                )
+            if facts_block:
+                enriched_instructions = (
+                    (enriched_instructions + "\n\n" if enriched_instructions else "")
+                    + "RESEARCH DATA (sourced from Google Search — use these in the article):"
+                    + facts_block
+                )
+
+        sections = [
+            {
+                "heading": s.heading,
+                "subheadings": s.subheadings,
+                "notes": s.notes,
+                "word_count_target": s.word_count_target,
+            }
+            for s in outline.sections
+        ]
+
+        article = await content_ai_service.generate_article(
+            title=title or outline.title,
+            keyword=keyword,
+            sections=sections,
+            tone=tone,
+            target_audience=target_audience,
+            writing_style=writing_style,
+            voice=voice,
+            list_usage=list_usage,
+            custom_instructions=enriched_instructions or None,
+            word_count_target=word_count_target,
+            language=language,
+        )
+        models_used["article"] = settings.anthropic_model
+
+        # ----------------------------------------------------------------
+        # Steps 5 + 6 + 7: SEO check, fact-check, image prompt (parallel)
+        # ----------------------------------------------------------------
+        async def _seo_check() -> dict:
+            if serp_analysis:
+                try:
+                    return await gemini_service.analyze_seo_vs_serp(article.content, serp_analysis)
+                except Exception as e:
+                    logger.warning("SERP SEO check failed: %s", e)
+            return {}
+
+        async def _fact_check() -> list[str]:
+            try:
+                return await asyncio.wait_for(
+                    content_ai_service.fact_check_content(article.content),
+                    timeout=30.0,
+                )
+            except Exception as e:
+                logger.warning("AI fact-check failed: %s", e)
+                return []
+
+        async def _image_prompt() -> str | None:
+            try:
+                return await asyncio.wait_for(
+                    content_ai_service.generate_image_prompt(
+                        title=title or outline.title,
+                        content=article.content,
+                        keyword=keyword,
+                    ),
+                    timeout=30.0,
+                )
+            except Exception as e:
+                logger.warning("Image prompt generation failed: %s", e)
+                return None
+
+        serp_seo, ai_flags, image_prompt = await asyncio.gather(
+            _seo_check(), _fact_check(), _image_prompt()
+        )
+
+        # Merge regex + AI flagged stats, deduplicate
+        import markdown as _md
+
+        content_html = _md.markdown(article.content, extensions=["extra"])
+        regex_flags = _extract_flagged_stats(content_html)
+
+        seen: set[str] = {re.sub(r"\s+", " ", s).strip() for s in regex_flags}
+        flagged_stats = list(regex_flags)
+        for claim in ai_flags:
+            normalized = re.sub(r"\s+", " ", claim).strip()
+            if normalized not in seen:
+                seen.add(normalized)
+                flagged_stats.append(claim)
+
+        if serp_seo:
+            models_used["seo_check"] = settings.gemini_model
+
+        return PipelineResult(
+            outline=outline,
+            article=article,
+            serp_analysis=serp_analysis,
+            research_data=research_data,
+            image_prompt=image_prompt,
+            flagged_stats=flagged_stats,
+            serp_seo=serp_seo,
+            models_used=models_used,
+        )
+
+    async def run_outline_only(
+        self,
+        keyword: str,
+        tone: str = "professional",
+        target_audience: str | None = None,
+        word_count_target: int = 1500,
+        language: str = "en",
+        writing_style: str = "balanced",
+        voice: str = "second_person",
+        list_usage: str = "balanced",
+        custom_instructions: str | None = None,
+        with_serp: bool = False,
+    ) -> GeneratedOutline:
+        """Generate an outline only (used by bulk generation).
+
+        with_serp=False (default) skips Gemini steps for speed.
+        with_serp=True runs full SERP+research enrichment first.
+        """
+        serp_analysis: SERPAnalysis | None = None
+        research_data: ResearchData | None = None
+
+        if with_serp and gemini_service.is_available() and settings.enable_serp_analysis:
+            results = await asyncio.gather(
+                gemini_service.analyze_serp(keyword, language),
+                gemini_service.research_topic(keyword, language),
+                return_exceptions=True,
+            )
+            if isinstance(results[0], SERPAnalysis):
+                serp_analysis = results[0]
+            if isinstance(results[1], ResearchData):
+                research_data = results[1]
+
+        outline, _ = await self._get_outline(
+            keyword=keyword,
+            serp_analysis=serp_analysis,
+            research_data=research_data,
+            tone=tone,
+            target_audience=target_audience,
+            word_count_target=word_count_target,
+            language=language,
+            writing_style=writing_style,
+            voice=voice,
+            list_usage=list_usage,
+            custom_instructions=custom_instructions,
+        )
+        return outline
+
+
+# Module-level singleton
+content_pipeline = ContentPipeline()
