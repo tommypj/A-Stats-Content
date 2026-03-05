@@ -60,11 +60,13 @@ export async function generateMetadata({
       description,
       url: canonical,
       type: "article",
+      siteName: "A-Stats",
       publishedTime: post.published_at,
+      modifiedTime: post.updated_at || post.published_at,
       authors: post.author_name ? [post.author_name] : undefined,
       images: imageUrl
-        ? [{ url: imageUrl, alt: post.featured_image_alt || title }]
-        : undefined,
+        ? [{ url: imageUrl, width: 1200, height: 630, alt: post.featured_image_alt || title }]
+        : [{ url: "https://a-stats.app/icon.png", width: 512, height: 512, alt: title }],
     },
     twitter: {
       card: "summary_large_image",
@@ -78,9 +80,23 @@ export async function generateMetadata({
   };
 }
 
+function estimateWordCount(html: string | undefined): number | undefined {
+  if (!html) return undefined;
+  const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return text.split(" ").filter(Boolean).length;
+}
+
 function buildJsonLd(post: BlogPostDetail) {
   const baseUrl = "https://a-stats.app";
   const postUrl = `${baseUrl}/en/blog/${post.slug}`;
+
+  // Build keywords from tags + category
+  const keywords = [
+    ...(post.tags?.map((t) => t.name) ?? []),
+    ...(post.category ? [post.category.name] : []),
+  ].join(", ") || undefined;
+
+  const wordCount = estimateWordCount(post.content_html);
 
   const graph: Record<string, unknown>[] = [
     {
@@ -91,20 +107,19 @@ function buildJsonLd(post: BlogPostDetail) {
       datePublished: post.published_at,
       dateModified: post.updated_at || post.published_at,
       url: postUrl,
+      inLanguage: "en",
+      isAccessibleForFree: true,
+      ...(keywords && { keywords }),
+      ...(wordCount && { wordCount }),
+      ...(post.category && { articleSection: post.category.name }),
       mainEntityOfPage: { "@type": "WebPage", "@id": postUrl },
+      isPartOf: { "@id": `${baseUrl}/en/blog/#blog` },
       author: {
         "@type": "Person",
         name: post.author_name || "A-Stats Team",
+        url: `${baseUrl}/en/blog`,
       },
-      publisher: {
-        "@type": "Organization",
-        name: "A-Stats",
-        url: baseUrl,
-        logo: {
-          "@type": "ImageObject",
-          url: `${baseUrl}/images/logo.png`,
-        },
-      },
+      publisher: { "@id": `${baseUrl}/#organization` },
       ...(post.featured_image_url && {
         image: {
           "@type": "ImageObject",
@@ -112,28 +127,21 @@ function buildJsonLd(post: BlogPostDetail) {
           description: post.featured_image_alt || post.title,
         },
       }),
+      // Speakable — helps AI engines identify the most citable parts of the page
+      speakable: {
+        "@type": "SpeakableSpecification",
+        cssSelector: ["h1", "h2", ".article-description"],
+      },
     },
     {
       "@type": "BreadcrumbList",
       itemListElement: [
-        {
-          "@type": "ListItem",
-          position: 1,
-          name: "Home",
-          item: baseUrl,
-        },
-        {
-          "@type": "ListItem",
-          position: 2,
-          name: "Blog",
-          item: `${baseUrl}/en/blog`,
-        },
-        {
-          "@type": "ListItem",
-          position: 3,
-          name: post.title,
-          item: postUrl,
-        },
+        { "@type": "ListItem", position: 1, name: "Home", item: baseUrl },
+        { "@type": "ListItem", position: 2, name: "Blog", item: `${baseUrl}/en/blog` },
+        ...(post.category
+          ? [{ "@type": "ListItem", position: 3, name: post.category.name, item: `${baseUrl}/en/blog/category/${post.category.slug}` },
+             { "@type": "ListItem", position: 4, name: post.title, item: postUrl }]
+          : [{ "@type": "ListItem", position: 3, name: post.title, item: postUrl }]),
       ],
     },
   ];

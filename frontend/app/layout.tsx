@@ -46,6 +46,45 @@ export const metadata: Metadata = {
   },
 };
 
+const globalJsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://a-stats.app/#organization",
+      name: "A-Stats",
+      url: "https://a-stats.app",
+      logo: {
+        "@type": "ImageObject",
+        url: "https://a-stats.app/icon.png",
+        width: 512,
+        height: 512,
+      },
+      sameAs: [
+        "https://twitter.com/astatsapp",
+        "https://www.linkedin.com/company/a-stats",
+      ],
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://a-stats.app/#website",
+      url: "https://a-stats.app",
+      name: "A-Stats",
+      description:
+        "AI-powered content creation and SEO/AEO platform for modern creators.",
+      publisher: { "@id": "https://a-stats.app/#organization" },
+      potentialAction: {
+        "@type": "SearchAction",
+        target: {
+          "@type": "EntryPoint",
+          urlTemplate: "https://a-stats.app/en/blog?search={search_term_string}",
+        },
+        "query-input": "required name=search_term_string",
+      },
+    },
+  ],
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -54,6 +93,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.variable}>
       <body className="min-h-screen bg-healing-cream">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(globalJsonLd) }}
+        />
         <Providers>
           <ErrorBoundary>
             {children}

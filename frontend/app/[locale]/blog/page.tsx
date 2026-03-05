@@ -35,29 +35,67 @@ async function fetchCategories(): Promise<BlogCategory[]> {
   }
 }
 
+const BLOG_DESCRIPTION =
+  "Expert guides on SEO, AEO, AI content, and content marketing. Learn how to rank on Google and get cited by AI answer engines.";
+
 export async function generateMetadata(): Promise<Metadata> {
   return {
     title: "Blog — A-Stats | SEO & AEO Content Insights",
-    description:
-      "Expert guides on SEO, AEO, AI content, and content marketing. Learn how to rank on Google and get cited by AI answer engines.",
-    openGraph: {
-      title: "A-Stats Blog",
-      description: "Expert guides on SEO, AEO, AI content, and content marketing.",
-      url: "https://a-stats.app/en/blog",
-      type: "website",
-    },
+    description: BLOG_DESCRIPTION,
     alternates: {
+      canonical: "https://a-stats.app/en/blog",
       types: {
         "application/rss+xml": `${API_URL}/api/v1/blog/feed.xml`,
       },
     },
+    openGraph: {
+      title: "A-Stats Blog",
+      description: BLOG_DESCRIPTION,
+      url: "https://a-stats.app/en/blog",
+      type: "website",
+      siteName: "A-Stats",
+      images: [{ url: "https://a-stats.app/icon.png", width: 512, height: 512, alt: "A-Stats Blog" }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "A-Stats Blog",
+      description: BLOG_DESCRIPTION,
+      images: ["https://a-stats.app/icon.png"],
+    },
   };
 }
+
+const blogIndexJsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Blog",
+      "@id": "https://a-stats.app/en/blog/#blog",
+      url: "https://a-stats.app/en/blog",
+      name: "A-Stats Blog",
+      description: BLOG_DESCRIPTION,
+      publisher: { "@id": "https://a-stats.app/#organization" },
+      inLanguage: "en",
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: "https://a-stats.app" },
+        { "@type": "ListItem", position: 2, name: "Blog", item: "https://a-stats.app/en/blog" },
+      ],
+    },
+  ],
+};
 
 export default async function BlogPage() {
   const [postsData, categories] = await Promise.all([fetchPosts(), fetchCategories()]);
 
   return (
+    <>
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(blogIndexJsonLd) }}
+    />
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         {/* Header */}
         <div className="text-center mb-12">
@@ -79,5 +117,6 @@ export default async function BlogPage() {
           />
         </Suspense>
     </div>
+    </>
   );
 }

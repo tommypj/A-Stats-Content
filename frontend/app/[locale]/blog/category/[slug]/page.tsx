@@ -59,14 +59,29 @@ export async function generateMetadata({
   const category = await fetchCategory(slug);
   if (!category) return { title: "Category Not Found — A-Stats Blog" };
 
+  const title = `${category.name} — A-Stats Blog`;
+  const description =
+    category.description ||
+    `Browse all ${category.name} articles on the A-Stats blog.`;
+  const canonical = `https://a-stats.app/en/blog/category/${slug}`;
+
   return {
-    title: `${category.name} — A-Stats Blog`,
-    description:
-      category.description ||
-      `Browse all ${category.name} articles on the A-Stats blog.`,
+    title,
+    description,
+    alternates: { canonical },
     openGraph: {
-      title: `${category.name} — A-Stats Blog`,
-      url: `https://a-stats.app/en/blog/category/${slug}`,
+      title,
+      description,
+      url: canonical,
+      type: "website",
+      siteName: "A-Stats",
+      images: [{ url: "https://a-stats.app/icon.png", width: 512, height: 512, alt: title }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: ["https://a-stats.app/icon.png"],
     },
   };
 }
@@ -88,7 +103,36 @@ export default async function BlogCategoryPage({
     notFound();
   }
 
+  const categoryJsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "CollectionPage",
+        "@id": `https://a-stats.app/en/blog/category/${slug}/#collectionpage`,
+        url: `https://a-stats.app/en/blog/category/${slug}`,
+        name: `${category.name} — A-Stats Blog`,
+        description: category.description || `Browse all ${category.name} articles on the A-Stats blog.`,
+        inLanguage: "en",
+        isPartOf: { "@id": "https://a-stats.app/en/blog/#blog" },
+        publisher: { "@id": "https://a-stats.app/#organization" },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: "https://a-stats.app" },
+          { "@type": "ListItem", position: 2, name: "Blog", item: "https://a-stats.app/en/blog" },
+          { "@type": "ListItem", position: 3, name: category.name, item: `https://a-stats.app/en/blog/category/${slug}` },
+        ],
+      },
+    ],
+  };
+
   return (
+    <>
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(categoryJsonLd) }}
+    />
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         {/* Header */}
         <div className="text-center mb-12">
@@ -115,5 +159,6 @@ export default async function BlogCategoryPage({
           />
         </Suspense>
     </div>
+    </>
   );
 }
