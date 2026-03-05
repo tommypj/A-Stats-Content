@@ -113,44 +113,22 @@ class GeminiFlashService:
 
         return text[start:end].strip()
 
-    async def _call_gemini(self, prompt: str, max_tokens: int = 2048, use_grounding: bool = True) -> str:
-        """Call Gemini, with optional Google Search grounding.
+    async def _call_gemini(self, prompt: str, max_tokens: int = 2048) -> str:
+        """Call Gemini without search grounding for reliable JSON output.
 
-        Tries grounded call first; if the response contains no JSON object,
-        falls back to an ungrounded call (which reliably outputs clean JSON).
+        Search grounding (google_search tool) causes Gemini to prepend prose
+        attribution text and citation markers that corrupt JSON output.
+        Gemini's training data is strong enough for SERP pattern analysis;
+        grounding can be re-added with a two-step approach later if needed.
         """
         types = self._types
-        config_grounded = types.GenerateContentConfig(
-            tools=[types.Tool(google_search=types.GoogleSearch())],
-            temperature=0.1,
-            max_output_tokens=max_tokens,
-        )
-        config_plain = types.GenerateContentConfig(
-            temperature=0.1,
-            max_output_tokens=max_tokens,
-        )
-
-        if use_grounding:
-            try:
-                response = await self._client.aio.models.generate_content(
-                    model=self._model_name,
-                    contents=prompt,
-                    config=config_grounded,
-                )
-                raw = response.text or ""
-                extracted = self._extract_json(raw)
-                if extracted:
-                    return extracted
-                # Grounded response had no JSON — fall through to plain call
-                logger.debug("Grounded Gemini response had no JSON, retrying without grounding")
-            except Exception as e:
-                logger.debug("Grounded Gemini call failed (%s), retrying without grounding", e)
-
-        # Plain call (no grounding) — reliably outputs clean JSON
         response = await self._client.aio.models.generate_content(
             model=self._model_name,
             contents=prompt,
-            config=config_plain,
+            config=types.GenerateContentConfig(
+                temperature=0.1,
+                max_output_tokens=max_tokens,
+            ),
         )
         return self._extract_json(response.text or "")
 
