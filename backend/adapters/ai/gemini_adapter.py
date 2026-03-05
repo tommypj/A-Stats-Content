@@ -114,12 +114,11 @@ class GeminiFlashService:
         return text[start:end].strip()
 
     async def _call_gemini(self, prompt: str, max_tokens: int = 2048) -> str:
-        """Call Gemini without search grounding for reliable JSON output.
+        """Call Gemini with forced JSON output mode.
 
-        Search grounding (google_search tool) causes Gemini to prepend prose
-        attribution text and citation markers that corrupt JSON output.
-        Gemini's training data is strong enough for SERP pattern analysis;
-        grounding can be re-added with a two-step approach later if needed.
+        Uses response_mime_type='application/json' so Gemini outputs raw JSON
+        without any markdown fences, prose preamble, or citation markers.
+        Thinking is disabled so the full token budget goes to the response.
         """
         types = self._types
         response = await self._client.aio.models.generate_content(
@@ -128,6 +127,7 @@ class GeminiFlashService:
             config=types.GenerateContentConfig(
                 temperature=0.1,
                 max_output_tokens=max_tokens,
+                response_mime_type="application/json",
                 # Gemini 2.5-flash is a thinking model — disable thinking for structured
                 # JSON output so all token budget goes to the actual response, not reasoning.
                 thinking_config=types.ThinkingConfig(thinking_budget=0),
@@ -138,7 +138,8 @@ class GeminiFlashService:
         except Exception as text_err:
             logger.warning("Gemini response.text raised: %s", text_err)
             raw = ""
-        return self._extract_json(raw)
+        logger.debug("Gemini raw response (%d chars): %r", len(raw), raw[:200])
+        return raw.strip()
 
     async def analyze_serp(self, keyword: str, language: str = "en") -> SERPAnalysis:
         """Analyze Google SERP for a keyword using Gemini with Search grounding."""
