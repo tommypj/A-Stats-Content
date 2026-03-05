@@ -56,9 +56,9 @@ export default function PostCard({ post }: PostCardProps) {
           </h2>
         </Link>
 
-        {post.excerpt && (
+        {(post.excerpt || post.meta_description) && (
           <p className="text-sm text-text-secondary leading-relaxed mb-4 line-clamp-2">
-            {post.excerpt}
+            {post.excerpt || post.meta_description}
           </p>
         )}
 
