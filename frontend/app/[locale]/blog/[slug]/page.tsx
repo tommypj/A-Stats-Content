@@ -117,7 +117,6 @@ function buildJsonLd(post: BlogPostDetail) {
       author: {
         "@type": "Person",
         name: post.author_name || "A-Stats Team",
-        url: `${baseUrl}/en/blog`,
       },
       publisher: { "@id": `${baseUrl}/#organization` },
       ...(post.featured_image_url && {

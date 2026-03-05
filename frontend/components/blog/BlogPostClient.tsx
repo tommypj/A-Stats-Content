@@ -203,6 +203,11 @@ export default function BlogPostClient({ post, relatedPosts: initialRelated = []
               {formatDate(post.published_at)}
             </span>
           )}
+          {post.updated_at && post.updated_at !== post.published_at && (
+            <span className="flex items-center gap-1 text-text-muted/70 italic text-xs">
+              Updated {formatDate(post.updated_at)}
+            </span>
+          )}
         </div>
 
         {/* Hero image — full width below meta */}

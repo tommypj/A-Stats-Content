@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import Link from "next/link";
 import BlogListClient from "@/components/blog/BlogListClient";
 import type { BlogCategory, BlogPostCard } from "@/lib/api";
 
@@ -134,6 +135,15 @@ export default async function BlogCategoryPage({
       dangerouslySetInnerHTML={{ __html: JSON.stringify(categoryJsonLd) }}
     />
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-1.5 text-xs text-text-muted mb-8 flex-wrap">
+          <Link href="/" className="hover:text-primary-600 transition-colors">Home</Link>
+          <span>•</span>
+          <Link href="/blog" className="hover:text-primary-600 transition-colors">Blog</Link>
+          <span>•</span>
+          <span className="text-text-secondary">{category.name}</span>
+        </nav>
+
         {/* Header */}
         <div className="text-center mb-12">
           <p className="text-sm font-semibold uppercase tracking-wide text-primary-600 mb-2">Category</p>

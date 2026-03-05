@@ -4,7 +4,8 @@ import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, Calendar, Clock, ArrowRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, Clock, ArrowRight, Search, X } from "lucide-react";
+import { toast } from "sonner";
 import PostCard from "./PostCard";
 import type { BlogPostCard, BlogCategory } from "@/lib/api";
 
@@ -142,25 +143,28 @@ export default function BlogListClient({
   const [totalPages, setTotalPages] = useState(initialTotalPages);
   const [loading, setLoading] = useState(false);
   const [activeCategory, setActiveCategory] = useState(categorySlug || "");
+  const [search, setSearch] = useState("");
+  const [activeSearch, setActiveSearch] = useState("");
 
-  const loadPosts = useCallback(async (p: number, cat: string) => {
+  const loadPosts = useCallback(async (p: number, cat: string, q: string) => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
       params.set("page", String(p));
       params.set("page_size", "12");
       if (cat) params.set("category_slug", cat);
+      if (q.trim()) params.set("search", q.trim().slice(0, 200));
 
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const res = await fetch(`${API_URL}/api/v1/blog/posts?${params.toString()}`);
-      if (!res.ok) return;
+      if (!res.ok) throw new Error("Failed to load posts");
       const data = await res.json();
       setPosts(data.items);
       setTotal(data.total);
       setTotalPages(data.total_pages);
       setPage(p);
     } catch {
-      // silently fail — show existing posts
+      toast.error("Failed to load posts. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -168,7 +172,9 @@ export default function BlogListClient({
 
   const handleCategoryChange = (slug: string) => {
     setActiveCategory(slug);
-    loadPosts(1, slug);
+    setSearch("");
+    setActiveSearch("");
+    loadPosts(1, slug, "");
     if (slug) {
       router.push(`/blog/category/${slug}`);
     } else {
@@ -176,13 +182,65 @@ export default function BlogListClient({
     }
   };
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setActiveSearch(search);
+    setActiveCategory("");
+    loadPosts(1, "", search);
+  };
+
+  const clearSearch = () => {
+    setSearch("");
+    setActiveSearch("");
+    loadPosts(1, activeCategory, "");
+  };
+
   const [featured, ...rest] = posts;
 
   return (
     <div>
+      {/* Search */}
+      <form onSubmit={handleSearch} className="mb-6 flex gap-2">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search articles…"
+            maxLength={200}
+            className="w-full pl-9 pr-9 py-2 border border-surface-tertiary rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={clearSearch}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+              aria-label="Clear search"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        <button
+          type="submit"
+          className="px-4 py-2 bg-primary-600 text-white rounded-xl text-sm font-medium hover:bg-primary-700 transition-colors"
+        >
+          Search
+        </button>
+      </form>
+
+      {/* Active search label */}
+      {activeSearch && (
+        <div className="flex items-center gap-2 mb-6 text-sm text-text-secondary">
+          <span>Results for <span className="font-semibold text-text-primary">&ldquo;{activeSearch}&rdquo;</span></span>
+          <button onClick={clearSearch} className="text-primary-600 hover:text-primary-700 text-xs underline">Clear</button>
+        </div>
+      )}
+
       {/* Category filter pills */}
-      {categories.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-10">
+      {!activeSearch && categories.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-10" role="group" aria-label="Filter by category">
           <button
             onClick={() => handleCategoryChange("")}
             className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-150 ${
@@ -193,7 +251,7 @@ export default function BlogListClient({
           >
             All Posts
           </button>
-          {categories.map((cat) => (
+          {categories.map((cat: BlogCategory) => (
             <button
               key={cat.id}
               onClick={() => handleCategoryChange(cat.slug)}
@@ -275,7 +333,7 @@ export default function BlogListClient({
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-4 mt-12">
           <button
-            onClick={() => loadPosts(page - 1, activeCategory)}
+            onClick={() => loadPosts(page - 1, activeCategory, activeSearch)}
             disabled={page === 1 || loading}
             className="inline-flex items-center gap-2 px-4 py-2 border border-surface-tertiary rounded-xl text-sm font-medium disabled:opacity-40 hover:bg-surface-secondary transition-colors"
           >
@@ -286,7 +344,7 @@ export default function BlogListClient({
             {page} / {totalPages}
           </span>
           <button
-            onClick={() => loadPosts(page + 1, activeCategory)}
+            onClick={() => loadPosts(page + 1, activeCategory, activeSearch)}
             disabled={page === totalPages || loading}
             className="inline-flex items-center gap-2 px-4 py-2 border border-surface-tertiary rounded-xl text-sm font-medium disabled:opacity-40 hover:bg-surface-secondary transition-colors"
           >

@@ -109,7 +109,7 @@ async def list_posts(
     page_size: int = Query(12, ge=1, le=50),
     category_slug: str | None = Query(None),
     tag_slug: str | None = Query(None),
-    search: str | None = Query(None),
+    search: str | None = Query(None, max_length=200),
     db: AsyncSession = Depends(get_db),
 ):
     """List published blog posts (paginated)."""
@@ -251,7 +251,10 @@ async def rss_feed(
             BlogPost.deleted_at.is_(None),
             BlogPost.published_at <= func.now(),
         )
-        .options(selectinload(BlogPost.category))
+        .options(
+            selectinload(BlogPost.category),
+            selectinload(BlogPost.post_tags).selectinload(BlogPostTag.tag),
+        )
         .order_by(BlogPost.published_at.desc())
         .limit(20)
     )
@@ -271,6 +274,8 @@ async def rss_feed(
         # Escape XML special chars
         title_esc = post.title.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         desc_esc = desc.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        author_tag = f"      <author>{post.author_name}</author>\n" if post.author_name else ""
+        category_tag = f"      <category>{post.category.name}</category>\n" if post.category else ""
         items_xml += f"""
     <item>
       <title>{title_esc}</title>
@@ -278,7 +283,7 @@ async def rss_feed(
       <guid isPermaLink="true">{base_url}/en/blog/{post.slug}</guid>
       <pubDate>{pub_date}</pubDate>
       <description>{desc_esc}</description>
-    </item>"""
+{author_tag}{category_tag}    </item>"""
 
     rss_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
