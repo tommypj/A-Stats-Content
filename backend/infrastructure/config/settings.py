@@ -171,7 +171,7 @@ class Settings(BaseSettings):
 
     # Gemini (SERP analysis, research, SEO check)
     gemini_api_key: str | None = None
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-2.5-flash"
 
     # Pipeline feature flags
     enable_serp_analysis: bool = True  # Set False to skip SERP (e.g. bulk jobs)
