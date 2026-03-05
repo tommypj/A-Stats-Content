@@ -130,7 +130,13 @@ class GeminiFlashService:
                 max_output_tokens=max_tokens,
             ),
         )
-        return self._extract_json(response.text or "")
+        try:
+            raw = response.text or ""
+        except Exception as text_err:
+            logger.warning("Gemini response.text raised: %s | candidates: %s", text_err, response.candidates)
+            raw = ""
+        logger.info("Gemini raw response (%d chars): %r", len(raw), raw[:300])
+        return self._extract_json(raw)
 
     async def analyze_serp(self, keyword: str, language: str = "en") -> SERPAnalysis:
         """Analyze Google SERP for a keyword using Gemini with Search grounding."""
