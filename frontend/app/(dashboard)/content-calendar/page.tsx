@@ -56,6 +56,12 @@ function toLocalDateKey(d: Date): string {
 }
 
 function parseDate(isoString: string): Date {
+  // Date-only strings ("2026-03-15") are parsed as UTC by JS, which shifts
+  // to the previous day in negative-offset timezones.  Append T00:00:00 so
+  // the string is treated as local time instead.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(isoString)) {
+    return new Date(isoString + "T00:00:00");
+  }
   return new Date(isoString);
 }
 
