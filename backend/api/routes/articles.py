@@ -53,8 +53,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/articles", tags=["articles"])
 
 # Timeout (seconds) for the grammar proofread pass — sourced from settings so it can be
-# overridden via environment variable (GEN-31)
+# overridden via environment variable (GEN-31). Non-English articles are longer and need more time.
 PROOFREAD_TIMEOUT_SECONDS = getattr(settings, "ai_request_timeout", 60)
+PROOFREAD_TIMEOUT_LONG_SECONDS = 180  # Romanian and other non-English articles
 
 # Limit concurrent AI generation tasks to prevent resource exhaustion
 _generation_semaphore = asyncio.Semaphore(5)
@@ -419,13 +420,17 @@ async def _run_article_generation(
 
             # Grammar proofreading pass
             is_proofread = False
+            _proofread_timeout = (
+                PROOFREAD_TIMEOUT_LONG_SECONDS if language != "en"
+                else PROOFREAD_TIMEOUT_SECONDS
+            )
             try:
                 proofread_content = await asyncio.wait_for(
                     content_ai_service.proofread_grammar(
                         content=generated.content,
                         language=language,
                     ),
-                    timeout=PROOFREAD_TIMEOUT_SECONDS,
+                    timeout=_proofread_timeout,
                 )
                 # Update generated content with proofread version
                 generated = GeneratedArticle(
