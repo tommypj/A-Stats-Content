@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { api, Article, Outline } from "@/lib/api";
+import { toast } from "sonner";
 import {
   Calendar,
   ChevronLeft,
@@ -12,6 +13,8 @@ import {
   X,
   ExternalLink,
   RefreshCw,
+  Plus,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,11 +26,15 @@ type ContentItemType = "outline" | "article";
 
 interface CalendarItem {
   id: string;
+  /** Raw article id (without "article-" prefix), only set for type==="article" */
+  articleId?: string;
   type: ContentItemType;
   title: string;
   status: string;
   date: Date;
   href: string;
+  /** Whether this item was placed by an explicit planned_date */
+  isScheduled: boolean;
 }
 
 // -------------------------------------------------------------------------
@@ -42,7 +49,6 @@ const MONTH_NAMES = [
 ];
 
 function toLocalDateKey(d: Date): string {
-  // Format as YYYY-MM-DD using local time, not UTC
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
@@ -110,7 +116,7 @@ function getPillConfig(item: CalendarItem): PillConfig {
 }
 
 // -------------------------------------------------------------------------
-// Sub-components
+// ContentPill
 // -------------------------------------------------------------------------
 
 function ContentPill({ item }: { item: CalendarItem }) {
@@ -133,6 +139,127 @@ function ContentPill({ item }: { item: CalendarItem }) {
 }
 
 // -------------------------------------------------------------------------
+// ScheduleModal — shown when clicking an empty day cell
+// -------------------------------------------------------------------------
+
+interface ScheduleModalProps {
+  date: Date;
+  articles: Article[];
+  scheduling: boolean;
+  onSchedule: (articleId: string) => void;
+  onClose: () => void;
+}
+
+function ScheduleModal({
+  date,
+  articles,
+  scheduling,
+  onSchedule,
+  onClose,
+}: ScheduleModalProps) {
+  const unscheduled = articles.filter((a) => !a.planned_date);
+
+  const formatDate = (d: Date) =>
+    d.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 z-30 bg-black/20" onClick={onClose} />
+
+      {/* Modal */}
+      <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl border border-surface-tertiary w-full max-w-md flex flex-col max-h-[80vh]">
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-surface-tertiary">
+            <div>
+              <p className="text-xs text-text-secondary uppercase tracking-wide font-semibold">
+                Schedule content for
+              </p>
+              <p className="text-sm font-semibold text-text-primary">
+                {formatDate(date)}
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-surface-secondary transition-colors"
+            >
+              <X className="h-4 w-4 text-text-secondary" />
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="flex-1 overflow-y-auto px-5 py-4">
+            {unscheduled.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-text-secondary">
+                  All your articles already have a planned date.
+                </p>
+                <Link
+                  href="/outlines/new"
+                  className="mt-3 inline-block text-sm text-primary-600 hover:underline"
+                >
+                  Create a new outline
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-text-secondary mb-3">
+                  Select an article to schedule on this date:
+                </p>
+                {unscheduled.map((article) => {
+                  const cfg =
+                    ARTICLE_STATUS_PILLS[article.status] ??
+                    ARTICLE_STATUS_PILLS["draft"];
+                  return (
+                    <button
+                      key={article.id}
+                      disabled={scheduling}
+                      onClick={() => onSchedule(article.id)}
+                      className="w-full flex items-start gap-3 p-3 rounded-xl border border-surface-tertiary hover:bg-surface-secondary transition-colors text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span
+                        className={cn(
+                          "mt-1 w-2 h-2 rounded-full shrink-0",
+                          cfg.dot
+                        )}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-text-primary truncate">
+                          {article.title}
+                        </p>
+                        <p
+                          className={cn(
+                            "text-xs font-medium mt-0.5",
+                            cfg.text
+                          )}
+                        >
+                          {cfg.label}
+                        </p>
+                      </div>
+                      {scheduling ? (
+                        <Loader2 className="h-4 w-4 text-text-secondary animate-spin shrink-0 mt-0.5" />
+                      ) : (
+                        <Plus className="h-4 w-4 text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// -------------------------------------------------------------------------
 // Day detail panel (slide-in from the right side)
 // -------------------------------------------------------------------------
 
@@ -140,9 +267,10 @@ interface DayPanelProps {
   date: Date | null;
   items: CalendarItem[];
   onClose: () => void;
+  onRefresh: () => void;
 }
 
-function DayPanel({ date, items, onClose }: DayPanelProps) {
+function DayPanel({ date, items, onClose, onRefresh }: DayPanelProps) {
   if (!date) return null;
 
   const outlines = items.filter((i) => i.type === "outline");
@@ -156,13 +284,21 @@ function DayPanel({ date, items, onClose }: DayPanelProps) {
       day: "numeric",
     });
 
+  const handleUnschedule = async (articleId: string) => {
+    try {
+      await api.articles.update(articleId, { planned_date: null });
+      toast.success("Article unscheduled");
+      onClose();
+      onRefresh();
+    } catch {
+      toast.error("Failed to unschedule article");
+    }
+  };
+
   return (
     <>
       {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-30 bg-black/20"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 z-30 bg-black/20" onClick={onClose} />
 
       {/* Panel */}
       <div className="fixed right-0 top-0 bottom-0 z-40 w-full max-w-80 sm:w-80 bg-white shadow-2xl border-l border-surface-tertiary flex flex-col">
@@ -214,7 +350,15 @@ function DayPanel({ date, items, onClose }: DayPanelProps) {
               </p>
               <div className="space-y-2">
                 {articles.map((item) => (
-                  <PanelItemRow key={item.id} item={item} />
+                  <PanelItemRow
+                    key={item.id}
+                    item={item}
+                    onUnschedule={
+                      item.isScheduled && item.articleId
+                        ? () => handleUnschedule(item.articleId!)
+                        : undefined
+                    }
+                  />
                 ))}
               </div>
             </section>
@@ -225,24 +369,43 @@ function DayPanel({ date, items, onClose }: DayPanelProps) {
   );
 }
 
-function PanelItemRow({ item }: { item: CalendarItem }) {
+interface PanelItemRowProps {
+  item: CalendarItem;
+  onUnschedule?: () => void;
+}
+
+function PanelItemRow({ item, onUnschedule }: PanelItemRowProps) {
   const cfg = getPillConfig(item);
 
   return (
-    <Link
-      href={item.href}
-      className="flex items-start gap-3 p-3 rounded-xl border border-surface-tertiary hover:bg-surface-secondary transition-colors group"
-    >
-      <span className={cn("mt-1 w-2 h-2 rounded-full shrink-0", cfg.dot)} />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-text-primary truncate">{item.title}</p>
-        <p className={cn("text-xs font-medium mt-0.5", cfg.text)}>
-          {cfg.label}
-          {item.type === "outline" ? " · Outline" : " · Article"}
-        </p>
-      </div>
-      <ExternalLink className="h-3.5 w-3.5 text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />
-    </Link>
+    <div className="flex items-start gap-2">
+      <Link
+        href={item.href}
+        className="flex-1 flex items-start gap-3 p-3 rounded-xl border border-surface-tertiary hover:bg-surface-secondary transition-colors group min-w-0"
+      >
+        <span className={cn("mt-1 w-2 h-2 rounded-full shrink-0", cfg.dot)} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-text-primary truncate">
+            {item.title}
+          </p>
+          <p className={cn("text-xs font-medium mt-0.5", cfg.text)}>
+            {cfg.label}
+            {item.type === "outline" ? " · Outline" : " · Article"}
+          </p>
+        </div>
+        <ExternalLink className="h-3.5 w-3.5 text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />
+      </Link>
+
+      {onUnschedule && (
+        <button
+          onClick={onUnschedule}
+          title="Unschedule"
+          className="p-2 rounded-lg hover:bg-red-50 hover:text-red-600 text-text-secondary transition-colors shrink-0 mt-0.5"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -263,22 +426,41 @@ export default function ContentCalendarPage() {
   // Day detail panel state
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
+  // Schedule modal state
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState<Date | null>(null);
+  const [scheduling, setScheduling] = useState(false);
+
   // -----------------------------------------------------------------------
-  // Data loading — load all items and filter client-side
-  // The list APIs support page_size; we load up to 500 of each to cover
-  // any realistic month view without requiring date-filter params.
+  // Data loading — paginate through all items (API caps at 100 per page)
   // -----------------------------------------------------------------------
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [artRes, outRes] = await Promise.all([
-        api.articles.list({ page_size: 500 }),
-        api.outlines.list({ page_size: 500 }),
+      const fetchAll = async <T,>(
+        fetcher: (params: {
+          page: number;
+          page_size: number;
+        }) => Promise<{ items: T[]; pages: number }>
+      ): Promise<T[]> => {
+        const first = await fetcher({ page: 1, page_size: 100 });
+        if (first.pages <= 1) return first.items;
+        const remaining = await Promise.all(
+          Array.from({ length: first.pages - 1 }, (_, i) =>
+            fetcher({ page: i + 2, page_size: 100 })
+          )
+        );
+        return [...first.items, ...remaining.flatMap((r) => r.items)];
+      };
+
+      const [allArticles, allOutlines] = await Promise.all([
+        fetchAll(api.articles.list),
+        fetchAll(api.outlines.list),
       ]);
-      setArticles(artRes.items);
-      setOutlines(outRes.items);
-    } catch (err) {
+      setArticles(allArticles);
+      setOutlines(allOutlines);
+    } catch {
       setError("Failed to load content. Please try again.");
     } finally {
       setLoading(false);
@@ -301,19 +483,24 @@ export default function ContentCalendarPage() {
         status: o.status,
         date: parseDate(o.created_at),
         href: `/outlines/${o.id}`,
+        isScheduled: false,
       })
     ),
     ...articles.map(
       (a): CalendarItem => ({
         id: `article-${a.id}`,
+        articleId: a.id,
         type: "article",
         title: a.title,
         status: a.status,
-        // Published articles anchor to their published date; others use created_at
-        date: a.status === "published" && a.published_at
+        // Priority: planned_date > published_at (for published) > created_at
+        date: a.planned_date
+          ? parseDate(a.planned_date)
+          : a.status === "published" && a.published_at
           ? parseDate(a.published_at)
           : parseDate(a.created_at),
         href: `/articles/${a.id}`,
+        isScheduled: !!a.planned_date,
       })
     ),
   ];
@@ -334,12 +521,10 @@ export default function ContentCalendarPage() {
   const startPadding = firstDay.getDay(); // 0=Sunday
   const daysInMonth = lastDay.getDate();
 
-  // Build flat array: nulls for leading padding, then day numbers
   const gridCells: (number | null)[] = [
     ...Array(startPadding).fill(null),
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
-  // Pad the end to complete the last row
   while (gridCells.length % 7 !== 0) gridCells.push(null);
 
   // -----------------------------------------------------------------------
@@ -385,8 +570,36 @@ export default function ContentCalendarPage() {
     const clicked = new Date(year, month, day);
     const key = toLocalDateKey(clicked);
     const items = itemsByDate.get(key) ?? [];
-    if (items.length === 0) return; // nothing to show
-    setSelectedDate(clicked);
+
+    if (items.length > 0) {
+      // Show day panel for days with content
+      setSelectedDate(clicked);
+    } else {
+      // Show schedule modal for empty days
+      setScheduleDate(clicked);
+      setShowScheduleModal(true);
+    }
+  };
+
+  // -----------------------------------------------------------------------
+  // Schedule an article to a date
+  // -----------------------------------------------------------------------
+  const handleSchedule = async (articleId: string) => {
+    if (!scheduleDate) return;
+    setScheduling(true);
+    try {
+      await api.articles.update(articleId, {
+        planned_date: toLocalDateKey(scheduleDate),
+      });
+      toast.success("Article scheduled");
+      setShowScheduleModal(false);
+      setScheduleDate(null);
+      loadData();
+    } catch {
+      toast.error("Failed to schedule article");
+    } finally {
+      setScheduling(false);
+    }
   };
 
   // Items for the detail panel
@@ -420,7 +633,8 @@ export default function ContentCalendarPage() {
               Content Calendar
             </h1>
             <p className="text-text-secondary mt-1">
-              Track your content pipeline — from outline to published article
+              Track your content pipeline — from outline to published article.
+              Click an empty day to schedule content.
             </p>
           </div>
           <button
@@ -506,15 +720,18 @@ export default function ContentCalendarPage() {
             <div className="grid grid-cols-7 min-w-[500px]">
               {gridCells.map((day, cellIdx) => {
                 const colIdx = cellIdx % 7;
-                const key = day !== null ? toLocalDateKey(new Date(year, month, day)) : `empty-${cellIdx}`;
+                const key =
+                  day !== null
+                    ? toLocalDateKey(new Date(year, month, day))
+                    : `empty-${cellIdx}`;
                 const dayItems = day !== null ? (itemsByDate.get(key) ?? []) : [];
                 const visibleItems = dayItems.slice(0, 3);
                 const overflow = dayItems.length - visibleItems.length;
                 const today_ = day !== null && isToday(day);
                 const weekend = isWeekend(colIdx);
-                // Last row and last column borders
                 const isLastRow = cellIdx >= gridCells.length - 7;
                 const isLastCol = colIdx === 6;
+                const hasItems = dayItems.length > 0;
 
                 return (
                   <div
@@ -526,14 +743,15 @@ export default function ContentCalendarPage() {
                       isLastCol && "border-r-0",
                       today_ && "bg-primary-50 border-primary-200",
                       weekend && !today_ && "bg-surface-secondary/50",
-                      day !== null && dayItems.length > 0 && "cursor-pointer hover:bg-surface-secondary/70 transition-colors",
+                      day !== null &&
+                        "cursor-pointer hover:bg-surface-secondary/70 transition-colors",
                       day === null && "bg-surface-secondary/20"
                     )}
                   >
                     {day !== null && (
                       <>
                         {/* Day number */}
-                        <div className="flex items-center justify-end">
+                        <div className="flex items-center justify-between">
                           <span
                             className={cn(
                               "text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full",
@@ -544,6 +762,10 @@ export default function ContentCalendarPage() {
                           >
                             {day}
                           </span>
+                          {/* Show + hint on empty days (desktop only) */}
+                          {!hasItems && (
+                            <Plus className="h-3 w-3 text-text-secondary/40 hidden md:block" />
+                          )}
                         </div>
 
                         {/* Content pills */}
@@ -570,7 +792,10 @@ export default function ContentCalendarPage() {
       {/* Legend */}
       <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
         {legendItems.map(({ dot, label }) => (
-          <div key={label} className="flex items-center gap-1.5 text-sm text-text-secondary">
+          <div
+            key={label}
+            className="flex items-center gap-1.5 text-sm text-text-secondary"
+          >
             <span className={cn("w-2.5 h-2.5 rounded-full", dot)} />
             {label}
           </div>
@@ -582,7 +807,22 @@ export default function ContentCalendarPage() {
         date={selectedDate}
         items={panelItems}
         onClose={() => setSelectedDate(null)}
+        onRefresh={loadData}
       />
+
+      {/* Schedule modal */}
+      {showScheduleModal && scheduleDate && (
+        <ScheduleModal
+          date={scheduleDate}
+          articles={articles}
+          scheduling={scheduling}
+          onSchedule={handleSchedule}
+          onClose={() => {
+            setShowScheduleModal(false);
+            setScheduleDate(null);
+          }}
+        />
+      )}
     </div>
   );
 }

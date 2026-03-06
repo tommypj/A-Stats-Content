@@ -2,7 +2,7 @@
 Content API schemas for outlines, articles, and images.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -182,6 +182,7 @@ class ArticleUpdateRequest(BaseModel):
     )  # GEN-39: SEO meta descriptions should not exceed 160 chars
     content: str | None = None
     status: Literal["draft", "completed", "published"] | None = None
+    planned_date: date | None = Field(None, description="Planned date for content calendar scheduling")
 
 
 class ArticleSEOAnalysis(BaseModel):
@@ -225,6 +226,7 @@ class ArticleResponse(BaseModel):
     published_url: str | None
     featured_image_id: str | None
     social_posts: dict[str, Any] | None = None
+    planned_date: date | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -254,6 +256,7 @@ class ArticleListItemResponse(BaseModel):
     published_url: str | None
     featured_image_id: str | None
     social_posts: dict[str, Any] | None = None
+    planned_date: date | None = None
     created_at: datetime
     updated_at: datetime
 

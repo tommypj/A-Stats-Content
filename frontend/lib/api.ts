@@ -1723,6 +1723,7 @@ export interface Article {
   wordpress_post_id?: number;
   wordpress_post_url?: string;
   social_posts?: SocialPostsData;
+  planned_date?: string;  // ISO date string YYYY-MM-DD
   created_at: string;
   updated_at: string;
 }
@@ -1811,6 +1812,7 @@ export interface UpdateArticleInput {
   meta_description?: string;
   content?: string;
   status?: string;
+  planned_date?: string | null;
 }
 
 export interface ArticleListResponse {
