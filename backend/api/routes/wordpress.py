@@ -509,12 +509,22 @@ async def publish_to_wordpress(
             )
             featured_image = img_result.scalar_one_or_none()
             if featured_image and featured_image.url:
+                # Generate SEO-optimized metadata from article context
+                seo_meta = _generate_image_seo_metadata(
+                    article_title=article.title,
+                    article_keyword=article.keyword,
+                    article_meta_description=article.meta_description,
+                )
                 async with _wp_client(timeout=60.0) as media_client:
                     upload_result = await _upload_image_to_wp(
                         client=media_client,
                         image=featured_image,
                         wp_creds=wp_creds,
                         auth_header=auth_header,
+                        title=seo_meta["title"],
+                        alt_text=seo_meta["alt_text"],
+                        caption=seo_meta["caption"],
+                        description=seo_meta["description"],
                     )
                     featured_media_id = upload_result["wordpress_media_id"]
                     logger.info(
@@ -658,6 +668,58 @@ def _convert_to_webp(image_bytes: bytes, quality: int = 82) -> tuple[bytes, bool
         return image_bytes, False
 
 
+def _generate_image_seo_metadata(
+    article_title: str,
+    article_keyword: str,
+    article_meta_description: str | None = None,
+) -> dict[str, str]:
+    """
+    Generate SEO-optimized WordPress media metadata from article context.
+
+    WordPress media items support four text fields visible to search engines:
+    - alt_text: Read by screen readers and indexed by Google Images.
+    - title: Shown on hover and used as the media item name in WP admin.
+    - caption: Displayed below the image in most themes (supports HTML).
+    - description: Used by some themes/plugins and in attachment pages.
+
+    Returns:
+        Dict with keys ``alt_text``, ``title``, ``caption``, ``description``.
+    """
+    # Alt text — concise, keyword-front, describes what the image represents
+    alt_text = f"{article_keyword} — featured image for {article_title}"
+    if len(alt_text) > 125:
+        alt_text = f"{article_keyword} — {article_title}"[:125]
+
+    # Title — the media item name in WP; clean, keyword-rich
+    media_title = f"{article_title} — Featured Image"
+    if len(media_title) > 100:
+        media_title = article_title[:96] + " ..."
+
+    # Caption — short sentence shown below the image in most themes
+    caption = f"Illustration for the article: {article_title}."
+    if len(caption) > 200:
+        caption = f"Illustration for: {article_title[:150]}."
+
+    # Description — longer text; uses meta description if available
+    if article_meta_description:
+        description = (
+            f"Featured image for \"{article_title}\". "
+            f"{article_meta_description}"
+        )
+    else:
+        description = (
+            f"Featured image for \"{article_title}\", "
+            f"covering the topic of {article_keyword}."
+        )
+
+    return {
+        "alt_text": alt_text,
+        "title": media_title,
+        "caption": caption,
+        "description": description,
+    }
+
+
 async def _upload_image_to_wp(
     client: httpx.AsyncClient,
     image: GeneratedImage,
@@ -665,6 +727,8 @@ async def _upload_image_to_wp(
     auth_header: str,
     title: str | None = None,
     alt_text: str | None = None,
+    caption: str | None = None,
+    description: str | None = None,
 ) -> dict:
     """
     Download an image from its source URL and upload it to the WordPress media library.
@@ -676,6 +740,8 @@ async def _upload_image_to_wp(
         auth_header: Prebuilt Basic Auth header value.
         title: Optional title override for the media item.
         alt_text: Optional alt text override for the media item.
+        caption: Optional caption (displayed below image in most WP themes).
+        description: Optional long description for the media attachment page.
 
     Returns:
         A dict with ``wordpress_media_id`` (int) and ``source_url`` (str).
@@ -719,11 +785,21 @@ async def _upload_image_to_wp(
         "image/gif": ".gif",
     }
     ext = ext_map.get(content_type, ".png")
-    filename = f"ai-image-{image.id[:8]}{ext}"
+    # Use a keyword-based slug for the filename when SEO metadata is provided,
+    # so WordPress generates a keyword-rich image URL (good for Google Images).
+    if title:
+        slug = title.lower().replace(" ", "-").replace("—", "")
+        slug = "".join(c for c in slug if c.isalnum() or c == "-")
+        slug = slug.strip("-")[:60]
+        filename = f"{slug}{ext}"
+    else:
+        filename = f"ai-image-{image.id[:8]}{ext}"
 
-    # Resolve title and alt text
+    # Resolve all four SEO metadata fields
     resolved_title = title or image.alt_text or image.prompt[:100]
     resolved_alt = alt_text or image.alt_text or f"AI-generated image: {image.prompt[:100]}"
+    resolved_caption = caption or ""
+    resolved_description = description or ""
 
     # Upload to WordPress media library
     upload_url = f"{wp_creds['site_url']}/wp-json/wp/v2/media"
@@ -747,18 +823,24 @@ async def _upload_image_to_wp(
     wp_media = response.json()
     media_id = wp_media["id"]
 
-    # Set title and alt text on the uploaded media item
+    # Set all four SEO fields on the uploaded media item
     update_url = f"{wp_creds['site_url']}/wp-json/wp/v2/media/{media_id}"
+    media_meta: dict[str, str] = {
+        "title": resolved_title,
+        "alt_text": resolved_alt,
+    }
+    if resolved_caption:
+        media_meta["caption"] = resolved_caption
+    if resolved_description:
+        media_meta["description"] = resolved_description
+
     await client.post(
         update_url,
         headers={
             "Authorization": auth_header,
             "Content-Type": "application/json",
         },
-        json={
-            "title": resolved_title,
-            "alt_text": resolved_alt,
-        },
+        json=media_meta,
     )
 
     source_url = wp_media.get("source_url", wp_media.get("guid", {}).get("rendered", ""))
