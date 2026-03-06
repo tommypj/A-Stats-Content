@@ -14,6 +14,9 @@ falls back to the all-Claude path transparently.
 """
 
 import asyncio
+import dataclasses
+import hashlib
+import json
 import logging
 import re
 from dataclasses import dataclass, field
@@ -43,6 +46,42 @@ class PipelineResult:
     flagged_stats: list[str] = field(default_factory=list)
     serp_seo: dict = field(default_factory=dict)
     models_used: dict[str, str] = field(default_factory=dict)
+    url_slug: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# SERP/Research Redis cache helpers (24h TTL)
+# ---------------------------------------------------------------------------
+
+_SERP_CACHE_TTL = 86400  # 24 hours
+
+
+def _serp_cache_key(prefix: str, keyword: str, language: str) -> str:
+    h = hashlib.md5(f"{keyword.lower().strip()}:{language}".encode()).hexdigest()[:16]
+    return f"serp_cache:{prefix}:{h}"
+
+
+async def _cache_get(key: str) -> dict | None:
+    try:
+        import redis.asyncio as aioredis  # type: ignore[import]
+
+        r = aioredis.from_url(settings.redis_url, decode_responses=True)
+        raw = await r.get(key)
+        await r.aclose()
+        return json.loads(raw) if raw else None
+    except Exception:
+        return None
+
+
+async def _cache_set(key: str, data: dict) -> None:
+    try:
+        import redis.asyncio as aioredis  # type: ignore[import]
+
+        r = aioredis.from_url(settings.redis_url, decode_responses=True)
+        await r.setex(key, _SERP_CACHE_TTL, json.dumps(data))
+        await r.aclose()
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -103,6 +142,8 @@ class ContentPipeline:
         voice: str,
         list_usage: str,
         custom_instructions: str | None,
+        secondary_keywords: list[str] | None = None,
+        entities: list[str] | None = None,
     ) -> tuple[GeneratedOutline, str]:
         """Generate outline via OpenAI (Structured Outputs), falling back to Claude on error.
 
@@ -123,6 +164,8 @@ class ContentPipeline:
                         voice=voice,
                         list_usage=list_usage,
                         custom_instructions=custom_instructions,
+                        secondary_keywords=secondary_keywords,
+                        entities=entities,
                     ),
                     timeout=60.0,
                 )
@@ -144,6 +187,8 @@ class ContentPipeline:
             voice=voice,
             list_usage=list_usage,
             custom_instructions=custom_instructions,
+            secondary_keywords=secondary_keywords,
+            entities=entities,
         )
         logger.info("Outline generated via Claude (fallback)")
         return outline, settings.anthropic_model
@@ -160,10 +205,12 @@ class ContentPipeline:
         voice: str = "second_person",
         list_usage: str = "balanced",
         custom_instructions: str | None = None,
+        secondary_keywords: list[str] | None = None,
+        entities: list[str] | None = None,
     ) -> PipelineResult:
         """Run the full 6-step multi-model pipeline.
 
-        Steps 1+2 run in parallel (Gemini SERP + research).
+        Steps 1+2 run in parallel (Gemini SERP + research, with Redis cache).
         Step 3: outline via OpenAI (fallback Claude).
         Step 4: article via Claude (enriched with research context).
         Steps 5+6+7 run in parallel (SERP SEO check + AI fact-check + image prompt).
@@ -172,31 +219,54 @@ class ContentPipeline:
 
         # ----------------------------------------------------------------
         # Steps 1 + 2: SERP analysis + research (parallel, both Gemini)
+        # Redis cache (24h TTL) avoids repeat Gemini calls for same keyword.
         # ----------------------------------------------------------------
         serp_analysis: SERPAnalysis | None = None
         research_data: ResearchData | None = None
 
         if gemini_service.is_available() and settings.enable_serp_analysis:
-            tasks = []
-            if settings.enable_serp_analysis:
-                tasks.append(gemini_service.analyze_serp(keyword, language))
-            if settings.enable_research_step:
-                tasks.append(gemini_service.research_topic(keyword, language))
+            serp_key = _serp_cache_key("serp", keyword, language)
+            research_key = _serp_cache_key("research", keyword, language)
 
-            if tasks:
-                results = await asyncio.gather(*tasks, return_exceptions=True)
-                idx = 0
-                if settings.enable_serp_analysis:
-                    r = results[idx]
-                    idx += 1
-                    if isinstance(r, SERPAnalysis):
-                        serp_analysis = r
+            serp_cached, research_cached = await asyncio.gather(
+                _cache_get(serp_key), _cache_get(research_key)
+            )
+
+            if serp_cached:
+                try:
+                    serp_analysis = SERPAnalysis(**serp_cached)
+                    logger.info("SERP cache hit for '%s' [%s]", keyword, language)
+                    models_used["serp"] = "cache"
+                except Exception:
+                    serp_cached = None
+
+            if research_cached:
+                try:
+                    research_data = ResearchData(**research_cached)
+                    logger.info("Research cache hit for '%s' [%s]", keyword, language)
+                    models_used["research"] = "cache"
+                except Exception:
+                    research_cached = None
+
+            gemini_tasks: list[tuple[str, object]] = []
+            if not serp_cached and settings.enable_serp_analysis:
+                gemini_tasks.append(("serp", gemini_service.analyze_serp(keyword, language)))
+            if not research_cached and settings.enable_research_step:
+                gemini_tasks.append(("research", gemini_service.research_topic(keyword, language)))
+
+            if gemini_tasks:
+                results = await asyncio.gather(*[t[1] for t in gemini_tasks], return_exceptions=True)
+                for (name, _), result in zip(gemini_tasks, results):
+                    if name == "serp" and isinstance(result, SERPAnalysis):
+                        serp_analysis = result
                         models_used["serp"] = settings.gemini_model
-                if settings.enable_research_step and idx < len(results):
-                    r = results[idx]
-                    if isinstance(r, ResearchData):
-                        research_data = r
+                        if result.top_headings:
+                            await _cache_set(serp_key, dataclasses.asdict(result))
+                    elif name == "research" and isinstance(result, ResearchData):
+                        research_data = result
                         models_used["research"] = settings.gemini_model
+                        if result.key_facts or result.statistics:
+                            await _cache_set(research_key, dataclasses.asdict(result))
 
         # ----------------------------------------------------------------
         # Step 3: Outline generation
@@ -213,6 +283,8 @@ class ContentPipeline:
             voice=voice,
             list_usage=list_usage,
             custom_instructions=custom_instructions,
+            secondary_keywords=secondary_keywords,
+            entities=entities,
         )
         models_used["outline"] = outline_model
 
@@ -259,6 +331,8 @@ class ContentPipeline:
             custom_instructions=enriched_instructions or None,
             word_count_target=word_count_target,
             language=language,
+            secondary_keywords=secondary_keywords,
+            entities=entities,
         )
         models_used["article"] = settings.anthropic_model
 
@@ -327,6 +401,7 @@ class ContentPipeline:
             flagged_stats=flagged_stats,
             serp_seo=serp_seo,
             models_used=models_used,
+            url_slug=article.url_slug or None,
         )
 
     async def run_outline_only(
@@ -341,6 +416,8 @@ class ContentPipeline:
         list_usage: str = "balanced",
         custom_instructions: str | None = None,
         with_serp: bool = False,
+        secondary_keywords: list[str] | None = None,
+        entities: list[str] | None = None,
     ) -> GeneratedOutline:
         """Generate an outline only (used by bulk generation).
 
@@ -373,6 +450,8 @@ class ContentPipeline:
             voice=voice,
             list_usage=list_usage,
             custom_instructions=custom_instructions,
+            secondary_keywords=secondary_keywords,
+            entities=entities,
         )
         return outline
 

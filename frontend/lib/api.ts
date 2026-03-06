@@ -1268,8 +1268,10 @@ export const api = {
         list_usage?: string;
         custom_instructions?: string;
         language?: string;
+        secondary_keywords?: string[];
+        entities?: string[];
       }) =>
-        apiRequest<{ content_html: string; meta_description?: string; suggested_title?: string; image_prompt?: string; flagged_stats?: string[] }>({
+        apiRequest<{ content_html: string; meta_description?: string; suggested_title?: string; image_prompt?: string; flagged_stats?: string[]; url_slug?: string }>({
           method: "POST",
           url: "/admin/blog/generate-content",
           data,
@@ -1757,6 +1759,8 @@ export interface GenerateArticleInput {
   list_usage?: string;
   custom_instructions?: string;
   language?: string;
+  secondary_keywords?: string[];
+  entities?: string[];
 }
 
 export interface UpdateArticleInput {

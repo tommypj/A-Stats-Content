@@ -333,6 +333,8 @@ async def _generate_article_background(
     custom_instructions: str | None,
     word_count_target: int = 1500,
     language: str = "en",
+    secondary_keywords: list[str] | None = None,
+    entities: list[str] | None = None,
 ):
     """Background task that generates article content and updates the DB."""
     # GEN-41: TODO — add per-user generation semaphore to limit concurrent AI calls per user
@@ -353,6 +355,8 @@ async def _generate_article_background(
             custom_instructions=custom_instructions,
             word_count_target=word_count_target,
             language=language,
+            secondary_keywords=secondary_keywords,
+            entities=entities,
         )
 
 
@@ -371,6 +375,8 @@ async def _run_article_generation(
     custom_instructions: str | None,
     word_count_target: int = 1500,
     language: str = "en",
+    secondary_keywords: list[str] | None = None,
+    entities: list[str] | None = None,
 ):
     """Inner implementation of background article generation (called under semaphore)."""
     start_time = time.time()
@@ -413,6 +419,8 @@ async def _run_article_generation(
                     voice=voice,
                     list_usage=list_usage,
                     custom_instructions=custom_instructions,
+                    secondary_keywords=secondary_keywords,
+                    entities=entities,
                 ),
                 timeout=600.0,  # 10 min hard limit — covers SERP+research+outline+article
             )
@@ -472,6 +480,8 @@ async def _run_article_generation(
                 seo_result["is_proofread"] = is_proofread
                 if pipeline_result.serp_seo:
                     seo_result.update(pipeline_result.serp_seo)
+                if pipeline_result.url_slug:
+                    seo_result["suggested_slug"] = pipeline_result.url_slug
                 article.seo_score = seo_result["score"]
                 article.seo_analysis = seo_result
             except Exception as seo_err:
@@ -479,6 +489,7 @@ async def _run_article_generation(
                 article.seo_analysis = {
                     "is_proofread": is_proofread,
                     **(pipeline_result.serp_seo or {}),
+                    **({"suggested_slug": pipeline_result.url_slug} if pipeline_result.url_slug else {}),
                 }
 
             # Apply pipeline image prompt and flagged stats (already computed in parallel)
@@ -649,15 +660,11 @@ async def generate_article(
     # GEN-47: Validate generation style params against allowed enum values.
     # Brand voice values come from user-editable JSON — sanitize to defaults on invalid input.
     _VALID_WRITING_STYLES = {
-        "editorial",
-        "conversational",
-        "formal",
-        "technical",
-        "simplified",
-        "balanced",
+        "editorial", "narrative", "listicle", "balanced",
+        "storytelling", "how_to", "informative", "persuasive", "technical", "academic",
     }
     _VALID_VOICES = {"first_person", "second_person", "third_person"}
-    _VALID_LIST_USAGES = {"heavy", "light", "balanced"}
+    _VALID_LIST_USAGES = {"minimal", "light", "balanced", "heavy", "extensive"}
 
     resolved_writing_style = body.writing_style or brand_voice.get("writing_style") or "balanced"
     if resolved_writing_style not in _VALID_WRITING_STYLES:
@@ -689,6 +696,8 @@ async def generate_article(
             custom_instructions=body.custom_instructions or brand_voice.get("custom_instructions"),
             word_count_target=outline.word_count_target or 1500,
             language=body.language or brand_voice.get("language") or current_user.language or "en",
+            secondary_keywords=body.secondary_keywords or None,
+            entities=body.entities or None,
         )
     )
     _active_generation_tasks[article_id] = task

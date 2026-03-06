@@ -570,6 +570,8 @@ class BlogGenerateRequest(BaseModel):
     list_usage: str = "balanced"
     custom_instructions: str | None = None
     language: str = "en"
+    secondary_keywords: list[str] = []
+    entities: list[str] = []
 
 
 class BlogGenerateResponse(BaseModel):
@@ -578,6 +580,7 @@ class BlogGenerateResponse(BaseModel):
     suggested_title: str | None = None
     image_prompt: str | None = None
     flagged_stats: list[str] = []
+    url_slug: str | None = None
 
 
 @router.post("/generate-content", response_model=BlogGenerateResponse)
@@ -603,6 +606,8 @@ async def admin_generate_blog_content(
         voice=body.voice,
         list_usage=body.list_usage,
         custom_instructions=body.custom_instructions,
+        secondary_keywords=body.secondary_keywords or None,
+        entities=body.entities or None,
     )
 
     # Convert markdown to HTML
@@ -621,6 +626,7 @@ async def admin_generate_blog_content(
         suggested_title=pipeline_result.outline.title or None,
         image_prompt=pipeline_result.image_prompt,
         flagged_stats=pipeline_result.flagged_stats,
+        url_slug=pipeline_result.url_slug or None,
     )
 
 

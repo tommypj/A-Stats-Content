@@ -83,6 +83,7 @@ class GeneratedArticle:
     content: str
     meta_description: str
     word_count: int
+    url_slug: str = ""
 
 
 class AnthropicContentService:
@@ -141,7 +142,13 @@ class AnthropicContentService:
         style_instructions = {
             "editorial": "Write in an editorial, opinion-driven style. Take clear positions, use rhetorical questions, and build persuasive arguments. Each section should read like a magazine feature — compelling, authoritative, and narrative-driven.",
             "narrative": "Write in a storytelling, narrative style. Use anecdotes, scenarios, and vivid descriptions. Guide the reader through a journey rather than presenting information in a structured list format. Paint pictures with words.",
+            "storytelling": "Write using a storytelling approach with narrative flow, anecdotes, and vivid scenarios. Guide the reader through a journey that illustrates key points through examples and real-world situations.",
             "listicle": "Write in a structured listicle style. Use numbered items or bullet points as the primary format. Each point should have a bold heading followed by a brief explanation. Keep it scannable and punchy.",
+            "how_to": "Write as a practical step-by-step guide. Use numbered steps, clear action verbs, and concrete instructions. Focus on actionability and implementation over theory.",
+            "informative": "Write in a clear, educational style that prioritizes accuracy and comprehensiveness. Present information objectively with well-organized sections and supporting evidence.",
+            "persuasive": "Write to persuade and influence. Build compelling arguments, use evidence strategically, address objections proactively, and guide the reader toward a clear conclusion or action.",
+            "technical": "Write for a technically literate audience. Use precise terminology, include technical details, reference specifications, and assume domain knowledge without over-explaining basics.",
+            "academic": "Write in a formal academic style with structured argumentation, evidence-based claims, objective tone, and scholarly precision. Avoid colloquialisms and maintain professional distance.",
             "balanced": "Write in a balanced editorial style that combines flowing prose paragraphs with occasional lists. The majority of content should be written as engaging paragraphs. Use bullet points or numbered lists sparingly — only when presenting 4+ parallel items that genuinely benefit from list format (like ingredients, steps in a process, or tool recommendations). Never use a list when a well-written paragraph would be more engaging.",
         }
 
@@ -153,8 +160,10 @@ class AnthropicContentService:
 
         list_instructions = {
             "minimal": "Avoid bullet points and numbered lists almost entirely. Express all information through well-crafted prose paragraphs. If you must use a list, limit it to one per 500 words maximum.",
+            "light": "Use lists sparingly — prefer flowing prose with only occasional lists (one per major section at most). When lists appear, keep them short (3-5 items) with good prose context around them.",
             "balanced": "Use lists sparingly and strategically. For every list you include, ensure there are at least 3-4 substantial prose paragraphs surrounding it. Lists should be the exception, not the rule.",
             "heavy": "Feel free to use bullet points and numbered lists frequently to make content highly scannable. But still include introductory and transitional paragraphs between lists.",
+            "extensive": "Use bullet points and numbered lists as a primary format throughout. Make the content highly scannable. Almost every key point should be in a list format. Include brief introductory sentences but lead with structured lists.",
         }
 
         language_name = self._get_language_name(language)
@@ -220,6 +229,8 @@ CRITICAL RULES:
         voice: str = "second_person",
         list_usage: str = "balanced",
         custom_instructions: str | None = None,
+        secondary_keywords: list[str] | None = None,
+        entities: list[str] | None = None,
     ) -> GeneratedOutline:
         """
         Generate an article outline based on keyword and parameters.
@@ -248,7 +259,20 @@ CRITICAL RULES:
             self._sanitize_prompt_input(custom_instructions, 1000) if custom_instructions else None
         )
 
+        secondary_keywords = [
+            self._sanitize_prompt_input(kw, 100) for kw in (secondary_keywords or [])[:10] if kw
+        ]
+        entities = [
+            self._sanitize_prompt_input(e, 100) for e in (entities or [])[:10] if e
+        ]
+
         audience_context = f"Target audience: {target_audience}" if target_audience else ""
+        secondary_kw_context = (
+            f"\nSecondary keywords to include: {', '.join(secondary_keywords)}" if secondary_keywords else ""
+        )
+        entities_context = (
+            f"\nEntities to mention: {', '.join(entities)}" if entities else ""
+        )
         custom_context = (
             f"\nAdditional instructions: {custom_instructions}" if custom_instructions else ""
         )
@@ -264,7 +288,7 @@ CRITICAL RULES:
 Keyword: {keyword}
 {audience_context}
 Tone: {tone}
-Target word count: {word_count_target} words{language_context}{custom_context}
+Target word count: {word_count_target} words{language_context}{secondary_kw_context}{entities_context}{custom_context}
 
 Generate a detailed outline with:
 1. A compelling, SEO-optimized title that is 30-60 characters long and includes the keyword "{keyword}"{f" (in {language_name})" if language != "en" else ""}
@@ -351,6 +375,8 @@ Respond in JSON format:
         custom_instructions: str | None = None,
         word_count_target: int = 1500,
         language: str = "en",
+        secondary_keywords: list[str] | None = None,
+        entities: list[str] | None = None,
     ) -> GeneratedArticle:
         """
         Generate a full article based on an outline.
@@ -381,7 +407,20 @@ Respond in JSON format:
         )
         title = self._sanitize_prompt_input(title, 300)
 
+        secondary_keywords = [
+            self._sanitize_prompt_input(kw, 100) for kw in (secondary_keywords or [])[:10] if kw
+        ]
+        entities = [
+            self._sanitize_prompt_input(e, 100) for e in (entities or [])[:10] if e
+        ]
+
         audience_context = f"Target audience: {target_audience}" if target_audience else ""
+        secondary_kw_context = (
+            f"\nSECONDARY KEYWORDS: {', '.join(secondary_keywords)}" if secondary_keywords else ""
+        )
+        entities_context = (
+            f"\nENTITIES (integrate naturally): {', '.join(entities)}" if entities else ""
+        )
         custom_context = (
             f"\nAdditional instructions from the user:\n{custom_instructions}"
             if custom_instructions
@@ -439,7 +478,7 @@ Respond in JSON format:
 
 Title: {title}
 Keyword: {keyword}
-{audience_context}
+{audience_context}{secondary_kw_context}{entities_context}
 Tone: {tone}{language_context}
 
 **TARGET WORD COUNT: approximately {word_count_target} words (between {word_min} and {word_max} words). Strict requirement — do NOT exceed {word_max} words.**
@@ -509,9 +548,10 @@ SEO & COMPLETENESS REQUIREMENTS
 
 Write in markdown format. Start directly with the introduction — do NOT add an H1 title.
 
-At the very end, after the article, add:
+At the very end, after the article, add on separate lines:
 ---
-META_DESCRIPTION: [A compelling 150-160 character meta description that MUST include the keyword "{keyword}"]"""
+META_DESCRIPTION: [A compelling 150-160 character meta description that MUST include the keyword "{keyword}"]
+URL_SLUG: [SEO-friendly URL slug, lowercase, hyphens only, max 60 chars, must include the keyword]"""
 
         # Generate with retry on truncation
         max_attempts = 2
@@ -558,13 +598,20 @@ META_DESCRIPTION: [A compelling 150-160 character meta description that MUST inc
             raise AIGenerationError("AI returned empty response")
         response_text = message.content[0].text
 
-        # Extract meta description
+        # Extract meta description and url slug
         meta_description = ""
+        url_slug = ""
         content = response_text
         if "META_DESCRIPTION:" in response_text:
-            parts = response_text.split("META_DESCRIPTION:")
+            parts = response_text.split("META_DESCRIPTION:", 1)
             content = parts[0].strip().rstrip("-").strip()
-            meta_description = parts[1].strip()[:160]
+            after_meta = parts[1]
+            if "URL_SLUG:" in after_meta:
+                meta_parts = after_meta.split("URL_SLUG:", 1)
+                meta_description = meta_parts[0].strip()[:160]
+                url_slug = meta_parts[1].split("\n")[0].strip()[:100]
+            else:
+                meta_description = after_meta.strip()[:160]
 
         # Calculate word count
         word_count = len(content.split())
@@ -574,6 +621,7 @@ META_DESCRIPTION: [A compelling 150-160 character meta description that MUST inc
             content=content,
             meta_description=meta_description,
             word_count=word_count,
+            url_slug=url_slug,
         )
 
     async def proofread_grammar(

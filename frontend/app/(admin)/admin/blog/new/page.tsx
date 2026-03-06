@@ -39,8 +39,11 @@ export default function AdminNewBlogPostPage() {
   const [aiListUsage, setAiListUsage] = useState("balanced");
   const [aiCustomInstructions, setAiCustomInstructions] = useState("");
   const [aiLanguage, setAiLanguage] = useState("en");
+  const [aiSecondaryKeywords, setAiSecondaryKeywords] = useState("");
+  const [aiEntities, setAiEntities] = useState("");
   const [imagePrompt, setImagePrompt] = useState("");
   const [flaggedStats, setFlaggedStats] = useState<string[]>([]);
+  const [generatedSlug, setGeneratedSlug] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Form fields
@@ -111,11 +114,18 @@ export default function AdminNewBlogPostPage() {
         list_usage: aiListUsage,
         custom_instructions: aiCustomInstructions || undefined,
         language: aiLanguage,
+        secondary_keywords: aiSecondaryKeywords
+          ? aiSecondaryKeywords.split(",").map((s) => s.trim()).filter(Boolean)
+          : undefined,
+        entities: aiEntities
+          ? aiEntities.split(",").map((s) => s.trim()).filter(Boolean)
+          : undefined,
       });
       setContentHtml(result.content_html);
       if (result.meta_description && !metaDescription) setMetaDescription(result.meta_description);
       if (result.image_prompt) setImagePrompt(result.image_prompt);
       setFlaggedStats(result.flagged_stats || []);
+      if (result.url_slug) setGeneratedSlug(result.url_slug);
       toast.success("Content generated!");
     } catch (err) {
       toast.error(parseApiError(err).message);
@@ -335,6 +345,28 @@ export default function AdminNewBlogPostPage() {
                       className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                     />
                   </div>
+                  <div>
+                    <label className="block text-xs font-medium text-text-secondary mb-1">Secondary Keywords</label>
+                    <input
+                      type="text"
+                      value={aiSecondaryKeywords}
+                      onChange={e => setAiSecondaryKeywords(e.target.value)}
+                      placeholder="keyword1, keyword2"
+                      className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                    />
+                    <p className="text-xs text-text-muted mt-0.5">Comma-separated, max 10</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-text-secondary mb-1">Entities</label>
+                    <input
+                      type="text"
+                      value={aiEntities}
+                      onChange={e => setAiEntities(e.target.value)}
+                      placeholder="Google, HubSpot, Neil Patel"
+                      className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                    />
+                    <p className="text-xs text-text-muted mt-0.5">Brands, tools, people</p>
+                  </div>
                 </div>
               )}
 
@@ -384,6 +416,19 @@ export default function AdminNewBlogPostPage() {
                 </div>
               )}
             </div>
+
+            {generatedSlug && !slugEdited && (
+              <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+                <span className="text-xs font-medium text-green-700">Suggested slug:</span>
+                <button
+                  onClick={() => { setSlug(generatedSlug); setSlugEdited(true); }}
+                  className="text-xs font-mono text-green-800 hover:underline"
+                >
+                  {generatedSlug}
+                </button>
+                <span className="text-xs text-green-600">(click to apply)</span>
+              </div>
+            )}
 
             {flaggedStats.length > 0 && (
               <div className="border border-amber-300 bg-amber-50 rounded-lg p-4">

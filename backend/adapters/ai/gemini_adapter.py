@@ -28,6 +28,7 @@ class SERPAnalysis:
     paa_questions: list[str] = field(default_factory=list)
     content_gaps: list[str] = field(default_factory=list)
     competing_titles: list[str] = field(default_factory=list)
+    search_intent: str = "informational"  # informational | commercial | transactional | navigational
 
 
 @dataclass
@@ -154,7 +155,8 @@ Analyze the top 10 search results and return a JSON object with this exact struc
   "avg_word_count": 1500,
   "paa_questions": ["question 1", "question 2"],
   "content_gaps": ["gap 1", "gap 2"],
-  "competing_titles": ["title 1", "title 2"]
+  "competing_titles": ["title 1", "title 2"],
+  "search_intent": "informational"
 }}
 
 - top_headings: the most common H2/H3 headings used across top results (max 12)
@@ -162,6 +164,7 @@ Analyze the top 10 search results and return a JSON object with this exact struc
 - paa_questions: "People Also Ask" questions from the SERP (max 8)
 - content_gaps: topics the top results miss or undercover (max 5)
 - competing_titles: actual article titles from top results (max 5)
+- search_intent: primary search intent — one of: informational, commercial, transactional, navigational
 
 Return ONLY valid JSON, no markdown fences, no explanation. Language context: {language}"""
 
@@ -177,6 +180,7 @@ Return ONLY valid JSON, no markdown fences, no explanation. Language context: {l
                 paa_questions=data.get("paa_questions", []),
                 content_gaps=data.get("content_gaps", []),
                 competing_titles=data.get("competing_titles", []),
+                search_intent=data.get("search_intent", "informational"),
             )
         except Exception as e:
             logger.warning("Gemini SERP analysis failed for '%s': %s", keyword, e)

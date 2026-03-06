@@ -45,6 +45,8 @@ function NewArticleContent() {
   const [voice, setVoice] = useState("second_person");
   const [listUsage, setListUsage] = useState("balanced");
   const [customInstructions, setCustomInstructions] = useState("");
+  const [secondaryKeywords, setSecondaryKeywords] = useState("");
+  const [entities, setEntities] = useState("");
   // FE-CONTENT-01: track mount status to prevent setState on unmounted component
   const mountedRef = useRef(true);
   const pollingRef = useRef(false);
@@ -93,6 +95,12 @@ function NewArticleContent() {
         voice: voice,
         list_usage: listUsage,
         custom_instructions: customInstructions || undefined,
+        secondary_keywords: secondaryKeywords
+          ? secondaryKeywords.split(",").map((s) => s.trim()).filter(Boolean)
+          : undefined,
+        entities: entities
+          ? entities.split(",").map((s) => s.trim()).filter(Boolean)
+          : undefined,
       });
 
       // Poll GET /articles/{id} every 3s until completed/failed (max ~12 minutes)
@@ -322,6 +330,35 @@ function NewArticleContent() {
                   <p className={`text-xs mt-1 ${customInstructions.length > 800 ? "text-amber-500" : "text-text-muted"}`}>
                     {customInstructions.length}/1000 characters
                   </p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                      Secondary Keywords (optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={secondaryKeywords}
+                      onChange={(e) => setSecondaryKeywords(e.target.value)}
+                      placeholder="keyword1, keyword2, keyword3"
+                      className="w-full px-3 py-2 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all text-sm"
+                    />
+                    <p className="text-xs text-text-muted mt-1">Comma-separated, max 10</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                      Entities (optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={entities}
+                      onChange={(e) => setEntities(e.target.value)}
+                      placeholder="Google, HubSpot, Neil Patel"
+                      className="w-full px-3 py-2 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all text-sm"
+                    />
+                    <p className="text-xs text-text-muted mt-1">Brands, tools, people — comma-separated</p>
+                  </div>
                 </div>
               </div>
 

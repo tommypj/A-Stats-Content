@@ -111,11 +111,27 @@ class ArticleGenerateRequest(BaseModel):
     language: str | None = Field(
         None, max_length=10, description="Content language code (e.g., 'en', 'ro')"
     )
+    secondary_keywords: list[str] = Field(
+        default_factory=list,
+        description="Secondary keywords to weave naturally into the article (max 10)",
+    )
+    entities: list[str] = Field(
+        default_factory=list,
+        description="Key entities (people, brands, tools) to mention naturally (max 10)",
+    )
 
     # GEN-47: Validate enum-like fields against values the AI adapter actually supports
-    VALID_WRITING_STYLES: ClassVar[set[str]] = {"editorial", "narrative", "listicle", "balanced"}
+    VALID_WRITING_STYLES: ClassVar[set[str]] = {
+        "editorial", "narrative", "listicle", "balanced",
+        "storytelling", "how_to", "informative", "persuasive", "technical", "academic",
+    }
     VALID_VOICES: ClassVar[set[str]] = {"first_person", "second_person", "third_person"}
-    VALID_LIST_USAGES: ClassVar[set[str]] = {"minimal", "balanced", "heavy"}
+    VALID_LIST_USAGES: ClassVar[set[str]] = {"minimal", "light", "balanced", "heavy", "extensive"}
+
+    @field_validator("secondary_keywords", "entities")
+    @classmethod
+    def cap_list(cls, v: list[str]) -> list[str]:
+        return [s.strip()[:100] for s in v[:10] if s.strip()]
 
     @field_validator("writing_style")
     @classmethod

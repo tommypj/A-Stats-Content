@@ -77,6 +77,8 @@ class OpenAIOutlineService:
         voice: str = "second_person",
         list_usage: str = "balanced",
         custom_instructions: str | None = None,
+        secondary_keywords: list[str] | None = None,
+        entities: list[str] | None = None,
     ) -> GeneratedOutline:
         """Generate a structured outline using GPT-4o mini with Structured Outputs.
 
@@ -93,6 +95,7 @@ class OpenAIOutlineService:
             gaps = "\n".join(f"  - {g}" for g in serp_analysis.content_gaps[:5])
             serp_block = (
                 f"\nSERP Intelligence (from live Google Search):\n"
+                f"- Search intent: {serp_analysis.search_intent}\n"
                 f"- Top competitor headings:\n{headings}\n"
                 f"- People Also Ask questions:\n{paa}\n"
                 f"- Content gaps to exploit:\n{gaps}\n"
@@ -110,9 +113,24 @@ class OpenAIOutlineService:
                 f"- Real statistics to use:\n{stats}\n"
             )
 
+        secondary_keywords = secondary_keywords or []
+        entities = entities or []
+
         audience_line = f"Target audience: {target_audience}" if target_audience else ""
         custom_line = (
             f"\nAdditional instructions: {custom_instructions}" if custom_instructions else ""
+        )
+        secondary_kw_line = (
+            f"\nSecondary keywords to cover naturally: {', '.join(secondary_keywords[:10])}"
+            if secondary_keywords else ""
+        )
+        entities_line = (
+            f"\nKey entities to integrate naturally: {', '.join(entities[:10])}"
+            if entities else ""
+        )
+        search_intent_line = (
+            f"\nDetected search intent: {serp_analysis.search_intent}"
+            if serp_analysis and hasattr(serp_analysis, "search_intent") else ""
         )
 
         system_prompt = (
@@ -128,13 +146,16 @@ class OpenAIOutlineService:
             f"Language: {language}\n"
             f"{serp_block}"
             f"{research_block}"
+            f"{secondary_kw_line}"
+            f"{entities_line}"
             f"{custom_line}\n\n"
             f"Create an outline that:\n"
             f"1. Covers the keyword comprehensively based on SERP data\n"
             f"2. Addresses People Also Ask questions within relevant sections\n"
             f"3. Exploits content gaps that competitors miss\n"
             f"4. Incorporates the research facts naturally within section notes\n"
-            f"5. Has sections with realistic word count targets summing to ~{word_count_target} words"
+            f"5. Has sections with realistic word count targets summing to ~{word_count_target} words\n"
+            f"6. Matches the detected search intent{search_intent_line}"
         )
 
         response = await self._client.beta.chat.completions.parse(
