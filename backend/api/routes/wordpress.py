@@ -836,10 +836,14 @@ async def _upload_image_to_wp(
     # Use a keyword-based slug for the filename when SEO metadata is provided,
     # so WordPress generates a keyword-rich image URL (good for Google Images).
     if title:
-        slug = title.lower().replace(" ", "-").replace("—", "")
+        # Transliterate to ASCII for Content-Disposition header compatibility
+        import unicodedata
+        normalized = unicodedata.normalize("NFKD", title.lower())
+        slug = normalized.encode("ascii", "ignore").decode("ascii")
+        slug = slug.replace(" ", "-").replace("—", "")
         slug = "".join(c for c in slug if c.isalnum() or c == "-")
         slug = slug.strip("-")[:60]
-        filename = f"{slug}{ext}"
+        filename = f"{slug}{ext}" if slug else f"ai-image-{image.id[:8]}{ext}"
     else:
         filename = f"ai-image-{image.id[:8]}{ext}"
 
