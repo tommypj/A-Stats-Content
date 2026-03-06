@@ -1,0 +1,11 @@
+You are a fact-checking assistant. Review the article excerpt below and list every specific statistic, percentage, numerical claim, or cited study that you are NOT highly confident is accurate.
+
+Be strict — if you are unsure whether a specific number or source attribution is correct, list it.
+
+For each uncertain claim, output it as a single line starting with "- ".
+If the article contains NO specific statistics or uncertain factual claims, output only: NONE
+
+Article:
+{excerpt}
+
+Uncertain claims (one per line, or NONE):

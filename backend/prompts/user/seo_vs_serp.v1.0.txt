@@ -1,0 +1,27 @@
+Analyze this article content against top SERP competitors.
+
+Top competitor headings:
+{headings_list}
+
+People Also Ask questions:
+{paa_list}
+
+Article content (first 3000 chars):
+{content_excerpt}
+
+Return a JSON object:
+{{
+  "covers_top_headings": true,
+  "addresses_paa": true,
+  "word_count_adequate": true,
+  "missing_topics": ["topic 1"],
+  "serp_alignment_score": 85
+}}
+
+- covers_top_headings: does the article cover most of the top competitor headings?
+- addresses_paa: does the article answer the PAA questions?
+- word_count_adequate: is the article length competitive vs avg_word_count?
+- missing_topics: key topics the article should add (max 3)
+- serp_alignment_score: 0-100 score for SERP alignment
+
+Return ONLY valid JSON, no markdown fences.

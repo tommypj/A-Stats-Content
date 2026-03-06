@@ -1,0 +1,79 @@
+Write a complete, high-performance article optimised for both Google Search and AI answer engines (Google AI Overviews, Perplexity, ChatGPT). Follow ALL structural requirements below exactly.
+
+Title: {title}
+Keyword: {keyword}
+{audience_context}{secondary_kw_context}{entities_context}
+Tone: {tone}{language_context}
+
+**TARGET WORD COUNT: approximately {word_count_target} words (between {word_min} and {word_max} words). Strict requirement — do NOT exceed {word_max} words.**
+
+Outline:
+{sections_text}
+
+═══════════════════════════════════════════
+MANDATORY ARTICLE STRUCTURE — FOLLOW EXACTLY
+═══════════════════════════════════════════
+
+━━━ SECTION 1: INTRODUCTION (HPPP Formula) ━━━
+Write the introduction using this exact 4-part sequence:
+• Hook: ONE striking sentence — a surprising statistic, counterintuitive fact, or a statement the reader immediately nods at
+• Problem: 1-2 sentences naming the specific challenge the reader faces related to "{keyword}"
+• Promise: 1 sentence stating this article provides the solution
+• Preview: 1-2 sentences summarising what the article covers
+
+Immediately after the HPPP intro, add this TL;DR callout on its own line:
+> **Quick Answer:** [30-50 word direct, standalone answer to the primary question about "{keyword}" — must be independently citable]
+
+━━━ SECTION 2: BODY SECTIONS (apply to EVERY H2) ━━━
+Each H2 section should generally include the following elements, but vary the order and emphasis to create natural reading rhythm — avoid a repetitive template feel:
+a) **Answer Capsule** (strongly recommended as the opening): 1-2 sentences, 20-25 words, that directly answer the section's implied question. Should stand alone without surrounding context.
+b) **Context Block**: Expand to 120-180 words total for the section, adding supporting data, examples, or evidence
+c) **Supporting element**: where appropriate, include a list, table, example, or analogy — choose what best fits the section's content
+d) **Statistics**: ONLY include statistics you are highly confident are accurate. Mark every specific figure with [VERIFY] for editorial review — e.g., "62% of marketers report better engagement (HubSpot, 2025) [VERIFY]". Prefer qualitative claims ("research consistently shows", "the majority of", "industry data suggests") over precise numbers you are not certain about. NEVER invent percentages or attribute data to organizations unless you are certain they published it.
+
+Vary how you open sections — some with the answer capsule, some with a scenario or question, some with a striking fact. The goal is natural editorial flow, not mechanical repetition.
+
+{format_guidelines}
+
+━━━ SECTION 3: COMPARISON TABLE (include when topic allows) ━━━
+If the topic involves comparing options, approaches, tools, or methods, include a markdown table:
+| Aspect | Option A | Option B |
+|--------|----------|----------|
+Use at least 3 columns and 4 rows. Place it inside the most relevant H2 section.
+
+━━━ SECTION 4: EXPERT INSIGHT (REQUIRED) ━━━
+Include at least one expert insight formatted as a blockquote:
+> **[Expert Name, Role/Organisation]:** "[Direct quote or insight that adds authority to a key point in the article]"
+
+Place it naturally within the body where it supports a claim.
+
+━━━ SECTION 5: FAQ SECTION (REQUIRED — DO NOT SKIP) ━━━
+After the main body and before the conclusion, add:
+
+## Frequently Asked Questions About {keyword}
+
+Write exactly 5-7 Q&As. Rules:
+- Question: Phrased exactly as a real user would type in Google or ask a voice assistant (question format, not a statement)
+- Answer: 40-60 words, completely self-contained — NO "as mentioned above", NO "as discussed", NO forward references
+
+━━━ SECTION 6: CONCLUSION ━━━
+Structure the conclusion as:
+a) Summary paragraph: 40-60 words restating the core answer in fresh language (do not repeat the intro)
+b) **Key Takeaways** list: 4-6 concrete, actionable bullet points from the article
+c) Call to action: 1-2 sentence next step for the reader
+
+═══════════════════════════════════════════
+SEO & COMPLETENESS REQUIREMENTS
+═══════════════════════════════════════════
+- **Word count**: MUST be between {word_min} and {word_max} words. Distribute proportionally across all {section_count} sections — do NOT stop early.
+- **Keyword placement**: Mention "{keyword}" naturally within the first 100 words. Use it in at least one H2 heading. Use semantic variations and related phrases throughout — do NOT repeat the exact keyword unnaturally.
+- **Links**: Include 2-3 contextual markdown links with descriptive anchor text: [descriptive text](https://example.com/page). At least 1 external link to an authoritative source.
+- **Complete ALL outline sections**: Every H2 and H3 in the outline must be covered.
+{custom_context}
+
+Write in markdown format. Start directly with the introduction — do NOT add an H1 title.
+
+At the very end, after the article, add on separate lines:
+---
+META_DESCRIPTION: [A compelling 150-160 character meta description that MUST include the keyword "{keyword}"]
+URL_SLUG: [SEO-friendly URL slug, lowercase, hyphens only, max 60 chars, must include the keyword]

@@ -52,6 +52,8 @@ import { clsx } from "clsx";
 import { toast } from "sonner";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
+import { QualityTierBadge } from "@/components/article/quality-tier-badge";
+import { StructuredDataPreview } from "@/components/article/structured-data-preview";
 
 // ---------------------------------------------------------------------------
 // Word Count Widget — live word count, optional target + progress bar
@@ -1285,6 +1287,7 @@ export default function ArticleEditorPage() {
               <span className="px-2 py-0.5 bg-surface-secondary rounded-md">
                 {article.keyword}
               </span>
+              <QualityTierBadge tier={article.quality_tier} />
               <span>{article.word_count} words</span>
               {article.read_time && <span>{article.read_time} min read</span>}
             </div>
@@ -1849,6 +1852,9 @@ export default function ArticleEditorPage() {
               </ul>
             </Card>
           )}
+
+          {/* Structured Data Preview */}
+          <StructuredDataPreview schemas={article.schemas} />
 
           {/* Quick Actions */}
           <Card className="p-4">

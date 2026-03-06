@@ -1,0 +1,28 @@
+{
+  "prompts": {
+    "article_system": { "version": "1.0", "path": "system/article_system.v1.0.txt" },
+    "outline_claude": { "version": "1.0", "path": "user/outline_claude.v1.0.txt" },
+    "outline_openai": { "version": "1.0", "path": "user/outline_openai.v1.0.txt" },
+    "article_generation": { "version": "1.0", "path": "user/article_generation.v1.0.txt" },
+    "fact_check": { "version": "1.0", "path": "user/fact_check.v1.0.txt" },
+    "image_prompt": { "version": "1.0", "path": "user/image_prompt.v1.0.txt" },
+    "proofread": { "version": "1.0", "path": "user/proofread.v1.0.txt" },
+    "improve_content": { "version": "1.0", "path": "user/improve_content.v1.0.txt" },
+    "meta_description": { "version": "1.0", "path": "user/meta_description.v1.0.txt" },
+    "social_posts": { "version": "1.0", "path": "user/social_posts.v1.0.txt" },
+    "content_suggestions": { "version": "1.0", "path": "user/content_suggestions.v1.0.txt" },
+    "serp_analysis": { "version": "1.0", "path": "user/serp_analysis.v1.0.txt" },
+    "research": { "version": "1.0", "path": "user/research.v1.0.txt" },
+    "seo_vs_serp": { "version": "1.0", "path": "user/seo_vs_serp.v1.0.txt" },
+    "fact_check_repair": { "version": "1.0", "path": "user/fact_check_repair.v1.0.txt" },
+    "section_regeneration": { "version": "1.0", "path": "user/section_regeneration.v1.0.txt" },
+    "cluster_generation": { "version": "1.0", "path": "user/cluster_generation.v1.0.txt" }
+  },
+  "config": {
+    "writing_styles": "config/writing_styles.json",
+    "voice_options": "config/voice_options.json",
+    "list_usage": "config/list_usage.json",
+    "format_guidelines": "config/format_guidelines.json",
+    "improvement_types": "config/improvement_types.json"
+  }
+}

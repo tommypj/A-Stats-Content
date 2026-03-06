@@ -1,0 +1,24 @@
+Generate social media posts for the following article. Each post should promote the article and include the URL.
+
+Article Title: {article_title}
+Article Summary: {article_summary}
+Article URL: {article_url}
+Keywords: {keywords_text}
+
+Generate a post for each platform with these constraints:
+
+1. **Twitter/X** (max 280 characters total including URL): Concise hook, include the URL, add 2-3 relevant hashtags. Must be punchy and engaging.
+
+2. **LinkedIn** (max 3000 characters): Professional tone, include 2-3 key takeaways as bullet points, include the URL, add 3-5 professional hashtags. Start with a compelling hook.
+
+3. **Facebook** (max 500 characters): Conversational tone, start with an engaging question or hook, include the URL, add 2-3 hashtags. Encourage engagement.
+
+4. **Instagram** (caption style): Write an engaging caption with emojis, include 5-10 relevant hashtags at the end, mention "link in bio" instead of the URL. Make it visually descriptive.
+
+Respond in JSON format:
+{{
+    "twitter": "tweet text here",
+    "linkedin": "linkedin post here",
+    "facebook": "facebook post here",
+    "instagram": "instagram caption here"
+}}

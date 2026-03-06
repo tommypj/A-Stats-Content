@@ -218,6 +218,9 @@ class ArticleResponse(BaseModel):
     seo_analysis: dict[str, Any] | None
     ai_model: str | None
     image_prompt: str | None = None
+    quality_tier: str | None = None
+    schemas: dict[str, Any] | None = None
+    run_metadata: dict[str, Any] | None = None
     published_at: datetime | None
     published_url: str | None
     featured_image_id: str | None
@@ -246,6 +249,7 @@ class ArticleListItemResponse(BaseModel):
     seo_analysis: dict[str, Any] | None
     ai_model: str | None
     image_prompt: str | None = None
+    quality_tier: str | None = None
     published_at: datetime | None
     published_url: str | None
     featured_image_id: str | None

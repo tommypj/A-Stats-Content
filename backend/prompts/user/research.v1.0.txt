@@ -1,0 +1,15 @@
+Search Google for real facts and statistics about: "{keyword}"
+
+Return a JSON object with this exact structure:
+{{
+  "key_facts": ["Fact sentence. (source.com)"],
+  "statistics": ["X% of Y according to Z. (source.com)"],
+  "related_topics": ["topic 1", "topic 2"]
+}}
+
+- key_facts: verified factual statements with source domain in parentheses (max 8)
+- statistics: real numerical statistics with source domain in parentheses (max 6)
+- related_topics: closely related subtopics worth covering (max 6)
+
+Only include facts/stats you found via Google Search. Include the source domain in parentheses.
+Return ONLY valid JSON, no markdown fences, no explanation. Language context: {language}

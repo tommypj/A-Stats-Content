@@ -1,0 +1,33 @@
+Analyze these keyword opportunities from Google Search Console and suggest article topics.
+
+KEYWORD DATA:
+{keywords_text}
+
+EXISTING ARTICLES (avoid duplicating these):
+{existing_text}
+{language_instruction}
+
+For each suggestion provide:
+1. A compelling, SEO-optimized article title
+2. The primary target keyword
+3. A content angle (1-2 sentences describing the unique approach)
+4. Rationale for why this content would perform well (based on the data)
+5. Estimated difficulty (easy/medium/hard based on keyword competition implied by position)
+6. Recommended word count (1000-3000)
+
+Group related keywords into single article suggestions where appropriate.
+Suggest 5-{max_suggestions} articles.
+
+Respond in JSON format:
+{{
+    "suggestions": [
+        {{
+            "suggested_title": "Article Title",
+            "target_keyword": "primary keyword",
+            "content_angle": "Unique approach description",
+            "rationale": "Why this will perform well",
+            "estimated_difficulty": "easy|medium|hard",
+            "estimated_word_count": 1500
+        }}
+    ]
+}}

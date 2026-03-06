@@ -1,0 +1,6 @@
+{improvement_instruction}
+
+Original content:
+{content}
+
+Provide the improved version in markdown format.

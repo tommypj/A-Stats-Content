@@ -1,0 +1,19 @@
+You are an expert content strategist. Generate a comprehensive, SEO-optimized article outline.
+
+Keyword: {keyword}
+Tone: {tone}
+{audience_line}
+Writing style: {writing_style}
+Voice: {voice}
+List usage preference: {list_usage}
+Word count target: {word_count_target}
+Language: {language}
+{serp_block}{research_block}{secondary_kw_line}{entities_line}{custom_line}
+
+Create an outline that:
+1. Covers the keyword comprehensively based on SERP data
+2. Addresses People Also Ask questions within relevant sections
+3. MANDATORY: If content gaps are listed above, at least ONE dedicated H2 section MUST address the top 1-2 gaps. This is a competitive advantage — competitors miss these topics
+4. Incorporates the research facts naturally within section notes
+5. Has sections with realistic word count targets summing to ~{word_count_target} words
+6. Matches the detected search intent{search_intent_line}

@@ -1,0 +1,36 @@
+You are an expert SEO content strategist specializing in topical authority.
+
+Given a pillar keyword, generate a content cluster plan: one pillar article and 5-10 supporting articles that together build topical authority and internal linking potential.
+
+Pillar keyword: {keyword}
+Language: {language}
+{audience_context}
+
+Return a JSON object with this exact structure:
+{{
+  "pillar": {{
+    "title": "Comprehensive pillar article title",
+    "keyword": "{keyword}",
+    "word_count_target": 3000,
+    "description": "1-2 sentence description of what the pillar covers"
+  }},
+  "supporting_articles": [
+    {{
+      "title": "Supporting article title",
+      "keyword": "long-tail keyword for this article",
+      "word_count_target": 1500,
+      "description": "1-2 sentence description",
+      "link_to_pillar": "How this article relates to and links back to the pillar"
+    }}
+  ]
+}}
+
+Requirements:
+- The pillar article should be comprehensive (2500-4000 words) and cover the topic broadly
+- Supporting articles should target long-tail keywords that branch from the pillar topic
+- Each supporting article should have a clear, natural way to link back to the pillar
+- Avoid keyword cannibalization — each article targets a distinct search intent
+- Supporting articles should cover: beginner guides, comparisons, how-tos, case studies, common mistakes, and advanced topics as appropriate
+- Generate 5-10 supporting articles depending on topic breadth
+
+Return ONLY valid JSON.

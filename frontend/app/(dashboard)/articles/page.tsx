@@ -34,6 +34,7 @@ import { clsx } from "clsx";
 import { useProject } from "@/contexts/ProjectContext";
 import { ContentOwnershipBadge } from "@/components/project/content-ownership-badge";
 import { UsageLimitBanner } from "@/components/project/usage-limit-warning";
+import { QualityTierBadge } from "@/components/article/quality-tier-badge";
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof FileText }> = {
   draft: { label: "Draft", color: "bg-gray-100 text-gray-700", icon: FileText },
@@ -629,6 +630,7 @@ export default function ArticlesPage() {
                       <span className="px-2 py-0.5 bg-surface-secondary rounded-md">
                         {article.keyword}
                       </span>
+                      <QualityTierBadge tier={article.quality_tier} />
                       <span className="flex items-center gap-1">
                         <FileText className="h-3.5 w-3.5" />
                         {article.word_count} words

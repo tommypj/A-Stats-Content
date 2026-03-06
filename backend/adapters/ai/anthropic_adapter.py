@@ -6,12 +6,14 @@ import asyncio
 import json
 import logging
 import random
+import re
 from dataclasses import dataclass
 from typing import Any
 
 import anthropic
 
 from infrastructure.config.settings import settings
+from prompts.loader import prompt_loader
 
 logger = logging.getLogger(__name__)
 
@@ -137,75 +139,31 @@ class AnthropicContentService:
         list_usage: str = "balanced",
         language: str = "en",
     ) -> str:
-        """Get the system prompt for content generation."""
-
-        style_instructions = {
-            "editorial": "Write in an editorial, opinion-driven style. Take clear positions, use rhetorical questions, and build persuasive arguments. Each section should read like a magazine feature — compelling, authoritative, and narrative-driven.",
-            "narrative": "Write in a storytelling, narrative style. Use anecdotes, scenarios, and vivid descriptions. Guide the reader through a journey rather than presenting information in a structured list format. Paint pictures with words.",
-            "storytelling": "Write using a storytelling approach with narrative flow, anecdotes, and vivid scenarios. Guide the reader through a journey that illustrates key points through examples and real-world situations.",
-            "listicle": "Write in a structured listicle style. Use numbered items or bullet points as the primary format. Each point should have a bold heading followed by a brief explanation. Keep it scannable and punchy.",
-            "how_to": "Write as a practical step-by-step guide. Use numbered steps, clear action verbs, and concrete instructions. Focus on actionability and implementation over theory.",
-            "informative": "Write in a clear, educational style that prioritizes accuracy and comprehensiveness. Present information objectively with well-organized sections and supporting evidence.",
-            "persuasive": "Write to persuade and influence. Build compelling arguments, use evidence strategically, address objections proactively, and guide the reader toward a clear conclusion or action.",
-            "technical": "Write for a technically literate audience. Use precise terminology, include technical details, reference specifications, and assume domain knowledge without over-explaining basics.",
-            "academic": "Write in a formal academic style with structured argumentation, evidence-based claims, objective tone, and scholarly precision. Avoid colloquialisms and maintain professional distance.",
-            "balanced": "Write in a balanced editorial style that combines flowing prose paragraphs with occasional lists. The majority of content should be written as engaging paragraphs. Use bullet points or numbered lists sparingly — only when presenting 4+ parallel items that genuinely benefit from list format (like ingredients, steps in a process, or tool recommendations). Never use a list when a well-written paragraph would be more engaging.",
-        }
-
-        voice_instructions = {
-            "first_person": "Write in first person (I/we). Share personal insights and experiences as if you are an expert sharing your own journey and knowledge.",
-            "second_person": "Write in second person (you/your). Address the reader directly, making the content feel personal and actionable.",
-            "third_person": "Write in third person (one/they/people). Maintain an objective, authoritative distance suitable for academic or professional contexts.",
-        }
-
-        list_instructions = {
-            "minimal": "Avoid bullet points and numbered lists almost entirely. Express all information through well-crafted prose paragraphs. If you must use a list, limit it to one per 500 words maximum.",
-            "light": "Use lists sparingly — prefer flowing prose with only occasional lists (one per major section at most). When lists appear, keep them short (3-5 items) with good prose context around them.",
-            "balanced": "Use lists sparingly and strategically. For every list you include, ensure there are at least 3-4 substantial prose paragraphs surrounding it. Lists should be the exception, not the rule.",
-            "heavy": "Feel free to use bullet points and numbered lists frequently to make content highly scannable. But still include introductory and transitional paragraphs between lists.",
-            "extensive": "Use bullet points and numbered lists as a primary format throughout. Make the content highly scannable. Almost every key point should be in a list format. Include brief introductory sentences but lead with structured lists.",
-        }
+        """Get the system prompt for content generation from versioned template."""
+        style_instructions = prompt_loader.get_config("writing_styles")
+        voice_instructions = prompt_loader.get_config("voice_options")
+        list_instructions = prompt_loader.get_config("list_usage")
 
         language_name = self._get_language_name(language)
-        language_instruction = ""
         if language != "en":
-            language_instruction = f"""
-LANGUAGE — THIS IS CRITICAL:
-You MUST write the ENTIRE article in {language_name}. Every word, heading, subheading, paragraph, and meta description must be in {language_name}.
-Use native-level grammar, correct gender agreements, proper declensions, and natural idiomatic expressions.
-Do NOT mix languages. Do NOT use English words unless they are commonly used loanwords in {language_name}.
-Write as a native {language_name} speaker would — with correct syntax, word order, and cultural context.
-Before finalizing each paragraph, mentally verify grammar: correct gender agreements, proper case declensions, accurate verb conjugations, and natural word order for {language_name}.
-"""
+            language_instruction = (
+                f"\nLANGUAGE — THIS IS CRITICAL:\n"
+                f"You MUST write the ENTIRE article in {language_name}. Every heading, paragraph, sentence, and meta description must be in {language_name}.\n"
+                f"Use native-level grammar, correct gender agreements, proper declensions, and natural idiomatic expressions.\n"
+                f"Do NOT mix languages. Do NOT use English words unless they are commonly used loanwords in {language_name}.\n"
+                f"Write as a native {language_name} speaker would — with correct syntax, word order, and cultural context.\n"
+                f"Before finalizing each paragraph, mentally verify grammar: correct gender agreements, proper case declensions, accurate verb conjugations, and natural word order for {language_name}.\n"
+            )
         else:
             language_instruction = "\nLANGUAGE: Write in English.\n"
 
-        return f"""You are an expert SEO content writer who produces high-quality, human-sounding articles.
-{language_instruction}
-WRITING APPROACH:
-{style_instructions.get(writing_style, style_instructions["balanced"])}
-
-VOICE:
-{voice_instructions.get(voice, voice_instructions["second_person"])}
-
-LIST USAGE:
-{list_instructions.get(list_usage, list_instructions["balanced"])}
-
-CRITICAL RULES:
-1. Write like a skilled human journalist, not an AI. Vary sentence length. Use transitional phrases between ideas.
-2. Each paragraph should be 3-5 sentences that develop a single idea with depth.
-3. Use the target keyword naturally — never bold it repeatedly or force it into every section.
-4. Subheadings (H2, H3) should be followed by at least 2-3 prose paragraphs before any list appears.
-5. Include specific examples, analogies, and scenarios rather than generic advice.
-6. Do NOT start multiple consecutive paragraphs with the same word or structure.
-7. Avoid filler phrases like "In conclusion", "It's important to note that", "As mentioned above".
-8. STATISTICS AND CITATIONS — CRITICAL: NEVER fabricate or invent specific statistics, percentages, or numerical claims. You do not have real-time data access. Only include a statistic if you are highly confident it is a widely-known, verifiable fact. When uncertain, use qualitative language instead (e.g., "a growing body of research suggests", "industry surveys consistently find", "the majority of"). When you DO include a specific figure, append [VERIFY] immediately after the citation so the editor knows to fact-check it before publishing — format: "X% (Source, Year) [VERIFY]". NEVER attribute a statistic to a specific organization (APA, LinkedIn, HubSpot, etc.) unless you are highly confident that organization published that exact figure.
-9. GRAMMAR AND LANGUAGE QUALITY: Use impeccable grammar throughout. Ensure subject-verb agreement, correct tense consistency, proper use of articles (a/an/the), correct prepositions, and natural sentence flow. Every sentence must be grammatically correct and publication-ready.
-10. STRUCTURE FOR AI SEARCH VISIBILITY (non-negotiable):
-    - The FIRST 1-2 sentences under every H2 heading must be an "Answer Capsule" — a 20-25 word direct answer to that section's implied question that stands alone without surrounding context.
-    - Keep each sub-section between 120-180 words — the optimal range for AI retrieval engines (Google AI Overviews, Perplexity, ChatGPT) to extract and cite content.
-    - Every article MUST end with a "Frequently Asked Questions" H2 section containing 5-7 real user questions with 40-60 word self-contained answers.
-    - If including a statistic, always append [VERIFY] for editorial fact-checking. NEVER fabricate specific numbers or attribute data to organizations unless you are highly confident the figure is accurate."""
+        return prompt_loader.format(
+            "article_system",
+            language_instruction=language_instruction,
+            style_instruction=style_instructions.get(writing_style, style_instructions["balanced"]),
+            voice_instruction=voice_instructions.get(voice, voice_instructions["second_person"]),
+            list_instruction=list_instructions.get(list_usage, list_instructions["balanced"]),
+        )
 
     @staticmethod
     def _sanitize_prompt_input(text: str | None, max_length: int) -> str:
@@ -283,36 +241,25 @@ CRITICAL RULES:
             else ""
         )
 
-        prompt = f"""Create a comprehensive article outline for the following:
+        language_name = self._get_language_name(language)
+        language_title_hint = f' (in {language_name})' if language != "en" else ""
+        language_heading_hint = f' (in {language_name})' if language != "en" else ""
+        language_meta_hint = f' (in {language_name})' if language != "en" else ""
 
-Keyword: {keyword}
-{audience_context}
-Tone: {tone}
-Target word count: {word_count_target} words{language_context}{secondary_kw_context}{entities_context}{custom_context}
-
-Generate a detailed outline with:
-1. A compelling, SEO-optimized title that is 30-60 characters long and includes the keyword "{keyword}"{f" (in {language_name})" if language != "en" else ""}
-2. 5-7 main sections with H2 headings{f" (in {language_name})" if language != "en" else ""}
-3. 2-4 subheadings (H3) per section
-4. Brief notes for each section describing the content
-5. Estimated word count per section
-6. A meta description (150-160 characters) that includes the keyword "{keyword}"{f" (in {language_name})" if language != "en" else ""}
-
-Respond in JSON format:
-{{
-    "title": "Article Title",
-    "meta_description": "SEO meta description...",
-    "sections": [
-        {{
-            "heading": "Section H2 Heading",
-            "subheadings": ["H3 Subheading 1", "H3 Subheading 2"],
-            "notes": "Brief description of what to cover",
-            "word_count_target": 200
-        }}
-    ],
-    "estimated_word_count": 1500,
-    "estimated_read_time": 7
-}}"""
+        prompt = prompt_loader.format(
+            "outline_claude",
+            keyword=keyword,
+            audience_context=audience_context,
+            tone=tone,
+            word_count_target=word_count_target,
+            language_context=language_context,
+            secondary_kw_context=secondary_kw_context,
+            entities_context=entities_context,
+            custom_context=custom_context,
+            language_title_hint=language_title_hint,
+            language_heading_hint=language_heading_hint,
+            language_meta_hint=language_meta_hint,
+        )
 
         message = await _retry_with_backoff(
             lambda: self._client.messages.create(
@@ -458,100 +405,31 @@ Respond in JSON format:
         word_max = int(word_count_target * 1.15)
 
         # Build content format guidelines that respect list_usage and writing_style
+        fmt_config = prompt_loader.get_config("format_guidelines")
         if list_usage == "heavy" or writing_style == "listicle":
-            format_guidelines = """4. Structure content for maximum scannability — use bullet points and numbered lists as a primary format alongside paragraphs
-5. Open with a brief introduction (1-2 paragraphs) that hooks the reader, then dive into structured content
-6. Under each heading, use a mix of short paragraphs and lists. Lead with a brief context paragraph, then use a list to present key points
-7. When you use a list, each item should have a bold lead-in followed by a 1-2 sentence explanation"""
+            format_guidelines = fmt_config["heavy"]
         elif list_usage == "minimal":
-            format_guidelines = """4. Write rich, flowing paragraphs as the ONLY content format — avoid bullet points and numbered lists almost entirely
-5. Open with a compelling introduction (2-3 paragraphs) that hooks the reader through narrative prose
-6. Under each heading, write 3-4 substantive paragraphs. Do NOT use lists unless absolutely necessary (e.g., a sequence of 5+ steps)
-7. If you must use a single list, limit it to one in the entire article, and surround it with explanatory paragraphs"""
+            format_guidelines = fmt_config["minimal"]
         else:
-            format_guidelines = """4. Write rich, flowing paragraphs as the PRIMARY content format, with occasional lists where they genuinely help
-5. Open with a compelling introduction (2-3 paragraphs) that hooks the reader without using lists
-6. Under each heading, write at least 2-3 substantive paragraphs BEFORE considering any list
-7. When you do use a list, introduce it with a paragraph and follow it with analysis or a connecting paragraph"""
+            format_guidelines = fmt_config["default"]
 
-        prompt = f"""Write a complete, high-performance article optimised for both Google Search and AI answer engines (Google AI Overviews, Perplexity, ChatGPT). Follow ALL structural requirements below exactly.
-
-Title: {title}
-Keyword: {keyword}
-{audience_context}{secondary_kw_context}{entities_context}
-Tone: {tone}{language_context}
-
-**TARGET WORD COUNT: approximately {word_count_target} words (between {word_min} and {word_max} words). Strict requirement — do NOT exceed {word_max} words.**
-
-Outline:
-{sections_text}
-
-═══════════════════════════════════════════
-MANDATORY ARTICLE STRUCTURE — FOLLOW EXACTLY
-═══════════════════════════════════════════
-
-━━━ SECTION 1: INTRODUCTION (HPPP Formula) ━━━
-Write the introduction using this exact 4-part sequence:
-• Hook: ONE striking sentence — a surprising statistic, counterintuitive fact, or a statement the reader immediately nods at
-• Problem: 1-2 sentences naming the specific challenge the reader faces related to "{keyword}"
-• Promise: 1 sentence stating this article provides the solution
-• Preview: 1-2 sentences summarising what the article covers
-
-Immediately after the HPPP intro, add this TL;DR callout on its own line:
-> **Quick Answer:** [30-50 word direct, standalone answer to the primary question about "{keyword}" — must be independently citable]
-
-━━━ SECTION 2: BODY SECTIONS (apply to EVERY H2) ━━━
-Under each H2 heading, follow this sequence:
-a) **Answer Capsule** (REQUIRED FIRST — no exceptions): 1-2 sentences, 20-25 words, that directly answer the section's implied question. Must stand alone without surrounding context.
-b) **Context Block**: Expand to 120-180 words total for the section, adding supporting data, examples, or evidence
-c) **Supporting element**: a list, table, or example as appropriate to the section content
-d) **Statistics**: ONLY include statistics you are highly confident are accurate. Mark every specific figure with [VERIFY] for editorial review — e.g., "62% of marketers report better engagement (HubSpot, 2025) [VERIFY]". Prefer qualitative claims ("research consistently shows", "the majority of", "industry data suggests") over precise numbers you are not certain about. NEVER invent percentages or attribute data to organizations unless you are certain they published it.
-
-{format_guidelines}
-
-━━━ SECTION 3: COMPARISON TABLE (include when topic allows) ━━━
-If the topic involves comparing options, approaches, tools, or methods, include a markdown table:
-| Aspect | Option A | Option B |
-|--------|----------|----------|
-Use at least 3 columns and 4 rows. Place it inside the most relevant H2 section.
-
-━━━ SECTION 4: EXPERT INSIGHT (REQUIRED) ━━━
-Include at least one expert insight formatted as a blockquote:
-> **[Expert Name, Role/Organisation]:** "[Direct quote or insight that adds authority to a key point in the article]"
-
-Place it naturally within the body where it supports a claim.
-
-━━━ SECTION 5: FAQ SECTION (REQUIRED — DO NOT SKIP) ━━━
-After the main body and before the conclusion, add:
-
-## Frequently Asked Questions About {keyword}
-
-Write exactly 5-7 Q&As. Rules:
-- Question: Phrased exactly as a real user would type in Google or ask a voice assistant (question format, not a statement)
-- Answer: 40-60 words, completely self-contained — NO "as mentioned above", NO "as discussed", NO forward references
-
-━━━ SECTION 6: CONCLUSION ━━━
-Structure the conclusion as:
-a) Summary paragraph: 40-60 words restating the core answer in fresh language (do not repeat the intro)
-b) **Key Takeaways** list: 4-6 concrete, actionable bullet points from the article
-c) Call to action: 1-2 sentence next step for the reader
-
-═══════════════════════════════════════════
-SEO & COMPLETENESS REQUIREMENTS
-═══════════════════════════════════════════
-- **Word count**: MUST be between {word_min} and {word_max} words. Distribute proportionally across all {len(sections)} sections — do NOT stop early.
-- **Keyword in introduction**: Mention "{keyword}" naturally within the first 1-2 sentences
-- **Keyword density**: Use "{keyword}" naturally throughout, targeting 1-2% density. Do NOT force it.
-- **Links**: Include 2-3 contextual markdown links with descriptive anchor text: [descriptive text](https://example.com/page). At least 1 external link to an authoritative source.
-- **Complete ALL outline sections**: Every H2 and H3 in the outline must be covered.
-{custom_context}
-
-Write in markdown format. Start directly with the introduction — do NOT add an H1 title.
-
-At the very end, after the article, add on separate lines:
----
-META_DESCRIPTION: [A compelling 150-160 character meta description that MUST include the keyword "{keyword}"]
-URL_SLUG: [SEO-friendly URL slug, lowercase, hyphens only, max 60 chars, must include the keyword]"""
+        prompt = prompt_loader.format(
+            "article_generation",
+            title=title,
+            keyword=keyword,
+            audience_context=audience_context,
+            secondary_kw_context=secondary_kw_context,
+            entities_context=entities_context,
+            tone=tone,
+            language_context=language_context,
+            word_count_target=word_count_target,
+            word_min=word_min,
+            word_max=word_max,
+            sections_text=sections_text,
+            format_guidelines=format_guidelines,
+            section_count=len(sections),
+            custom_context=custom_context,
+        )
 
         # Generate with retry on truncation
         max_attempts = 2
@@ -645,21 +523,11 @@ URL_SLUG: [SEO-friendly URL slug, lowercase, hyphens only, max 60 chars, must in
 
         language_name = self._get_language_name(language)
 
-        prompt = f"""Proofread the following article and fix ALL grammar mistakes.
-
-RULES:
-1. Fix grammar errors: subject-verb agreement, tense consistency, articles, prepositions, punctuation, and sentence fragments.
-2. Do NOT change the meaning, tone, or structure of the content.
-3. Do NOT add or remove sections, headings, or paragraphs.
-4. Do NOT change markdown formatting (##, ###, **, [], etc.).
-5. Do NOT rephrase sentences that are already grammatically correct.
-6. Do NOT change the word count significantly (stay within 2% of original).
-7. Language: {language_name}
-
-Return ONLY the corrected article in markdown format. No explanations or notes.
-
-ARTICLE:
-{content}"""
+        prompt = prompt_loader.format(
+            "proofread",
+            language_name=language_name,
+            content=content,
+        )
 
         _proofread_max_tokens = max(len(content.split()) * 3, 4000)
         message = await _retry_with_backoff(
@@ -692,19 +560,16 @@ ARTICLE:
         if not self._client:
             return content
 
-        improvement_instructions = {
-            "seo": f"Optimize this content for SEO, naturally incorporating the keyword '{keyword}' where appropriate. Improve headings, meta tags, and keyword placement.",
-            "readability": "Improve the readability of this content. Use shorter sentences, clearer language, and better paragraph structure.",
-            "engagement": "Make this content more engaging. Add hooks, rhetorical questions, and emotional appeals while maintaining professionalism.",
-            "grammar": "Proofread and fix all grammar mistakes in this content. Fix subject-verb agreement, tense consistency, articles, prepositions, punctuation, and sentence fragments. Do NOT change the meaning, structure, or tone. Do NOT add or remove sections.",
-        }
+        improvement_instructions = prompt_loader.get_config("improvement_types")
+        instruction = improvement_instructions.get(improvement_type, improvement_instructions["seo"])
+        if improvement_type == "seo" and keyword:
+            instruction = instruction.replace("{keyword}", keyword)
 
-        prompt = f"""{improvement_instructions.get(improvement_type, improvement_instructions["seo"])}
-
-Original content:
-{content}
-
-Provide the improved version in markdown format."""
+        prompt = prompt_loader.format(
+            "improve_content",
+            improvement_instruction=instruction,
+            content=content,
+        )
 
         message = await _retry_with_backoff(
             lambda: self._client.messages.create(
@@ -729,19 +594,12 @@ Provide the improved version in markdown format."""
         if not self._client:
             return f"Learn about {keyword}. {title[:100]}"
 
-        prompt = f"""Generate an SEO-optimized meta description for this article:
-
-Title: {title}
-Keyword: {keyword}
-Content summary: {content[:500]}...
-
-Requirements:
-- 150-160 characters
-- Include the keyword naturally
-- Compelling and action-oriented
-- Encourage clicks from search results
-
-Respond with ONLY the meta description, nothing else."""
+        prompt = prompt_loader.format(
+            "meta_description",
+            title=title,
+            keyword=keyword,
+            content_summary=content[:500],
+        )
 
         message = await _retry_with_backoff(
             lambda: self._client.messages.create(
@@ -839,30 +697,13 @@ Respond with ONLY the meta description, nothing else."""
 
         keywords_text = ", ".join(keywords) if keywords else "content marketing"
 
-        prompt = f"""Generate social media posts for the following article. Each post should promote the article and include the URL.
-
-Article Title: {article_title}
-Article Summary: {article_summary}
-Article URL: {article_url}
-Keywords: {keywords_text}
-
-Generate a post for each platform with these constraints:
-
-1. **Twitter/X** (max 280 characters total including URL): Concise hook, include the URL, add 2-3 relevant hashtags. Must be punchy and engaging.
-
-2. **LinkedIn** (max 3000 characters): Professional tone, include 2-3 key takeaways as bullet points, include the URL, add 3-5 professional hashtags. Start with a compelling hook.
-
-3. **Facebook** (max 500 characters): Conversational tone, start with an engaging question or hook, include the URL, add 2-3 hashtags. Encourage engagement.
-
-4. **Instagram** (caption style): Write an engaging caption with emojis, include 5-10 relevant hashtags at the end, mention "link in bio" instead of the URL. Make it visually descriptive.
-
-Respond in JSON format:
-{{
-    "twitter": "tweet text here",
-    "linkedin": "linkedin post here",
-    "facebook": "facebook post here",
-    "instagram": "instagram caption here"
-}}"""
+        prompt = prompt_loader.format(
+            "social_posts",
+            article_title=article_title,
+            article_summary=article_summary,
+            article_url=article_url,
+            keywords_text=keywords_text,
+        )
 
         message = await _retry_with_backoff(
             lambda: self._client.messages.create(
@@ -905,24 +746,12 @@ Respond in JSON format:
         if not self._client:
             return f"A visually striking image representing {keyword}, related to {title}"
 
-        # Use only the first ~1500 chars of content to keep cost low
-        content_excerpt = content[:1500]
-
-        prompt = f"""Based on this article, write a concise image generation prompt (1-3 sentences) that an AI image model like Ideogram or DALL-E could use to create a compelling featured image.
-
-Title: {title}
-Keyword: {keyword}
-Content excerpt:
-{content_excerpt}
-
-Requirements:
-- Describe a specific visual scene, not abstract concepts
-- Include details about composition, lighting, colors, and mood
-- Do NOT include any text or words in the image description
-- Keep it under 200 words
-- Optimize for photographic or editorial style
-
-Respond with ONLY the image prompt, nothing else."""
+        prompt = prompt_loader.format(
+            "image_prompt",
+            title=title,
+            keyword=keyword,
+            content_excerpt=content[:1500],
+        )
 
         message = await _retry_with_backoff(
             lambda: self._client.messages.create(
@@ -950,17 +779,10 @@ Respond with ONLY the image prompt, nothing else."""
         # Limit input to keep cost low — first 6000 chars covers most articles
         excerpt = content[:6000]
 
-        prompt = f"""You are a fact-checking assistant. Review the article excerpt below and list every specific statistic, percentage, numerical claim, or cited study that you are NOT highly confident is accurate.
-
-Be strict — if you are unsure whether a specific number or source attribution is correct, list it.
-
-For each uncertain claim, output it as a single line starting with "- ".
-If the article contains NO specific statistics or uncertain factual claims, output only: NONE
-
-Article:
-{excerpt}
-
-Uncertain claims (one per line, or NONE):"""
+        prompt = prompt_loader.format(
+            "fact_check",
+            excerpt=excerpt,
+        )
 
         message = await _retry_with_backoff(
             lambda: self._client.messages.create(
@@ -981,6 +803,120 @@ Uncertain claims (one per line, or NONE):"""
             if line and len(line) > 10:
                 claims.append(line)
         return claims
+
+    async def regenerate_section(
+        self,
+        full_content: str,
+        section_heading: str,
+        keyword: str,
+        tone: str = "professional",
+        section_word_target: int = 200,
+        reason: str | None = None,
+        writing_style: str = "balanced",
+        voice: str = "second_person",
+        list_usage: str = "balanced",
+        language: str = "en",
+    ) -> str:
+        """Regenerate a single H2 section within an article.
+
+        Splits the article at the target H2, regenerates just that section,
+        and returns the full article with the section replaced.
+        """
+        if not self._client:
+            return full_content
+
+        # Split article into sections by H2 headings
+        h2_pattern = re.compile(r"^(## .+)$", re.MULTILINE)
+        parts = h2_pattern.split(full_content)
+
+        # Find the target section
+        target_idx = None
+        for i, part in enumerate(parts):
+            if part.strip().startswith("## ") and section_heading.lower() in part.lower():
+                target_idx = i
+                break
+
+        if target_idx is None:
+            logger.warning("Section '%s' not found in article", section_heading)
+            return full_content
+
+        # Build context: content before and after the target section
+        context_before = "".join(parts[max(0, target_idx - 2) : target_idx]).strip()[-500:]
+        # Section content is at target_idx (heading) + target_idx+1 (body)
+        next_section_idx = target_idx + 2
+        context_after = "".join(parts[next_section_idx : next_section_idx + 2]).strip()[:500]
+
+        reason_context = f"Reason for regeneration: {reason}" if reason else ""
+
+        prompt = prompt_loader.format(
+            "section_regeneration",
+            keyword=keyword,
+            tone=tone,
+            section_heading=section_heading.lstrip("# ").strip(),
+            section_word_target=section_word_target,
+            reason_context=reason_context,
+            context_before=context_before or "(beginning of article)",
+            context_after=context_after or "(end of article)",
+        )
+
+        message = await _retry_with_backoff(
+            lambda: self._client.messages.create(
+                model=self._model,
+                max_tokens=2000,
+                temperature=0.3,
+                system=self._get_system_prompt(
+                    writing_style=writing_style,
+                    voice=voice,
+                    list_usage=list_usage,
+                    language=language,
+                ),
+                messages=[{"role": "user", "content": prompt}],
+            )
+        )
+
+        new_section = message.content[0].text.strip()
+
+        # Replace the old section with the new one
+        before = "".join(parts[:target_idx])
+        after = "".join(parts[next_section_idx:])
+        return before + new_section + "\n\n" + after
+
+    async def repair_flagged_claims(
+        self,
+        content: str,
+        flagged_claims: list[str],
+    ) -> str:
+        """Repair flagged statistical claims by replacing them with qualitative language.
+
+        Uses Haiku for cost efficiency. Returns the repaired article content.
+        If no claims are flagged or client is unavailable, returns content unchanged.
+        """
+        if not self._client or not flagged_claims:
+            return content
+
+        claims_text = "\n".join(f"- {claim}" for claim in flagged_claims)
+
+        prompt = prompt_loader.format(
+            "fact_check_repair",
+            flagged_claims=claims_text,
+            content=content,
+        )
+
+        _repair_max_tokens = max(len(content.split()) * 3, 4000)
+        message = await _retry_with_backoff(
+            lambda: self._client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=_repair_max_tokens,
+                temperature=0.1,
+                messages=[{"role": "user", "content": prompt}],
+            )
+        )
+
+        repaired = message.content[0].text.strip()
+        if not repaired or len(repaired) < len(content) * 0.5:
+            logger.warning("Fact-check repair returned suspiciously short content, using original")
+            return content
+        return repaired
 
     async def generate_content_suggestions(
         self,
@@ -1034,39 +970,13 @@ Uncertain claims (one per line, or NONE):"""
             else "None"
         )
 
-        prompt = f"""Analyze these keyword opportunities from Google Search Console and suggest article topics.
-
-KEYWORD DATA:
-{keywords_text}
-
-EXISTING ARTICLES (avoid duplicating these):
-{existing_text}
-{language_instruction}
-
-For each suggestion provide:
-1. A compelling, SEO-optimized article title
-2. The primary target keyword
-3. A content angle (1-2 sentences describing the unique approach)
-4. Rationale for why this content would perform well (based on the data)
-5. Estimated difficulty (easy/medium/hard based on keyword competition implied by position)
-6. Recommended word count (1000-3000)
-
-Group related keywords into single article suggestions where appropriate.
-Suggest 5-{min(len(keywords), 10)} articles.
-
-Respond in JSON format:
-{{
-    "suggestions": [
-        {{
-            "suggested_title": "Article Title",
-            "target_keyword": "primary keyword",
-            "content_angle": "Unique approach description",
-            "rationale": "Why this will perform well",
-            "estimated_difficulty": "easy|medium|hard",
-            "estimated_word_count": 1500
-        }}
-    ]
-}}"""
+        prompt = prompt_loader.format(
+            "content_suggestions",
+            keywords_text=keywords_text,
+            existing_text=existing_text,
+            language_instruction=language_instruction,
+            max_suggestions=min(len(keywords), 10),
+        )
 
         try:
             message = await _retry_with_backoff(
@@ -1090,6 +1000,58 @@ Respond in JSON format:
         except Exception as e:
             logger.error(f"Failed to generate content suggestions: {e}")
             raise
+
+    async def generate_content_cluster(
+        self,
+        keyword: str,
+        target_audience: str | None = None,
+        language: str = "en",
+    ) -> dict:
+        """Generate a topical authority cluster plan: pillar + supporting articles.
+
+        Returns a dict with 'pillar' and 'supporting_articles' keys.
+        """
+        if not self._client:
+            return {
+                "pillar": {
+                    "title": f"Complete Guide to {keyword.title()}",
+                    "keyword": keyword,
+                    "word_count_target": 3000,
+                    "description": f"Comprehensive guide covering all aspects of {keyword}",
+                },
+                "supporting_articles": [],
+            }
+
+        keyword = self._sanitize_prompt_input(keyword, 100)
+        audience_context = (
+            f"Target audience: {self._sanitize_prompt_input(target_audience, 500)}"
+            if target_audience
+            else ""
+        )
+
+        prompt = prompt_loader.format(
+            "cluster_generation",
+            keyword=keyword,
+            language=language,
+            audience_context=audience_context,
+        )
+
+        message = await _retry_with_backoff(
+            lambda: self._client.messages.create(
+                model=self._model,
+                max_tokens=3000,
+                temperature=0.4,
+                messages=[{"role": "user", "content": prompt}],
+            )
+        )
+
+        response_text = message.content[0].text
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0]
+        elif "```" in response_text:
+            response_text = response_text.split("```")[1].split("```")[0]
+
+        return json.loads(response_text.strip())
 
     async def generate_text(
         self,

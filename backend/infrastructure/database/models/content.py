@@ -219,6 +219,11 @@ class Article(Base, TimestampMixin):
     generation_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     image_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Pipeline metadata (added by architecture review improvements)
+    quality_tier: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    schemas: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    run_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
     # Soft delete
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True

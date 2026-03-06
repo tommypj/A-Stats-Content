@@ -1,112 +1,128 @@
 ## How SEO Scoring Works
 
-Every article in the A-Stats editor receives a live SEO score out of 100. The score updates in real time as you write — no need to save or publish first. It is calculated entirely in your browser using ten checks, each worth up to 10 points. A score of 80 or above is considered strong for on-page SEO fundamentals.
+Every article in the A-Stats editor receives a live SEO score out of 100. The score updates in real time as you write — no need to save or publish first. It is calculated entirely in your browser using ten checks with varying weights. A score of 80 or above is considered strong for on-page SEO fundamentals.
 
-The score is displayed in the top-right corner of the article editor as a colored badge. Green means 80+, yellow means 50–79, and red means below 50.
+The score is displayed in the top-right corner of the article editor as a colored badge. Green means 80+, yellow means 50-79, and red means below 50.
 
 ---
 
 ## The 10 Scoring Checks
 
-### 1. Target Keyword in Title (10 pts)
+### 1. Keyword in First 100 Words (10 pts)
+
+Your target keyword must appear naturally within the first 100 words of the article. This signals immediate relevance to both search engines and readers.
+
+**How to pass:** Mention your keyword in the opening paragraph. Front-loading it in the first 1-2 sentences is ideal.
+
+> Tip: The first 100 words form the "above the fold" content that Google weighs most heavily for relevance signals.
+
+---
+
+### 2. Keyword in at Least One H2 Heading (5 pts)
+
+At least one H2-level heading in the article body must contain the target keyword or a close variant. This reinforces topical relevance in the article structure.
+
+**How to pass:** Work your keyword naturally into one section heading. Do not stuff every heading with the keyword — one well-placed heading is enough.
+
+> Tip: H2 headings are the primary structural signal for AI answer engines (Google AI Overviews, Perplexity). A keyword-rich H2 increases citation probability.
+
+---
+
+### 3. Target Keyword in Title (15 pts)
 
 The article title must contain your exact target keyword or a close variant. The check uses whole-word matching, so "marketing" will not satisfy a keyword of "content marketing."
 
-**How to pass:** Set your target keyword in the keyword field before writing. Then make sure the article title includes that phrase naturally. Front-loading the keyword (placing it near the start of the title) is a best practice but is not required to pass the check.
+**How to pass:** Set your target keyword in the keyword field before writing. Then make sure the article title includes that phrase naturally.
 
 > Tip: Titles between 50 and 60 characters perform best in search results. Longer titles get truncated in Google.
 
 ---
 
-### 2. Meta Description Present and Keyword Included (10 pts)
+### 4. Meta Description (10 pts)
 
-A meta description must be set and must contain the target keyword. This is the snippet that appears under your title in Google search results.
+A meta description must be set, between 120 and 160 characters. This is the snippet that appears under your title in Google search results.
 
-**How to pass:** Fill in the meta description field in the article settings panel. Write a natural, compelling summary of the article (120–155 characters) and include the keyword once.
+**How to pass:** Fill in the meta description field in the article settings panel. Write a natural, compelling summary of the article (120-160 characters).
 
 > Tip: Think of the meta description as an ad for your article. A higher click-through rate signals relevance to Google.
 
 ---
 
-### 3. Target Keyword in at Least One H2 Heading (10 pts)
+### 5. Section Structure — 3+ H2 Headings (15 pts)
 
-The body of your article must include at least one H2-level heading that contains the target keyword or a close variant. H1 headings are not checked here — that is handled by the title check.
+The article must contain at least 3 H2-level headings. Well-structured articles with clear sections perform better in search and are more easily cited by AI answer engines.
 
-**How to pass:** Structure your article with H2 headings for major sections. Work your keyword naturally into one of those section headings.
+**How to pass:** Break your article into at least 3 major sections using H2 headings. Each section should cover a distinct subtopic.
 
-> Tip: Do not stuff every heading with the keyword. One well-placed keyword heading is enough to pass and reads more naturally to readers.
-
----
-
-### 4. Keyword Density in Range (10 pts)
-
-The keyword should appear in 0.5%–2.5% of the total word count. Too low and the article may not rank for the term; too high and it reads like spam and may be penalized.
-
-**How to pass:** For a 1,000-word article, you need the keyword to appear roughly 5–25 times. Read the article aloud — if the keyword sounds forced or repetitive, you have crossed into over-optimization.
-
-> Tip: Use related terms and synonyms to reinforce topical authority without repeating the exact keyword phrase.
+> Tip: Articles with 5-7 H2 sections tend to perform best. Each section should be 120-180 words — the optimal range for AI retrieval engines.
 
 ---
 
-### 5. Sufficient Word Count (10 pts)
+### 6. FAQ Section Present (15 pts)
 
-Articles must reach a minimum word count to pass this check. The threshold is 300 words for short-form content. In practice, articles covering competitive keywords tend to perform best at 1,000 words or more.
+The article must contain a "Frequently Asked Questions" section. FAQ sections are the highest-citation format for Google AI Overviews and Perplexity.
 
-**How to pass:** The live word count is shown at the bottom of the editor. Expand thin sections by adding examples, statistics, or step-by-step instructions.
+**How to pass:** Add a heading that includes "Frequently Asked Questions" or "FAQ" and include 5-7 question-and-answer pairs beneath it.
 
-> Tip: Word count is a proxy for comprehensiveness, not quality. A 400-word article that fully answers a simple question is better than a 2,000-word article padded with filler.
+> Tip: Each FAQ answer should be 40-60 words and completely self-contained — no "as mentioned above" references.
 
 ---
 
-### 6. Internal Links Present (10 pts)
+### 7. External Citation Link (10 pts)
 
-The article must contain at least one link pointing to another page on your site. Internal links help search engines understand your site structure and distribute page authority.
+The article must contain at least one link to an external authoritative source. External citations improve credibility and signal research quality.
 
-**How to pass:** Link to a related article, your homepage, or a relevant product or service page. The link must be a standard anchor tag with an `href` pointing to your domain.
+**How to pass:** Link to a relevant study, official documentation, industry report, or authoritative source using descriptive anchor text.
 
 > Tip: Use descriptive anchor text that reflects the content of the linked page. Avoid "click here" or "read more."
 
 ---
 
-### 7. Images Have Alt Text (10 pts)
+### 8. Structured Lists (10 pts)
 
-Every image in the article must have a non-empty `alt` attribute. Alt text helps search engines index your images and is a legal accessibility requirement under WCAG guidelines.
+The article must contain at least one bullet-point or numbered list. Structured lists are among the most-cited formats by AI answer engines.
 
-**How to pass:** When you insert an image through the editor, fill in the alt text field. Describe the image in plain language and include the keyword where it is genuinely relevant.
+**How to pass:** Include bullet points or a numbered list where they genuinely help present information. Key Takeaways sections and comparison lists both count.
+
+> Tip: Lists are excellent for steps, comparisons, and summaries. But use them strategically — prose paragraphs should remain the primary format.
+
+---
+
+### 9. Quick Answer / TL;DR Block (5 pts)
+
+The article should contain a blockquote-style Quick Answer or TL;DR block near the top. This increases the chance of being cited as a direct answer by AI search engines.
+
+**How to pass:** Add a blockquote after your introduction: `> **Quick Answer:** [40-70 word standalone answer]`.
+
+> Tip: The Quick Answer should be independently citable — it must make sense without any surrounding context.
+
+---
+
+### 10. Images Have Alt Text (5 pts)
+
+Every image in the article must have a non-empty alt attribute. Alt text helps search engines index your images and is an accessibility requirement under WCAG guidelines.
+
+**How to pass:** When you insert an image, fill in the alt text field. Describe the image in plain language.
 
 > Tip: Screen readers read alt text aloud for visually impaired users. Write alt text for people first, search engines second.
 
 ---
 
-### 8. Readability (10 pts)
+## Score Weights Summary
 
-The article body is evaluated for sentence-level readability. Long, dense paragraphs without breaks will reduce this score. The check penalizes articles where the average sentence length is very high.
-
-**How to pass:** Keep paragraphs to 3–4 sentences. Use short sentences alongside longer ones to vary rhythm. Break up long blocks with subheadings, bullet points, or numbered lists.
-
-> Tip: Writing at a Flesch-Kincaid Grade 8 level (roughly the reading level of a 13-year-old) typically performs well in search because it is easy to skim and share.
-
----
-
-### 9. URL Slug Contains Keyword (10 pts)
-
-The article's URL slug — the part after your domain — should contain the target keyword. Clean, keyword-rich slugs are a minor but consistent ranking signal.
-
-**How to pass:** Set the URL slug in the article settings panel. Use hyphens to separate words. Remove stop words like "a," "the," and "and" to keep it short.
-
-**Example:** For a keyword of "content marketing strategy," a good slug is `/content-marketing-strategy` rather than `/a-comprehensive-guide-to-content-marketing-strategy`.
-
-> Tip: Keep slugs short and permanent. Changing a URL after publishing loses any backlinks pointing to the old address.
-
----
-
-### 10. Structured Data Hints (10 pts)
-
-This check looks for patterns in your content that signal structured data readiness — FAQ sections with clear question-and-answer pairs, numbered how-to steps, or review content. These patterns make it easier for Google to generate rich results (featured snippets, FAQ dropdowns, how-to cards).
-
-**How to pass:** Add an FAQ section at the end of your article using a clear question-and-answer format. For tutorial content, use numbered steps with a clear outcome per step.
-
-> Tip: FAQ sections also improve your AEO score. A well-structured FAQ is one of the most effective additions you can make to any informational article.
+| Check | Points |
+|---|---|
+| Keyword in first 100 words | 10 |
+| Keyword in at least one H2 | 5 |
+| Keyword in title | 15 |
+| Meta description (120-160 chars) | 10 |
+| Section structure (3+ H2s) | 15 |
+| FAQ section | 15 |
+| External citation link | 10 |
+| Structured lists | 10 |
+| Quick Answer / TL;DR | 5 |
+| Images have alt text | 5 |
+| **Total** | **100** |
 
 ---
 
@@ -114,9 +130,9 @@ This check looks for patterns in your content that signal structured data readin
 
 | Score Range | Meaning |
 |---|---|
-| 90–100 | Excellent — strong on-page fundamentals |
-| 80–89 | Good — minor improvements available |
-| 60–79 | Moderate — several checks failing |
+| 90-100 | Excellent — strong on-page fundamentals |
+| 80-89 | Good — minor improvements available |
+| 60-79 | Moderate — several checks failing |
 | Below 60 | Needs work — significant gaps |
 
 The score badge in the editor shows which checks are passing (green checkmark) and which are failing (red X) in a dropdown panel. Fix the failing checks from highest to lowest impact.

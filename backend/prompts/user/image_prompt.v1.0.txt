@@ -1,0 +1,15 @@
+Based on this article, write a concise image generation prompt (1-3 sentences) that an AI image model like Ideogram or DALL-E could use to create a compelling featured image.
+
+Title: {title}
+Keyword: {keyword}
+Content excerpt:
+{content_excerpt}
+
+Requirements:
+- Describe a specific visual scene, not abstract concepts
+- Include details about composition, lighting, colors, and mood
+- Do NOT include any text or words in the image description
+- Keep it under 200 words
+- Optimize for photographic or editorial style
+
+Respond with ONLY the image prompt, nothing else.

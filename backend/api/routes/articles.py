@@ -141,17 +141,24 @@ def analyze_seo(content: str, keyword: str, title: str, meta_description: str) -
     words = re.split(r"\s+", content.strip())
     word_count = len(words) if words and words[0] else 0
 
-    # Keyword density (whole-word matches only to avoid substring false positives)
-    keyword_count = len(re.findall(r"\b" + re.escape(keyword_lower) + r"\b", content_lower))
+    # Keyword usage metrics (semantic SEO — no density targeting)
+    kw_pattern = r"\b" + re.escape(keyword_lower) + r"\b"
+    keyword_count = len(re.findall(kw_pattern, content_lower))
     keyword_density = (keyword_count / word_count * 100) if word_count > 0 else 0
 
     # Title keyword check
-    title_has_keyword = bool(re.search(r"\b" + re.escape(keyword_lower) + r"\b", title.lower()))
+    title_has_keyword = bool(re.search(kw_pattern, title.lower()))
+
+    # Keyword in first 100 words
+    first_100_words = " ".join(words[:100]).lower()
+    keyword_in_first_100 = bool(re.search(kw_pattern, first_100_words))
 
     # Keyword in opening (first 300 chars — covers HPPP hook + problem)
-    keyword_in_opening = bool(
-        re.search(r"\b" + re.escape(keyword_lower) + r"\b", content_lower[:300])
-    )
+    keyword_in_opening = bool(re.search(kw_pattern, content_lower[:300]))
+
+    # Keyword in at least one H2 heading
+    h2_lines = re.findall(r"^## (.+)$", content, re.MULTILINE)
+    keyword_in_h2 = any(re.search(kw_pattern, h.lower()) for h in h2_lines)
 
     # Headings: H2 count (## but not ###)
     h2_count = len(re.findall(r"^## ", content, re.MULTILINE))
@@ -188,10 +195,10 @@ def analyze_seo(content: str, keyword: str, title: str, meta_description: str) -
     # Generate actionable suggestions
     # ----------------------------------------------------------------
     suggestions = []
-    if keyword_density < 1:
-        suggestions.append(f"Increase keyword '{keyword}' usage (currently {keyword_density:.1f}%)")
-    elif keyword_density > 3:
-        suggestions.append(f"Reduce keyword stuffing (currently {keyword_density:.1f}%)")
+    if not keyword_in_first_100:
+        suggestions.append(f"Mention '{keyword}' within the first 100 words of the article")
+    if not keyword_in_h2:
+        suggestions.append(f"Include '{keyword}' in at least one H2 heading")
     if not title_has_keyword:
         suggestions.append("Add target keyword to the title")
     if not keyword_in_opening:
@@ -231,7 +238,8 @@ def analyze_seo(content: str, keyword: str, title: str, meta_description: str) -
     # Score (0-100) — updated weights for GEO/AEO 2025-2026
     # ----------------------------------------------------------------
     score = 0
-    score += 15 if 1 <= keyword_density <= 3 else 0  # Keyword density
+    score += 10 if keyword_in_first_100 else 0  # Keyword in first 100 words
+    score += 5 if keyword_in_h2 else 0  # Keyword in at least one H2
     score += 15 if title_has_keyword else 0  # Keyword in title
     score += 10 if meta_description and 120 <= len(meta_description) <= 160 else 0  # Meta desc
     score += 15 if headings_structure == "good" else 0  # 3+ H2s
@@ -244,6 +252,8 @@ def analyze_seo(content: str, keyword: str, title: str, meta_description: str) -
     return {
         "score": min(100, score),
         "keyword_density": round(keyword_density, 2),
+        "keyword_in_first_100": keyword_in_first_100,
+        "keyword_in_h2": keyword_in_h2,
         "title_has_keyword": title_has_keyword,
         "keyword_in_opening": keyword_in_opening,
         "meta_description_length": len(meta_description) if meta_description else 0,
@@ -500,6 +510,13 @@ async def _run_article_generation(
                     **(article.seo_analysis or {}),
                     "flagged_stats": pipeline_result.flagged_stats,
                 }
+
+            # Persist pipeline metadata (schemas, quality tier, run metrics)
+            if pipeline_result.schemas:
+                article.schemas = pipeline_result.schemas
+            if pipeline_result.run_metadata:
+                article.quality_tier = pipeline_result.run_metadata.quality_tier
+                article.run_metadata = pipeline_result.run_metadata.to_dict()
 
             # Log successful generation and increment usage (single commit)
             duration_ms = int((time.time() - start_time) * 1000)

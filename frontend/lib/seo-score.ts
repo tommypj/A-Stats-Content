@@ -6,15 +6,16 @@
  * produce the same score for the same content.
  *
  * Weights (sum = 100):
- *   Keyword density 1–3%     15 pts
- *   Keyword in title         15 pts
- *   Meta description length  10 pts
- *   H2 headings (3+)         15 pts
- *   FAQ section              15 pts
- *   External citation link   10 pts
- *   Structured lists         10 pts
- *   Quick Answer / TL;DR      5 pts
- *   Image alt texts           5 pts
+ *   Keyword in first 100 words  10 pts
+ *   Keyword in at least one H2   5 pts
+ *   Keyword in title            15 pts
+ *   Meta description length     10 pts
+ *   H2 headings (3+)            15 pts
+ *   FAQ section                 15 pts
+ *   External citation link      10 pts
+ *   Structured lists            10 pts
+ *   Quick Answer / TL;DR         5 pts
+ *   Image alt texts              5 pts
  */
 
 export interface SEOCheck {
@@ -74,6 +75,16 @@ export function calculateSEOScore(article: SEOArticleInput): SEOScore {
   const kwCount = keyword ? countKeyword(content, kw) : 0;
   const density = total > 0 ? (kwCount / total) * 100 : 0;
 
+  // Keyword in first 100 words
+  const first100Words = content.trim().split(/\s+/).slice(0, 100).join(" ");
+  const kwInFirst100 = keyword.length > 0 &&
+    new RegExp(`\\b${escapeRegex(kw)}\\b`, "i").test(first100Words);
+
+  // Keyword in at least one H2 heading
+  const h2Lines = [...content.matchAll(/^## (.+)$/gm)].map((m) => m[1]);
+  const kwInH2 = keyword.length > 0 &&
+    h2Lines.some((h) => new RegExp(`\\b${escapeRegex(kw)}\\b`, "i").test(h));
+
   const titleHasKeyword = keyword.length > 0 &&
     new RegExp(`\\b${escapeRegex(kw)}\\b`, "i").test(title);
 
@@ -98,14 +109,20 @@ export function calculateSEOScore(article: SEOArticleInput): SEOScore {
 
   const checks: SEOCheck[] = [
     {
-      label: `Keyword density 1–3% (${density.toFixed(1)}%)`,
-      passed: keyword.length > 0 && density >= 1 && density <= 3,
-      tip: !keyword
-        ? "Set a target keyword so this check can evaluate keyword density."
-        : density < 1
-        ? `Use "${keyword}" more naturally throughout — currently ${density.toFixed(1)}%.`
-        : `Reduce keyword repetition to avoid over-optimisation — currently ${density.toFixed(1)}%.`,
-      points: 15,
+      label: "Keyword in first 100 words",
+      passed: kwInFirst100,
+      tip: keyword
+        ? `Mention "${keyword}" naturally within the first 100 words of the article.`
+        : "Set a target keyword so this check can evaluate keyword placement.",
+      points: 10,
+    },
+    {
+      label: "Keyword in at least one H2",
+      passed: kwInH2,
+      tip: keyword
+        ? `Include "${keyword}" in at least one H2 heading for topical relevance.`
+        : "Set a target keyword so this check can evaluate heading usage.",
+      points: 5,
     },
     {
       label: "Keyword in title",

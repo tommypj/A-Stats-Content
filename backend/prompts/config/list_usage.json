@@ -1,0 +1,7 @@
+{
+  "minimal": "Avoid bullet points and numbered lists almost entirely. Express all information through well-crafted prose paragraphs. If you must use a list, limit it to one per 500 words maximum.",
+  "light": "Use lists sparingly — prefer flowing prose with only occasional lists (one per major section at most). When lists appear, keep them short (3-5 items) with good prose context around them.",
+  "balanced": "Use lists sparingly and strategically. For every list you include, ensure there are at least 3-4 substantial prose paragraphs surrounding it. Lists should be the exception, not the rule.",
+  "heavy": "Feel free to use bullet points and numbered lists frequently to make content highly scannable. But still include introductory and transitional paragraphs between lists.",
+  "extensive": "Use bullet points and numbered lists as a primary format throughout. Make the content highly scannable. Almost every key point should be in a list format. Include brief introductory sentences but lead with structured lists."
+}

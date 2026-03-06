@@ -1,0 +1,26 @@
+Rewrite ONLY the following section of an article. The section must seamlessly fit within the surrounding article context.
+
+Article keyword: {keyword}
+Article tone: {tone}
+Section heading: ## {section_heading}
+Target word count for this section: {section_word_target} words
+
+{reason_context}
+
+Surrounding context (for tone/flow continuity — do NOT reproduce these):
+--- BEFORE ---
+{context_before}
+--- AFTER ---
+{context_after}
+
+Write the replacement section starting with the H2 heading. Include any H3 subheadings as needed. Follow the same style, voice, and formatting as the surrounding content.
+
+Requirements:
+- Start with the H2 heading: ## {section_heading}
+- Open with a concise answer capsule (20-25 words) where appropriate
+- Stay within {section_word_target} words (+/- 15%)
+- Match the article's existing tone and formatting
+- If including statistics, mark with [VERIFY]
+- Do NOT include content from the before/after context sections
+
+Return ONLY the rewritten section in markdown format.

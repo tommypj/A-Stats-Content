@@ -1,0 +1,31 @@
+Create a comprehensive article outline for the following:
+
+Keyword: {keyword}
+{audience_context}
+Tone: {tone}
+Target word count: {word_count_target} words{language_context}{secondary_kw_context}{entities_context}{custom_context}
+
+Generate a detailed outline with:
+1. A compelling, SEO-optimized title that is 30-60 characters long and includes the keyword "{keyword}"{language_title_hint}
+2. 5-7 main sections with H2 headings{language_heading_hint}
+3. 2-4 subheadings (H3) per section
+4. Brief notes for each section describing the content
+5. Estimated word count per section
+6. A meta description (150-160 characters) that includes the keyword "{keyword}"{language_meta_hint}
+7. Cover angles and subtopics that competitors typically miss — think about what a reader would still want to know after reading the top 5 Google results
+
+Respond in JSON format:
+{{
+    "title": "Article Title",
+    "meta_description": "SEO meta description...",
+    "sections": [
+        {{
+            "heading": "Section H2 Heading",
+            "subheadings": ["H3 Subheading 1", "H3 Subheading 2"],
+            "notes": "Brief description of what to cover",
+            "word_count_target": 200
+        }}
+    ],
+    "estimated_word_count": 1500,
+    "estimated_read_time": 7
+}}

@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from adapters.ai.anthropic_adapter import GeneratedOutline, OutlineSection
 from infrastructure.config.settings import settings
+from prompts.loader import prompt_loader
 
 logger = logging.getLogger(__name__)
 
@@ -133,29 +134,22 @@ class OpenAIOutlineService:
             if serp_analysis and hasattr(serp_analysis, "search_intent") else ""
         )
 
-        system_prompt = (
-            f"You are an expert content strategist. Generate a comprehensive, "
-            f"SEO-optimized article outline.\n\n"
-            f"Keyword: {keyword}\n"
-            f"Tone: {tone}\n"
-            f"{audience_line}\n"
-            f"Writing style: {writing_style}\n"
-            f"Voice: {voice}\n"
-            f"List usage preference: {list_usage}\n"
-            f"Word count target: {word_count_target}\n"
-            f"Language: {language}\n"
-            f"{serp_block}"
-            f"{research_block}"
-            f"{secondary_kw_line}"
-            f"{entities_line}"
-            f"{custom_line}\n\n"
-            f"Create an outline that:\n"
-            f"1. Covers the keyword comprehensively based on SERP data\n"
-            f"2. Addresses People Also Ask questions within relevant sections\n"
-            f"3. Exploits content gaps that competitors miss\n"
-            f"4. Incorporates the research facts naturally within section notes\n"
-            f"5. Has sections with realistic word count targets summing to ~{word_count_target} words\n"
-            f"6. Matches the detected search intent{search_intent_line}"
+        system_prompt = prompt_loader.format(
+            "outline_openai",
+            keyword=keyword,
+            tone=tone,
+            audience_line=audience_line,
+            writing_style=writing_style,
+            voice=voice,
+            list_usage=list_usage,
+            word_count_target=word_count_target,
+            language=language,
+            serp_block=serp_block,
+            research_block=research_block,
+            secondary_kw_line=secondary_kw_line,
+            entities_line=entities_line,
+            custom_line=custom_line,
+            search_intent_line=search_intent_line,
         )
 
         response = await self._client.beta.chat.completions.parse(

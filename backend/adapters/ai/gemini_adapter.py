@@ -15,6 +15,7 @@ import re
 from dataclasses import dataclass, field
 
 from infrastructure.config.settings import settings
+from prompts.loader import prompt_loader
 
 logger = logging.getLogger(__name__)
 
@@ -147,26 +148,11 @@ class GeminiFlashService:
         if not self.is_available():
             return SERPAnalysis()
 
-        prompt = f"""Search Google for: "{keyword}"
-
-Analyze the top 10 search results and return a JSON object with this exact structure:
-{{
-  "top_headings": ["heading 1", "heading 2"],
-  "avg_word_count": 1500,
-  "paa_questions": ["question 1", "question 2"],
-  "content_gaps": ["gap 1", "gap 2"],
-  "competing_titles": ["title 1", "title 2"],
-  "search_intent": "informational"
-}}
-
-- top_headings: the most common H2/H3 headings used across top results (max 12)
-- avg_word_count: estimated average word count of top results
-- paa_questions: "People Also Ask" questions from the SERP (max 8)
-- content_gaps: topics the top results miss or undercover (max 5)
-- competing_titles: actual article titles from top results (max 5)
-- search_intent: primary search intent — one of: informational, commercial, transactional, navigational
-
-Return ONLY valid JSON, no markdown fences, no explanation. Language context: {language}"""
+        prompt = prompt_loader.format(
+            "serp_analysis",
+            keyword=keyword,
+            language=language,
+        )
 
         try:
             raw = await asyncio.wait_for(
@@ -191,21 +177,11 @@ Return ONLY valid JSON, no markdown fences, no explanation. Language context: {l
         if not self.is_available():
             return ResearchData()
 
-        prompt = f"""Search Google for real facts and statistics about: "{keyword}"
-
-Return a JSON object with this exact structure:
-{{
-  "key_facts": ["Fact sentence. (source.com)"],
-  "statistics": ["X% of Y according to Z. (source.com)"],
-  "related_topics": ["topic 1", "topic 2"]
-}}
-
-- key_facts: verified factual statements with source domain in parentheses (max 8)
-- statistics: real numerical statistics with source domain in parentheses (max 6)
-- related_topics: closely related subtopics worth covering (max 6)
-
-Only include facts/stats you found via Google Search. Include the source domain in parentheses.
-Return ONLY valid JSON, no markdown fences, no explanation. Language context: {language}"""
+        prompt = prompt_loader.format(
+            "research",
+            keyword=keyword,
+            language=language,
+        )
 
         try:
             raw = await asyncio.wait_for(
@@ -230,33 +206,12 @@ Return ONLY valid JSON, no markdown fences, no explanation. Language context: {l
         headings_list = "\n".join(f"- {h}" for h in serp.top_headings[:8])
         paa_list = "\n".join(f"- {q}" for q in serp.paa_questions[:6])
 
-        prompt = f"""Analyze this article content against top SERP competitors.
-
-Top competitor headings:
-{headings_list}
-
-People Also Ask questions:
-{paa_list}
-
-Article content (first 3000 chars):
-{content[:3000]}
-
-Return a JSON object:
-{{
-  "covers_top_headings": true,
-  "addresses_paa": true,
-  "word_count_adequate": true,
-  "missing_topics": ["topic 1"],
-  "serp_alignment_score": 85
-}}
-
-- covers_top_headings: does the article cover most of the top competitor headings?
-- addresses_paa: does the article answer the PAA questions?
-- word_count_adequate: is the article length competitive vs avg_word_count?
-- missing_topics: key topics the article should add (max 3)
-- serp_alignment_score: 0-100 score for SERP alignment
-
-Return ONLY valid JSON, no markdown fences."""
+        prompt = prompt_loader.format(
+            "seo_vs_serp",
+            headings_list=headings_list,
+            paa_list=paa_list,
+            content_excerpt=content[:3000],
+        )
 
         try:
             raw = await asyncio.wait_for(

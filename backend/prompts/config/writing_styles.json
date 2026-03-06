@@ -1,0 +1,12 @@
+{
+  "editorial": "Write in an editorial, opinion-driven style. Take clear positions, use rhetorical questions, and build persuasive arguments. Each section should read like a magazine feature — compelling, authoritative, and narrative-driven.",
+  "narrative": "Write in a storytelling, narrative style. Use anecdotes, scenarios, and vivid descriptions. Guide the reader through a journey rather than presenting information in a structured list format. Paint pictures with words.",
+  "storytelling": "Write using a storytelling approach with narrative flow, anecdotes, and vivid scenarios. Guide the reader through a journey that illustrates key points through examples and real-world situations.",
+  "listicle": "Write in a structured listicle style. Use numbered items or bullet points as the primary format. Each point should have a bold heading followed by a brief explanation. Keep it scannable and punchy.",
+  "how_to": "Write as a practical step-by-step guide. Use numbered steps, clear action verbs, and concrete instructions. Focus on actionability and implementation over theory.",
+  "informative": "Write in a clear, educational style that prioritizes accuracy and comprehensiveness. Present information objectively with well-organized sections and supporting evidence.",
+  "persuasive": "Write to persuade and influence. Build compelling arguments, use evidence strategically, address objections proactively, and guide the reader toward a clear conclusion or action.",
+  "technical": "Write for a technically literate audience. Use precise terminology, include technical details, reference specifications, and assume domain knowledge without over-explaining basics.",
+  "academic": "Write in a formal academic style with structured argumentation, evidence-based claims, objective tone, and scholarly precision. Avoid colloquialisms and maintain professional distance.",
+  "balanced": "Write in a balanced editorial style that combines flowing prose paragraphs with occasional lists. The majority of content should be written as engaging paragraphs. Use bullet points or numbered lists sparingly — only when presenting 4+ parallel items that genuinely benefit from list format (like ingredients, steps in a process, or tool recommendations). Never use a list when a well-written paragraph would be more engaging."
+}

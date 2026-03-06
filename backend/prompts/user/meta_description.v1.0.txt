@@ -1,0 +1,13 @@
+Generate an SEO-optimized meta description for this article:
+
+Title: {title}
+Keyword: {keyword}
+Content summary: {content_summary}...
+
+Requirements:
+- 150-160 characters
+- Include the keyword naturally
+- Compelling and action-oriented
+- Encourage clicks from search results
+
+Respond with ONLY the meta description, nothing else.

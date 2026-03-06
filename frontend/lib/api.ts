@@ -1645,16 +1645,24 @@ export interface OutlineListResponse {
 export interface SEOAnalysis {
   score: number;
   keyword_density: number;
+  keyword_in_first_100: boolean;
+  keyword_in_h2: boolean;
   title_has_keyword: boolean;
+  keyword_in_opening: boolean;
   meta_description_length: number;
   headings_structure: string;
   h2_count: number;
   h3_count: number;
   internal_links: number;
   external_links: number;
+  has_faq: boolean;
+  has_lists: boolean;
+  has_quick_answer: boolean;
   image_alt_texts: boolean;
   readability_score: number;
+  word_count: number;
   suggestions: string[];
+  flagged_stats?: string[];
 }
 
 export interface Article {
@@ -1678,6 +1686,9 @@ export interface Article {
   published_url?: string;
   featured_image_id?: string;
   image_prompt?: string;
+  quality_tier?: string;
+  schemas?: Record<string, unknown>;
+  run_metadata?: Record<string, unknown>;
   wordpress_post_id?: number;
   wordpress_post_url?: string;
   social_posts?: SocialPostsData;

@@ -720,6 +720,9 @@ class TestAnalyzeSEO:
         assert "seo_score" in data
         assert "seo_analysis" in data
         assert data["seo_analysis"]["keyword_density"] is not None
+        assert "keyword_in_first_100" in data["seo_analysis"]
+        assert "keyword_in_h2" in data["seo_analysis"]
+        assert "keyword_in_opening" in data["seo_analysis"]
         assert "suggestions" in data["seo_analysis"]
 
     async def test_analyze_seo_no_content(
