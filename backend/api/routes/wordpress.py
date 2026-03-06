@@ -603,9 +603,37 @@ async def publish_to_wordpress(
                 )
 
             wp_post = response.json()
+            wp_post_id = wp_post["id"]
+
+            # Ensure featured image is set via a separate PATCH call.
+            # Some WordPress themes/plugins ignore featured_media in the
+            # initial POST payload, so an explicit update is more reliable.
+            if featured_media_id is not None:
+                wp_featured = wp_post.get("featured_media", 0)
+                if wp_featured != featured_media_id:
+                    logger.info(
+                        "Featured media not set on post %s (got %s, expected %s) — patching explicitly",
+                        wp_post_id, wp_featured, featured_media_id,
+                    )
+                    patch_url = f"{wp_creds['site_url']}/wp-json/wp/v2/posts/{wp_post_id}"
+                    patch_resp = await client.post(
+                        patch_url,
+                        headers={
+                            "Authorization": auth_header,
+                            "Content-Type": "application/json",
+                        },
+                        json={"featured_media": featured_media_id},
+                    )
+                    if patch_resp.status_code in (200, 201):
+                        logger.info("Featured media patched successfully on post %s", wp_post_id)
+                    else:
+                        logger.warning(
+                            "Failed to patch featured media on post %s: %s",
+                            wp_post_id, patch_resp.text[:300],
+                        )
 
             # Update article with WordPress post info
-            article.wordpress_post_id = wp_post["id"]
+            article.wordpress_post_id = wp_post_id
             article.published_url = wp_post["link"]
             article.published_at = datetime.now(UTC)
             # GEN-06: Mark article as published so it's distinguishable from drafts.

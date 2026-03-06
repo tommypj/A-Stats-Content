@@ -197,7 +197,27 @@ class ContentSchedulerService:
                     return
 
                 wp_post = response.json()
-                article.wordpress_post_id = wp_post["id"]
+                wp_post_id = wp_post["id"]
+
+                # Ensure featured image is set via explicit PATCH
+                if featured_media_id is not None:
+                    wp_featured = wp_post.get("featured_media", 0)
+                    if wp_featured != featured_media_id:
+                        patch_url = f"{wp_creds['site_url']}/wp-json/wp/v2/posts/{wp_post_id}"
+                        patch_resp = await client.post(
+                            patch_url,
+                            headers={
+                                "Authorization": auth_header,
+                                "Content-Type": "application/json",
+                            },
+                            json={"featured_media": featured_media_id},
+                        )
+                        if patch_resp.status_code in (200, 201):
+                            logger.info("Featured media patched on post %s", wp_post_id)
+                        else:
+                            logger.warning("Failed to patch featured media on post %s", wp_post_id)
+
+                article.wordpress_post_id = wp_post_id
                 article.published_url = wp_post["link"]
                 article.published_at = datetime.now(UTC)
                 article.status = ContentStatus.PUBLISHED.value
@@ -205,7 +225,7 @@ class ContentSchedulerService:
 
                 logger.info(
                     "Auto-published article %s to WordPress (post ID: %s, URL: %s)",
-                    article.id, wp_post["id"], wp_post["link"],
+                    article.id, wp_post_id, wp_post["link"],
                 )
 
         except Exception as exc:
