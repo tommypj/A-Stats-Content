@@ -605,32 +605,52 @@ async def publish_to_wordpress(
             wp_post = response.json()
             wp_post_id = wp_post["id"]
 
-            # Ensure featured image is set via a separate PATCH call.
-            # Some WordPress themes/plugins ignore featured_media in the
-            # initial POST payload, so an explicit update is more reliable.
+            # Attach media to the post and set as featured image.
+            # WordPress media items are "unattached" after upload. Some themes
+            # and Gutenberg require the media to be explicitly attached (post
+            # field on media) AND set via featured_media on the post.
             if featured_media_id is not None:
-                wp_featured = wp_post.get("featured_media", 0)
-                if wp_featured != featured_media_id:
+                # Step 1: Attach the media item to this post
+                media_attach_url = f"{wp_creds['site_url']}/wp-json/wp/v2/media/{featured_media_id}"
+                attach_resp = await client.post(
+                    media_attach_url,
+                    headers={
+                        "Authorization": auth_header,
+                        "Content-Type": "application/json",
+                    },
+                    json={"post": wp_post_id},
+                )
+                if attach_resp.status_code in (200, 201):
                     logger.info(
-                        "Featured media not set on post %s (got %s, expected %s) — patching explicitly",
-                        wp_post_id, wp_featured, featured_media_id,
+                        "Attached media %s to post %s", featured_media_id, wp_post_id
                     )
-                    patch_url = f"{wp_creds['site_url']}/wp-json/wp/v2/posts/{wp_post_id}"
-                    patch_resp = await client.post(
-                        patch_url,
-                        headers={
-                            "Authorization": auth_header,
-                            "Content-Type": "application/json",
-                        },
-                        json={"featured_media": featured_media_id},
+                else:
+                    logger.warning(
+                        "Failed to attach media %s to post %s: %s",
+                        featured_media_id, wp_post_id, attach_resp.text[:300],
                     )
-                    if patch_resp.status_code in (200, 201):
-                        logger.info("Featured media patched successfully on post %s", wp_post_id)
-                    else:
-                        logger.warning(
-                            "Failed to patch featured media on post %s: %s",
-                            wp_post_id, patch_resp.text[:300],
-                        )
+
+                # Step 2: Set featured_media on the post (always, don't trust initial POST)
+                post_patch_url = f"{wp_creds['site_url']}/wp-json/wp/v2/posts/{wp_post_id}"
+                patch_resp = await client.post(
+                    post_patch_url,
+                    headers={
+                        "Authorization": auth_header,
+                        "Content-Type": "application/json",
+                    },
+                    json={"featured_media": int(featured_media_id)},
+                )
+                if patch_resp.status_code in (200, 201):
+                    patched_featured = patch_resp.json().get("featured_media", 0)
+                    logger.info(
+                        "Featured media on post %s set to %s (response: %s)",
+                        wp_post_id, featured_media_id, patched_featured,
+                    )
+                else:
+                    logger.warning(
+                        "Failed to set featured media on post %s: HTTP %s — %s",
+                        wp_post_id, patch_resp.status_code, patch_resp.text[:300],
+                    )
 
             # Update article with WordPress post info
             article.wordpress_post_id = wp_post_id
