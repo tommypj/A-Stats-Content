@@ -40,6 +40,7 @@ import {
   DollarSign,
   Building2,
   Lock,
+  Target,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { toast } from "sonner";
@@ -121,6 +122,7 @@ const navigation: NavItem[] = [
     ],
   },
   { name: "Knowledge", href: "/knowledge", icon: BookOpen },
+  { name: "Competitor Analysis", href: "/competitor-analysis", icon: Target },
   {
     name: "Projects",
     icon: FolderOpen,

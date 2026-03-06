@@ -15,6 +15,7 @@ from .auth import router as auth_router
 from .billing import router as billing_router
 from .blog import router as blog_router
 from .bulk import router as bulk_router
+from .competitor import router as competitor_router
 from .health import router as health_router
 from .images import router as images_router
 from .knowledge import router as knowledge_router
@@ -48,6 +49,7 @@ api_router.include_router(project_invitations_router)
 api_router.include_router(projects_router)
 api_router.include_router(notifications_router)
 api_router.include_router(bulk_router)
+api_router.include_router(competitor_router)
 api_router.include_router(agency_router)
 api_router.include_router(blog_router)
 api_router.include_router(admin_blog_router)

@@ -1548,6 +1548,37 @@ export const api = {
       }),
   },
 
+  // Competitor Analysis
+  competitors: {
+    analyze: (domain: string, projectId?: string) =>
+      apiRequest<CompetitorAnalysis>({
+        method: "POST",
+        url: "/competitors/analyze",
+        data: { domain, project_id: projectId },
+      }),
+    list: (page = 1, pageSize = 20) =>
+      apiRequest<{ items: CompetitorAnalysis[]; total: number; page: number; page_size: number; pages: number }>({
+        url: `/competitors/analyses?page=${page}&page_size=${pageSize}`,
+      }),
+    get: (id: string) =>
+      apiRequest<CompetitorAnalysisDetail>({
+        url: `/competitors/analyses/${id}`,
+      }),
+    delete: (id: string) =>
+      apiRequest<void>({
+        method: "DELETE",
+        url: `/competitors/analyses/${id}`,
+      }),
+    keywords: (id: string) =>
+      apiRequest<{ keywords: KeywordAggregation[]; total: number }>({
+        url: `/competitors/analyses/${id}/keywords`,
+      }),
+    gaps: (id: string) =>
+      apiRequest<KeywordGapResponse>({
+        url: `/competitors/analyses/${id}/gaps`,
+      }),
+  },
+
   // Public Blog
   blog: {
     list: (params?: { page?: number; page_size?: number; category_slug?: string; tag_slug?: string; search?: string }) =>
@@ -2825,6 +2856,56 @@ export interface AdminRevenueAnalytics {
   current_mrr: number;
   current_arr: number;
   revenue_growth_rate: number;
+}
+
+// Competitor Analysis
+export interface CompetitorAnalysis {
+  id: string;
+  user_id: string;
+  project_id: string | null;
+  domain: string;
+  status: string;
+  total_urls: number;
+  scraped_urls: number;
+  total_keywords: number;
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+  expires_at: string;
+}
+
+export interface CompetitorArticle {
+  id: string;
+  url: string;
+  title: string | null;
+  meta_description: string | null;
+  url_slug: string | null;
+  word_count: number | null;
+  extracted_keyword: string | null;
+  keyword_confidence: number | null;
+}
+
+export interface CompetitorAnalysisDetail extends CompetitorAnalysis {
+  articles: CompetitorArticle[];
+}
+
+export interface KeywordAggregation {
+  keyword: string;
+  article_count: number;
+  articles: { url: string; title: string | null }[];
+}
+
+export interface KeywordGapItem {
+  keyword: string;
+  competitor_articles: number;
+  competitor_urls: string[];
+}
+
+export interface KeywordGapResponse {
+  gaps: KeywordGapItem[];
+  total_competitor_keywords: number;
+  total_your_keywords: number;
+  total_gaps: number;
 }
 
 export interface AdminSystemAnalytics {
