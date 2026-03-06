@@ -949,20 +949,89 @@ async def upload_media_to_wordpress(
 
     try:
         async with _wp_client(timeout=60.0) as client:
+            # Generate SEO metadata if the image belongs to an article
+            seo_title = request.title
+            seo_alt = request.alt_text
+            seo_caption = None
+            seo_description = None
+
+            # Check if this image is the featured image for a published article
+            article_for_featured: Article | None = None
+            if image.article_id:
+                art_result = await db.execute(
+                    select(Article).where(Article.id == image.article_id)
+                )
+                article_for_featured = art_result.scalar_one_or_none()
+                if article_for_featured:
+                    seo_meta = _generate_image_seo_metadata(
+                        article_title=article_for_featured.title,
+                        article_keyword=article_for_featured.keyword,
+                        article_meta_description=article_for_featured.meta_description,
+                    )
+                    seo_title = seo_title or seo_meta["title"]
+                    seo_alt = seo_alt or seo_meta["alt_text"]
+                    seo_caption = seo_meta["caption"]
+                    seo_description = seo_meta["description"]
+
             result_data = await _upload_image_to_wp(
                 client=client,
                 image=image,
                 wp_creds=wp_creds,
                 auth_header=auth_header,
-                title=request.title,
-                alt_text=request.alt_text,
+                title=seo_title,
+                alt_text=seo_alt,
+                caption=seo_caption,
+                description=seo_description,
             )
 
+            wp_media_id = result_data["wordpress_media_id"]
+            message = "Image uploaded successfully to WordPress media library"
+
+            # If the image's article is already published to WordPress,
+            # attach the media and set it as the featured image automatically.
+            if (
+                article_for_featured
+                and article_for_featured.wordpress_post_id
+                and article_for_featured.featured_image_id == image.id
+            ):
+                wp_post_id = article_for_featured.wordpress_post_id
+                # Attach media to the post
+                media_attach_url = f"{wp_creds['site_url']}/wp-json/wp/v2/media/{wp_media_id}"
+                await client.post(
+                    media_attach_url,
+                    headers={
+                        "Authorization": auth_header,
+                        "Content-Type": "application/json",
+                    },
+                    json={"post": wp_post_id},
+                )
+                # Set as featured image
+                post_patch_url = f"{wp_creds['site_url']}/wp-json/wp/v2/posts/{wp_post_id}"
+                patch_resp = await client.post(
+                    post_patch_url,
+                    headers={
+                        "Authorization": auth_header,
+                        "Content-Type": "application/json",
+                    },
+                    json={"featured_media": int(wp_media_id)},
+                )
+                if patch_resp.status_code in (200, 201):
+                    logger.info(
+                        "Set uploaded media %s as featured image on WP post %s",
+                        wp_media_id, wp_post_id,
+                    )
+                    message = "Image uploaded and set as featured image on WordPress"
+                else:
+                    logger.warning(
+                        "Uploaded media %s but failed to set as featured on post %s: %s",
+                        wp_media_id, wp_post_id, patch_resp.text[:300],
+                    )
+
             return WordPressMediaUploadResponse(
-                wordpress_media_id=result_data["wordpress_media_id"],
+                wordpress_media_id=wp_media_id,
                 wordpress_url="",
                 source_url=result_data["source_url"],
-                message="Image uploaded successfully to WordPress media library",
+                message=message,
             )
 
     except httpx.RequestError as e:
