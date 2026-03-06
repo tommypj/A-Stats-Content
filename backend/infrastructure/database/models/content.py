@@ -2,14 +2,13 @@
 Content database models: Outline and Article.
 """
 
-from datetime import date, datetime
+from datetime import datetime
 from enum import StrEnum
 from typing import Optional
 from uuid import uuid4
 
 from sqlalchemy import (
     JSON,
-    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -231,7 +230,8 @@ class Article(Base, TimestampMixin):
     )
 
     # Planning / scheduling
-    planned_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    planned_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    auto_publish: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     # Publishing
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -179,6 +179,11 @@ async def lifespan(app: FastAPI):
     logger.info("Starting social media scheduler...")
     scheduler_task = asyncio.create_task(scheduler_service.start())
 
+    # Start content calendar auto-publish scheduler
+    from services.content_scheduler import content_scheduler
+    logger.info("Starting content calendar scheduler...")
+    content_scheduler_task = asyncio.create_task(content_scheduler.start())
+
     # Start periodic task-queue cleanup (runs every 30 minutes, removes tasks >1h old)
     async def _task_queue_cleanup_loop():
         while True:
@@ -245,6 +250,15 @@ async def lifespan(app: FastAPI):
     try:
         await decay_alert_cleanup_task
     except asyncio.CancelledError:
+        pass
+
+    # Stop content scheduler
+    logger.info("Stopping content scheduler...")
+    await content_scheduler.stop()
+    content_scheduler_task.cancel()
+    try:
+        await asyncio.wait_for(asyncio.shield(content_scheduler_task), timeout=10.0)
+    except (TimeoutError, asyncio.CancelledError):
         pass
 
     # Stop scheduler — INFRA-07: wait up to 30 s for in-flight publishes to complete
