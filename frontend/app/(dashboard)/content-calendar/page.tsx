@@ -434,7 +434,7 @@ function PanelItemRow({ item, onUnschedule }: PanelItemRowProps) {
               <span className="text-xs text-text-secondary">{time}</span>
             )}
             {item.autoPublish && (
-              <Globe className="h-3 w-3 text-primary-500" title="Auto-publish enabled" />
+              <span title="Auto-publish enabled"><Globe className="h-3 w-3 text-primary-500" /></span>
             )}
           </div>
         </div>
