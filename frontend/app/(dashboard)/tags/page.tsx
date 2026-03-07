@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Loader2, Pencil, Trash2, Tag as TagIcon, X } from "lucide-react";
+import { Plus, Loader2, Pencil, Trash2, Tag as TagIcon } from "lucide-react";
 import { toast } from "sonner";
 import { api, parseApiError, Tag, CreateTagInput } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { useRequireAuth } from "@/lib/auth";
 import { useProject } from "@/contexts/ProjectContext";
@@ -103,7 +104,7 @@ export default function TagsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-display text-3xl font-bold text-text-primary">Tags</h1>
+          <h1 className="font-display text-2xl font-bold text-text-primary">Tags</h1>
           <p className="mt-2 text-text-secondary">
             Organize your articles and outlines with tags
           </p>
@@ -173,86 +174,75 @@ export default function TagsPage() {
       )}
 
       {/* Create/Edit Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-surface-primary border border-border rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-text-primary">
-                {editing ? "Edit Tag" : "New Tag"}
-              </h2>
-              <button
-                onClick={() => setShowModal(false)}
-                className="text-text-muted hover:text-text-primary"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      <Dialog
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title={editing ? "Edit Tag" : "New Tag"}
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1">
+              Name *
+            </label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="e.g. SEO, Product, How-to"
+              className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              onKeyDown={(e) => e.key === "Enter" && handleSave()}
+            />
+          </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Name *
-                </label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="e.g. SEO, Product, How-to"
-                  className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                  onKeyDown={(e) => e.key === "Enter" && handleSave()}
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-2">
+              Color
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {PRESET_COLORS.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setForm((f) => ({ ...f, color: c }))}
+                  className={`h-8 w-8 rounded-full border-2 transition-transform ${
+                    form.color === c
+                      ? "border-text-primary scale-110"
+                      : "border-transparent hover:scale-105"
+                  }`}
+                  style={{ backgroundColor: c }}
+                  aria-label={`Color ${c}`}
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">
-                  Color
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {PRESET_COLORS.map((c) => (
-                    <button
-                      key={c}
-                      onClick={() => setForm((f) => ({ ...f, color: c }))}
-                      className={`h-8 w-8 rounded-full border-2 transition-transform ${
-                        form.color === c
-                          ? "border-text-primary scale-110"
-                          : "border-transparent hover:scale-105"
-                      }`}
-                      style={{ backgroundColor: c }}
-                      aria-label={`Color ${c}`}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Preview */}
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Preview
-                </label>
-                <div className="flex items-center gap-2 px-3 py-2 bg-surface-secondary rounded-lg w-fit">
-                  <span
-                    className="h-3 w-3 rounded-full"
-                    style={{ backgroundColor: form.color }}
-                  />
-                  <span className="font-medium text-text-primary">
-                    {form.name || "Tag name"}
-                  </span>
-                </div>
-              </div>
+              ))}
             </div>
+          </div>
 
-            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
-              <Button variant="outline" onClick={() => setShowModal(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleSave} disabled={saving}>
-                {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                {editing ? "Save Changes" : "Create Tag"}
-              </Button>
+          {/* Preview */}
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1">
+              Preview
+            </label>
+            <div className="flex items-center gap-2 px-3 py-2 bg-surface-secondary rounded-lg w-fit">
+              <span
+                className="h-3 w-3 rounded-full"
+                style={{ backgroundColor: form.color }}
+              />
+              <span className="font-medium text-text-primary">
+                {form.name || "Tag name"}
+              </span>
             </div>
           </div>
         </div>
-      )}
+
+        <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
+          <Button variant="outline" onClick={() => setShowModal(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            {editing ? "Save Changes" : "Create Tag"}
+          </Button>
+        </div>
+      </Dialog>
     </div>
   );
 }

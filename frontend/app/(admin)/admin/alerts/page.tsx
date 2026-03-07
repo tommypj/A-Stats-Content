@@ -37,7 +37,7 @@ function SeverityBadge({ severity }: { severity: string }) {
   return (
     <span
       className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${
-        styles[severity] ?? "bg-gray-100 text-gray-800"
+        styles[severity] ?? "bg-surface-tertiary text-text-primary"
       }`}
     >
       <SeverityIcon severity={severity} />
@@ -55,7 +55,7 @@ function SeverityDot({ severity }: { severity: string }) {
   return (
     <span
       className={`inline-block h-2.5 w-2.5 rounded-full flex-shrink-0 ${
-        colors[severity] ?? "bg-gray-400"
+        colors[severity] ?? "bg-text-muted"
       }`}
     />
   );
@@ -197,7 +197,7 @@ export default function AdminAlertsPage() {
         <button
           onClick={handleMarkAllRead}
           disabled={markingAllRead}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-surface-tertiary rounded-lg hover:bg-surface-secondary text-sm font-medium disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 bg-surface border border-surface-tertiary rounded-lg hover:bg-surface-secondary text-sm font-medium disabled:opacity-50"
         >
           <CheckCheck className="h-4 w-4" />
           {markingAllRead ? "Marking..." : "Mark All Read"}
@@ -205,7 +205,7 @@ export default function AdminAlertsPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-surface-tertiary p-4">
+      <div className="bg-surface rounded-xl border border-surface-tertiary p-4">
         <div className="flex flex-col sm:flex-row gap-4">
           <select
             value={severityFilter}
@@ -237,12 +237,12 @@ export default function AdminAlertsPage() {
 
       {/* Alerts List */}
       {loading ? (
-        <div className="bg-white rounded-xl border border-surface-tertiary p-12 text-center">
+        <div className="bg-surface rounded-xl border border-surface-tertiary p-12 text-center">
           <div className="inline-block h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
           <p className="mt-4 text-text-muted">Loading alerts...</p>
         </div>
       ) : error ? (
-        <div className="bg-white rounded-xl border border-surface-tertiary p-12 text-center">
+        <div className="bg-surface rounded-xl border border-surface-tertiary p-12 text-center">
           <p className="text-red-600">{error}</p>
           <button
             onClick={loadAlerts}
@@ -252,7 +252,7 @@ export default function AdminAlertsPage() {
           </button>
         </div>
       ) : alerts.length === 0 ? (
-        <div className="bg-white rounded-xl border border-surface-tertiary p-12 text-center">
+        <div className="bg-surface rounded-xl border border-surface-tertiary p-12 text-center">
           <Bell className="h-12 w-12 text-text-muted mx-auto mb-4" />
           <p className="text-text-muted">No alerts found</p>
         </div>
@@ -264,7 +264,7 @@ export default function AdminAlertsPage() {
               <div
                 key={alert.id}
                 className={clsx(
-                  "bg-white rounded-xl border p-5 transition-colors",
+                  "bg-surface rounded-xl border p-5 transition-colors",
                   alert.is_read
                     ? "border-surface-tertiary opacity-75"
                     : "border-surface-tertiary shadow-sm",

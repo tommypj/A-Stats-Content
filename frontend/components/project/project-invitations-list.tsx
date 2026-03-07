@@ -18,7 +18,7 @@ interface ProjectInvitationsListProps {
 const statusConfig = {
   pending: { icon: Clock, color: "bg-yellow-100 text-yellow-800 border-yellow-300", label: "Pending" },
   accepted: { icon: CheckCircle, color: "bg-green-100 text-green-800 border-green-300", label: "Accepted" },
-  expired: { icon: XCircle, color: "bg-gray-100 text-gray-800 border-gray-300", label: "Expired" },
+  expired: { icon: XCircle, color: "bg-surface-tertiary text-text-primary border-surface-tertiary", label: "Expired" },
   revoked: { icon: XCircle, color: "bg-red-100 text-red-800 border-red-300", label: "Revoked" },
 };
 
@@ -26,7 +26,7 @@ const roleColors = {
   owner: "bg-yellow-100 text-yellow-800",
   admin: "bg-purple-100 text-purple-800",
   member: "bg-blue-100 text-blue-800",
-  viewer: "bg-gray-100 text-gray-800",
+  viewer: "bg-surface-tertiary text-text-primary",
 };
 
 export function ProjectInvitationsList({ invitations, onRevoke, onResend }: ProjectInvitationsListProps) {

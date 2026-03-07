@@ -270,7 +270,7 @@ export default function ClientDetailPage() {
               </div>
             )}
             <div>
-              <h1 className="font-display text-3xl font-bold text-text-primary">
+              <h1 className="font-display text-2xl font-bold text-text-primary">
                 {workspace.client_name}
               </h1>
               {workspace.client_email && (

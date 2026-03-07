@@ -207,7 +207,7 @@ export function PostPreview({
       {/* Header */}
       <div className="p-3 flex items-center gap-3 border-b border-surface-tertiary">
         <div className="h-8 w-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 p-0.5">
-          <div className="h-full w-full rounded-full bg-white flex items-center justify-center overflow-hidden">
+          <div className="h-full w-full rounded-full bg-surface flex items-center justify-center overflow-hidden">
             {profileImageUrl ? (
               <img src={profileImageUrl} alt={accountName} className="h-full w-full object-cover" />
             ) : (

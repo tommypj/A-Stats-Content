@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner";
 import { api, parseApiError, ClientWorkspace, Project } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const INPUT_CLASS =
@@ -205,76 +206,73 @@ export default function AgencyClientsPage() {
       )}
 
       {/* Add Client Modal */}
-      {showAdd && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-surface rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
-            <h2 className="text-lg font-semibold text-text-primary mb-4">
-              Add Client Workspace
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Client Name *
-                </label>
-                <input
-                  type="text"
-                  value={addForm.client_name}
-                  onChange={(e) =>
-                    setAddForm({ ...addForm, client_name: e.target.value })
-                  }
-                  className={INPUT_CLASS}
-                  placeholder="Acme Corp"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Client Email
-                </label>
-                <input
-                  type="email"
-                  value={addForm.client_email}
-                  onChange={(e) =>
-                    setAddForm({ ...addForm, client_email: e.target.value })
-                  }
-                  className={INPUT_CLASS}
-                  placeholder="client@example.com"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Project *
-                </label>
-                <select
-                  value={addForm.project_id}
-                  onChange={(e) =>
-                    setAddForm({ ...addForm, project_id: e.target.value })
-                  }
-                  className={INPUT_CLASS}
-                >
-                  <option value="">Select project...</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 mt-6">
-              <Button variant="ghost" onClick={() => setShowAdd(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                onClick={handleAddClient}
-                disabled={adding}
-              >
-                {adding ? "Creating..." : "Create Workspace"}
-              </Button>
-            </div>
+      <Dialog
+        isOpen={showAdd}
+        onClose={() => setShowAdd(false)}
+        title="Add Client Workspace"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1">
+              Client Name *
+            </label>
+            <input
+              type="text"
+              value={addForm.client_name}
+              onChange={(e) =>
+                setAddForm({ ...addForm, client_name: e.target.value })
+              }
+              className={INPUT_CLASS}
+              placeholder="Acme Corp"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1">
+              Client Email
+            </label>
+            <input
+              type="email"
+              value={addForm.client_email}
+              onChange={(e) =>
+                setAddForm({ ...addForm, client_email: e.target.value })
+              }
+              className={INPUT_CLASS}
+              placeholder="client@example.com"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1">
+              Project *
+            </label>
+            <select
+              value={addForm.project_id}
+              onChange={(e) =>
+                setAddForm({ ...addForm, project_id: e.target.value })
+              }
+              className={INPUT_CLASS}
+            >
+              <option value="">Select project...</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
-      )}
+        <div className="flex justify-end gap-3 mt-6">
+          <Button variant="ghost" onClick={() => setShowAdd(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleAddClient}
+            disabled={adding}
+          >
+            {adding ? "Creating..." : "Create Workspace"}
+          </Button>
+        </div>
+      </Dialog>
     </div>
   );
 }

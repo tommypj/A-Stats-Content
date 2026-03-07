@@ -161,7 +161,7 @@ export default function SocialHistoryPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-surface-tertiary p-4 mb-6">
+      <div className="bg-surface rounded-xl border border-surface-tertiary p-4 mb-6">
         <div className="flex flex-col md:flex-row gap-4">
           {/* Search */}
           <div className="flex-1">
@@ -183,7 +183,7 @@ export default function SocialHistoryPage() {
               setStatusFilter(e.target.value as SocialPostStatus | "all");
               setPage(1);
             }}
-            className="px-4 py-2 border border-surface-tertiary rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="px-4 py-2 border border-surface-tertiary rounded-lg text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             <option value="all">All Status</option>
             <option value="pending">Pending</option>
@@ -201,7 +201,7 @@ export default function SocialHistoryPage() {
               setPlatformFilter(e.target.value as SocialPlatform | "all");
               setPage(1);
             }}
-            className="px-4 py-2 border border-surface-tertiary rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="px-4 py-2 border border-surface-tertiary rounded-lg text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             <option value="all">All Platforms</option>
             <option value="twitter">Twitter</option>
@@ -217,7 +217,7 @@ export default function SocialHistoryPage() {
               className={cn(
                 "p-2 rounded-md transition-colors",
                 viewMode === "list"
-                  ? "bg-white shadow-sm"
+                  ? "bg-surface shadow-sm"
                   : "text-text-secondary hover:text-text-primary"
               )}
               aria-label="List view"
@@ -229,7 +229,7 @@ export default function SocialHistoryPage() {
               className={cn(
                 "p-2 rounded-md transition-colors",
                 viewMode === "grid"
-                  ? "bg-white shadow-sm"
+                  ? "bg-surface shadow-sm"
                   : "text-text-secondary hover:text-text-primary"
               )}
               aria-label="Grid view"
@@ -279,14 +279,14 @@ export default function SocialHistoryPage() {
 
       {/* Posts List */}
       {loading ? (
-        <div className="flex items-center justify-center h-64 bg-white rounded-xl border border-surface-tertiary">
+        <div className="flex items-center justify-center h-64 bg-surface rounded-xl border border-surface-tertiary">
           <div className="text-center">
             <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
             <p className="text-text-secondary">Loading posts...</p>
           </div>
         </div>
       ) : posts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-64 bg-white rounded-xl border border-surface-tertiary">
+        <div className="flex flex-col items-center justify-center h-64 bg-surface rounded-xl border border-surface-tertiary">
           <History className="h-12 w-12 text-text-secondary mb-4" />
           <p className="text-lg font-medium text-text-secondary">No posts found</p>
           <p className="text-sm text-text-secondary mt-1">

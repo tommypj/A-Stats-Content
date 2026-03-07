@@ -114,7 +114,7 @@ export function SiteSelector({
                 "disabled:opacity-50 disabled:cursor-not-allowed",
                 selectedSite === site.site_url
                   ? "border-primary-500 bg-primary-50"
-                  : "border-surface-tertiary bg-white"
+                  : "border-surface-tertiary bg-surface"
               )}
             >
               <div className="flex items-start justify-between gap-4">

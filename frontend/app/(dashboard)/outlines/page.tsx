@@ -25,17 +25,18 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Dialog } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AIGenerationProgress } from "@/components/ui/ai-generation-progress";
 import { clsx } from "clsx";
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof FileText }> = {
-  draft: { label: "Draft", color: "bg-gray-100 text-gray-700", icon: FileText },
+  draft: { label: "Draft", color: "bg-surface-tertiary text-text-secondary", icon: FileText },
   generating: { label: "Generating", color: "bg-yellow-100 text-yellow-700", icon: Loader2 },
   completed: { label: "Completed", color: "bg-green-100 text-green-700", icon: CheckCircle2 },
   failed: { label: "Failed", color: "bg-red-100 text-red-700", icon: XCircle },
 };
-const defaultStatus = { label: "Unknown", color: "bg-gray-100 text-gray-500", icon: FileText };
+const defaultStatus = { label: "Unknown", color: "bg-surface-tertiary text-text-muted", icon: FileText };
 
 const STATUS_OPTIONS = [
   { value: "", label: "All Statuses" },
@@ -323,7 +324,7 @@ export default function OutlinesPage() {
           <div className="flex items-center gap-2 ml-auto">
             <button
               onClick={handleBulkExport}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary-300 bg-white text-sm font-medium text-primary-700 hover:bg-primary-50 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary-300 bg-surface text-sm font-medium text-primary-700 hover:bg-primary-50 transition-colors"
             >
               <Download className="h-4 w-4" />
               Export
@@ -432,7 +433,7 @@ export default function OutlinesPage() {
                       {activeMenu === outline.id && (
                         <>
                           <div className="fixed inset-0 z-40" onClick={() => setActiveMenu(null)} />
-                          <div className="absolute right-0 mt-1 w-40 bg-white rounded-lg border border-surface-tertiary shadow-lg z-50">
+                          <div className="absolute right-0 mt-1 w-40 bg-surface rounded-lg border border-surface-tertiary shadow-lg z-50">
                             <button
                               onClick={() => handleRegenerate(outline.id)}
                               className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-surface-secondary"
@@ -585,119 +586,112 @@ function CreateOutlineModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop: only dismissible when not generating */}
-      <div
-        className="absolute inset-0 bg-black/50"
-        onClick={loading ? undefined : onClose}
-      />
-      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6">
-        <h2 className="text-xl font-display font-bold text-text-primary mb-4">
-          Create New Outline
-        </h2>
-
-        {loading ? (
-          /* Progress view shown while the API call is in flight */
+    <Dialog
+      isOpen={true}
+      onClose={loading ? () => {} : onClose}
+      title="Create New Outline"
+    >
+      {loading ? (
+        /* Progress view shown while the API call is in flight */
+        <div>
+          <AIGenerationProgress
+            type="outline"
+            keyword={keyword}
+            isGenerating={loading}
+          />
+          <div className="mt-4 flex justify-center">
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-sm text-text-muted hover:text-text-secondary underline underline-offset-2 transition-colors"
+            >
+              Cancel and close
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* Normal form view */
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <AIGenerationProgress
-              type="outline"
-              keyword={keyword}
-              isGenerating={loading}
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              Target Keyword *
+            </label>
+            <input
+              type="text"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              placeholder="e.g., anxiety relief techniques"
+              className="w-full px-4 py-2.5 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all"
             />
-            <div className="mt-4 flex justify-center">
-              <button
-                type="button"
-                onClick={onClose}
-                className="text-sm text-text-muted hover:text-text-secondary underline underline-offset-2 transition-colors"
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              Target Audience
+            </label>
+            <input
+              type="text"
+              value={targetAudience}
+              onChange={(e) => setTargetAudience(e.target.value)}
+              placeholder="e.g., adults dealing with work stress"
+              className="w-full px-4 py-2.5 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                Tone
+              </label>
+              <select
+                value={tone}
+                onChange={(e) => setTone(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all"
               >
-                Cancel and close
-              </button>
+                <option value="professional">Professional</option>
+                <option value="friendly">Friendly</option>
+                <option value="empathetic">Empathetic</option>
+                <option value="informative">Informative</option>
+                <option value="conversational">Conversational</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                Word Count
+              </label>
+              <select
+                value={wordCount}
+                onChange={(e) => setWordCount(Number(e.target.value))}
+                className="w-full px-4 py-2.5 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all"
+              >
+                <option value={800}>Short (~800 words)</option>
+                <option value={1500}>Medium (~1500 words)</option>
+                <option value={2500}>Long (~2500 words)</option>
+                <option value={4000}>Very Long (~4000 words)</option>
+              </select>
             </div>
           </div>
-        ) : (
-          /* Normal form view */
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                Target Keyword *
-              </label>
-              <input
-                type="text"
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                placeholder="e.g., anxiety relief techniques"
-                className="w-full px-4 py-2.5 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all"
-              />
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                Target Audience
-              </label>
-              <input
-                type="text"
-                value={targetAudience}
-                onChange={(e) => setTargetAudience(e.target.value)}
-                placeholder="e.g., adults dealing with work stress"
-                className="w-full px-4 py-2.5 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all"
-              />
-            </div>
+          {error && (
+            <p className="text-sm text-red-600">{error}</p>
+          )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                  Tone
-                </label>
-                <select
-                  value={tone}
-                  onChange={(e) => setTone(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all"
-                >
-                  <option value="professional">Professional</option>
-                  <option value="friendly">Friendly</option>
-                  <option value="empathetic">Empathetic</option>
-                  <option value="informative">Informative</option>
-                  <option value="conversational">Conversational</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                  Word Count
-                </label>
-                <select
-                  value={wordCount}
-                  onChange={(e) => setWordCount(Number(e.target.value))}
-                  className="w-full px-4 py-2.5 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all"
-                >
-                  <option value={800}>Short (~800 words)</option>
-                  <option value={1500}>Medium (~1500 words)</option>
-                  <option value={2500}>Long (~2500 words)</option>
-                  <option value={4000}>Very Long (~4000 words)</option>
-                </select>
-              </div>
-            </div>
-
-            {error && (
-              <p className="text-sm text-red-600">{error}</p>
-            )}
-
-            <div className="flex gap-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onClose}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button type="submit" className="flex-1" disabled={loading} isLoading={loading}>
-                Generate Outline
-              </Button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
+          <div className="flex gap-3 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button type="submit" className="flex-1" disabled={loading} isLoading={loading}>
+              Generate Outline
+            </Button>
+          </div>
+        </form>
+      )}
+    </Dialog>
   );
 }

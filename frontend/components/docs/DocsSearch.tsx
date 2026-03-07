@@ -112,12 +112,12 @@ export default function DocsSearch({ articles, linkPrefix }: DocsSearchProps) {
           onChange={(e) => handleSearch(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => results.length > 0 && setIsOpen(true)}
-          className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border border-cream-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-300 text-text-primary placeholder:text-text-muted"
+          className="w-full pl-9 pr-4 py-2.5 text-sm bg-surface border border-cream-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-300 text-text-primary placeholder:text-text-muted"
         />
       </div>
 
       {isOpen && (
-        <div className="absolute top-full mt-2 w-full bg-white rounded-xl border border-cream-200 shadow-soft-lg overflow-hidden z-50">
+        <div className="absolute top-full mt-2 w-full bg-surface rounded-xl border border-cream-200 shadow-soft-lg overflow-hidden z-50">
           {results.map((article, i) => (
             <button
               key={`${article.category}/${article.slug}`}

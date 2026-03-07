@@ -57,7 +57,7 @@ export default function AdminAuditLogsPage() {
     if (lowerAction.includes("create")) return "bg-green-100 text-green-800";
     if (lowerAction.includes("update") || lowerAction.includes("edit")) return "bg-blue-100 text-blue-800";
     if (lowerAction.includes("delete") || lowerAction.includes("remove")) return "bg-red-100 text-red-800";
-    if (lowerAction.includes("view") || lowerAction.includes("read")) return "bg-gray-100 text-gray-800";
+    if (lowerAction.includes("view") || lowerAction.includes("read")) return "bg-surface-tertiary text-text-primary";
     return "bg-purple-100 text-purple-800";
   };
 
@@ -72,14 +72,14 @@ export default function AdminAuditLogsPage() {
         </div>
         <button
           onClick={loadLogs}
-          className="px-4 py-2 bg-white border border-surface-tertiary rounded-lg hover:bg-surface-secondary text-sm font-medium"
+          className="px-4 py-2 bg-surface border border-surface-tertiary rounded-lg hover:bg-surface-secondary text-sm font-medium"
         >
           Refresh
         </button>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-surface-tertiary p-4">
+      <div className="bg-surface rounded-xl border border-surface-tertiary p-4">
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1">
             <div className="relative">
@@ -128,7 +128,7 @@ export default function AdminAuditLogsPage() {
       </div>
 
       {/* Logs Table */}
-      <div className="bg-white rounded-xl border border-surface-tertiary overflow-hidden">
+      <div className="bg-surface rounded-xl border border-surface-tertiary overflow-hidden">
         {loading ? (
           <div className="p-12 text-center">
             <div className="inline-block h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
@@ -245,7 +245,7 @@ export default function AdminAuditLogsPage() {
                                   <h4 className="text-xs font-medium text-text-secondary uppercase mb-1">
                                     Details
                                   </h4>
-                                  <pre className="text-xs bg-white p-3 rounded-lg border border-surface-tertiary overflow-x-auto">
+                                  <pre className="text-xs bg-surface p-3 rounded-lg border border-surface-tertiary overflow-x-auto">
                                     {JSON.stringify(log.metadata, null, 2)}
                                   </pre>
                                 </div>

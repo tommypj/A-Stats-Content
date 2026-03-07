@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface ErrorProps {
   error: Error & { digest?: string };
@@ -40,14 +41,11 @@ export default function DashboardError({ error, reset }: ErrorProps) {
 
         {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-3 justify-center pt-1">
-          <button
-            onClick={reset}
-            className="btn-primary"
-          >
+          <Button onClick={reset}>
             Try again
-          </button>
-          <Link href="/dashboard" className="btn-secondary">
-            Go to Dashboard
+          </Button>
+          <Link href="/dashboard">
+            <Button variant="secondary">Go to Dashboard</Button>
           </Link>
         </div>
       </div>

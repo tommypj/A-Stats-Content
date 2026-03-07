@@ -28,7 +28,7 @@ function StatCard({
   color: string;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-surface-tertiary p-5">
+    <div className="bg-surface rounded-xl border border-surface-tertiary p-5">
       <div className="flex items-center gap-3">
         <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${color}`}>
           <Icon className="h-5 w-5" />
@@ -51,7 +51,7 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <span
       className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-        styles[status] ?? "bg-gray-100 text-gray-800"
+        styles[status] ?? "bg-surface-tertiary text-text-primary"
       }`}
     >
       {status}
@@ -142,7 +142,7 @@ export default function AdminGenerationsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {statsLoading ? (
           Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-xl border border-surface-tertiary p-5 animate-pulse">
+            <div key={i} className="bg-surface rounded-xl border border-surface-tertiary p-5 animate-pulse">
               <div className="h-10 w-10 rounded-lg bg-surface-secondary mb-3" />
               <div className="h-3 w-20 bg-surface-secondary rounded mb-2" />
               <div className="h-5 w-12 bg-surface-secondary rounded" />
@@ -185,7 +185,7 @@ export default function AdminGenerationsPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-surface-tertiary p-4">
+      <div className="bg-surface rounded-xl border border-surface-tertiary p-4">
         <div className="flex flex-wrap gap-3">
           <div className="flex-1 min-w-[200px]">
             <div className="relative">
@@ -236,7 +236,7 @@ export default function AdminGenerationsPage() {
       </div>
 
       {/* Logs Table */}
-      <div className="bg-white rounded-xl border border-surface-tertiary overflow-hidden">
+      <div className="bg-surface rounded-xl border border-surface-tertiary overflow-hidden">
         {loading ? (
           <div className="p-12 text-center">
             <div className="inline-block h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />

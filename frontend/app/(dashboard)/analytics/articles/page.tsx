@@ -122,7 +122,7 @@ export default function ArticlePerformancePage() {
     const styles = {
       improving: "bg-green-50 text-green-700 border-green-200",
       declining: "bg-red-50 text-red-700 border-red-200",
-      neutral: "bg-gray-50 text-gray-700 border-gray-200",
+      neutral: "bg-surface-secondary text-text-secondary border-surface-tertiary",
       new: "bg-blue-50 text-blue-700 border-blue-200",
     };
     return (
@@ -149,7 +149,7 @@ export default function ArticlePerformancePage() {
           <Link href="/analytics" className="text-sm text-primary-600 hover:text-primary-700 mb-4 inline-block">
             ← Back to Analytics
           </Link>
-          <h1 className="font-display text-3xl font-bold text-text-primary">Article Performance</h1>
+          <h1 className="font-display text-2xl font-bold text-text-primary">Article Performance</h1>
           <p className="mt-2 text-text-secondary">
             Connect Google Search Console to track your published articles
           </p>
@@ -172,7 +172,7 @@ export default function ArticlePerformancePage() {
         </Link>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h1 className="font-display text-3xl font-bold text-text-primary">Article Performance</h1>
+            <h1 className="font-display text-2xl font-bold text-text-primary">Article Performance</h1>
             <p className="mt-2 text-text-secondary">
               Track how your published articles perform in search
             </p>

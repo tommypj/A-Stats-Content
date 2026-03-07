@@ -64,7 +64,7 @@ function CallbackContent() {
 
   if (status === "loading") {
     return (
-      <div className="container mx-auto p-6 flex items-center justify-center min-h-[60vh]">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <Card className="p-8 text-center max-w-md w-full">
           <Loader2 className="h-16 w-16 text-primary-500 animate-spin mx-auto mb-6" />
           <h2 className="text-2xl font-semibold text-text-primary mb-2">
@@ -80,7 +80,7 @@ function CallbackContent() {
 
   if (status === "error") {
     return (
-      <div className="container mx-auto p-6 flex items-center justify-center min-h-[60vh]">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <Card className="p-8 text-center max-w-md w-full">
           <div className="h-16 w-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
             <AlertCircle className="h-8 w-8 text-red-500" />
@@ -103,7 +103,7 @@ function CallbackContent() {
   }
 
   return (
-    <div className="container mx-auto p-6 flex items-center justify-center min-h-[60vh]">
+    <div className="flex items-center justify-center min-h-[60vh]">
       <Card className="p-8 text-center max-w-md w-full">
         <div className="h-16 w-16 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
           <CheckCircle className="h-8 w-8 text-green-500" />
@@ -131,7 +131,7 @@ function CallbackContent() {
 export default function CallbackPage() {
   return (
     <Suspense fallback={
-      <div className="container mx-auto p-6 flex items-center justify-center min-h-[60vh]">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <Card className="p-8 text-center max-w-md w-full">
           <Loader2 className="h-16 w-16 text-primary-500 animate-spin mx-auto mb-6" />
           <h2 className="text-2xl font-semibold text-text-primary mb-2">

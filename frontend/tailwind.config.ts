@@ -67,6 +67,14 @@ const config: Config = {
           700: "#915544",
           800: "#77483c",
         },
+        // Social platform brand colors
+        social: {
+          twitter: "#1DA1F2",
+          linkedin: "#0A66C2",
+          facebook: "#1877F2",
+          instagram: "#E4405F",
+          wordpress: "#21759B",
+        },
         // CSS variable-based colors (shadcn/ui)
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

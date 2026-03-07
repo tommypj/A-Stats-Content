@@ -85,12 +85,12 @@ export default function SocialCalendarPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className="space-y-6 max-w-7xl">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-3xl font-bold flex items-center gap-3">
+            <h1 className="text-2xl font-display font-bold text-text-primary flex items-center gap-3">
               <Calendar className="h-8 w-8 text-primary-500" />
               Social Media Calendar
             </h1>
@@ -121,7 +121,7 @@ export default function SocialCalendarPage() {
               <select
                 value={filterPlatform}
                 onChange={(e) => setFilterPlatform(e.target.value as SocialPlatform | "all")}
-                className="px-3 py-2 border border-surface-tertiary rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="px-3 py-2 border border-surface-tertiary rounded-lg text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option value="all">All Platforms</option>
                 <option value="twitter">Twitter</option>
@@ -138,7 +138,7 @@ export default function SocialCalendarPage() {
                 className={cn(
                   "px-4 py-2 rounded-md text-sm font-medium transition-colors",
                   view === "month"
-                    ? "bg-white shadow-sm"
+                    ? "bg-surface shadow-sm"
                     : "text-text-secondary hover:text-text-primary"
                 )}
               >
@@ -149,7 +149,7 @@ export default function SocialCalendarPage() {
                 className={cn(
                   "px-4 py-2 rounded-md text-sm font-medium transition-colors",
                   view === "week"
-                    ? "bg-white shadow-sm"
+                    ? "bg-surface shadow-sm"
                     : "text-text-secondary hover:text-text-primary"
                 )}
               >
@@ -160,7 +160,7 @@ export default function SocialCalendarPage() {
                 className={cn(
                   "px-4 py-2 rounded-md text-sm font-medium transition-colors",
                   view === "day"
-                    ? "bg-white shadow-sm"
+                    ? "bg-surface shadow-sm"
                     : "text-text-secondary hover:text-text-primary"
                 )}
               >
@@ -173,7 +173,7 @@ export default function SocialCalendarPage() {
 
       {/* Calendar */}
       {loading ? (
-        <div className="flex items-center justify-center h-96 bg-white rounded-xl border border-surface-tertiary">
+        <div className="flex items-center justify-center h-96 bg-surface rounded-xl border border-surface-tertiary">
           <div className="text-center">
             <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
             <p className="text-text-secondary">Loading calendar...</p>

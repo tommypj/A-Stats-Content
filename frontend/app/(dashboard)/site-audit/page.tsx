@@ -77,7 +77,7 @@ function statusBadge(status: string) {
     "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
     status === "completed" && "bg-green-100 text-green-700",
     status === "failed" && "bg-red-100 text-red-700",
-    status === "pending" && "bg-gray-100 text-gray-700",
+    status === "pending" && "bg-surface-tertiary text-text-secondary",
     status === "crawling" && "bg-blue-100 text-blue-700",
     status === "analyzing" && "bg-purple-100 text-purple-700"
   );

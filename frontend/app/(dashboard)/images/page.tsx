@@ -359,7 +359,7 @@ export default function ImagesPage() {
           <div className="flex items-center gap-2 ml-auto">
             <button
               onClick={handleBulkExport}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary-300 bg-white text-sm font-medium text-primary-700 hover:bg-primary-50 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary-300 bg-surface text-sm font-medium text-primary-700 hover:bg-primary-50 transition-colors"
             >
               <Download className="h-4 w-4" />
               Export
@@ -489,7 +489,7 @@ export default function ImagesPage() {
                             type="checkbox"
                             checked={isChecked}
                             onChange={() => toggleSelectOne(image.id)}
-                            className="h-4 w-4 rounded border-white bg-white/90 text-primary-600 focus:ring-primary-500 cursor-pointer shadow"
+                            className="h-4 w-4 rounded border-white bg-surface/90 text-primary-600 focus:ring-primary-500 cursor-pointer shadow"
                           />
                         </label>
                       </div>
@@ -511,7 +511,7 @@ export default function ImagesPage() {
                         <button
                           onClick={() => setActiveMenu(activeMenu === image.id ? null : image.id)}
                           aria-label="Image actions"
-                          className="p-1.5 rounded-lg bg-white/90 hover:bg-white shadow-sm backdrop-blur-sm"
+                          className="p-1.5 rounded-lg bg-surface/90 hover:bg-surface shadow-sm backdrop-blur-sm"
                         >
                           <MoreVertical className="h-4 w-4 text-text-muted" />
                         </button>
@@ -519,7 +519,7 @@ export default function ImagesPage() {
                         {activeMenu === image.id && (
                           <>
                             <div className="fixed inset-0 z-40" onClick={() => setActiveMenu(null)} />
-                            <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg border border-surface-tertiary shadow-lg z-50">
+                            <div className="absolute right-0 mt-1 w-48 bg-surface rounded-lg border border-surface-tertiary shadow-lg z-50">
                               <button
                                 onClick={() => handleCopyUrl(getImageUrl(image.url), image.id)}
                                 className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-surface-secondary"
@@ -648,8 +648,8 @@ export default function ImagesPage() {
       {selectedImage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80" onClick={() => setSelectedImage(null)} />
-          <div className="relative bg-white rounded-2xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-auto">
-            <div className="sticky top-0 bg-white border-b border-surface-tertiary p-4 flex items-center justify-between z-10">
+          <div className="relative bg-surface rounded-2xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-auto">
+            <div className="sticky top-0 bg-surface border-b border-surface-tertiary p-4 flex items-center justify-between z-10">
               <div>
                 <h3 className="font-medium text-text-primary">Generated Image</h3>
                 <p className="text-sm text-text-secondary mt-0.5">

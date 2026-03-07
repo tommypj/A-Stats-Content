@@ -10,7 +10,6 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -20,6 +19,7 @@ import {
   CreateReportInput,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import {
   Card,
   CardContent,
@@ -159,7 +159,7 @@ export default function ReportsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-display text-3xl font-bold text-text-primary">
+          <h1 className="font-display text-2xl font-bold text-text-primary">
             Reports
           </h1>
           <p className="mt-2 text-text-secondary">
@@ -293,119 +293,107 @@ export default function ReportsPage() {
       )}
 
       {/* Create Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-surface-primary border border-border rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-text-primary">
-                Generate Report
-              </h2>
-              <button
-                onClick={() => setShowModal(false)}
-                className="text-text-muted hover:text-text-primary"
-              >
-                <X className="h-5 w-5" />
-              </button>
+      <Dialog
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title="Generate Report"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1">
+              Report Name *
+            </label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, name: e.target.value }))
+              }
+              placeholder="e.g. March 2026 SEO Overview"
+              className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1">
+              Report Type
+            </label>
+            <select
+              value={form.report_type}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, report_type: e.target.value }))
+              }
+              className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            >
+              {REPORT_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1">
+                From
+              </label>
+              <input
+                type="date"
+                value={form.date_from || ""}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    date_from: e.target.value || undefined,
+                  }))
+                }
+                className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              />
             </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Report Name *
-                </label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, name: e.target.value }))
-                  }
-                  placeholder="e.g. March 2026 SEO Overview"
-                  className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Report Type
-                </label>
-                <select
-                  value={form.report_type}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, report_type: e.target.value }))
-                  }
-                  className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                >
-                  {REPORT_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1">
-                    From
-                  </label>
-                  <input
-                    type="date"
-                    value={form.date_from || ""}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        date_from: e.target.value || undefined,
-                      }))
-                    }
-                    className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1">
-                    To
-                  </label>
-                  <input
-                    type="date"
-                    value={form.date_to || ""}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        date_to: e.target.value || undefined,
-                      }))
-                    }
-                    className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Description
-                </label>
-                <input
-                  type="text"
-                  value={form.description || ""}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, description: e.target.value }))
-                  }
-                  placeholder="Optional notes about this report"
-                  className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
-              <Button variant="outline" onClick={() => setShowModal(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleCreate} disabled={saving}>
-                {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Generate Report
-              </Button>
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1">
+                To
+              </label>
+              <input
+                type="date"
+                value={form.date_to || ""}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    date_to: e.target.value || undefined,
+                  }))
+                }
+                className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              />
             </div>
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1">
+              Description
+            </label>
+            <input
+              type="text"
+              value={form.description || ""}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, description: e.target.value }))
+              }
+              placeholder="Optional notes about this report"
+              className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            />
+          </div>
         </div>
-      )}
+
+        <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
+          <Button variant="outline" onClick={() => setShowModal(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleCreate} disabled={saving}>
+            {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Generate Report
+          </Button>
+        </div>
+      </Dialog>
     </div>
   );
 }

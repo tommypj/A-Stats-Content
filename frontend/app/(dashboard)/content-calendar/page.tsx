@@ -83,7 +83,7 @@ interface PillConfig {
 }
 
 const STATUS_PILLS: Record<string, PillConfig> = {
-  draft: { bg: "bg-gray-100", text: "text-gray-700", dot: "bg-gray-400", label: "Draft" },
+  draft: { bg: "bg-surface-tertiary", text: "text-text-secondary", dot: "bg-text-muted", label: "Draft" },
   generating: { bg: "bg-yellow-100", text: "text-yellow-800", dot: "bg-yellow-500", label: "Generating" },
   completed: { bg: "bg-green-100", text: "text-green-800", dot: "bg-green-500", label: "Ready" },
   published: { bg: "bg-purple-100", text: "text-purple-800", dot: "bg-purple-500", label: "Published" },
@@ -153,9 +153,9 @@ function ScheduleModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-30 bg-black/20" onClick={onClose} />
-      <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl border border-surface-tertiary w-full max-w-md flex flex-col max-h-[80vh]">
+      <div className="fixed inset-0 z-50 bg-black/20" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="bg-surface rounded-2xl shadow-2xl border border-surface-tertiary w-full max-w-md flex flex-col max-h-[80vh]">
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-surface-tertiary">
             <div>
@@ -197,7 +197,7 @@ function ScheduleModal({
                 <select
                   value={hour}
                   onChange={(e) => setHour(Number(e.target.value))}
-                  className="px-3 py-2 rounded-lg border border-surface-tertiary text-sm bg-white"
+                  className="px-3 py-2 rounded-lg border border-surface-tertiary text-sm bg-surface"
                 >
                   {Array.from({ length: 24 }, (_, i) => (
                     <option key={i} value={i}>
@@ -209,7 +209,7 @@ function ScheduleModal({
                 <select
                   value={minute}
                   onChange={(e) => setMinute(Number(e.target.value))}
-                  className="px-3 py-2 rounded-lg border border-surface-tertiary text-sm bg-white"
+                  className="px-3 py-2 rounded-lg border border-surface-tertiary text-sm bg-surface"
                 >
                   {[0, 15, 30, 45].map((m) => (
                     <option key={m} value={m}>
@@ -226,7 +226,7 @@ function ScheduleModal({
                 type="checkbox"
                 checked={autoPublish}
                 onChange={(e) => setAutoPublish(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                className="h-4 w-4 rounded border-surface-tertiary text-primary-600 focus:ring-primary-500"
               />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-text-primary flex items-center gap-1.5">
@@ -326,8 +326,8 @@ function DayPanel({ date, items, onClose, onRefresh, onOpenSchedule }: DayPanelP
 
   return (
     <>
-      <div className="fixed inset-0 z-30 bg-black/20" onClick={onClose} />
-      <div className="fixed right-0 top-0 bottom-0 z-40 w-full max-w-80 sm:w-80 bg-white shadow-2xl border-l border-surface-tertiary flex flex-col">
+      <div className="fixed inset-0 z-50 bg-black/20" onClick={onClose} />
+      <div className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-80 sm:w-80 bg-surface shadow-2xl border-l border-surface-tertiary flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-surface-tertiary">
           <div>
@@ -679,7 +679,7 @@ export default function ContentCalendarPage() {
   // Render
   // ---------------------------------------------------------------------------
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className="space-y-6 max-w-7xl">
       {/* Page header */}
       <div className="mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-1">

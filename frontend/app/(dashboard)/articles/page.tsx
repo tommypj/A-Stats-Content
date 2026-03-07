@@ -37,13 +37,13 @@ import { UsageLimitBanner } from "@/components/project/usage-limit-warning";
 import { QualityTierBadge } from "@/components/article/quality-tier-badge";
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof FileText }> = {
-  draft: { label: "Draft", color: "bg-gray-100 text-gray-700", icon: FileText },
+  draft: { label: "Draft", color: "bg-surface-tertiary text-text-secondary", icon: FileText },
   generating: { label: "Generating", color: "bg-yellow-100 text-yellow-700", icon: Loader2 },
   completed: { label: "Completed", color: "bg-green-100 text-green-700", icon: CheckCircle2 },
   published: { label: "Published", color: "bg-blue-100 text-blue-700", icon: ExternalLink },
   failed: { label: "Failed", color: "bg-red-100 text-red-700", icon: XCircle },
 };
-const defaultStatus = { label: "Unknown", color: "bg-gray-100 text-gray-500", icon: FileText };
+const defaultStatus = { label: "Unknown", color: "bg-surface-tertiary text-text-muted", icon: FileText };
 
 const STATUS_OPTIONS = [
   { value: "", label: "All Statuses" },
@@ -373,7 +373,7 @@ export default function ArticlesPage() {
                 className={clsx(
                   "px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
                   contentFilter === "all"
-                    ? "bg-white text-text-primary shadow-sm"
+                    ? "bg-surface text-text-primary shadow-sm"
                     : "text-text-secondary hover:text-text-primary"
                 )}
               >
@@ -387,7 +387,7 @@ export default function ArticlesPage() {
                 className={clsx(
                   "px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
                   contentFilter === "personal"
-                    ? "bg-white text-text-primary shadow-sm"
+                    ? "bg-surface text-text-primary shadow-sm"
                     : "text-text-secondary hover:text-text-primary"
                 )}
               >
@@ -401,7 +401,7 @@ export default function ArticlesPage() {
                 className={clsx(
                   "px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
                   contentFilter === "project"
-                    ? "bg-white text-text-primary shadow-sm"
+                    ? "bg-surface text-text-primary shadow-sm"
                     : "text-text-secondary hover:text-text-primary"
                 )}
               >
@@ -487,7 +487,7 @@ export default function ArticlesPage() {
           <div className="flex items-center gap-2 ml-auto">
             <button
               onClick={handleBulkExport}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary-300 bg-white text-sm font-medium text-primary-700 hover:bg-primary-50 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary-300 bg-surface text-sm font-medium text-primary-700 hover:bg-primary-50 transition-colors"
             >
               <Download className="h-4 w-4" />
               Export
@@ -671,7 +671,7 @@ export default function ArticlesPage() {
                     {activeMenu === article.id && (
                       <>
                         <div className="fixed inset-0 z-40" onClick={() => setActiveMenu(null)} />
-                        <div className="absolute right-0 mt-1 w-40 bg-white rounded-lg border border-surface-tertiary shadow-lg z-50">
+                        <div className="absolute right-0 mt-1 w-40 bg-surface rounded-lg border border-surface-tertiary shadow-lg z-50">
                           <Link
                             href={`/articles/${article.id}`}
                             className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-surface-secondary"

@@ -18,6 +18,7 @@ import {
   CreateTemplateInput,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import {
   Card,
   CardContent,
@@ -199,7 +200,7 @@ export default function TemplatesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-display text-3xl font-bold text-text-primary">
+          <h1 className="font-display text-2xl font-bold text-text-primary">
             Templates
           </h1>
           <p className="mt-2 text-text-secondary">
@@ -335,218 +336,207 @@ export default function TemplatesPage() {
       )}
 
       {/* Create/Edit Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-surface-primary border border-border rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto mx-4 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-text-primary">
-                {editing ? "Edit Template" : "New Template"}
-              </h2>
-              <button
-                onClick={() => setShowModal(false)}
-                className="text-text-muted hover:text-text-primary"
+      <Dialog
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title={editing ? "Edit Template" : "New Template"}
+        size="lg"
+      >
+        <div className="space-y-4">
+          {/* Name */}
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1">
+              Name *
+            </label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, name: e.target.value }))
+              }
+              placeholder="e.g. Long-form SEO guide"
+              className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            />
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1">
+              Description
+            </label>
+            <input
+              type="text"
+              value={form.description || ""}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, description: e.target.value }))
+              }
+              placeholder="Brief description of when to use this template"
+              className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            />
+          </div>
+
+          {/* Two-column row */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1">
+                Tone
+              </label>
+              <select
+                value={form.tone || "professional"}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, tone: e.target.value }))
+                }
+                className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-primary"
               >
-                <X className="h-5 w-5" />
-              </button>
+                {TONE_OPTIONS.map((t) => (
+                  <option key={t} value={t}>
+                    {t.charAt(0).toUpperCase() + t.slice(1)}
+                  </option>
+                ))}
+              </select>
             </div>
-
-            <div className="space-y-4">
-              {/* Name */}
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Name *
-                </label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, name: e.target.value }))
-                  }
-                  placeholder="e.g. Long-form SEO guide"
-                  className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Description
-                </label>
-                <input
-                  type="text"
-                  value={form.description || ""}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, description: e.target.value }))
-                  }
-                  placeholder="Brief description of when to use this template"
-                  className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                />
-              </div>
-
-              {/* Two-column row */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1">
-                    Tone
-                  </label>
-                  <select
-                    value={form.tone || "professional"}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, tone: e.target.value }))
-                    }
-                    className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                  >
-                    {TONE_OPTIONS.map((t) => (
-                      <option key={t} value={t}>
-                        {t.charAt(0).toUpperCase() + t.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1">
-                    Word Count Target
-                  </label>
-                  <input
-                    type="number"
-                    min={100}
-                    max={20000}
-                    value={form.word_count_target || 1500}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        word_count_target: parseInt(e.target.value) || 1500,
-                      }))
-                    }
-                    className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                  />
-                </div>
-              </div>
-
-              {/* Target Audience */}
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Target Audience
-                </label>
-                <input
-                  type="text"
-                  value={form.target_audience || ""}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      target_audience: e.target.value,
-                    }))
-                  }
-                  placeholder="e.g. Marketing managers at B2B SaaS companies"
-                  className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                />
-              </div>
-
-              {/* Writing style & Voice */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1">
-                    Writing Style
-                  </label>
-                  <input
-                    type="text"
-                    value={form.writing_style || ""}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        writing_style: e.target.value,
-                      }))
-                    }
-                    placeholder="e.g. Data-driven, concise"
-                    className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1">
-                    Voice
-                  </label>
-                  <input
-                    type="text"
-                    value={form.voice || ""}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, voice: e.target.value }))
-                    }
-                    placeholder="e.g. Authoritative, friendly"
-                    className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                  />
-                </div>
-              </div>
-
-              {/* Custom Instructions */}
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Custom Instructions
-                </label>
-                <textarea
-                  rows={3}
-                  value={form.custom_instructions || ""}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      custom_instructions: e.target.value,
-                    }))
-                  }
-                  placeholder="Any special instructions for article generation..."
-                  className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary resize-none"
-                />
-              </div>
-
-              {/* Sections */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-text-secondary">
-                    Sections
-                  </label>
-                  <Button variant="ghost" size="sm" onClick={addSection}>
-                    <Plus className="h-3.5 w-3.5 mr-1" /> Add Section
-                  </Button>
-                </div>
-                {(form.sections || []).length === 0 ? (
-                  <p className="text-sm text-text-muted">
-                    No sections defined. Sections will be auto-generated.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {(form.sections || []).map((s, i) => (
-                      <div key={i} className="flex gap-2">
-                        <input
-                          type="text"
-                          value={s.heading}
-                          onChange={(e) => updateSection(i, e.target.value)}
-                          placeholder={`Section ${i + 1} heading`}
-                          className="flex-1 px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                        />
-                        <button
-                          onClick={() => removeSection(i)}
-                          className="text-text-muted hover:text-red-500"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
-              <Button variant="outline" onClick={() => setShowModal(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleSave} disabled={saving}>
-                {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                {editing ? "Save Changes" : "Create Template"}
-              </Button>
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1">
+                Word Count Target
+              </label>
+              <input
+                type="number"
+                min={100}
+                max={20000}
+                value={form.word_count_target || 1500}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    word_count_target: parseInt(e.target.value) || 1500,
+                  }))
+                }
+                className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              />
             </div>
           </div>
+
+          {/* Target Audience */}
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1">
+              Target Audience
+            </label>
+            <input
+              type="text"
+              value={form.target_audience || ""}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  target_audience: e.target.value,
+                }))
+              }
+              placeholder="e.g. Marketing managers at B2B SaaS companies"
+              className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            />
+          </div>
+
+          {/* Writing style & Voice */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1">
+                Writing Style
+              </label>
+              <input
+                type="text"
+                value={form.writing_style || ""}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    writing_style: e.target.value,
+                  }))
+                }
+                placeholder="e.g. Data-driven, concise"
+                className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1">
+                Voice
+              </label>
+              <input
+                type="text"
+                value={form.voice || ""}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, voice: e.target.value }))
+                }
+                placeholder="e.g. Authoritative, friendly"
+                className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              />
+            </div>
+          </div>
+
+          {/* Custom Instructions */}
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1">
+              Custom Instructions
+            </label>
+            <textarea
+              rows={3}
+              value={form.custom_instructions || ""}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  custom_instructions: e.target.value,
+                }))
+              }
+              placeholder="Any special instructions for article generation..."
+              className="w-full px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary resize-none"
+            />
+          </div>
+
+          {/* Sections */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-text-secondary">
+                Sections
+              </label>
+              <Button variant="ghost" size="sm" onClick={addSection}>
+                <Plus className="h-3.5 w-3.5 mr-1" /> Add Section
+              </Button>
+            </div>
+            {(form.sections || []).length === 0 ? (
+              <p className="text-sm text-text-muted">
+                No sections defined. Sections will be auto-generated.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {(form.sections || []).map((s, i) => (
+                  <div key={i} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={s.heading}
+                      onChange={(e) => updateSection(i, e.target.value)}
+                      placeholder={`Section ${i + 1} heading`}
+                      className="flex-1 px-3 py-2 bg-surface-secondary border border-border rounded-lg text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                    />
+                    <button
+                      onClick={() => removeSection(i)}
+                      className="text-text-muted hover:text-red-500"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      )}
+
+        {/* Footer */}
+        <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
+          <Button variant="outline" onClick={() => setShowModal(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            {editing ? "Save Changes" : "Create Template"}
+          </Button>
+        </div>
+      </Dialog>
     </div>
   );
 }

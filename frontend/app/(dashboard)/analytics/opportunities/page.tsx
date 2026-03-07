@@ -200,7 +200,7 @@ export default function ContentOpportunitiesPage() {
         </Link>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h1 className="font-display text-3xl font-bold text-text-primary">Content Opportunities</h1>
+            <h1 className="font-display text-2xl font-bold text-text-primary">Content Opportunities</h1>
             <p className="mt-2 text-text-secondary">
               Discover keyword opportunities and get AI-powered content suggestions
             </p>
@@ -332,7 +332,7 @@ export default function ContentOpportunitiesPage() {
                           onChange={() => toggleKeyword(item.keyword)}
                           // FE-ANA-09: Disable when at max selection and this keyword is not selected
                           disabled={selectedKeywords.size >= 20 && !selectedKeywords.has(item.keyword)}
-                          className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="rounded border-surface-tertiary text-primary-600 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                       </td>
                       <td className="p-4 text-sm font-medium text-text-primary max-w-xs truncate">

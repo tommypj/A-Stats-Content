@@ -27,7 +27,7 @@ const roleColors = {
   owner: "bg-yellow-100 text-yellow-800 border-yellow-300",
   admin: "bg-purple-100 text-purple-800 border-purple-300",
   member: "bg-blue-100 text-blue-800 border-blue-300",
-  viewer: "bg-gray-100 text-gray-800 border-gray-300",
+  viewer: "bg-surface-tertiary text-text-primary border-surface-tertiary",
 };
 
 export function ProjectMembersList({ members, myRole, onUpdateRole, onRemove }: ProjectMembersListProps) {
@@ -125,7 +125,7 @@ export function ProjectMembersList({ members, myRole, onUpdateRole, onRemove }: 
                     value={member.role}
                     onChange={(e) => handleRoleChange(member.user_id, e.target.value as ProjectRole)}
                     disabled={loadingMember === member.user_id}
-                    className="px-3 py-1.5 rounded-lg border border-surface-tertiary bg-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="px-3 py-1.5 rounded-lg border border-surface-tertiary bg-surface text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
                   >
                     <option value="admin">Admin</option>
                     <option value="member">Member</option>

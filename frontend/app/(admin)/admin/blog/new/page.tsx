@@ -271,12 +271,12 @@ export default function AdminNewBlogPostPage() {
                     value={aiKeyword}
                     onChange={e => setAiKeyword(e.target.value)}
                     placeholder="e.g. SEO tips 2025"
-                    className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                    className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-text-secondary mb-1">Tone</label>
-                  <select value={aiTone} onChange={e => setAiTone(e.target.value)} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+                  <select value={aiTone} onChange={e => setAiTone(e.target.value)} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface">
                     <option value="professional">Professional</option>
                     <option value="conversational">Conversational</option>
                     <option value="educational">Educational</option>
@@ -286,7 +286,7 @@ export default function AdminNewBlogPostPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-text-secondary mb-1">Word Count</label>
-                  <select value={aiWordCount} onChange={e => setAiWordCount(e.target.value)} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+                  <select value={aiWordCount} onChange={e => setAiWordCount(e.target.value)} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface">
                     <option value="800">~800 words</option>
                     <option value="1200">~1200 words</option>
                     <option value="1800">~1800 words</option>
@@ -300,7 +300,7 @@ export default function AdminNewBlogPostPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-primary-200">
                   <div>
                     <label className="block text-xs font-medium text-text-secondary mb-1">Writing Style</label>
-                    <select value={aiWritingStyle} onChange={e => setAiWritingStyle(e.target.value)} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+                    <select value={aiWritingStyle} onChange={e => setAiWritingStyle(e.target.value)} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface">
                       <option value="balanced">Balanced</option>
                       <option value="storytelling">Storytelling</option>
                       <option value="listicle">Listicle</option>
@@ -310,7 +310,7 @@ export default function AdminNewBlogPostPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-text-secondary mb-1">Voice</label>
-                    <select value={aiVoice} onChange={e => setAiVoice(e.target.value)} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+                    <select value={aiVoice} onChange={e => setAiVoice(e.target.value)} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface">
                       <option value="second_person">Second person (you/your)</option>
                       <option value="first_person">First person (I/we)</option>
                       <option value="third_person">Third person</option>
@@ -318,7 +318,7 @@ export default function AdminNewBlogPostPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-text-secondary mb-1">List Usage</label>
-                    <select value={aiListUsage} onChange={e => setAiListUsage(e.target.value)} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+                    <select value={aiListUsage} onChange={e => setAiListUsage(e.target.value)} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface">
                       <option value="balanced">Balanced</option>
                       <option value="minimal">Minimal (prose-heavy)</option>
                       <option value="extensive">Extensive (list-heavy)</option>
@@ -326,7 +326,7 @@ export default function AdminNewBlogPostPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-text-secondary mb-1">Language</label>
-                    <select value={aiLanguage} onChange={e => setAiLanguage(e.target.value)} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+                    <select value={aiLanguage} onChange={e => setAiLanguage(e.target.value)} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface">
                       <option value="en">English</option>
                       <option value="es">Spanish</option>
                       <option value="fr">French</option>
@@ -342,7 +342,7 @@ export default function AdminNewBlogPostPage() {
                       onChange={e => setAiCustomInstructions(e.target.value)}
                       placeholder="e.g. Include real examples, mention our product A-Stats..."
                       rows={2}
-                      className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                      className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface"
                     />
                   </div>
                   <div>
@@ -352,7 +352,7 @@ export default function AdminNewBlogPostPage() {
                       value={aiSecondaryKeywords}
                       onChange={e => setAiSecondaryKeywords(e.target.value)}
                       placeholder="keyword1, keyword2"
-                      className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                      className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface"
                     />
                     <p className="text-xs text-text-muted mt-0.5">Comma-separated, max 10</p>
                   </div>
@@ -363,7 +363,7 @@ export default function AdminNewBlogPostPage() {
                       value={aiEntities}
                       onChange={e => setAiEntities(e.target.value)}
                       placeholder="Google, HubSpot, Neil Patel"
-                      className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                      className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface"
                     />
                     <p className="text-xs text-text-muted mt-0.5">Brands, tools, people</p>
                   </div>
@@ -395,7 +395,7 @@ export default function AdminNewBlogPostPage() {
                       value={imagePrompt}
                       onChange={e => setImagePrompt(e.target.value)}
                       rows={2}
-                      className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                      className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface"
                     />
                   </div>
                   {featuredImageUrl && (
@@ -405,7 +405,7 @@ export default function AdminNewBlogPostPage() {
                   <button
                     onClick={handleGenerateImage}
                     disabled={generatingImage}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-primary-300 text-primary-700 rounded-lg text-xs font-medium hover:bg-primary-50 disabled:opacity-50"
+                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-surface border border-primary-300 text-primary-700 rounded-lg text-xs font-medium hover:bg-primary-50 disabled:opacity-50"
                   >
                     {generatingImage ? (
                       <><Loader2 className="h-3 w-3 animate-spin" /> Generating image...</>

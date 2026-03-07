@@ -34,7 +34,7 @@ const roleConfig: Record<
   viewer: {
     label: "Viewer",
     icon: Eye,
-    colorClasses: "bg-gray-100 text-gray-700 border-gray-200",
+    colorClasses: "bg-surface-tertiary text-text-secondary border-surface-tertiary",
   },
 };
 

@@ -40,7 +40,7 @@ export function CookieBanner() {
       aria-label="Cookie consent"
       className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-2xl animate-in slide-in-from-bottom-4 duration-300"
     >
-      <div className="rounded-2xl border border-surface-tertiary bg-white/95 backdrop-blur-md shadow-xl p-4 sm:p-5">
+      <div className="rounded-2xl border border-surface-tertiary bg-surface/95 backdrop-blur-md shadow-xl p-4 sm:p-5">
         <div className="flex items-start gap-3">
           <div className="h-9 w-9 rounded-xl bg-primary-50 flex items-center justify-center shrink-0 mt-0.5">
             <Cookie className="h-4 w-4 text-primary-500" />

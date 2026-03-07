@@ -124,14 +124,14 @@ export default function AdminImagesPage() {
         </div>
         <Link
           href="/admin/content"
-          className="px-4 py-2 bg-white border border-surface-tertiary rounded-lg hover:bg-surface-secondary text-sm font-medium"
+          className="px-4 py-2 bg-surface border border-surface-tertiary rounded-lg hover:bg-surface-secondary text-sm font-medium"
         >
           Back to Content
         </Link>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-surface-tertiary p-4">
+      <div className="bg-surface rounded-xl border border-surface-tertiary p-4">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
             <div className="relative">
@@ -184,7 +184,7 @@ export default function AdminImagesPage() {
       </div>
 
       {/* Images Grid */}
-      <div className="bg-white rounded-xl border border-surface-tertiary p-6">
+      <div className="bg-surface rounded-xl border border-surface-tertiary p-6">
         {loading ? (
           <div className="p-12 text-center">
             <div className="inline-block h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
@@ -217,7 +217,7 @@ export default function AdminImagesPage() {
                     type="checkbox"
                     checked={selectedIds.has(image.id)}
                     onChange={() => toggleSelect(image.id)}
-                    className="absolute top-2 left-2 z-10 rounded border-gray-300"
+                    className="absolute top-2 left-2 z-10 rounded border-surface-tertiary"
                   />
                   {image.url ? (
                     <Image

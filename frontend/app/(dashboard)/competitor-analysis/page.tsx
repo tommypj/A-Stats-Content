@@ -46,7 +46,7 @@ function statusBadge(status: string) {
     "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
     status === "completed" && "bg-green-100 text-green-700",
     status === "failed" && "bg-red-100 text-red-700",
-    status === "pending" && "bg-gray-100 text-gray-700",
+    status === "pending" && "bg-surface-tertiary text-text-secondary",
     (status === "processing" || status === "scraping" || status === "analyzing") &&
       "bg-yellow-100 text-yellow-700"
   );
@@ -295,7 +295,7 @@ function ArticlesTab({ detail }: { detail: CompetitorAnalysisDetail }) {
                           ? "bg-green-100 text-green-700"
                           : confidence >= 50
                           ? "bg-yellow-100 text-yellow-700"
-                          : "bg-gray-100 text-gray-600"
+                          : "bg-surface-tertiary text-text-secondary"
                       )}
                     >
                       {confidence}%

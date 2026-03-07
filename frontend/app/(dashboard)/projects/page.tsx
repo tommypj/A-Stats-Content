@@ -34,7 +34,7 @@ const roleColors = {
   owner: "text-yellow-600",
   admin: "text-purple-600",
   member: "text-blue-600",
-  viewer: "text-gray-600",
+  viewer: "text-text-secondary",
 };
 
 export default function ProjectsPage() {

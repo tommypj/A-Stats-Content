@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { api, parseApiError, AgencyProfile, ClientWorkspace, Project } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const ALLOWED_FEATURE_OPTIONS = [
@@ -339,7 +340,7 @@ export default function AgencyPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-text-primary">Agency Dashboard</h1>
+          <h1 className="text-2xl font-display font-bold text-text-primary">Agency Dashboard</h1>
           <p className="text-text-secondary mt-1 text-sm">
             Manage client workspaces, portals, and branded reports
           </p>
@@ -455,141 +456,147 @@ export default function AgencyPage() {
       </div>
 
       {/* Add Client Modal */}
-      {showAddClient && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <Card className="w-full max-w-md shadow-2xl">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary-500" />
-                Add Client Workspace
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Project selector */}
-              <div>
-                <label className="block text-xs font-medium text-text-secondary mb-1">
-                  Project <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={clientForm.project_id}
-                  onChange={(e) =>
-                    setClientForm((p) => ({ ...p, project_id: e.target.value }))
-                  }
-                  className={INPUT_CLASS}
+      <Dialog
+        isOpen={showAddClient}
+        onClose={() => {
+          setShowAddClient(false);
+          setClientForm({
+            project_id: "",
+            client_name: "",
+            client_email: "",
+            allowed_features: {
+              analytics: true,
+              content: true,
+              social: false,
+            },
+          });
+        }}
+        title="Add Client Workspace"
+      >
+        <div className="space-y-4">
+          {/* Project selector */}
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1">
+              Project <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={clientForm.project_id}
+              onChange={(e) =>
+                setClientForm((p) => ({ ...p, project_id: e.target.value }))
+              }
+              className={INPUT_CLASS}
+            >
+              <option value="">Select a project...</option>
+              {projects.map((proj) => (
+                <option key={proj.id} value={proj.id}>
+                  {proj.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1">
+              Client Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={clientForm.client_name}
+              onChange={(e) =>
+                setClientForm((p) => ({ ...p, client_name: e.target.value }))
+              }
+              placeholder="Acme Corp"
+              className={INPUT_CLASS}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1">
+              Client Email
+            </label>
+            <input
+              type="email"
+              value={clientForm.client_email}
+              onChange={(e) =>
+                setClientForm((p) => ({ ...p, client_email: e.target.value }))
+              }
+              placeholder="client@acme.com"
+              className={INPUT_CLASS}
+            />
+          </div>
+
+          {/* Allowed features */}
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-2">
+              Allowed Features
+            </label>
+            <div className="space-y-2">
+              {ALLOWED_FEATURE_OPTIONS.map(({ key, label }) => (
+                <label
+                  key={key}
+                  className="flex items-center gap-2 cursor-pointer group"
                 >
-                  <option value="">Select a project...</option>
-                  {projects.map((proj) => (
-                    <option key={proj.id} value={proj.id}>
-                      {proj.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-text-secondary mb-1">
-                  Client Name <span className="text-red-500">*</span>
+                  <input
+                    type="checkbox"
+                    checked={
+                      clientForm.allowed_features[
+                        key as keyof typeof clientForm.allowed_features
+                      ]
+                    }
+                    onChange={(e) =>
+                      setClientForm((p) => ({
+                        ...p,
+                        allowed_features: {
+                          ...p.allowed_features,
+                          [key]: e.target.checked,
+                        },
+                      }))
+                    }
+                    className="h-4 w-4 rounded border-surface-tertiary text-primary-500 focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-text-primary group-hover:text-primary-500 transition-colors">
+                    {label}
+                  </span>
                 </label>
-                <input
-                  type="text"
-                  value={clientForm.client_name}
-                  onChange={(e) =>
-                    setClientForm((p) => ({ ...p, client_name: e.target.value }))
-                  }
-                  placeholder="Acme Corp"
-                  className={INPUT_CLASS}
-                />
-              </div>
+              ))}
+            </div>
+          </div>
 
-              <div>
-                <label className="block text-xs font-medium text-text-secondary mb-1">
-                  Client Email
-                </label>
-                <input
-                  type="email"
-                  value={clientForm.client_email}
-                  onChange={(e) =>
-                    setClientForm((p) => ({ ...p, client_email: e.target.value }))
-                  }
-                  placeholder="client@acme.com"
-                  className={INPUT_CLASS}
-                />
-              </div>
-
-              {/* Allowed features */}
-              <div>
-                <label className="block text-xs font-medium text-text-secondary mb-2">
-                  Allowed Features
-                </label>
-                <div className="space-y-2">
-                  {ALLOWED_FEATURE_OPTIONS.map(({ key, label }) => (
-                    <label
-                      key={key}
-                      className="flex items-center gap-2 cursor-pointer group"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={
-                          clientForm.allowed_features[
-                            key as keyof typeof clientForm.allowed_features
-                          ]
-                        }
-                        onChange={(e) =>
-                          setClientForm((p) => ({
-                            ...p,
-                            allowed_features: {
-                              ...p.allowed_features,
-                              [key]: e.target.checked,
-                            },
-                          }))
-                        }
-                        className="h-4 w-4 rounded border-surface-tertiary text-primary-500 focus:ring-primary-500"
-                      />
-                      <span className="text-sm text-text-primary group-hover:text-primary-500 transition-colors">
-                        {label}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-1">
-                <Button
-                  onClick={handleAddClient}
-                  variant="primary"
-                  size="sm"
-                  disabled={
-                    isAddingClient ||
-                    !clientForm.project_id ||
-                    !clientForm.client_name.trim()
-                  }
-                >
-                  {isAddingClient ? "Adding..." : "Add Client"}
-                </Button>
-                <Button
-                  onClick={() => {
-                    setShowAddClient(false);
-                    setClientForm({
-                      project_id: "",
-                      client_name: "",
-                      client_email: "",
-                      allowed_features: {
-                        analytics: true,
-                        content: true,
-                        social: false,
-                      },
-                    });
-                  }}
-                  variant="ghost"
-                  size="sm"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="flex gap-2 pt-1">
+            <Button
+              onClick={handleAddClient}
+              variant="primary"
+              size="sm"
+              disabled={
+                isAddingClient ||
+                !clientForm.project_id ||
+                !clientForm.client_name.trim()
+              }
+            >
+              {isAddingClient ? "Adding..." : "Add Client"}
+            </Button>
+            <Button
+              onClick={() => {
+                setShowAddClient(false);
+                setClientForm({
+                  project_id: "",
+                  client_name: "",
+                  client_email: "",
+                  allowed_features: {
+                    analytics: true,
+                    content: true,
+                    social: false,
+                  },
+                });
+              }}
+              variant="ghost"
+              size="sm"
+            >
+              Cancel
+            </Button>
+          </div>
         </div>
-      )}
+      </Dialog>
 
       {/* Client Workspace List */}
       <Card>

@@ -30,12 +30,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const STATUS_CONFIG: Record<string, { icon: typeof CheckCircle2; color: string; label: string }> = {
-  pending: { icon: Clock, color: "text-gray-500", label: "Pending" },
+  pending: { icon: Clock, color: "text-text-muted", label: "Pending" },
   processing: { icon: Loader2, color: "text-blue-500", label: "Processing" },
   completed: { icon: CheckCircle2, color: "text-green-500", label: "Completed" },
   partially_failed: { icon: AlertTriangle, color: "text-yellow-500", label: "Partial" },
   failed: { icon: XCircle, color: "text-red-500", label: "Failed" },
-  cancelled: { icon: Pause, color: "text-gray-400", label: "Cancelled" },
+  cancelled: { icon: Pause, color: "text-text-muted", label: "Cancelled" },
 };
 
 export default function BulkContentPage() {
@@ -155,7 +155,7 @@ export default function BulkContentPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-text-primary">Bulk Content</h1>
+          <h1 className="text-2xl font-display font-bold text-text-primary">Bulk Content</h1>
           <p className="text-text-secondary mt-1">
             Generate outlines in bulk from a list of keywords
           </p>
@@ -273,7 +273,7 @@ export default function BulkContentPage() {
                               job.status === "processing" ? "bg-blue-100 text-blue-700" :
                               job.status === "failed" ? "bg-red-100 text-red-700" :
                               job.status === "partially_failed" ? "bg-yellow-100 text-yellow-700" :
-                              "bg-gray-100 text-gray-600"
+                              "bg-surface-tertiary text-text-secondary"
                             }`}>
                               {cfg.label}
                             </span>

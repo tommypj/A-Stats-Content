@@ -114,7 +114,7 @@ export default function ArticlePerformanceDetailPage() {
           <Link href="/analytics/articles" className="text-sm text-primary-600 hover:text-primary-700 mb-4 inline-block">
             ← Back to Article Performance
           </Link>
-          <h1 className="font-display text-3xl font-bold text-text-primary">Article Detail</h1>
+          <h1 className="font-display text-2xl font-bold text-text-primary">Article Detail</h1>
         </div>
         <GscConnectBanner onConnect={handleConnect} isLoading={isConnecting} />
       </div>

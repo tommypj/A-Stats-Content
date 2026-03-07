@@ -252,7 +252,7 @@ export default function AgencyReportsPage() {
                 <select
                   value={pageSize}
                   onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                  className="rounded-lg border border-surface-tertiary bg-white px-2 py-1 text-sm text-text-primary"
+                  className="rounded-lg border border-surface-tertiary bg-surface px-2 py-1 text-sm text-text-primary"
                 >
                   {PAGE_SIZE_OPTIONS.map((s) => (
                     <option key={s} value={s}>

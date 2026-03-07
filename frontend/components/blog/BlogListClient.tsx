@@ -55,7 +55,7 @@ function FeaturedPostCard({ post }: { post: BlogPostCard }) {
             Featured
           </span>
           {post.category && (
-            <span className="absolute top-4 left-[110px] px-3 py-1 bg-white/90 text-primary-700 text-xs font-semibold rounded-full">
+            <span className="absolute top-4 left-[110px] px-3 py-1 bg-surface/90 text-primary-700 text-xs font-semibold rounded-full">
               {post.category.name}
             </span>
           )}

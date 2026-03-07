@@ -225,7 +225,7 @@ export default function ConversionGoalsPage() {
         </Link>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h1 className="font-display text-3xl font-bold text-text-primary">
+            <h1 className="font-display text-2xl font-bold text-text-primary">
               Conversion Goals
             </h1>
             <p className="mt-1 text-text-secondary">
@@ -265,7 +265,7 @@ export default function ConversionGoalsPage() {
                   setFormData((prev) => ({ ...prev, name: e.target.value }))
                 }
                 placeholder="e.g. Newsletter Sign-up"
-                className="w-full px-3 py-2 border border-surface-tertiary rounded-xl text-sm text-text-primary bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-text-muted"
+                className="w-full px-3 py-2 border border-surface-tertiary rounded-xl text-sm text-text-primary bg-surface focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-text-muted"
               />
             </div>
 
@@ -277,7 +277,7 @@ export default function ConversionGoalsPage() {
               <select
                 value={formData.goal_type}
                 onChange={(e) => handleGoalTypeChange(e.target.value)}
-                className="w-full px-3 py-2 border border-surface-tertiary rounded-xl text-sm text-text-primary bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 border border-surface-tertiary rounded-xl text-sm text-text-primary bg-surface focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 {GOAL_TYPES.map((t) => (
                   <option key={t.value} value={t.value}>
@@ -299,7 +299,7 @@ export default function ConversionGoalsPage() {
                 rows={6}
                 placeholder="{}"
                 spellCheck={false}
-                className={`w-full px-3 py-2 border rounded-xl text-sm text-text-primary bg-white font-mono focus:outline-none focus:ring-2 focus:ring-primary-500 resize-y ${
+                className={`w-full px-3 py-2 border rounded-xl text-sm text-text-primary bg-surface font-mono focus:outline-none focus:ring-2 focus:ring-primary-500 resize-y ${
                   configError
                     ? "border-red-400 focus:ring-red-400"
                     : "border-surface-tertiary"
@@ -327,7 +327,7 @@ export default function ConversionGoalsPage() {
                 }`}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                  className={`inline-block h-4 w-4 transform rounded-full bg-surface shadow transition-transform ${
                     formData.is_active ? "translate-x-6" : "translate-x-1"
                   }`}
                 />

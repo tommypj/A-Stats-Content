@@ -129,7 +129,7 @@ export function TransferOwnershipModal({
                   </div>
                   <Crown
                     className={`h-5 w-5 ${
-                      selectedMember === member.user_id ? "text-yellow-500" : "text-gray-300"
+                      selectedMember === member.user_id ? "text-yellow-500" : "text-text-muted"
                     }`}
                   />
                 </label>

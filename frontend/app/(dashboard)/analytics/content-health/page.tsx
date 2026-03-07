@@ -462,8 +462,8 @@ export default function ContentHealthPage() {
                                   </span>
                                   <span className={`text-xs px-1.5 py-0.5 rounded ${
                                     s.estimated_impact === "high" ? "bg-blue-100 text-blue-600" :
-                                    s.estimated_impact === "medium" ? "bg-gray-100 text-gray-600" :
-                                    "bg-gray-50 text-gray-500"
+                                    s.estimated_impact === "medium" ? "bg-surface-tertiary text-text-secondary" :
+                                    "bg-surface-secondary text-text-muted"
                                   }`}>
                                     {s.estimated_impact} impact
                                   </span>

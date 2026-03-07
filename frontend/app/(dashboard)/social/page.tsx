@@ -100,7 +100,7 @@ export default function SocialDashboard() {
       case "instagram":
         return "text-pink-500";
       default:
-        return "text-gray-500";
+        return "text-text-muted";
     }
   };
 

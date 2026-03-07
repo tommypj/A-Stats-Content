@@ -199,7 +199,7 @@ export default function ComposePage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="space-y-6">
         <div className="animate-pulse space-y-6">
           <div className="h-10 bg-surface-secondary rounded w-1/3" />
           <div className="h-64 bg-surface-secondary rounded-xl" />
@@ -210,7 +210,7 @@ export default function ComposePage() {
 
   if (accounts.length === 0) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="space-y-6">
         <Card className="p-8 text-center">
           <AlertCircle className="h-12 w-12 text-text-tertiary mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-text-primary mb-2">
@@ -229,12 +229,12 @@ export default function ComposePage() {
   }
 
   return (
-    <div className="container mx-auto p-6">
+    <div className="space-y-6">
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-text-primary">Create Post</h1>
+            <h1 className="text-2xl font-display font-bold text-text-primary">Create Post</h1>
             <p className="text-text-secondary mt-1">
               Compose and schedule your social media post
             </p>

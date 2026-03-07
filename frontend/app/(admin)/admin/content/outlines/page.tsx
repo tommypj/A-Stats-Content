@@ -131,14 +131,14 @@ export default function AdminOutlinesPage() {
         </div>
         <Link
           href="/admin/content"
-          className="px-4 py-2 bg-white border border-surface-tertiary rounded-lg hover:bg-surface-secondary text-sm font-medium"
+          className="px-4 py-2 bg-surface border border-surface-tertiary rounded-lg hover:bg-surface-secondary text-sm font-medium"
         >
           Back to Content
         </Link>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-surface-tertiary p-4">
+      <div className="bg-surface rounded-xl border border-surface-tertiary p-4">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
             <div className="relative">
@@ -192,7 +192,7 @@ export default function AdminOutlinesPage() {
       </div>
 
       {/* Outlines Table */}
-      <div className="bg-white rounded-xl border border-surface-tertiary overflow-hidden">
+      <div className="bg-surface rounded-xl border border-surface-tertiary overflow-hidden">
         {loading ? (
           <div className="p-12 text-center">
             <div className="inline-block h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
@@ -224,7 +224,7 @@ export default function AdminOutlinesPage() {
                         type="checkbox"
                         checked={selectedIds.size === outlines.length && outlines.length > 0}
                         onChange={toggleSelectAll}
-                        className="rounded border-gray-300"
+                        className="rounded border-surface-tertiary"
                       />
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">
@@ -255,7 +255,7 @@ export default function AdminOutlinesPage() {
                           type="checkbox"
                           checked={selectedIds.has(outline.id)}
                           onChange={() => toggleSelect(outline.id)}
-                          className="rounded border-gray-300"
+                          className="rounded border-surface-tertiary"
                         />
                       </td>
                       <td className="px-4 py-3">
@@ -277,7 +277,7 @@ export default function AdminOutlinesPage() {
                             outline.status === "completed"
                               ? "bg-green-100 text-green-800"
                               : outline.status === "draft"
-                              ? "bg-gray-100 text-gray-800"
+                              ? "bg-surface-tertiary text-text-primary"
                               : outline.status === "generating"
                               ? "bg-yellow-100 text-yellow-800"
                               : "bg-red-100 text-red-800"

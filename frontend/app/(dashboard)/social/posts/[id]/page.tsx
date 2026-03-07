@@ -135,7 +135,7 @@ export default function PostDetailPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-5xl">
+      <div className="space-y-6 max-w-5xl">
         <div className="flex items-center justify-center h-96">
           <div className="text-center">
             <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
@@ -148,7 +148,7 @@ export default function PostDetailPage() {
 
   if (!post) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-5xl">
+      <div className="space-y-6 max-w-5xl">
         <div className="text-center">
           <p className="text-lg text-text-secondary">Post not found</p>
           <Button className="mt-4" onClick={() => router.push("/social/history")}>
@@ -164,7 +164,7 @@ export default function PostDetailPage() {
   const hasFailed = post.status === "failed" || post.targets?.some((t) => t.status === "failed");
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-5xl">
+    <div className="space-y-6 max-w-5xl">
       <ConfirmDialog
         isOpen={!!confirmAction}
         onClose={() => setConfirmAction(null)}
@@ -190,7 +190,7 @@ export default function PostDetailPage() {
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-3xl font-bold">Post Details</h1>
+              <h1 className="text-2xl font-display font-bold text-text-primary">Post Details</h1>
               <PostStatusBadge status={post.status} />
             </div>
             <div className="flex items-center gap-4 text-sm text-text-secondary">
@@ -288,7 +288,7 @@ export default function PostDetailPage() {
                     className="flex items-center justify-between p-4 bg-surface-secondary rounded-lg"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="flex items-center justify-center w-10 h-10 rounded-full bg-white">
+                      <span className="flex items-center justify-center w-10 h-10 rounded-full bg-surface">
                         {PLATFORM_ICONS[target.platform]}
                       </span>
                       <div>

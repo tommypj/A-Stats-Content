@@ -22,11 +22,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const ITEM_STATUS: Record<string, { icon: typeof CheckCircle2; color: string }> = {
-  pending: { icon: Clock, color: "text-gray-400" },
+  pending: { icon: Clock, color: "text-text-muted" },
   processing: { icon: Loader2, color: "text-blue-500" },
   completed: { icon: CheckCircle2, color: "text-green-500" },
   failed: { icon: XCircle, color: "text-red-500" },
-  cancelled: { icon: Pause, color: "text-gray-400" },
+  cancelled: { icon: Pause, color: "text-text-muted" },
 };
 
 const ITEMS_PER_PAGE = 50;

@@ -223,7 +223,7 @@ function NewArticleContent() {
               <div className="p-4 bg-surface-secondary rounded-xl">
                 <h3 className="font-medium text-text-primary mb-2">{outline.title}</h3>
                 <div className="flex items-center gap-3 text-sm text-text-secondary">
-                  <span className="px-2 py-0.5 bg-white rounded-md">{outline.keyword}</span>
+                  <span className="px-2 py-0.5 bg-surface rounded-md">{outline.keyword}</span>
                   <span>{outline.sections?.length || 0} sections</span>
                   <span>~{outline.word_count_target} words</span>
                 </div>

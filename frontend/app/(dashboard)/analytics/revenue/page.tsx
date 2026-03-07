@@ -263,7 +263,7 @@ export default function RevenueAttributionPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-text-primary">Revenue Attribution</h1>
+          <h1 className="text-2xl font-display font-bold text-text-primary">Revenue Attribution</h1>
           <p className="text-text-secondary mt-1">
             Track how your organic content drives conversions and revenue
           </p>

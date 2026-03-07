@@ -228,7 +228,7 @@ export default function AdminBlogPostsPage() {
                     <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
                       post.status === "published"
                         ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-600"
+                        : "bg-surface-tertiary text-text-secondary"
                     }`}>
                       {post.status}
                     </span>

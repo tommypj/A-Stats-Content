@@ -94,7 +94,7 @@ function WordCountWidget({ content, target, onTargetChange }: WordCountWidgetPro
   const clampedPct = Math.min(pct, 100);
 
   return (
-    <div className="bg-white rounded-xl border border-surface-tertiary p-4 space-y-3">
+    <div className="bg-surface rounded-xl border border-surface-tertiary p-4 space-y-3">
       {/* Header row */}
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-text-primary">Word Count</p>
@@ -198,7 +198,7 @@ function SerpPreview({ title, slug, metaDescription, keyword }: SerpPreviewProps
   const breadcrumb = `yoursite.com › blog › ${slug || "article-slug"}`;
 
   return (
-    <div className="bg-white rounded-xl border border-surface-tertiary p-4 space-y-3">
+    <div className="bg-surface rounded-xl border border-surface-tertiary p-4 space-y-3">
       {/* Header */}
       <div className="flex items-center gap-2">
         <Eye className="h-4 w-4 text-text-muted flex-shrink-0" />
@@ -217,7 +217,7 @@ function SerpPreview({ title, slug, metaDescription, keyword }: SerpPreviewProps
       </div>
 
       {/* Google-style result card */}
-      <div className="rounded-lg border border-surface-tertiary bg-white px-4 py-3 space-y-0.5 shadow-sm">
+      <div className="rounded-lg border border-surface-tertiary bg-surface px-4 py-3 space-y-0.5 shadow-sm">
         {/* URL breadcrumb */}
         <p className="text-xs text-green-700 truncate">{breadcrumb}</p>
 
@@ -395,7 +395,7 @@ function AiAnswerPreview({ title, content, keyword, url }: AiAnswerPreviewProps)
   const hasSnippet = snippet.length > 0;
 
   return (
-    <div className="bg-white rounded-xl border border-surface-tertiary p-4 space-y-3">
+    <div className="bg-surface rounded-xl border border-surface-tertiary p-4 space-y-3">
       {/* Header */}
       <div className="flex items-center gap-2">
         <Bot className="h-4 w-4 text-purple-500 flex-shrink-0" />
@@ -468,7 +468,7 @@ function AiAnswerPreview({ title, content, keyword, url }: AiAnswerPreviewProps)
               )}
             </p>
             {hasSnippet && (
-              <div className="mt-2 flex items-center gap-2 bg-white rounded-lg border border-surface-tertiary px-2.5 py-1.5">
+              <div className="mt-2 flex items-center gap-2 bg-surface rounded-lg border border-surface-tertiary px-2.5 py-1.5">
                 <div className="w-4 h-4 rounded-sm bg-purple-200 flex items-center justify-center flex-shrink-0">
                   <span className="text-[8px] font-bold text-purple-700">S</span>
                 </div>
@@ -1926,7 +1926,7 @@ export default function ArticleEditorPage() {
                           "rounded-lg border p-2.5 transition-colors",
                           previewRevision?.id === rev.id
                             ? "border-primary-300 bg-primary-50"
-                            : "border-surface-tertiary bg-white hover:bg-surface-secondary"
+                            : "border-surface-tertiary bg-surface hover:bg-surface-secondary"
                         )}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -2040,7 +2040,7 @@ export default function ArticleEditorPage() {
                   linkSuggestions.map((suggestion) => (
                     <div
                       key={suggestion.id}
-                      className="flex items-start gap-2 p-2 rounded-lg border border-surface-tertiary bg-white hover:bg-surface-secondary transition-colors"
+                      className="flex items-start gap-2 p-2 rounded-lg border border-surface-tertiary bg-surface hover:bg-surface-secondary transition-colors"
                     >
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium text-text-primary leading-snug line-clamp-2">

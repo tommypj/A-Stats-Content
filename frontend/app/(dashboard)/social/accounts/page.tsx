@@ -129,7 +129,7 @@ export default function AccountsPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="space-y-6">
         <div className="animate-pulse space-y-6">
           <div className="h-10 bg-surface-secondary rounded w-1/3" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -143,7 +143,7 @@ export default function AccountsPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-8">
+    <div className="space-y-8">
       <ConfirmDialog
         isOpen={!!confirmAction}
         onClose={() => setConfirmAction(null)}
@@ -156,7 +156,7 @@ export default function AccountsPage() {
 
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-text-primary">Social Accounts</h1>
+        <h1 className="text-2xl font-display font-bold text-text-primary">Social Accounts</h1>
         <p className="text-text-secondary mt-1">
           Connect and manage your social media accounts
         </p>

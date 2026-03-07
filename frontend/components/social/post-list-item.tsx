@@ -17,10 +17,10 @@ interface PostListItemProps {
 }
 
 const PLATFORM_ICONS: Record<SocialPlatform, React.ReactNode> = {
-  twitter: <Twitter className="h-4 w-4 text-[#1DA1F2]" />,
-  linkedin: <Linkedin className="h-4 w-4 text-[#0A66C2]" />,
-  facebook: <Facebook className="h-4 w-4 text-[#1877F2]" />,
-  instagram: <Instagram className="h-4 w-4 text-[#E4405F]" />,
+  twitter: <Twitter className="h-4 w-4 text-social-twitter" />,
+  linkedin: <Linkedin className="h-4 w-4 text-social-linkedin" />,
+  facebook: <Facebook className="h-4 w-4 text-social-facebook" />,
+  instagram: <Instagram className="h-4 w-4 text-social-instagram" />,
 };
 
 export function PostListItem({

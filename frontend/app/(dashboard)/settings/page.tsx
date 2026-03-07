@@ -190,7 +190,7 @@ function ProfileSection({
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              className="w-full rounded-xl border border-surface-tertiary bg-white px-3 py-2 text-sm"
+              className="w-full rounded-xl border border-surface-tertiary bg-surface px-3 py-2 text-sm"
             >
               <option value="en">English</option>
               <option value="ro">Romanian</option>
@@ -206,7 +206,7 @@ function ProfileSection({
             <select
               value={timezone}
               onChange={(e) => setTimezone(e.target.value)}
-              className="w-full rounded-xl border border-surface-tertiary bg-white px-3 py-2 text-sm"
+              className="w-full rounded-xl border border-surface-tertiary bg-surface px-3 py-2 text-sm"
             >
               <option value="UTC">UTC</option>
               <option value="Europe/Bucharest">Europe/Bucharest</option>
@@ -528,9 +528,9 @@ function DeleteAccountDialog({
 
           {/* Buttons */}
           <div className="flex justify-end gap-3 pt-1">
-            <button onClick={onClose} disabled={isDeleting} className="btn-secondary">
+            <Button variant="secondary" onClick={onClose} disabled={isDeleting}>
               Cancel
-            </button>
+            </Button>
             <button
               onClick={onConfirm}
               disabled={!confirmed || isDeleting}

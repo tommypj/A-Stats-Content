@@ -102,7 +102,7 @@ export default function AEOPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-text-primary">AEO Scores</h1>
+          <h1 className="text-2xl font-display font-bold text-text-primary">AEO Scores</h1>
           <p className="text-text-secondary mt-1">
             Answer Engine Optimization — how AI-ready your content is
           </p>

@@ -63,14 +63,14 @@ export default function AdminAnalyticsPage() {
         </div>
         <button
           onClick={loadAnalytics}
-          className="px-4 py-2 bg-white border border-surface-tertiary rounded-lg hover:bg-surface-secondary text-sm font-medium"
+          className="px-4 py-2 bg-surface border border-surface-tertiary rounded-lg hover:bg-surface-secondary text-sm font-medium"
         >
           Refresh
         </button>
       </div>
 
       {/* Date Range Selector */}
-      <div className="bg-white rounded-xl border border-surface-tertiary p-4">
+      <div className="bg-surface rounded-xl border border-surface-tertiary p-4">
         <div className="flex items-center gap-4">
           <Calendar className="h-5 w-5 text-text-secondary" />
           <div className="flex items-center gap-3">
@@ -106,7 +106,7 @@ export default function AdminAnalyticsPage() {
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-xl border border-surface-tertiary p-6">
+        <div className="bg-surface rounded-xl border border-surface-tertiary p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 rounded-lg bg-blue-50">
               <Users className="h-6 w-6 text-blue-600" />
@@ -123,7 +123,7 @@ export default function AdminAnalyticsPage() {
           )}
         </div>
 
-        <div className="bg-white rounded-xl border border-surface-tertiary p-6">
+        <div className="bg-surface rounded-xl border border-surface-tertiary p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 rounded-lg bg-green-50">
               <FileText className="h-6 w-6 text-green-600" />
@@ -140,7 +140,7 @@ export default function AdminAnalyticsPage() {
           )}
         </div>
 
-        <div className="bg-white rounded-xl border border-surface-tertiary p-6">
+        <div className="bg-surface rounded-xl border border-surface-tertiary p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 rounded-lg bg-purple-50">
               <DollarSign className="h-6 w-6 text-purple-600" />
@@ -157,7 +157,7 @@ export default function AdminAnalyticsPage() {
           )}
         </div>
 
-        <div className="bg-white rounded-xl border border-surface-tertiary p-6">
+        <div className="bg-surface rounded-xl border border-surface-tertiary p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 rounded-lg bg-orange-50">
               <TrendingUp className="h-6 w-6 text-orange-600" />
@@ -178,7 +178,7 @@ export default function AdminAnalyticsPage() {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* User Growth */}
-        <div className="bg-white rounded-xl border border-surface-tertiary p-6">
+        <div className="bg-surface rounded-xl border border-surface-tertiary p-6">
           <h2 className="text-lg font-semibold text-text-primary mb-4">
             User Growth
           </h2>
@@ -196,7 +196,7 @@ export default function AdminAnalyticsPage() {
         </div>
 
         {/* Content Creation */}
-        <div className="bg-white rounded-xl border border-surface-tertiary p-6">
+        <div className="bg-surface rounded-xl border border-surface-tertiary p-6">
           <h2 className="text-lg font-semibold text-text-primary mb-4">
             Content Creation
           </h2>
@@ -214,7 +214,7 @@ export default function AdminAnalyticsPage() {
         </div>
 
         {/* Revenue Trend */}
-        <div className="bg-white rounded-xl border border-surface-tertiary p-6">
+        <div className="bg-surface rounded-xl border border-surface-tertiary p-6">
           <h2 className="text-lg font-semibold text-text-primary mb-4">
             Revenue Trend
           </h2>
@@ -232,7 +232,7 @@ export default function AdminAnalyticsPage() {
         </div>
 
         {/* Subscription Distribution */}
-        <div className="bg-white rounded-xl border border-surface-tertiary p-6">
+        <div className="bg-surface rounded-xl border border-surface-tertiary p-6">
           <h2 className="text-lg font-semibold text-text-primary mb-4">
             Users by Tier
           </h2>
@@ -252,7 +252,7 @@ export default function AdminAnalyticsPage() {
 
       {/* Top Creators */}
       {contentAnalytics && contentAnalytics.top_users.length > 0 && (
-        <div className="bg-white rounded-xl border border-surface-tertiary p-6">
+        <div className="bg-surface rounded-xl border border-surface-tertiary p-6">
           <h2 className="text-lg font-semibold text-text-primary mb-4">
             Top Content Creators
           </h2>

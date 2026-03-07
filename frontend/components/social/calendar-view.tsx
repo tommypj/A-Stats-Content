@@ -38,10 +38,10 @@ interface CalendarViewProps {
 }
 
 const PLATFORM_COLORS: Record<SocialPlatform, string> = {
-  twitter: "bg-[#1DA1F2] text-white",
-  linkedin: "bg-[#0A66C2] text-white",
-  facebook: "bg-[#1877F2] text-white",
-  instagram: "bg-gradient-to-r from-[#E4405F] to-[#5B51D8] text-white",
+  twitter: "bg-social-twitter text-white",
+  linkedin: "bg-social-linkedin text-white",
+  facebook: "bg-social-facebook text-white",
+  instagram: "bg-gradient-to-r from-social-instagram to-[#5B51D8] text-white",
 };
 
 const PLATFORM_ICONS: Record<SocialPlatform, React.ReactNode> = {
@@ -358,7 +358,7 @@ export function CalendarView({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-surface-tertiary overflow-hidden">
+    <div className="bg-surface rounded-xl shadow-sm border border-surface-tertiary overflow-hidden">
       {view === "month" && renderMonthView()}
       {view === "week" && renderWeekView()}
       {view === "day" && renderDayView()}
