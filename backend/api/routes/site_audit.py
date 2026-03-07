@@ -274,10 +274,29 @@ async def list_audit_pages(
 
     items = []
     for p in rows:
-        resp = AuditPageResponse.model_validate(p)
-        # Map the model's issues_json attribute to the schema's issues field
-        resp.issues = p.issues_json
-        items.append(resp)
+        # Build response manually to avoid lazy-loading the `issues` relationship
+        # (SQLAlchemy async + Pydantic from_attributes triggers MissingGreenlet)
+        items.append(AuditPageResponse(
+            id=p.id,
+            audit_id=p.audit_id,
+            url=p.url,
+            status_code=p.status_code,
+            response_time_ms=p.response_time_ms,
+            content_type=p.content_type,
+            word_count=p.word_count,
+            title=p.title,
+            meta_description=p.meta_description,
+            h1_count=p.h1_count,
+            has_canonical=p.has_canonical,
+            has_og_tags=p.has_og_tags,
+            has_structured_data=p.has_structured_data,
+            has_robots_meta=p.has_robots_meta,
+            page_size_bytes=p.page_size_bytes,
+            performance_score=p.performance_score,
+            pagespeed_data=p.pagespeed_data,
+            issues=p.issues_json,
+            created_at=p.created_at,
+        ))
 
     return AuditPageListResponse(
         items=items,
@@ -336,9 +355,17 @@ async def list_audit_issues(
 
     items = []
     for issue, page_url in rows:
-        resp = AuditIssueResponse.model_validate(issue)
-        resp.page_url = page_url
-        items.append(resp)
+        items.append(AuditIssueResponse(
+            id=issue.id,
+            audit_id=issue.audit_id,
+            page_id=issue.page_id,
+            issue_type=issue.issue_type,
+            severity=issue.severity,
+            message=issue.message,
+            details=issue.details,
+            page_url=page_url,
+            created_at=issue.created_at,
+        ))
 
     return AuditIssueListResponse(
         items=items,
