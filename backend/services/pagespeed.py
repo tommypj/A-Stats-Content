@@ -113,12 +113,13 @@ async def fetch_pagespeed(url: str, strategy: str = "mobile") -> dict[str, Any] 
 
             # Extract diagnostics (informational items)
             diagnostics = []
+            opportunity_ids = {o["id"] for o in opportunities}
             for audit_id, audit_data in audits.items():
                 if (
                     audit_data.get("details", {}).get("type") == "table"
                     and audit_data.get("score") is not None
                     and audit_data["score"] < 1
-                    and audit_id not in [o["id"] for o in opportunities]
+                    and audit_id not in opportunity_ids
                 ):
                     diagnostics.append({
                         "id": audit_id,

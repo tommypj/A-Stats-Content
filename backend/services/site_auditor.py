@@ -21,6 +21,7 @@ import httpx
 from bs4 import BeautifulSoup
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.plans import PLANS
 from infrastructure.database.connection import async_session_maker
 from infrastructure.database.models.site_audit import AuditIssue, AuditPage, SiteAudit
 
@@ -32,19 +33,19 @@ REQUEST_TIMEOUT = 10.0
 MAX_CRAWL_TIME = 1800  # 30 minutes
 CRAWL_DELAY = 0.5  # seconds between requests per slot
 
-# Tier-based limits
-PAGE_CAPS = {"free": 0, "starter": 10, "professional": 100, "enterprise": 500}
-AUDITS_PER_MONTH = {"free": 0, "starter": 5, "professional": 15, "enterprise": 50}
-
 
 # ============================================================================
 # SSRF Protection
 # ============================================================================
 
+_dns_cache: dict[str, bool] = {}
+
+
 def _is_safe_url(url: str) -> bool:
     """
     Block requests to private/internal IPs and hostnames.
     Returns True only for valid public domains.
+    Caches DNS results per hostname to avoid repeated resolution.
     """
     try:
         parsed = urlparse(url)
@@ -52,16 +53,23 @@ def _is_safe_url(url: str) -> bool:
         if not hostname:
             return False
 
+        # Check cache first
+        if hostname in _dns_cache:
+            return _dns_cache[hostname]
+
         # Block hostnames without a dot (e.g. "localhost", "internal")
         if "." not in hostname and hostname != "localhost":
+            _dns_cache[hostname] = False
             return False
         if hostname == "localhost":
+            _dns_cache[hostname] = False
             return False
 
         # Resolve hostname and check all IPs
         try:
             addrinfos = socket.getaddrinfo(hostname, None)
         except socket.gaierror:
+            _dns_cache[hostname] = False
             return False
 
         for family, _type, _proto, _canonname, sockaddr in addrinfos:
@@ -69,10 +77,13 @@ def _is_safe_url(url: str) -> bool:
             try:
                 ip = ipaddress.ip_address(ip_str)
             except ValueError:
+                _dns_cache[hostname] = False
                 return False
             if ip.is_private or ip.is_loopback or ip.is_reserved or ip.is_link_local:
+                _dns_cache[hostname] = False
                 return False
 
+        _dns_cache[hostname] = True
         return True
     except Exception:
         return False
@@ -123,10 +134,10 @@ def _normalize_url(url: str, base_url: str) -> str | None:
 
 async def _fetch_robots_txt(
     client: httpx.AsyncClient, domain: str
-) -> tuple[list[str], float]:
+) -> tuple[list[str], float, bool]:
     """
     Fetch /robots.txt and parse Disallow rules + Crawl-delay.
-    Returns (disallowed_paths, crawl_delay).
+    Returns (disallowed_paths, crawl_delay, robots_txt_exists).
     """
     disallowed: list[str] = []
     crawl_delay = 0.0
@@ -135,7 +146,7 @@ async def _fetch_robots_txt(
     try:
         resp = await client.get(url, follow_redirects=True, timeout=REQUEST_TIMEOUT)
         if resp.status_code != 200:
-            return disallowed, crawl_delay
+            return disallowed, crawl_delay, False
 
         current_agent: str | None = None
         applies_to_us = False
@@ -163,8 +174,9 @@ async def _fetch_robots_txt(
 
     except Exception as exc:
         logger.debug("Failed to fetch robots.txt for %s: %s", domain, exc)
+        return disallowed, crawl_delay, False
 
-    return disallowed, crawl_delay
+    return disallowed, crawl_delay, True
 
 
 def _is_path_allowed(path: str, disallowed: list[str]) -> bool:
@@ -190,13 +202,16 @@ def _analyze_page(
     headers: dict,
     page_size: int,
     redirect_chain: list[str],
+    soup: BeautifulSoup | None = None,
 ) -> tuple[dict, list[dict]]:
     """
     Analyze a single crawled page for SEO issues.
     Returns (page_data_dict, issues_list).
+    Accepts an optional pre-parsed soup to avoid double-parsing.
     """
     issues: list[dict] = []
-    soup = BeautifulSoup(html_body, "html.parser")
+    if soup is None:
+        soup = BeautifulSoup(html_body, "html.parser")
     is_https = url.startswith("https://")
 
     # --- Title tag ---
@@ -524,9 +539,10 @@ def _analyze_site_wide(pages_data: list[dict]) -> list[dict]:
 # ============================================================================
 
 async def _check_site_essentials(
-    client: httpx.AsyncClient, domain: str
+    client: httpx.AsyncClient, domain: str, has_robots_txt: bool = True
 ) -> list[dict]:
-    """Check for sitemap.xml and robots.txt presence."""
+    """Check for sitemap.xml and robots.txt presence.
+    Pass has_robots_txt from the earlier _fetch_robots_txt call to avoid a duplicate request."""
     issues: list[dict] = []
     base = f"https://{domain}"
 
@@ -548,18 +564,8 @@ async def _check_site_essentials(
             "message": "Missing sitemap.xml",
         })
 
-    # Robots.txt
-    try:
-        resp = await client.get(
-            f"{base}/robots.txt", follow_redirects=True, timeout=REQUEST_TIMEOUT
-        )
-        if resp.status_code != 200:
-            issues.append({
-                "issue_type": "missing_robots_txt",
-                "severity": "info",
-                "message": "Missing robots.txt",
-            })
-    except Exception:
+    # Robots.txt — reuse result from earlier fetch
+    if not has_robots_txt:
         issues.append({
             "issue_type": "missing_robots_txt",
             "severity": "info",
@@ -676,6 +682,7 @@ async def _crawl_site(
             if result["html"] and "text/html" in result.get("content_type", ""):
                 try:
                     link_soup = BeautifulSoup(result["html"], "html.parser")
+                    result["_soup"] = link_soup  # Cache for reuse in _analyze_page
                     for a_tag in link_soup.find_all("a", href=True):
                         href = a_tag["href"]
                         normalized = _normalize_url(href, result["final_url"])
@@ -728,6 +735,7 @@ async def run_site_audit(audit_id: str) -> None:
     Uses its own DB session (not the request session).
     """
     start_time = time.monotonic()
+    _dns_cache.clear()
 
     try:
         async with async_session_maker() as db:
@@ -756,7 +764,11 @@ async def run_site_audit(audit_id: str) -> None:
                 return
 
             tier = user.subscription_tier or "free"
-            max_pages = PAGE_CAPS.get(tier, PAGE_CAPS["free"])
+            now = datetime.now(UTC)
+            if user.subscription_expires and user.subscription_expires < now:
+                tier = "free"
+            plan = PLANS.get(tier, PLANS["free"])
+            max_pages = plan.get("limits", {}).get("site_audit_pages", 0)
 
             if max_pages <= 0:
                 audit.status = "failed"
@@ -770,7 +782,7 @@ async def run_site_audit(audit_id: str) -> None:
                 follow_redirects=True,
                 timeout=REQUEST_TIMEOUT,
             ) as client:
-                disallowed_paths, robots_delay = await _fetch_robots_txt(client, domain)
+                disallowed_paths, robots_delay, has_robots_txt = await _fetch_robots_txt(client, domain)
                 crawl_delay = max(CRAWL_DELAY, robots_delay)
 
                 # ----- Step 4: BFS Crawl -----
@@ -813,7 +825,10 @@ async def run_site_audit(audit_id: str) -> None:
                             headers=raw["headers"],
                             page_size=raw["page_size"],
                             redirect_chain=raw["redirect_chain"],
+                            soup=raw.pop("_soup", None),
                         )
+                        # Free HTML from memory after analysis
+                        raw["html"] = ""
                     else:
                         # Non-HTML page — store minimal data
                         page_data = {
@@ -844,21 +859,18 @@ async def run_site_audit(audit_id: str) -> None:
                 site_wide_issues = _analyze_site_wide(all_page_data)
 
                 # ----- Step 8: Site essentials (sitemap, robots) -----
-                essentials_issues = await _check_site_essentials(client, domain)
+                essentials_issues = await _check_site_essentials(client, domain, has_robots_txt)
 
             # ----- Step 8b: PageSpeed Insights on top pages -----
             try:
                 from services.pagespeed import fetch_pagespeed
 
                 # Pick homepage + top 4 most-linked pages for PageSpeed analysis
-                # internal_links_map is {source_url: set_of_urls_it_links_to}
-                # We want pages that are linked TO the most (most inbound links)
                 inbound_counts: dict[str, int] = {}
                 for _source_url, targets in internal_links_map.items():
                     for target in targets:
                         inbound_counts[target] = inbound_counts.get(target, 0) + 1
 
-                # Start with homepage, add top linked pages
                 homepage = f"https://{domain}"
                 pagespeed_urls = [homepage]
                 sorted_by_inbound = sorted(
@@ -871,20 +883,26 @@ async def run_site_audit(audit_id: str) -> None:
 
                 logger.info("Running PageSpeed Insights on %d pages", len(pagespeed_urls))
 
-                for ps_url in pagespeed_urls:
-                    ps_result = await fetch_pagespeed(ps_url)
-                    if ps_result:
-                        # Find the matching page data and update it
-                        for pdata in all_page_data:
-                            if pdata["url"] == ps_url:
+                # Build a URL→page_data lookup for O(1) matching
+                page_data_by_url = {p["url"]: p for p in all_page_data}
+
+                # Run PageSpeed calls concurrently (max 3 at a time)
+                ps_semaphore = asyncio.Semaphore(3)
+
+                async def _run_pagespeed(ps_url: str) -> None:
+                    async with ps_semaphore:
+                        ps_result = await fetch_pagespeed(ps_url)
+                        if ps_result:
+                            pdata = page_data_by_url.get(ps_url)
+                            if pdata:
                                 pdata["performance_score"] = ps_result["performance_score"]
                                 pdata["pagespeed_data"] = ps_result
-                                break
-                        logger.info(
-                            "PageSpeed for %s: score=%s",
-                            ps_url, ps_result["performance_score"],
-                        )
-                    await asyncio.sleep(1)  # Rate limit PageSpeed API calls
+                            logger.info(
+                                "PageSpeed for %s: score=%s",
+                                ps_url, ps_result["performance_score"],
+                            )
+
+                await asyncio.gather(*[_run_pagespeed(u) for u in pagespeed_urls])
 
             except Exception as ps_err:
                 logger.warning("PageSpeed analysis failed: %s", ps_err)
@@ -894,19 +912,12 @@ async def run_site_audit(audit_id: str) -> None:
             warning_count = 0
             info_count = 0
 
-            # Count page-level issues
-            for _idx, page_issues in all_page_issues:
-                for iss in page_issues:
-                    sev = iss.get("severity", "info")
-                    if sev == "critical":
-                        critical_count += 1
-                    elif sev == "warning":
-                        warning_count += 1
-                    else:
-                        info_count += 1
+            # Count all issues (page-level + site-wide + essentials)
+            all_issues_flat = [iss for _idx, pi in all_page_issues for iss in pi]
+            all_issues_flat.extend(site_wide_issues)
+            all_issues_flat.extend(essentials_issues)
 
-            # Count site-wide + essentials issues
-            for iss in site_wide_issues + essentials_issues:
+            for iss in all_issues_flat:
                 sev = iss.get("severity", "info")
                 if sev == "critical":
                     critical_count += 1

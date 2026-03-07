@@ -108,6 +108,24 @@ function truncateUrl(url: string, maxLen = 60): string {
   return url.slice(0, maxLen - 3) + "...";
 }
 
+function ScoreCircle({ score, size = "large" }: { score: number; size?: "large" | "small" }) {
+  const isLarge = size === "large";
+  return (
+    <div
+      className={cn(
+        "rounded-full border-4 flex items-center justify-center shrink-0",
+        scoreRingColor(score),
+        scoreBgColor(score),
+        isLarge ? "w-20 h-20" : "w-10 h-10"
+      )}
+    >
+      <span className={cn("font-bold", scoreColor(score), isLarge ? "text-2xl" : "text-sm")}>
+        {score}
+      </span>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Sub-components: Tabs
 // ---------------------------------------------------------------------------
@@ -208,6 +226,8 @@ function IssuesTab({ auditId }: { auditId: string }) {
   const [issueType, setIssueType] = useState("");
   const [issueTypes, setIssueTypes] = useState<string[]>([]);
 
+  const issueTypesLoaded = useRef(false);
+
   const loadIssues = useCallback(
     async (pg: number, sev: string, type: string) => {
       setLoading(true);
@@ -221,6 +241,15 @@ function IssuesTab({ auditId }: { auditId: string }) {
         setIssues(data.items);
         setTotalPages(data.pages);
         setTotal(data.total);
+
+        // Extract unique issue types from unfiltered first load (no extra API call)
+        if (!issueTypesLoaded.current && !sev && !type && pg === 1) {
+          // Fetch a larger page just for type extraction
+          const allData = await api.siteAudit.issues(auditId, { page: 1, page_size: 100 });
+          const types = [...new Set(allData.items.map((i) => i.issue_type))].sort();
+          setIssueTypes(types);
+          issueTypesLoaded.current = true;
+        }
       } catch (err) {
         toast.error(parseApiError(err).message);
       } finally {
@@ -229,17 +258,6 @@ function IssuesTab({ auditId }: { auditId: string }) {
     },
     [auditId]
   );
-
-  // Collect unique issue types on first load
-  useEffect(() => {
-    api.siteAudit
-      .issues(auditId, { page: 1, page_size: 100 })
-      .then((data) => {
-        const types = [...new Set(data.items.map((i) => i.issue_type))].sort();
-        setIssueTypes(types);
-      })
-      .catch(() => {});
-  }, [auditId]);
 
   useEffect(() => {
     loadIssues(page, severity, issueType);
@@ -866,7 +884,7 @@ export default function SiteAuditPage() {
         } catch {
           // silent poll failure
         }
-      }, 3000);
+      }, 5000);
     },
     [stopPolling]
   );
@@ -948,28 +966,6 @@ export default function SiteAuditPage() {
     } catch (err) {
       toast.error(parseApiError(err).message);
     }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Score circle component
-  // ---------------------------------------------------------------------------
-
-  function ScoreCircle({ score, size = "large" }: { score: number; size?: "large" | "small" }) {
-    const isLarge = size === "large";
-    return (
-      <div
-        className={cn(
-          "rounded-full border-4 flex items-center justify-center shrink-0",
-          scoreRingColor(score),
-          scoreBgColor(score),
-          isLarge ? "w-20 h-20" : "w-10 h-10"
-        )}
-      >
-        <span className={cn("font-bold", scoreColor(score), isLarge ? "text-2xl" : "text-sm")}>
-          {score}
-        </span>
-      </div>
-    );
   }
 
   // ---------------------------------------------------------------------------
@@ -1075,7 +1071,6 @@ export default function SiteAuditPage() {
               {selected.completed_at ? `Completed ${formatDate(selected.completed_at)}` : ""}
             </p>
           </div>
-          <ScoreCircle score={selected.score} size="large" />
           <Button variant="outline" onClick={handleExportCsv} className="ml-2">
             <Download className="h-4 w-4 mr-2" />
             Export CSV

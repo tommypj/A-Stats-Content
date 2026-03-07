@@ -249,9 +249,15 @@ async def list_audit_pages(
     base_query = select(AuditPage).where(AuditPage.audit_id == audit_id)
 
     if has_issues is True:
-        base_query = base_query.where(AuditPage.issues_json.isnot(None))
+        base_query = base_query.where(
+            AuditPage.issues_json.isnot(None),
+            func.jsonb_array_length(AuditPage.issues_json) > 0,
+        )
     elif has_issues is False:
-        base_query = base_query.where(AuditPage.issues_json.is_(None))
+        base_query = base_query.where(
+            AuditPage.issues_json.is_(None)
+            | (func.jsonb_array_length(AuditPage.issues_json) == 0)
+        )
 
     if min_status_code is not None:
         base_query = base_query.where(AuditPage.status_code >= min_status_code)

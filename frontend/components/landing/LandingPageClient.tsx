@@ -74,13 +74,32 @@ function RevealSection({
 
 function HeroMockup() {
   return (
-    <div className="relative pl-4 pt-6 pr-4 pb-6">
-      {/* WordPress badge — top left */}
-      <div className="absolute top-0 left-0 z-10 bg-white rounded-xl shadow-soft border border-surface-tertiary px-3 py-2 flex items-center gap-2">
-        <div className="h-6 w-6 rounded flex items-center justify-center text-white text-xs font-bold" style={{ backgroundColor: "#21759B" }}>W</div>
-        <div>
-          <div className="text-xs font-semibold text-text-primary leading-none">WordPress</div>
-          <div className="text-xs text-green-500 leading-none mt-0.5">Connected</div>
+    <div className="relative pt-6 pb-6 px-4">
+      {/* Integration badges — stacked above the card on mobile, overlapping top-left on desktop */}
+      <div className="flex flex-wrap gap-2 mb-3 lg:absolute lg:top-0 lg:left-0 lg:z-10 lg:flex-col lg:gap-1.5 lg:mb-0">
+        {/* WordPress */}
+        <div className="bg-white rounded-xl shadow-soft border border-surface-tertiary px-3 py-2 flex items-center gap-2">
+          <div className="h-6 w-6 rounded flex items-center justify-center text-white text-xs font-bold" style={{ backgroundColor: "#21759B" }}>W</div>
+          <div>
+            <div className="text-xs font-semibold text-text-primary leading-none">WordPress</div>
+            <div className="text-xs text-green-500 leading-none mt-0.5">Connected</div>
+          </div>
+        </div>
+        {/* Google Search Console */}
+        <div className="bg-white rounded-xl shadow-soft border border-surface-tertiary px-3 py-2 flex items-center gap-2">
+          <div className="h-6 w-6 rounded flex items-center justify-center text-white text-xs font-bold" style={{ backgroundColor: "#4285F4" }}>G</div>
+          <div>
+            <div className="text-xs font-semibold text-text-primary leading-none">Search Console</div>
+            <div className="text-xs text-green-500 leading-none mt-0.5">Connected</div>
+          </div>
+        </div>
+        {/* PageSpeed */}
+        <div className="bg-white rounded-xl shadow-soft border border-surface-tertiary px-3 py-2 flex items-center gap-2">
+          <div className="h-6 w-6 rounded flex items-center justify-center text-white text-xs font-bold" style={{ backgroundColor: "#F4B400" }}>⚡</div>
+          <div>
+            <div className="text-xs font-semibold text-text-primary leading-none">PageSpeed</div>
+            <div className="text-xs text-green-500 leading-none mt-0.5">Score: 94</div>
+          </div>
         </div>
       </div>
 
@@ -597,7 +616,7 @@ export default function LandingPageClient() {
             </div>
 
             {/* Right — product mockup */}
-            <div className="hero-animate-delay-2 relative hidden lg:block">
+            <div className="hero-animate-delay-2 relative mx-auto max-w-sm lg:max-w-none">
               <HeroMockup />
             </div>
           </div>
