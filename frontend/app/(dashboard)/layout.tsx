@@ -42,6 +42,9 @@ import {
   Lock,
   Target,
   ScanSearch,
+  LayoutTemplate,
+  ClipboardList,
+  Tags,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { toast } from "sonner";
@@ -122,9 +125,12 @@ const navigation: NavItem[] = [
       { name: "Revenue", href: "/analytics/revenue", icon: DollarSign, minTier: "starter" },
     ],
   },
+  { name: "Templates", href: "/templates", icon: LayoutTemplate },
+  { name: "Tags", href: "/tags", icon: Tags },
   { name: "Knowledge", href: "/knowledge", icon: BookOpen },
   { name: "Competitor Analysis", href: "/competitor-analysis", icon: Target },
   { name: "Site Audit", href: "/site-audit", icon: ScanSearch },
+  { name: "Reports", href: "/reports", icon: ClipboardList },
   {
     name: "Projects",
     icon: FolderOpen,

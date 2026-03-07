@@ -17,6 +17,9 @@ from .blog import BlogCategory, BlogPost, BlogPostStatus, BlogPostTag, BlogTag
 from .bulk import BulkJob, BulkJobItem, ContentTemplate
 from .competitor import CompetitorAnalysis, CompetitorArticle
 from .site_audit import AuditIssue, AuditPage, SiteAudit
+from .report import SEOReport
+from .tag import ArticleTag, OutlineTag, Tag
+from .template import ArticleTemplate
 from .content import Article, ArticleRevision, ContentStatus, ContentTone, GeneratedImage, Outline
 from .generation import AdminAlert, GenerationLog
 from .keyword_cache import KeywordResearchCache
@@ -92,4 +95,9 @@ __all__ = [
     "SiteAudit",
     "AuditPage",
     "AuditIssue",
+    "ArticleTemplate",
+    "SEOReport",
+    "Tag",
+    "ArticleTag",
+    "OutlineTag",
 ]

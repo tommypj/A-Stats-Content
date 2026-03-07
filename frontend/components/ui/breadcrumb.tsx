@@ -50,6 +50,8 @@ const PATH_LABELS: Record<string, string> = {
   "billing-and-plans": "Billing & Plans",
   "account-and-settings": "Account & Settings",
   docs: "Documentation",
+  templates: "Templates",
+  tags: "Tags",
 };
 
 export function Breadcrumb() {

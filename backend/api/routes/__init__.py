@@ -23,8 +23,11 @@ from .notifications import router as notifications_router
 from .outlines import router as outlines_router
 from .project_invitations import router as project_invitations_router
 from .projects import router as projects_router
+from .reports import router as reports_router
 from .site_audit import router as site_audit_router
 from .social import router as social_router
+from .tags import router as tags_router
+from .templates import router as templates_router
 from .wordpress import router as wordpress_router
 
 # Create main API router
@@ -55,6 +58,9 @@ api_router.include_router(agency_router)
 api_router.include_router(site_audit_router)
 api_router.include_router(blog_router)
 api_router.include_router(admin_blog_router)
+api_router.include_router(templates_router)
+api_router.include_router(reports_router)
+api_router.include_router(tags_router)
 
 # Future routes will be added here:
 # api_router.include_router(content_router, prefix="/content", tags=["Content"])

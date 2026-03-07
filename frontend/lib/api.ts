@@ -1622,6 +1622,52 @@ export const api = {
       }),
   },
 
+  // Article Templates
+  templates: {
+    list: (params?: { page?: number; page_size?: number; project_id?: string }) =>
+      apiRequest<ArticleTemplateListResponse>({ url: "/templates", params }),
+    get: (id: string) =>
+      apiRequest<ArticleTemplate>({ url: `/templates/${id}` }),
+    create: (data: CreateTemplateInput) =>
+      apiRequest<ArticleTemplate>({ method: "POST", url: "/templates", data }),
+    update: (id: string, data: UpdateTemplateInput) =>
+      apiRequest<ArticleTemplate>({ method: "PUT", url: `/templates/${id}`, data }),
+    delete: (id: string) =>
+      apiRequest<void>({ method: "DELETE", url: `/templates/${id}` }),
+  },
+
+  // Tags
+  tags: {
+    list: (params?: { page?: number; page_size?: number; project_id?: string }) =>
+      apiRequest<TagListResponse>({ url: "/tags", params }),
+    create: (data: CreateTagInput) =>
+      apiRequest<Tag>({ method: "POST", url: "/tags", data }),
+    update: (id: string, data: UpdateTagInput) =>
+      apiRequest<Tag>({ method: "PUT", url: `/tags/${id}`, data }),
+    delete: (id: string) =>
+      apiRequest<void>({ method: "DELETE", url: `/tags/${id}` }),
+    getArticleTags: (articleId: string) =>
+      apiRequest<Tag[]>({ url: `/tags/articles/${articleId}` }),
+    setArticleTags: (articleId: string, tagIds: string[]) =>
+      apiRequest<Tag[]>({ method: "PUT", url: `/tags/articles/${articleId}`, data: { tag_ids: tagIds } }),
+    getOutlineTags: (outlineId: string) =>
+      apiRequest<Tag[]>({ url: `/tags/outlines/${outlineId}` }),
+    setOutlineTags: (outlineId: string, tagIds: string[]) =>
+      apiRequest<Tag[]>({ method: "PUT", url: `/tags/outlines/${outlineId}`, data: { tag_ids: tagIds } }),
+  },
+
+  // SEO Reports
+  reports: {
+    list: (params?: { page?: number; page_size?: number; project_id?: string }) =>
+      apiRequest<SEOReportListResponse>({ url: "/reports", params }),
+    get: (id: string) =>
+      apiRequest<SEOReport>({ url: `/reports/${id}` }),
+    create: (data: CreateReportInput) =>
+      apiRequest<SEOReport>({ method: "POST", url: "/reports", data }),
+    delete: (id: string) =>
+      apiRequest<void>({ method: "DELETE", url: `/reports/${id}` }),
+  },
+
   // Public Blog
   blog: {
     list: (params?: { page?: number; page_size?: number; category_slug?: string; tag_slug?: string; search?: string }) =>
@@ -3419,4 +3465,109 @@ export interface AdminBlogPostUpdate {
   category_id?: string;
   tag_ids?: string[];
   schema_faq?: Record<string, unknown>;
+}
+
+// Article Templates
+export interface ArticleTemplate {
+  id: string;
+  user_id: string;
+  project_id?: string;
+  name: string;
+  description?: string;
+  target_audience?: string;
+  tone?: string;
+  word_count_target: number;
+  writing_style?: string;
+  voice?: string;
+  custom_instructions?: string;
+  sections?: Array<{ heading: string; subheadings?: string[]; notes?: string; word_count_target?: number }>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ArticleTemplateListResponse {
+  items: ArticleTemplate[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export interface CreateTemplateInput {
+  name: string;
+  description?: string;
+  project_id?: string;
+  target_audience?: string;
+  tone?: string;
+  word_count_target?: number;
+  writing_style?: string;
+  voice?: string;
+  custom_instructions?: string;
+  sections?: Array<{ heading: string; subheadings?: string[]; notes?: string; word_count_target?: number }>;
+}
+
+export type UpdateTemplateInput = Partial<CreateTemplateInput>;
+
+// Tags
+export interface Tag {
+  id: string;
+  user_id: string;
+  project_id?: string;
+  name: string;
+  color: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TagListResponse {
+  items: Tag[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export interface CreateTagInput {
+  name: string;
+  color?: string;
+  project_id?: string;
+}
+
+export interface UpdateTagInput {
+  name?: string;
+  color?: string;
+}
+
+// SEO Reports
+export interface SEOReport {
+  id: string;
+  user_id: string;
+  project_id?: string;
+  name: string;
+  description?: string;
+  report_type: string;
+  date_from?: string;
+  date_to?: string;
+  status: string;
+  error_message?: string;
+  report_data?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SEOReportListResponse {
+  items: SEOReport[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export interface CreateReportInput {
+  name: string;
+  description?: string;
+  project_id?: string;
+  report_type?: string;
+  date_from?: string;
+  date_to?: string;
 }
