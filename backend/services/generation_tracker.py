@@ -159,7 +159,7 @@ class GenerationTracker:
         all quota enforcement is user-level only.
         """
         if not user_id:
-            return True  # No user context — fail open
+            return False  # No user context — fail closed
 
         try:
             from infrastructure.database.models.user import User

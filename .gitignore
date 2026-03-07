@@ -4,6 +4,9 @@
 .claude/AGENT_LOG.md
 .claude/DEV_LOG.md
 
+# Overnight review output
+review-results/
+
 # Business / financial documents (not for version control)
 *.xlsx
 *.xls

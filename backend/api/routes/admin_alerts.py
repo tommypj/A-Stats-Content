@@ -34,7 +34,7 @@ async def get_alert_count(
 ):
     """Get unread and critical alert counts (for notification badge)."""
     unread_result = await db.execute(
-        select(func.count()).select_from(AdminAlert).where(not AdminAlert.is_read)
+        select(func.count()).select_from(AdminAlert).where(AdminAlert.is_read == False)  # noqa: E712
     )
     unread_count = unread_result.scalar() or 0
 
@@ -42,7 +42,7 @@ async def get_alert_count(
         select(func.count())
         .select_from(AdminAlert)
         .where(
-            not AdminAlert.is_read,
+            AdminAlert.is_read == False,  # noqa: E712
             AdminAlert.severity == "critical",
         )
     )
@@ -189,7 +189,7 @@ async def mark_all_read(
 ):
     """Mark all alerts as read."""
     result = await db.execute(
-        sql_update(AdminAlert).where(not AdminAlert.is_read).values(is_read=True)
+        sql_update(AdminAlert).where(AdminAlert.is_read == False).values(is_read=True)  # noqa: E712
     )
     # ADM-05: audit log inside the same transaction
     audit_log = AdminAuditLog(

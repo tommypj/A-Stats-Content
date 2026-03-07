@@ -246,7 +246,7 @@ async def run_decay_detection(
     # ANA-07: scope dedup to current project to avoid cross-project suppression
     dedup_conditions = [
         ContentDecayAlert.user_id == user_id,
-        not ContentDecayAlert.is_resolved,
+        ContentDecayAlert.is_resolved == False,  # noqa: E712
     ]
     if project_id:
         dedup_conditions.append(ContentDecayAlert.project_id == project_id)
@@ -412,7 +412,7 @@ async def get_content_health_score(
         .where(
             and_(
                 ContentDecayAlert.user_id == user_id,
-                not ContentDecayAlert.is_resolved,
+                ContentDecayAlert.is_resolved == False,  # noqa: E712
             )
         )
         .group_by(ContentDecayAlert.severity)
@@ -438,7 +438,7 @@ async def get_content_health_score(
     declining_q = select(func.count(func.distinct(ContentDecayAlert.article_id))).where(
         and_(
             ContentDecayAlert.user_id == user_id,
-            not ContentDecayAlert.is_resolved,
+            ContentDecayAlert.is_resolved == False,  # noqa: E712
             ContentDecayAlert.article_id.isnot(None),
         )
     )

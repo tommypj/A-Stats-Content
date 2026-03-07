@@ -911,11 +911,11 @@ async def list_scheduled_posts(
     total_pages = math.ceil(total / page_size) if total > 0 else 0
 
     return ScheduledPostListResponse(
-        posts=post_responses,
+        items=post_responses,
         total=total,
         page=page,
         page_size=page_size,
-        total_pages=total_pages,
+        pages=total_pages,
     )
 
 

@@ -18,6 +18,7 @@ from adapters.ai.replicate_adapter import image_ai_service
 from adapters.storage.image_storage import download_image, storage_adapter
 from api.middleware.rate_limit import limiter
 from api.routes.auth import get_current_user
+from api.utils import escape_like
 from api.schemas.content import (
     BulkDeleteRequest,
     BulkDeleteResponse,
@@ -319,7 +320,7 @@ async def list_images(
     if article_id:
         query = query.where(GeneratedImage.article_id == article_id)
     if prompt:
-        query = query.where(GeneratedImage.prompt.ilike(f"%{prompt}%"))
+        query = query.where(GeneratedImage.prompt.ilike(f"%{escape_like(prompt)}%"))
     if style:
         query = query.where(GeneratedImage.style == style)
 

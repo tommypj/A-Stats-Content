@@ -153,11 +153,11 @@ class ScheduledPostResponse(BaseModel):
 class ScheduledPostListResponse(BaseModel):
     """Paginated list of scheduled posts."""
 
-    posts: list[ScheduledPostResponse]
+    items: list[ScheduledPostResponse]
     total: int
     page: int
     page_size: int
-    total_pages: int
+    pages: int
 
 
 # ============================================

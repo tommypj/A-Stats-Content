@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.orm import declarative_base
+from infrastructure.database.models.base import Base  # noqa: F401 — re-export for legacy imports
 
 from ..config import get_settings
 
@@ -41,8 +41,7 @@ async_session_maker = async_sessionmaker(
     autoflush=False,
 )
 
-# Base class for models
-Base = declarative_base()
+# Base class imported from models.base — single source of truth for all models
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

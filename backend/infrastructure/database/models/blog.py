@@ -49,7 +49,7 @@ class BlogCategory(Base, TimestampMixin):
     posts: Mapped[list["BlogPost"]] = relationship(
         "BlogPost",
         back_populates="category",
-        lazy="dynamic",
+        lazy="selectin",
     )
 
     def __repr__(self) -> str:

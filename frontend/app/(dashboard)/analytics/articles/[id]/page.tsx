@@ -80,6 +80,7 @@ export default function ArticlePerformanceDetailPage() {
     try {
       setIsConnecting(true);
       const response = await api.analytics.getAuthUrl();
+      sessionStorage.setItem("gsc_oauth_state", response.state);
       window.location.href = response.auth_url;
     } catch (error) {
       const apiError = parseApiError(error);

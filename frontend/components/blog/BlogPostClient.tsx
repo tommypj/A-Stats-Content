@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
+import DOMPurify from "dompurify";
 import { Twitter, Linkedin, Facebook, Link2, Calendar, Clock, Mail, List } from "lucide-react";
 import { toast } from "sonner";
 import type { BlogPostCard, BlogPostDetail } from "@/lib/api";
@@ -251,7 +252,7 @@ export default function BlogPostClient({ post, relatedPosts: initialRelated = []
     if (!post.content_html) return { processedHtml: "", headings: [] };
     const extracted = extractHeadings(post.content_html);
     return {
-      processedHtml: injectHeadingIds(post.content_html, extracted),
+      processedHtml: DOMPurify.sanitize(injectHeadingIds(post.content_html, extracted)),
       headings: extracted,
     };
   }, [post.content_html]);
