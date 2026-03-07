@@ -627,7 +627,7 @@ async def generate_report(
     # DailyAnalytics is keyed by user_id (the project owner), not project_id.
     # We retrieve the project owner to scope the query correctly.
     # -----------------------------------------------------------------------
-    proj_result = await db.execute(select(Project).where(Project.id == workspace.project_id))
+    proj_result = await db.execute(select(Project).where(Project.id == workspace.project_id, Project.deleted_at.is_(None)))
     project = proj_result.scalar_one_or_none()
     project_owner_id = project.owner_id if project else current_user.id
 
@@ -914,7 +914,7 @@ async def get_portal_data(
     period_days = 30
 
     # Project owner for analytics queries
-    proj_result = await db.execute(select(Project).where(Project.id == workspace.project_id))
+    proj_result = await db.execute(select(Project).where(Project.id == workspace.project_id, Project.deleted_at.is_(None)))
     project = proj_result.scalar_one_or_none()
     project_owner_id = project.owner_id if project else None
 

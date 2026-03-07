@@ -38,6 +38,7 @@ class SiteAudit(Base, TimestampMixin):
         UUID(as_uuid=False),
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=True,
+        index=True,
     )
 
     # Target domain

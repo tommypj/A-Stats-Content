@@ -178,7 +178,7 @@ async def connect_wordpress(
             detail="No active project selected. Please select a project first.",
         )
     project_result = await db.execute(
-        select(Project).where(Project.id == current_user.current_project_id)
+        select(Project).where(Project.id == current_user.current_project_id, Project.deleted_at.is_(None))
     )
     project = project_result.scalar_one_or_none()
     if not project:
@@ -247,7 +247,7 @@ async def disconnect_wordpress(
             detail="No active project selected.",
         )
     project_result = await db.execute(
-        select(Project).where(Project.id == current_user.current_project_id)
+        select(Project).where(Project.id == current_user.current_project_id, Project.deleted_at.is_(None))
     )
     project = project_result.scalar_one_or_none()
     if not project or not project.wordpress_credentials:
@@ -282,7 +282,7 @@ async def get_wordpress_status(
             detail="No active project selected.",
         )
     project_result = await db.execute(
-        select(Project).where(Project.id == current_user.current_project_id)
+        select(Project).where(Project.id == current_user.current_project_id, Project.deleted_at.is_(None))
     )
     project = project_result.scalar_one_or_none()
     if not project or not project.wordpress_credentials:
@@ -344,7 +344,7 @@ async def get_wordpress_categories(
             detail="No active project selected.",
         )
     project_result = await db.execute(
-        select(Project).where(Project.id == current_user.current_project_id)
+        select(Project).where(Project.id == current_user.current_project_id, Project.deleted_at.is_(None))
     )
     project = project_result.scalar_one_or_none()
     wp_creds = get_wp_credentials(project) if project else None
@@ -403,7 +403,7 @@ async def get_wordpress_tags(
             detail="No active project selected.",
         )
     project_result = await db.execute(
-        select(Project).where(Project.id == current_user.current_project_id)
+        select(Project).where(Project.id == current_user.current_project_id, Project.deleted_at.is_(None))
     )
     project = project_result.scalar_one_or_none()
     wp_creds = get_wp_credentials(project) if project else None
@@ -488,7 +488,7 @@ async def publish_to_wordpress(
 
     # Get WordPress credentials from the current project (already verified above)
     proj_result = await db.execute(
-        select(Project).where(Project.id == current_user.current_project_id)
+        select(Project).where(Project.id == current_user.current_project_id, Project.deleted_at.is_(None))
     )
     article_project = proj_result.scalar_one_or_none()
     wp_creds = get_wp_credentials(article_project) if article_project else None
@@ -916,7 +916,7 @@ async def upload_media_to_wordpress(
             detail="No active project selected.",
         )
     proj_result = await db.execute(
-        select(Project).where(Project.id == current_user.current_project_id)
+        select(Project).where(Project.id == current_user.current_project_id, Project.deleted_at.is_(None))
     )
     current_project = proj_result.scalar_one_or_none()
     wp_creds = get_wp_credentials(current_project) if current_project else None

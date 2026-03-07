@@ -22,6 +22,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from infrastructure.database.connection import async_session_maker
+from services.site_auditor import _is_safe_url
 from infrastructure.database.models.competitor import CompetitorAnalysis, CompetitorArticle
 from infrastructure.database.models.content import Article
 
@@ -32,6 +33,7 @@ MAX_URLS = 500
 DEFAULT_CRAWL_DELAY = 1.0
 MAX_CONCURRENCY = 3
 REQUEST_TIMEOUT = 15.0
+MAX_ANALYSIS_TIME = 600  # 10 minutes total analysis timeout
 
 # ============================================================================
 # English stop words (no external dependency needed)
@@ -85,7 +87,10 @@ SKIP_EXTENSIONS = re.compile(r"\.(pdf|jpg|jpeg|png|gif|webp|svg|css|js|xml|zip|m
 # ============================================================================
 
 async def _fetch_text(client: httpx.AsyncClient, url: str) -> str | None:
-    """Fetch URL text content, return None on failure."""
+    """Fetch URL text content, return None on failure. Includes SSRF check."""
+    if not _is_safe_url(url):
+        logger.debug("Blocked unsafe URL in competitor analyzer: %s", url)
+        return None
     try:
         resp = await client.get(url, follow_redirects=True, timeout=REQUEST_TIMEOUT)
         if resp.status_code == 200:
@@ -295,6 +300,9 @@ async def scrape_pages(
     async def scrape_one(url: str) -> dict | None:
         nonlocal scraped_count
         async with semaphore:
+            if not _is_safe_url(url):
+                logger.debug("Blocked unsafe URL in scraper: %s", url)
+                return None
             try:
                 resp = await client.get(url, follow_redirects=True, timeout=REQUEST_TIMEOUT)
                 if resp.status_code != 200:
@@ -565,6 +573,96 @@ async def compute_keyword_gaps(
 # Main Pipeline Orchestrator (runs as background task)
 # ============================================================================
 
+async def _run_competitor_analysis_inner(analysis_id: str, start_time: float) -> None:
+    """Inner implementation of competitor analysis (called with timeout wrapper)."""
+    async with async_session_maker() as db:
+        analysis = await db.get(CompetitorAnalysis, analysis_id)
+        if not analysis:
+            logger.error("Analysis %s not found", analysis_id)
+            return
+
+        domain = analysis.domain
+        logger.info("Starting competitor analysis for %s (id: %s)", domain, analysis_id)
+
+        # Step 1: Discover URLs
+        analysis.status = "crawling"
+        await db.commit()
+
+        async with httpx.AsyncClient(
+            headers={"User-Agent": BOT_USER_AGENT},
+            follow_redirects=True,
+            timeout=REQUEST_TIMEOUT,
+        ) as client:
+            urls, crawl_delay = await discover_urls(client, domain)
+
+            if not urls:
+                analysis.status = "failed"
+                analysis.error_message = (
+                    f"No article URLs found for {domain}. "
+                    "The site may not have a public sitemap, or all URLs were filtered out."
+                )
+                await db.commit()
+                return
+
+            analysis.total_urls = len(urls)
+            analysis.status = "scraping"
+            await db.commit()
+
+            # Step 2: Scrape pages
+            pages_data = await scrape_pages(client, urls, crawl_delay, analysis_id)
+
+        if not pages_data:
+            analysis.status = "failed"
+            analysis.error_message = "All page scrapes failed. The site may block automated access."
+            await db.commit()
+            return
+
+        # Step 3: Extract keywords
+        # Re-fetch analysis since scrape_pages used separate sessions for progress
+        await db.refresh(analysis)
+        analysis.status = "extracting"
+        await db.commit()
+
+        keyword_results = extract_keywords_with_tfidf(pages_data)
+
+        # Step 4: Save competitor articles
+        for page_data, (keyword, confidence) in zip(pages_data, keyword_results):
+            article = CompetitorArticle(
+                id=str(uuid4()),
+                analysis_id=analysis_id,
+                url=page_data["url"],
+                title=page_data.get("title"),
+                meta_description=page_data.get("meta_description"),
+                headings=page_data.get("headings"),
+                url_slug=page_data.get("url_slug"),
+                word_count=page_data.get("word_count"),
+                extracted_keyword=keyword,
+                keyword_confidence=confidence,
+                scraped_at=datetime.now(timezone.utc),
+            )
+            db.add(article)
+
+        # Step 5: Finalize
+        distinct_keywords = len({
+            kw for kw, _ in keyword_results if kw is not None
+        })
+        analysis.total_keywords = distinct_keywords
+        analysis.scraped_urls = len(pages_data)
+        analysis.status = "completed"
+        analysis.completed_at = datetime.now(timezone.utc)
+        await db.commit()
+
+        elapsed = time.monotonic() - start_time
+        logger.info(
+            "Competitor analysis completed for %s: %d URLs, %d scraped, %d keywords in %.1fs",
+            domain,
+            len(urls),
+            len(pages_data),
+            distinct_keywords,
+            elapsed,
+        )
+
+
 async def run_competitor_analysis(analysis_id: str) -> None:
     """
     Background task that orchestrates the full competitor analysis pipeline.
@@ -573,92 +671,10 @@ async def run_competitor_analysis(analysis_id: str) -> None:
     start_time = time.monotonic()
 
     try:
-        async with async_session_maker() as db:
-            analysis = await db.get(CompetitorAnalysis, analysis_id)
-            if not analysis:
-                logger.error("Analysis %s not found", analysis_id)
-                return
-
-            domain = analysis.domain
-            logger.info("Starting competitor analysis for %s (id: %s)", domain, analysis_id)
-
-            # Step 1: Discover URLs
-            analysis.status = "crawling"
-            await db.commit()
-
-            async with httpx.AsyncClient(
-                headers={"User-Agent": BOT_USER_AGENT},
-                follow_redirects=True,
-                timeout=REQUEST_TIMEOUT,
-            ) as client:
-                urls, crawl_delay = await discover_urls(client, domain)
-
-                if not urls:
-                    analysis.status = "failed"
-                    analysis.error_message = (
-                        f"No article URLs found for {domain}. "
-                        "The site may not have a public sitemap, or all URLs were filtered out."
-                    )
-                    await db.commit()
-                    return
-
-                analysis.total_urls = len(urls)
-                analysis.status = "scraping"
-                await db.commit()
-
-                # Step 2: Scrape pages
-                pages_data = await scrape_pages(client, urls, crawl_delay, analysis_id)
-
-            if not pages_data:
-                analysis.status = "failed"
-                analysis.error_message = "All page scrapes failed. The site may block automated access."
-                await db.commit()
-                return
-
-            # Step 3: Extract keywords
-            # Re-fetch analysis since scrape_pages used separate sessions for progress
-            await db.refresh(analysis)
-            analysis.status = "extracting"
-            await db.commit()
-
-            keyword_results = extract_keywords_with_tfidf(pages_data)
-
-            # Step 4: Save competitor articles
-            for page_data, (keyword, confidence) in zip(pages_data, keyword_results):
-                article = CompetitorArticle(
-                    id=str(uuid4()),
-                    analysis_id=analysis_id,
-                    url=page_data["url"],
-                    title=page_data.get("title"),
-                    meta_description=page_data.get("meta_description"),
-                    headings=page_data.get("headings"),
-                    url_slug=page_data.get("url_slug"),
-                    word_count=page_data.get("word_count"),
-                    extracted_keyword=keyword,
-                    keyword_confidence=confidence,
-                    scraped_at=datetime.now(timezone.utc),
-                )
-                db.add(article)
-
-            # Step 5: Finalize
-            distinct_keywords = len({
-                kw for kw, _ in keyword_results if kw is not None
-            })
-            analysis.total_keywords = distinct_keywords
-            analysis.scraped_urls = len(pages_data)
-            analysis.status = "completed"
-            analysis.completed_at = datetime.now(timezone.utc)
-            await db.commit()
-
-            elapsed = time.monotonic() - start_time
-            logger.info(
-                "Competitor analysis completed for %s: %d URLs, %d scraped, %d keywords in %.1fs",
-                domain,
-                len(urls),
-                len(pages_data),
-                distinct_keywords,
-                elapsed,
-            )
+        await asyncio.wait_for(
+            _run_competitor_analysis_inner(analysis_id, start_time),
+            timeout=MAX_ANALYSIS_TIME,
+        )
 
     except Exception as exc:
         logger.exception("Competitor analysis failed for analysis %s: %s", analysis_id, exc)

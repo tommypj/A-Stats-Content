@@ -186,7 +186,7 @@ class FacebookAdapter(BaseSocialAdapter):
                 if response.status_code != 200:
                     error_data = response.json() if response.text else {}
                     error_msg = error_data.get("error", {}).get("message", "Token exchange failed")
-                    logger.error(f"Facebook token exchange failed: {error_msg}")
+                    logger.error("Facebook token exchange failed: %s", error_msg)
                     raise SocialAuthError(f"Token exchange failed: {error_msg}")
 
                 token_data = response.json()
@@ -209,16 +209,16 @@ class FacebookAdapter(BaseSocialAdapter):
                     profile_image_url=user_profile.get("picture", {}).get("data", {}).get("url"),
                 )
 
-                logger.info(f"Facebook authentication successful: {credentials.account_name}")
+                logger.info("Facebook authentication successful: %s", credentials.account_name)
                 return credentials
 
         except httpx.HTTPError as e:
-            logger.error(f"HTTP error during Facebook token exchange: {e}")
+            logger.error("HTTP error during Facebook token exchange: %s", e)
             raise SocialAuthError(f"Token exchange failed: {e}")
         except SocialAuthError:
             raise
         except Exception as e:
-            logger.error(f"Unexpected error during Facebook token exchange: {e}")
+            logger.error("Unexpected error during Facebook token exchange: %s", e)
             raise SocialAuthError(f"Token exchange failed: {e}")
 
     async def _get_long_lived_token(self, short_lived_token: str) -> str:
@@ -311,7 +311,7 @@ class FacebookAdapter(BaseSocialAdapter):
                 return result.get("data", [])
 
         except Exception as e:
-            logger.error(f"Error fetching Facebook pages: {e}")
+            logger.error("Error fetching Facebook pages: %s", e)
             raise SocialAPIError(f"Failed to fetch pages: {e}")
 
     async def refresh_token(self, credentials: SocialCredentials) -> SocialCredentials:
@@ -384,7 +384,7 @@ class FacebookAdapter(BaseSocialAdapter):
             raise SocialValidationError("page_id and page_token are required for Facebook posting")
 
         if self.mock_mode:
-            logger.info(f"Mock mode: Would post to Facebook page: {text[:50]}...")
+            logger.info("Mock mode: Would post to Facebook page: %s...", text[:50])
             return PostResult(
                 success=True,
                 post_id="123456789_987654321",
@@ -398,7 +398,7 @@ class FacebookAdapter(BaseSocialAdapter):
             }
 
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                logger.info(f"Posting to Facebook page {page_id}: {text[:50]}...")
+                logger.info("Posting to Facebook page %s: %s...", page_id, text[:50])
                 response = await client.post(
                     f"{self.API_BASE_URL}/{page_id}/feed",
                     data=post_data,
@@ -412,14 +412,14 @@ class FacebookAdapter(BaseSocialAdapter):
                 if response.status_code not in [200, 201]:
                     error_data = response.json() if response.text else {}
                     error_msg = error_data.get("error", {}).get("message", "Post creation failed")
-                    logger.error(f"Facebook API error: {error_msg}")
+                    logger.error("Facebook API error: %s", error_msg)
                     raise SocialAPIError(f"Post creation failed: {error_msg}")
 
                 result = response.json()
                 post_id = result.get("id", "")
                 post_url = f"https://www.facebook.com/{post_id.replace('_', '/posts/')}"
 
-                logger.info(f"Facebook post created successfully: {post_url}")
+                logger.info("Facebook post created successfully: %s", post_url)
                 return PostResult(
                     success=True,
                     post_id=post_id,
@@ -429,10 +429,10 @@ class FacebookAdapter(BaseSocialAdapter):
         except (SocialValidationError, SocialRateLimitError, SocialAPIError):
             raise
         except httpx.HTTPError as e:
-            logger.error(f"HTTP error during Facebook posting: {e}")
+            logger.error("HTTP error during Facebook posting: %s", e)
             return PostResult(success=False, error_message=str(e))
         except Exception as e:
-            logger.error(f"Unexpected error during Facebook posting: {e}")
+            logger.error("Unexpected error during Facebook posting: %s", e)
             return PostResult(success=False, error_message=str(e))
 
     async def post_with_media(
@@ -467,7 +467,7 @@ class FacebookAdapter(BaseSocialAdapter):
             raise SocialValidationError("page_id and page_token are required for Facebook posting")
 
         if self.mock_mode:
-            logger.info(f"Mock mode: Would post to Facebook page with {len(media_urls)} media")
+            logger.info("Mock mode: Would post to Facebook page with %d media", len(media_urls))
             return PostResult(
                 success=True,
                 post_id="123456789_987654321",
@@ -490,7 +490,7 @@ class FacebookAdapter(BaseSocialAdapter):
                 }
 
                 async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    logger.info(f"Posting photo to Facebook page {page_id}")
+                    logger.info("Posting photo to Facebook page %s", page_id)
                     response = await client.post(
                         f"{self.API_BASE_URL}/{page_id}/photos",
                         data=post_data,
@@ -510,7 +510,7 @@ class FacebookAdapter(BaseSocialAdapter):
                     post_id = result.get("post_id", result.get("id", ""))
                     post_url = f"https://www.facebook.com/{post_id.replace('_', '/posts/')}"
 
-                    logger.info(f"Facebook photo post created successfully: {post_url}")
+                    logger.info("Facebook photo post created successfully: %s", post_url)
                     return PostResult(
                         success=True,
                         post_id=post_id,
@@ -529,7 +529,7 @@ class FacebookAdapter(BaseSocialAdapter):
         except (SocialValidationError, SocialRateLimitError, SocialAPIError):
             raise
         except Exception as e:
-            logger.error(f"Error posting to Facebook with media: {e}")
+            logger.error("Error posting to Facebook with media: %s", e)
             return PostResult(success=False, error_message=str(e))
 
     async def upload_media(
@@ -596,7 +596,7 @@ class FacebookAdapter(BaseSocialAdapter):
                 result = response.json()
                 media_id = result.get("id", "")
 
-                logger.info(f"Media uploaded successfully: {media_id}")
+                logger.info("Media uploaded successfully: %s", media_id)
                 return MediaUploadResult(
                     media_id=media_id,
                     media_type="image",
@@ -605,7 +605,7 @@ class FacebookAdapter(BaseSocialAdapter):
         except SocialAPIError:
             raise
         except Exception as e:
-            logger.error(f"Error uploading media: {e}")
+            logger.error("Error uploading media: %s", e)
             raise SocialAPIError(f"Media upload failed: {e}")
 
     async def delete_post(
@@ -630,12 +630,12 @@ class FacebookAdapter(BaseSocialAdapter):
             raise SocialValidationError("page_token is required for post deletion")
 
         if self.mock_mode:
-            logger.info(f"Mock mode: Would delete Facebook post {post_id}")
+            logger.info("Mock mode: Would delete Facebook post %s", post_id)
             return True
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                logger.info(f"Deleting Facebook post {post_id}")
+                logger.info("Deleting Facebook post %s", post_id)
                 response = await client.delete(
                     f"{self.API_BASE_URL}/{post_id}",
                     params={"access_token": page_token},
@@ -644,7 +644,7 @@ class FacebookAdapter(BaseSocialAdapter):
                 if response.status_code == 200:
                     result = response.json()
                     if result.get("success"):
-                        logger.info(f"Facebook post {post_id} deleted successfully")
+                        logger.info("Facebook post %s deleted successfully", post_id)
                         return True
 
                 error_msg = response.json().get("error", {}).get("message", "Deletion failed")
@@ -653,7 +653,7 @@ class FacebookAdapter(BaseSocialAdapter):
         except SocialAPIError:
             raise
         except Exception as e:
-            logger.error(f"Error deleting Facebook post: {e}")
+            logger.error("Error deleting Facebook post: %s", e)
             raise SocialAPIError(f"Post deletion failed: {e}")
 
     def get_character_limit(self) -> int:

@@ -159,6 +159,7 @@ def schemas_to_html(schemas: dict) -> str:
     for key in ("article_schema", "faq_schema"):
         schema = schemas.get(key)
         if schema:
-            json_str = json.dumps(schema, indent=2, ensure_ascii=False)
+            json_str = json.dumps(schema, indent=2, ensure_ascii=False).replace("</", "<\\/")
+
             parts.append(f'<script type="application/ld+json">\n{json_str}\n</script>')
     return "\n".join(parts)

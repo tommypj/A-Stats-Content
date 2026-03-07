@@ -121,8 +121,8 @@ export function PlatformSelector({
                 isSelected
                   ? "border-primary-500 bg-primary-500/5"
                   : "border-surface-tertiary hover:bg-surface-secondary"
-              } ${!account.is_connected ? "opacity-50 cursor-not-allowed" : ""}`}
-              disabled={!account.is_connected}
+              } ${!account.is_active ? "opacity-50 cursor-not-allowed" : ""}`}
+              disabled={!account.is_active}
             >
               <div className="flex items-center gap-3">
                 {/* Checkbox */}
@@ -146,10 +146,10 @@ export function PlatformSelector({
                 {/* Account Info */}
                 <div className="flex-1 text-left min-w-0">
                   <p className="font-medium text-text-primary truncate">
-                    {account.display_name}
+                    {account.platform_display_name}
                   </p>
                   <p className="text-sm text-text-secondary truncate">
-                    @{account.username}
+                    @{account.platform_username}
                   </p>
                 </div>
 

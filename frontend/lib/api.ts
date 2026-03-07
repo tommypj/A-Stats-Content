@@ -216,17 +216,22 @@ apiClient.interceptors.response.use(undefined, (error: AxiosError) => {
       ? "Network error — check your connection"
       : `Server error (${status})`;
 
-    // FE-CONTENT-26: Note — retry only works for idempotent requests; POST retries may create duplicates
-    toast.error(message, {
-      action: {
-        label: "Retry",
-        onClick: () => {
-          apiClient(cfg).catch(() => {
-            // retry failed — the interceptor will fire again
-          });
+    const method = (cfg.method || "get").toLowerCase();
+    const isIdempotent = ["get", "put", "delete", "head", "options"].includes(method);
+    if (isIdempotent) {
+      toast.error(message, {
+        action: {
+          label: "Retry",
+          onClick: () => {
+            apiClient(cfg).catch(() => {
+              // retry failed — the interceptor will fire again
+            });
+          },
         },
-      },
-    });
+      });
+    } else {
+      toast.error(message);
+    }
   }
 
   return Promise.reject(error);
@@ -294,12 +299,8 @@ export const api = {
         data,
       }),
     me: () => cachedGet<UserResponse>("/auth/me", 60_000),
-    refresh: (refreshToken: string) =>
-      apiRequest<{ access_token: string; refresh_token: string; token_type: string; expires_in: number }>({
-        method: "POST",
-        url: "/auth/refresh",
-        data: { refresh_token: refreshToken },
-      }),
+    // Refresh is handled automatically by the response interceptor (cookie-based).
+    // No explicit refresh method needed.
     logout: async (): Promise<void> => {
       try {
         await apiRequest<void>({ method: "POST", url: "/auth/logout" });
@@ -388,7 +389,7 @@ export const api = {
       document.body.appendChild(a);
       a.click();
       a.remove();
-      window.URL.revokeObjectURL(url);
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
     },
   },
 
@@ -2031,9 +2032,9 @@ export interface WordPressPublishInput {
 }
 
 export interface WordPressPublishResponse {
-  success: boolean;
-  post_id: number;
-  post_url: string;
+  wordpress_post_id: number;
+  wordpress_url: string;
+  status: string;
   message?: string;
 }
 
@@ -2629,7 +2630,11 @@ export interface KnowledgeSource {
   description: string | null;
   tags: string[];
   created_at: string;
+  updated_at: string;
   error_message?: string;
+  file_url?: string;
+  processing_started_at?: string;
+  processing_completed_at?: string;
 }
 
 export interface KnowledgeSourceList {
@@ -2637,6 +2642,7 @@ export interface KnowledgeSourceList {
   total: number;
   page: number;
   page_size: number;
+  pages: number;
 }
 
 export interface SourceSnippet {
@@ -2659,6 +2665,9 @@ export interface KnowledgeStats {
   total_characters: number;
   total_queries: number;
   storage_used_mb: number;
+  sources_by_type?: Record<string, number>;
+  recent_queries?: string[];
+  avg_query_time_ms?: number;
 }
 
 // Social Media types
@@ -2668,16 +2677,17 @@ export type SocialPostStatus = "pending" | "queued" | "posting" | "posted" | "fa
 export interface SocialAccount {
   id: string;
   platform: SocialPlatform;
-  username: string;
-  display_name: string;
+  platform_username: string;
+  platform_display_name: string;
   profile_image_url?: string;
-  is_connected: boolean;
-  connected_at: string;
-  last_error?: string;
+  is_active: boolean;
+  last_verified_at: string;
+  verification_error?: string;
 }
 
 export interface SocialAccountListResponse {
   accounts: SocialAccount[];
+  total: number;
 }
 
 export interface ConnectSocialAccountInput {
@@ -3252,7 +3262,7 @@ export interface AdminAlertCount {
 }
 
 // Projects (Multi-tenancy) types
-export type ProjectRole = "owner" | "admin" | "member" | "viewer";
+export type ProjectRole = "owner" | "admin" | "editor" | "viewer";
 
 export interface Project {
   id: string;

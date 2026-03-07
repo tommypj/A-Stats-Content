@@ -145,7 +145,8 @@ export default function IntegrationsSettingsPage() {
   async function handleGscConnect() {
     setGscConnecting(true);
     try {
-      const { auth_url } = await api.analytics.getAuthUrl();
+      const { auth_url, state } = await api.analytics.getAuthUrl();
+      sessionStorage.setItem("gsc_oauth_state", state);
       window.open(auth_url, "_blank", "noopener");
       toast.info("Complete the Google sign-in in the new tab, then return here.");
     } catch (err) {

@@ -170,18 +170,24 @@ class LocalStorageAdapter(StorageAdapter):
             True if deleted successfully, False otherwise
         """
         try:
-            file_path = self.base_path / path
+            file_path = (self.base_path / path).resolve()
+            base_resolved = self.base_path.resolve()
+
+            # Path traversal check: ensure file is within base_path
+            if not str(file_path).startswith(str(base_resolved)):
+                logger.warning("Path traversal attempt blocked in image deletion: %s", path)
+                return False
 
             if file_path.exists():
                 file_path.unlink()
-                logger.info(f"Deleted image from local storage: {path}")
+                logger.info("Deleted image from local storage: %s", path)
                 return True
             else:
-                logger.warning(f"Image not found for deletion: {path}")
+                logger.warning("Image not found for deletion: %s", path)
                 return False
 
         except Exception as e:
-            logger.error(f"Failed to delete image from local storage: {e}")
+            logger.error("Failed to delete image from local storage: %s", e)
             return False
 
     async def get_image_url(self, path: str) -> str:

@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
-import { Toaster } from "sonner";
 import { Providers } from "@/components/providers";
 import "../globals.css";
 
@@ -57,16 +56,6 @@ export default async function LocaleLayout({
         <NextIntlClientProvider messages={messages}>
           <Providers>
             {children}
-            <Toaster
-              position="bottom-right"
-              toastOptions={{
-                style: {
-                  background: "white",
-                  border: "1px solid #f3ece0",
-                  borderRadius: "12px",
-                },
-              }}
-            />
           </Providers>
         </NextIntlClientProvider>
       </body>

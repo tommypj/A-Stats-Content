@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { AlertTriangle, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -142,14 +143,14 @@ export function ConfirmDialog({
 
           {/* Buttons */}
           <div className="flex justify-end gap-3 pt-2">
-            <button
+            <Button
               ref={cancelRef}
               onClick={onClose}
               disabled={isLoading}
-              className="btn-secondary"
+              variant="secondary"
             >
               {cancelLabel}
-            </button>
+            </Button>
             <button
               onClick={onConfirm}
               disabled={isLoading}

@@ -103,19 +103,36 @@ class PipelineResult:
 
 _SERP_CACHE_TTL = 86400  # 24 hours
 
+# Module-level Redis connection pool — avoids creating a new connection per cache op
+_redis_pool = None
+
+
+def _get_redis_pool():
+    """Return a shared Redis connection pool (lazy-initialized)."""
+    global _redis_pool
+    if _redis_pool is None:
+        try:
+            import redis.asyncio as aioredis  # type: ignore[import]
+
+            _redis_pool = aioredis.from_url(
+                settings.redis_url, decode_responses=True, max_connections=10
+            )
+        except Exception:
+            return None
+    return _redis_pool
+
 
 def _serp_cache_key(prefix: str, keyword: str, language: str) -> str:
-    h = hashlib.md5(f"{keyword.lower().strip()}:{language}".encode()).hexdigest()[:16]
+    h = hashlib.sha256(f"{keyword.lower().strip()}:{language}".encode()).hexdigest()[:16]
     return f"serp_cache:{prefix}:{h}"
 
 
 async def _cache_get(key: str) -> dict | None:
     try:
-        import redis.asyncio as aioredis  # type: ignore[import]
-
-        r = aioredis.from_url(settings.redis_url, decode_responses=True)
+        r = _get_redis_pool()
+        if r is None:
+            return None
         raw = await r.get(key)
-        await r.aclose()
         return json.loads(raw) if raw else None
     except Exception:
         return None
@@ -123,11 +140,10 @@ async def _cache_get(key: str) -> dict | None:
 
 async def _cache_set(key: str, data: dict) -> None:
     try:
-        import redis.asyncio as aioredis  # type: ignore[import]
-
-        r = aioredis.from_url(settings.redis_url, decode_responses=True)
+        r = _get_redis_pool()
+        if r is None:
+            return
         await r.setex(key, _SERP_CACHE_TTL, json.dumps(data))
-        await r.aclose()
     except Exception:
         pass
 

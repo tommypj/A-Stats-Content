@@ -1149,7 +1149,7 @@ async def export_my_data(
     ]
 
     # Knowledge sources
-    result = await db.execute(select(KnowledgeSource).where(KnowledgeSource.user_id == user_id))
+    result = await db.execute(select(KnowledgeSource).where(KnowledgeSource.user_id == user_id, KnowledgeSource.deleted_at.is_(None)))
     knowledge = [
         {
             "id": str(k.id),

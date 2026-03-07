@@ -210,7 +210,8 @@ export default function ContentHealthPage() {
         </div>
         <GscConnectBanner onConnect={async () => {
           try {
-            const { auth_url } = await api.analytics.getAuthUrl();
+            const { auth_url, state } = await api.analytics.getAuthUrl();
+            sessionStorage.setItem("gsc_oauth_state", state);
             window.open(auth_url, "_blank", "noopener,noreferrer");
           } catch (err) {
             toast.error(parseApiError(err).message);

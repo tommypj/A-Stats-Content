@@ -59,6 +59,9 @@ export default function AccountsPage() {
       setError(null);
 
       const res = await api.social.getConnectUrl(platform);
+      if (res.state) {
+        sessionStorage.setItem("social_oauth_state", res.state);
+      }
       window.location.href = res.authorization_url;
     } catch (err) {
       setError(parseApiError(err).message);
@@ -198,13 +201,13 @@ export default function AccountsPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-text-primary truncate">
-                          {account.display_name}
+                          {account.platform_display_name}
                         </h3>
                         <p className="text-sm text-text-secondary truncate">
-                          @{account.username}
+                          @{account.platform_username}
                         </p>
                       </div>
-                      {account.is_connected ? (
+                      {account.is_active ? (
                         <span className="flex items-center gap-1 text-xs text-green-600 whitespace-nowrap">
                           <CheckCircle className="h-3 w-3" />
                           Active
@@ -220,7 +223,7 @@ export default function AccountsPage() {
                     <div className="mt-3 text-xs text-text-tertiary">
                       <p>
                         Connected{" "}
-                        {new Date(account.connected_at).toLocaleDateString("en-US", {
+                        {new Date(account.last_verified_at).toLocaleDateString("en-US", {
                           month: "short",
                           day: "numeric",
                           year: "numeric",
@@ -228,15 +231,15 @@ export default function AccountsPage() {
                       </p>
                     </div>
 
-                    {account.last_error && (
+                    {account.verification_error && (
                       <div className="mt-3 p-2 bg-red-500/10 rounded text-xs text-red-600">
-                        {account.last_error}
+                        {account.verification_error}
                       </div>
                     )}
 
                     {/* Actions */}
                     <div className="mt-4 flex items-center gap-2">
-                      {!account.is_connected && (
+                      {!account.is_active && (
                         <Button
                           size="sm"
                           variant="outline"

@@ -296,6 +296,7 @@ export default function OutlineDetailPage() {
                   }}
                   disabled={index === 0}
                   className="p-1.5 rounded hover:bg-surface-secondary disabled:opacity-30"
+                  aria-label="Move section up"
                 >
                   <ChevronUp className="h-4 w-4" />
                 </button>
@@ -306,6 +307,7 @@ export default function OutlineDetailPage() {
                   }}
                   disabled={index === editedSections.length - 1}
                   className="p-1.5 rounded hover:bg-surface-secondary disabled:opacity-30"
+                  aria-label="Move section down"
                 >
                   <ChevronDown className="h-4 w-4" />
                 </button>
@@ -315,6 +317,7 @@ export default function OutlineDetailPage() {
                     removeSection(index);
                   }}
                   className="p-1.5 rounded hover:bg-red-50 text-red-500"
+                  aria-label="Remove section"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>

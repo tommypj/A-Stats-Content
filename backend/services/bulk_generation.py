@@ -131,7 +131,6 @@ async def process_bulk_outline_job(
 
         try:
             # Check usage limits
-            tracker = GenerationTracker(db)
             can_generate = await tracker.check_limit(
                 project_id=None, resource_type="outline", user_id=user_id
             )

@@ -84,7 +84,7 @@ export default function PublishToWordPressModal({
       });
 
       setPublished(true);
-      setPublishedUrl(result.post_url);
+      setPublishedUrl(result.wordpress_url);
       toast.success(
         status === "publish"
           ? "Article published to WordPress!"
@@ -92,7 +92,7 @@ export default function PublishToWordPressModal({
       );
 
       if (onSuccess) {
-        onSuccess(result.post_url);
+        onSuccess(result.wordpress_url);
       }
     } catch (error) {
       const apiError = parseApiError(error);

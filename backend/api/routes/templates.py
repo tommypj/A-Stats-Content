@@ -68,6 +68,20 @@ async def create_template(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ArticleTemplate:
+    # Check uniqueness on (user_id, name)
+    existing = await db.execute(
+        select(ArticleTemplate).where(
+            ArticleTemplate.user_id == current_user.id,
+            ArticleTemplate.name == body.name,
+            ArticleTemplate.deleted_at.is_(None),
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Template '{body.name}' already exists",
+        )
+
     template = ArticleTemplate(
         id=str(uuid4()),
         user_id=current_user.id,
@@ -128,7 +142,9 @@ async def update_template(
 
 
 @router.delete("/{template_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("10/minute")
 async def delete_template(
+    request: Request,
     template_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

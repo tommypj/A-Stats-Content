@@ -8,11 +8,12 @@ import math
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from api.middleware.rate_limit import limiter
 from api.routes.auth import get_current_user
 from api.schemas.competitor import (
     AnalyzeCompetitorRequest,
@@ -37,8 +38,10 @@ router = APIRouter(prefix="/competitors", tags=["competitors"])
 
 
 @router.post("/analyze", response_model=CompetitorAnalysisResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("3/minute")
 async def analyze_competitor(
-    request: AnalyzeCompetitorRequest,
+    request: Request,
+    body: AnalyzeCompetitorRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -46,8 +49,8 @@ async def analyze_competitor(
     Start a competitor analysis for the given domain.
     Returns cached result if a non-expired analysis exists.
     """
-    domain = request.domain
-    project_id = request.project_id
+    domain = body.domain
+    project_id = body.project_id
 
     # Check for cached (non-expired) analysis
     cached_result = await db.execute(
@@ -143,7 +146,9 @@ async def get_analysis(
 
 
 @router.delete("/analyses/{analysis_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("10/minute")
 async def delete_analysis(
+    request: Request,
     analysis_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

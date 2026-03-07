@@ -30,7 +30,7 @@ export function useRequireAuth(redirectTo: string = "/login") {
             subscription_tier: (user.subscription_tier || "free") as "free" | "starter" | "professional" | "enterprise",
           });
         } catch (error) {
-          const status = (error as any)?.response?.status;
+          const status = (error instanceof Error && "response" in error) ? (error as { response?: { status?: number } }).response?.status : undefined;
           if (status === 401 || status === 403) {
             // Cookie invalid or expired — clear state and redirect.
             // No localStorage to clean up — cookies are managed by the browser.

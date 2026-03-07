@@ -19,7 +19,7 @@ import {
   Circle,
   Activity,
 } from "lucide-react";
-import { api, Article, Outline, PlanInfo, UserResponse, ContentHealthSummary } from "@/lib/api";
+import { api, parseApiError, Article, Outline, PlanInfo, UserResponse, ContentHealthSummary } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 
@@ -286,7 +286,7 @@ export default function DashboardPage() {
         }
       }
     } catch (error) {
-      toast.error("Failed to load dashboard data. Please try again.");
+      toast.error(parseApiError(error).message);
     } finally {
       setLoading(false);
     }

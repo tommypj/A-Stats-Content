@@ -3,8 +3,8 @@
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import DateTime, ForeignKey, JSON, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, TimestampMixin
@@ -49,7 +49,7 @@ class SEOReport(Base, TimestampMixin):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Report data (JSON snapshot of analytics at generation time)
-    report_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    report_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     # Soft delete
     deleted_at: Mapped[datetime | None] = mapped_column(

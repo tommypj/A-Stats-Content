@@ -226,7 +226,7 @@ class TwitterAdapter(BaseSocialAdapter):
                 if response.status_code != 200:
                     error_data = response.json() if response.text else {}
                     error_msg = error_data.get("error_description", "Token exchange failed")
-                    logger.error(f"Twitter token exchange failed: {error_msg}")
+                    logger.error("Twitter token exchange failed: %s", error_msg)
                     raise SocialAuthError(f"Token exchange failed: {error_msg}")
 
                 token_data = response.json()
@@ -249,16 +249,16 @@ class TwitterAdapter(BaseSocialAdapter):
                 profile_image_url=user_profile.get("profile_image_url"),
             )
 
-            logger.info(f"Twitter authentication successful: @{credentials.account_username}")
+            logger.info("Twitter authentication successful: @%s", credentials.account_username)
             return credentials
 
         except httpx.HTTPError as e:
-            logger.error(f"HTTP error during Twitter token exchange: {e}")
+            logger.error("HTTP error during Twitter token exchange: %s", e)
             raise SocialAuthError(f"Token exchange failed: {e}")
         except SocialAuthError:
             raise
         except Exception as e:
-            logger.error(f"Unexpected error during Twitter token exchange: {e}")
+            logger.error("Unexpected error during Twitter token exchange: %s", e)
             raise SocialAuthError(f"Token exchange failed: {e}")
 
     async def _get_user_profile(self, access_token: str) -> dict[str, Any]:
@@ -328,7 +328,7 @@ class TwitterAdapter(BaseSocialAdapter):
                 if response.status_code != 200:
                     error_data = response.json() if response.text else {}
                     error_msg = error_data.get("error_description", "Token refresh failed")
-                    logger.error(f"Twitter token refresh failed: {error_msg}")
+                    logger.error("Twitter token refresh failed: %s", error_msg)
                     raise SocialAuthError(f"Token refresh failed: {error_msg}")
 
                 token_data = response.json()
@@ -342,12 +342,12 @@ class TwitterAdapter(BaseSocialAdapter):
             return credentials
 
         except httpx.HTTPError as e:
-            logger.error(f"HTTP error during Twitter token refresh: {e}")
+            logger.error("HTTP error during Twitter token refresh: %s", e)
             raise SocialAuthError(f"Token refresh failed: {e}")
         except SocialAuthError:
             raise
         except Exception as e:
-            logger.error(f"Unexpected error during Twitter token refresh: {e}")
+            logger.error("Unexpected error during Twitter token refresh: %s", e)
             raise SocialAuthError(f"Token refresh failed: {e}")
 
     async def verify_credentials(self, credentials: SocialCredentials) -> bool:
@@ -388,7 +388,7 @@ class TwitterAdapter(BaseSocialAdapter):
         self.validate_text_length(text)
 
         if self.mock_mode:
-            logger.info(f"Mock mode: Would post tweet: {text[:50]}...")
+            logger.info("Mock mode: Would post tweet: %s...", text[:50])
             return PostResult(
                 success=True,
                 post_id="1234567890",
@@ -399,7 +399,7 @@ class TwitterAdapter(BaseSocialAdapter):
             tweet_data = {"text": text}
 
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                logger.info(f"Posting tweet: {text[:50]}...")
+                logger.info("Posting tweet: %s...", text[:50])
                 response = await client.post(
                     f"{self.API_BASE_URL}/tweets",
                     headers={
@@ -412,20 +412,20 @@ class TwitterAdapter(BaseSocialAdapter):
                 # Handle rate limiting
                 if response.status_code == 429:
                     retry_after = response.headers.get("x-rate-limit-reset", "unknown")
-                    logger.error(f"Twitter rate limit exceeded. Reset at: {retry_after}")
+                    logger.error("Twitter rate limit exceeded. Reset at: %s", retry_after)
                     raise SocialRateLimitError(f"Rate limit exceeded. Reset at: {retry_after}")
 
                 if response.status_code != 201:
                     error_data = response.json() if response.text else {}
                     error_msg = error_data.get("detail", "Tweet creation failed")
-                    logger.error(f"Twitter API error: {error_msg}")
+                    logger.error("Twitter API error: %s", error_msg)
                     raise SocialAPIError(f"Tweet creation failed: {error_msg}")
 
                 result = response.json()
                 tweet_id = result["data"]["id"]
                 tweet_url = f"https://twitter.com/{credentials.account_username}/status/{tweet_id}"
 
-                logger.info(f"Tweet posted successfully: {tweet_url}")
+                logger.info("Tweet posted successfully: %s", tweet_url)
                 return PostResult(
                     success=True,
                     post_id=tweet_id,
@@ -435,10 +435,10 @@ class TwitterAdapter(BaseSocialAdapter):
         except (SocialValidationError, SocialRateLimitError, SocialAPIError):
             raise
         except httpx.HTTPError as e:
-            logger.error(f"HTTP error during tweet posting: {e}")
+            logger.error("HTTP error during tweet posting: %s", e)
             return PostResult(success=False, error_message=str(e))
         except Exception as e:
-            logger.error(f"Unexpected error during tweet posting: {e}")
+            logger.error("Unexpected error during tweet posting: %s", e)
             return PostResult(success=False, error_message=str(e))
 
     async def post_with_media(
@@ -467,7 +467,7 @@ class TwitterAdapter(BaseSocialAdapter):
             raise SocialValidationError("Twitter allows maximum 4 images per tweet")
 
         if self.mock_mode:
-            logger.info(f"Mock mode: Would post tweet with {len(media_urls)} media")
+            logger.info("Mock mode: Would post tweet with %s media", len(media_urls))
             return PostResult(
                 success=True,
                 post_id="1234567890",
@@ -508,7 +508,7 @@ class TwitterAdapter(BaseSocialAdapter):
             }
 
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                logger.info(f"Posting tweet with {len(media_ids)} media attachments")
+                logger.info("Posting tweet with %s media attachments", len(media_ids))
                 response = await client.post(
                     f"{self.API_BASE_URL}/tweets",
                     headers={
@@ -532,7 +532,7 @@ class TwitterAdapter(BaseSocialAdapter):
                 tweet_id = result["data"]["id"]
                 tweet_url = f"https://twitter.com/{credentials.account_username}/status/{tweet_id}"
 
-                logger.info(f"Tweet with media posted successfully: {tweet_url}")
+                logger.info("Tweet with media posted successfully: %s", tweet_url)
                 return PostResult(
                     success=True,
                     post_id=tweet_id,
@@ -542,7 +542,7 @@ class TwitterAdapter(BaseSocialAdapter):
         except (SocialValidationError, SocialRateLimitError, SocialAPIError):
             raise
         except Exception as e:
-            logger.error(f"Error posting tweet with media: {e}")
+            logger.error("Error posting tweet with media: %s", e)
             return PostResult(success=False, error_message=str(e))
 
     async def upload_media(
@@ -597,7 +597,7 @@ class TwitterAdapter(BaseSocialAdapter):
                 result = response.json()
                 media_id = str(result["media_id"])
 
-                logger.info(f"Media uploaded successfully: {media_id}")
+                logger.info("Media uploaded successfully: %s", media_id)
                 return MediaUploadResult(
                     media_id=media_id,
                     media_type="image",
@@ -606,7 +606,7 @@ class TwitterAdapter(BaseSocialAdapter):
         except SocialAPIError:
             raise
         except Exception as e:
-            logger.error(f"Error uploading media: {e}")
+            logger.error("Error uploading media: %s", e)
             raise SocialAPIError(f"Media upload failed: {e}")
 
     async def delete_post(self, credentials: SocialCredentials, post_id: str) -> bool:
@@ -624,19 +624,19 @@ class TwitterAdapter(BaseSocialAdapter):
             SocialAPIError: If deletion fails
         """
         if self.mock_mode:
-            logger.info(f"Mock mode: Would delete tweet {post_id}")
+            logger.info("Mock mode: Would delete tweet %s", post_id)
             return True
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                logger.info(f"Deleting tweet {post_id}")
+                logger.info("Deleting tweet %s", post_id)
                 response = await client.delete(
                     f"{self.API_BASE_URL}/tweets/{post_id}",
                     headers={"Authorization": f"Bearer {credentials.access_token}"},
                 )
 
                 if response.status_code == 200:
-                    logger.info(f"Tweet {post_id} deleted successfully")
+                    logger.info("Tweet %s deleted successfully", post_id)
                     return True
                 else:
                     error_msg = response.json().get("detail", "Deletion failed")
@@ -645,7 +645,7 @@ class TwitterAdapter(BaseSocialAdapter):
         except SocialAPIError:
             raise
         except Exception as e:
-            logger.error(f"Error deleting tweet: {e}")
+            logger.error("Error deleting tweet: %s", e)
             raise SocialAPIError(f"Tweet deletion failed: {e}")
 
     def get_character_limit(self) -> int:

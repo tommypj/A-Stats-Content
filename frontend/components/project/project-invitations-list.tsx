@@ -142,6 +142,7 @@ export function ProjectInvitationsList({ invitations, onRevoke, onResend }: Proj
                       onClick={() => handleRevoke(invitation.id)}
                       disabled={loadingInvitation === invitation.id}
                       className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                      aria-label="Cancel invitation"
                     >
                       <X className="h-4 w-4" />
                     </Button>

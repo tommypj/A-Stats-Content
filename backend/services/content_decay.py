@@ -317,13 +317,19 @@ async def generate_recovery_suggestions(
 
     from adapters.ai.anthropic_adapter import content_ai_service
 
+    # Sanitize user-controlled values before inserting into AI prompt
+    _sanitize = content_ai_service._sanitize_prompt_input
+    safe_keyword = _sanitize(alert.keyword or article_keyword or "", 200)
+    safe_url = _sanitize(alert.page_url or "N/A", 500)
+    safe_title = _sanitize(article_title or "N/A", 300)
+
     prompt = f"""Analyze this content performance decline and suggest specific recovery actions:
 
 Alert Type: {alert.alert_type}
 Severity: {alert.severity}
-Keyword: {alert.keyword or article_keyword}
-Page URL: {alert.page_url or "N/A"}
-Article Title: {article_title or "N/A"}
+Keyword: {safe_keyword}
+Page URL: {safe_url}
+Article Title: {safe_title}
 Metric: {alert.metric_name}
 Previous Value: {alert.metric_before}
 Current Value: {alert.metric_after}

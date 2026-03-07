@@ -115,7 +115,7 @@ export default function SocialDashboard() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="space-y-6">
         <div className="animate-pulse space-y-6">
           <div className="h-10 bg-surface-secondary rounded w-1/3" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -129,11 +129,11 @@ export default function SocialDashboard() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-8">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-text-primary">Social Media</h1>
+          <h1 className="text-2xl font-display font-bold text-text-primary">Social Media</h1>
           <p className="text-text-secondary mt-1">
             Manage your social media presence across platforms
           </p>
@@ -229,14 +229,14 @@ export default function SocialDashboard() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-text-primary truncate">
-                      {account.display_name}
+                      {account.platform_display_name}
                     </p>
                     <p className="text-sm text-text-secondary truncate">
-                      @{account.username}
+                      @{account.platform_username}
                     </p>
                   </div>
                 </div>
-                {account.is_connected ? (
+                {account.is_active ? (
                   <div className="mt-3 flex items-center gap-1 text-xs text-green-600">
                     <CheckCircle className="h-3 w-3" />
                     Connected

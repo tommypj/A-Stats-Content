@@ -183,7 +183,7 @@ class LinkedInAdapter(BaseSocialAdapter):
                 if response.status_code != 200:
                     error_data = response.json() if response.text else {}
                     error_msg = error_data.get("error_description", "Token exchange failed")
-                    logger.error(f"LinkedIn token exchange failed: {error_msg}")
+                    logger.error("LinkedIn token exchange failed: %s", error_msg)
                     raise SocialAuthError(f"Token exchange failed: {error_msg}")
 
                 token_data = response.json()
@@ -213,16 +213,16 @@ class LinkedInAdapter(BaseSocialAdapter):
                 profile_image_url=profile_image_url,
             )
 
-            logger.info(f"LinkedIn authentication successful: {credentials.account_name}")
+            logger.info("LinkedIn authentication successful: %s", credentials.account_name)
             return credentials
 
         except httpx.HTTPError as e:
-            logger.error(f"HTTP error during LinkedIn token exchange: {e}")
+            logger.error("HTTP error during LinkedIn token exchange: %s", e)
             raise SocialAuthError(f"Token exchange failed: {e}")
         except SocialAuthError:
             raise
         except Exception as e:
-            logger.error(f"Unexpected error during LinkedIn token exchange: {e}")
+            logger.error("Unexpected error during LinkedIn token exchange: %s", e)
             raise SocialAuthError(f"Token exchange failed: {e}")
 
     async def _get_user_profile(self, access_token: str) -> dict[str, Any]:
@@ -306,7 +306,7 @@ class LinkedInAdapter(BaseSocialAdapter):
         self.validate_text_length(text)
 
         if self.mock_mode:
-            logger.info(f"Mock mode: Would post LinkedIn update: {text[:50]}...")
+            logger.info("Mock mode: Would post LinkedIn update: %s...", text[:50])
             return PostResult(
                 success=True,
                 post_id="urn:li:share:1234567890",
@@ -328,7 +328,7 @@ class LinkedInAdapter(BaseSocialAdapter):
             }
 
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                logger.info(f"Posting LinkedIn update: {text[:50]}...")
+                logger.info("Posting LinkedIn update: %s...", text[:50])
                 response = await client.post(
                     f"{self.API_BASE_URL}/ugcPosts",
                     headers={
@@ -347,7 +347,7 @@ class LinkedInAdapter(BaseSocialAdapter):
                 if response.status_code not in [200, 201]:
                     error_data = response.json() if response.text else {}
                     error_msg = error_data.get("message", "Post creation failed")
-                    logger.error(f"LinkedIn API error: {error_msg}")
+                    logger.error("LinkedIn API error: %s", error_msg)
                     raise SocialAPIError(f"Post creation failed: {error_msg}")
 
                 result = response.json()
@@ -356,7 +356,7 @@ class LinkedInAdapter(BaseSocialAdapter):
                 post_id = result.get("value", {}).get("id") or result.get("id", "")
                 post_url = f"https://www.linkedin.com/feed/update/{post_id}"
 
-                logger.info(f"LinkedIn post created successfully: {post_url}")
+                logger.info("LinkedIn post created successfully: %s", post_url)
                 return PostResult(
                     success=True,
                     post_id=post_id,
@@ -366,10 +366,10 @@ class LinkedInAdapter(BaseSocialAdapter):
         except (SocialValidationError, SocialRateLimitError, SocialAPIError):
             raise
         except httpx.HTTPError as e:
-            logger.error(f"HTTP error during LinkedIn posting: {e}")
+            logger.error("HTTP error during LinkedIn posting: %s", e)
             return PostResult(success=False, error_message=str(e))
         except Exception as e:
-            logger.error(f"Unexpected error during LinkedIn posting: {e}")
+            logger.error("Unexpected error during LinkedIn posting: %s", e)
             return PostResult(success=False, error_message=str(e))
 
     async def post_with_media(
@@ -394,7 +394,7 @@ class LinkedInAdapter(BaseSocialAdapter):
         self.validate_text_length(text)
 
         if self.mock_mode:
-            logger.info(f"Mock mode: Would post LinkedIn update with {len(media_urls)} media")
+            logger.info("Mock mode: Would post LinkedIn update with %s media", len(media_urls))
             return PostResult(
                 success=True,
                 post_id="urn:li:share:1234567890",
@@ -443,7 +443,7 @@ class LinkedInAdapter(BaseSocialAdapter):
             }
 
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                logger.info(f"Posting LinkedIn update with {len(media_assets)} media attachments")
+                logger.info("Posting LinkedIn update with %s media attachments", len(media_assets))
                 response = await client.post(
                     f"{self.API_BASE_URL}/ugcPosts",
                     headers={
@@ -467,7 +467,7 @@ class LinkedInAdapter(BaseSocialAdapter):
                 post_id = result.get("id", "")
                 post_url = f"https://www.linkedin.com/feed/update/{post_id}"
 
-                logger.info(f"LinkedIn post with media created successfully: {post_url}")
+                logger.info("LinkedIn post with media created successfully: %s", post_url)
                 return PostResult(
                     success=True,
                     post_id=post_id,
@@ -477,7 +477,7 @@ class LinkedInAdapter(BaseSocialAdapter):
         except (SocialValidationError, SocialRateLimitError, SocialAPIError):
             raise
         except Exception as e:
-            logger.error(f"Error posting LinkedIn update with media: {e}")
+            logger.error("Error posting LinkedIn update with media: %s", e)
             return PostResult(success=False, error_message=str(e))
 
     async def upload_media(
@@ -571,7 +571,7 @@ class LinkedInAdapter(BaseSocialAdapter):
                 if upload_response.status_code not in [200, 201]:
                     raise SocialAPIError("Media binary upload failed")
 
-                logger.info(f"Media uploaded successfully: {asset_id}")
+                logger.info("Media uploaded successfully: %s", asset_id)
                 return MediaUploadResult(
                     media_id=asset_id,
                     media_type="image",
@@ -580,7 +580,7 @@ class LinkedInAdapter(BaseSocialAdapter):
         except SocialAPIError:
             raise
         except Exception as e:
-            logger.error(f"Error uploading media: {e}")
+            logger.error("Error uploading media: %s", e)
             raise SocialAPIError(f"Media upload failed: {e}")
 
     async def delete_post(self, credentials: SocialCredentials, post_id: str) -> bool:
@@ -598,12 +598,12 @@ class LinkedInAdapter(BaseSocialAdapter):
             SocialAPIError: If deletion fails
         """
         if self.mock_mode:
-            logger.info(f"Mock mode: Would delete LinkedIn post {post_id}")
+            logger.info("Mock mode: Would delete LinkedIn post %s", post_id)
             return True
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                logger.info(f"Deleting LinkedIn post {post_id}")
+                logger.info("Deleting LinkedIn post %s", post_id)
                 response = await client.delete(
                     f"{self.API_BASE_URL}/ugcPosts/{post_id}",
                     headers={
@@ -613,7 +613,7 @@ class LinkedInAdapter(BaseSocialAdapter):
                 )
 
                 if response.status_code == 204:
-                    logger.info(f"LinkedIn post {post_id} deleted successfully")
+                    logger.info("LinkedIn post %s deleted successfully", post_id)
                     return True
                 else:
                     error_msg = response.json().get("message", "Deletion failed")
@@ -622,7 +622,7 @@ class LinkedInAdapter(BaseSocialAdapter):
         except SocialAPIError:
             raise
         except Exception as e:
-            logger.error(f"Error deleting LinkedIn post: {e}")
+            logger.error("Error deleting LinkedIn post: %s", e)
             raise SocialAPIError(f"Post deletion failed: {e}")
 
     def get_character_limit(self) -> int:

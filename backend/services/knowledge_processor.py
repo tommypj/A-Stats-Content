@@ -38,9 +38,18 @@ def get_file_path(source_id: str, filename: str) -> Path:
 
 
 def delete_file(file_path: str) -> None:
-    """Delete a file from disk, ignoring missing-file errors."""
+    """Delete a file from disk, ignoring missing-file errors.
+
+    Validates that the resolved path is within KNOWLEDGE_STORAGE_DIR
+    to prevent path traversal attacks.
+    """
     try:
-        path = Path(file_path)
+        path = Path(file_path).resolve()
+        storage_dir = KNOWLEDGE_STORAGE_DIR.resolve()
+        # Path traversal check: ensure file is within storage directory
+        if not str(path).startswith(str(storage_dir)):
+            logger.warning("Path traversal attempt blocked: %s", file_path)
+            return
         if path.exists():
             path.unlink()
             logger.info("Deleted knowledge file: %s", file_path)

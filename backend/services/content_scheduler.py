@@ -9,6 +9,7 @@ it triggers the WordPress publish flow.
 import asyncio
 import logging
 from datetime import UTC, datetime
+from urllib.parse import urlparse
 
 import redis.asyncio as aioredis
 from sqlalchemy import and_, select
@@ -129,6 +130,16 @@ class ContentSchedulerService:
                 logger.warning(
                     "No WordPress credentials for project %s — skipping article %s",
                     article.project_id, article.id,
+                )
+                return
+
+            # Validate WordPress URL before making any requests
+            site_url = wp_creds.get("site_url", "")
+            parsed = urlparse(site_url)
+            if parsed.scheme not in ("http", "https") or not parsed.netloc:
+                logger.error(
+                    "Invalid WordPress URL for project %s: %s — skipping article %s",
+                    article.project_id, site_url, article.id,
                 )
                 return
 

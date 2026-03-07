@@ -145,8 +145,8 @@ export default function AnalyticsPage() {
       setDeviceData(deviceRes.items);
       setCountryData(countryRes.items);
     } catch (error) {
-      // Breakdowns are supplementary — log but don't toast
-      console.error("Failed to load breakdowns:", error);
+      // Breakdowns are supplementary — soft toast instead of blocking
+      toast.error("Failed to load device/country breakdowns");
     } finally {
       setIsLoadingBreakdown(false);
     }

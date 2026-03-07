@@ -284,8 +284,12 @@ async def create_article(
     article_id = str(uuid4())
     slug = slugify(request.title)
 
-    # Check slug uniqueness
-    existing = await db.execute(select(Article).where(Article.slug == slug))
+    # Check slug uniqueness (scoped to project, excluding soft-deleted)
+    project_id = getattr(current_user, "current_project_id", None)
+    slug_query = select(Article).where(Article.slug == slug, Article.deleted_at.is_(None))
+    if project_id:
+        slug_query = slug_query.where(Article.project_id == project_id)
+    existing = await db.execute(slug_query)
     if existing.scalar_one_or_none():
         slug = f"{slug}-{article_id[:8]}"
 
@@ -645,7 +649,10 @@ async def generate_article(
     article_id = str(uuid4())
     slug = slugify(outline.title)
 
-    existing = await db.execute(select(Article).where(Article.slug == slug))
+    slug_query = select(Article).where(Article.slug == slug, Article.deleted_at.is_(None))
+    if project_id:
+        slug_query = slug_query.where(Article.project_id == project_id)
+    existing = await db.execute(slug_query)
     if existing.scalar_one_or_none():
         slug = f"{slug}-{article_id[:8]}"
 
@@ -1440,12 +1447,14 @@ async def update_article(
 
     if "title" in update_data:
         new_slug = slugify(article.title)
-        existing = await db.execute(
-            select(Article).where(
-                Article.slug == new_slug,
-                Article.id != article_id,
-            )
+        slug_query = select(Article).where(
+            Article.slug == new_slug,
+            Article.id != article_id,
+            Article.deleted_at.is_(None),
         )
+        if article.project_id:
+            slug_query = slug_query.where(Article.project_id == article.project_id)
+        existing = await db.execute(slug_query)
         if existing.scalar_one_or_none():
             new_slug = f"{new_slug}-{article_id[:8]}"
         article.slug = new_slug

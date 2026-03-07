@@ -52,6 +52,13 @@ const PATH_LABELS: Record<string, string> = {
   docs: "Documentation",
   templates: "Templates",
   tags: "Tags",
+  "site-audit": "Site Audit",
+  "competitor-analysis": "Competitor Analysis",
+  generate: "Generate",
+  goals: "Goals",
+  posts: "Posts",
+  sources: "Sources",
+  jobs: "Jobs",
 };
 
 export function Breadcrumb() {

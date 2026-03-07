@@ -72,14 +72,6 @@
     @apply bg-surface rounded-2xl border border-surface-tertiary shadow-soft;
   }
 
-  .input {
-    @apply w-full rounded-xl border border-surface-tertiary bg-surface px-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 transition-all duration-200;
-  }
-
-  .label {
-    @apply text-sm font-medium text-text-secondary;
-  }
-
   .gradient-text {
     @apply bg-gradient-to-r from-primary-500 to-terra-500 bg-clip-text text-transparent;
   }

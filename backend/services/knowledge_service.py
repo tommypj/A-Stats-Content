@@ -339,10 +339,11 @@ Answer:"""
                     logger.error(f"Failed to log error query: {log_error}")
                     await db.rollback()
 
-            # Return error response
+            # Return generic error — do not leak internal exception details
+            logger.error("Knowledge query failed: %s", e, exc_info=True)
             return {
                 "query": query,
-                "answer": f"An error occurred while processing your query: {str(e)}",
+                "answer": "An error occurred while processing your query. Please try again later.",
                 "sources": [],
                 "query_time_ms": query_time_ms,
             }

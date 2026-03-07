@@ -3,8 +3,8 @@
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, TimestampMixin
@@ -44,7 +44,7 @@ class ArticleTemplate(Base, TimestampMixin):
     custom_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Section structure (JSON array matching outline sections format)
-    sections: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    sections: Mapped[list | None] = mapped_column(JSONB, nullable=True)
 
     # Soft delete
     deleted_at: Mapped[datetime | None] = mapped_column(

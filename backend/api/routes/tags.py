@@ -6,7 +6,7 @@ from typing import Annotated
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.middleware.rate_limit import limiter
@@ -71,11 +71,11 @@ async def create_tag(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Tag:
-    # Check uniqueness
+    # Check uniqueness (case-insensitive)
     existing = await db.execute(
         select(Tag).where(
             Tag.user_id == current_user.id,
-            Tag.name == body.name,
+            func.lower(Tag.name) == body.name.lower(),
             Tag.deleted_at.is_(None),
         )
     )
@@ -114,12 +114,12 @@ async def update_tag(
 
     update_data = body.model_dump(exclude_unset=True)
 
-    # If renaming, check uniqueness
+    # If renaming, check uniqueness (case-insensitive)
     if "name" in update_data and update_data["name"] != tag.name:
         dup = await db.execute(
             select(Tag).where(
                 Tag.user_id == current_user.id,
-                Tag.name == update_data["name"],
+                func.lower(Tag.name) == update_data["name"].lower(),
                 Tag.deleted_at.is_(None),
                 Tag.id != tag_id,
             )
@@ -139,7 +139,9 @@ async def update_tag(
 
 
 @router.delete("/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("20/minute")
 async def delete_tag(
+    request: Request,
     tag_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -162,7 +164,9 @@ async def delete_tag(
 # ── Assign / unassign ─────────────────────────────────────────────────────────
 
 @router.put("/articles/{article_id}", response_model=list[TagResponse])
+@limiter.limit("20/minute")
 async def set_article_tags(
+    request: Request,
     article_id: str,
     body: TagAssignRequest,
     current_user: User = Depends(get_current_user),
@@ -217,7 +221,9 @@ async def get_article_tags(
 
 
 @router.put("/outlines/{outline_id}", response_model=list[TagResponse])
+@limiter.limit("20/minute")
 async def set_outline_tags(
+    request: Request,
     outline_id: str,
     body: TagAssignRequest,
     current_user: User = Depends(get_current_user),

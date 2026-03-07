@@ -146,6 +146,7 @@ export function ProjectMembersList({ members, myRole, onUpdateRole, onRemove }: 
                     onClick={() => handleRemove(member.user_id, member.name)}
                     disabled={loadingMember === member.user_id}
                     className="text-red-500 hover:text-red-600 hover:bg-red-50 min-h-[44px] min-w-[44px]"
+                    aria-label="Remove member"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

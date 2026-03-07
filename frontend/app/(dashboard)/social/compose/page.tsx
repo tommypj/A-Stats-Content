@@ -363,8 +363,8 @@ export default function ComposePage() {
                         platform={account.platform}
                         content={content}
                         mediaUrls={mediaUrls}
-                        accountName={account.display_name}
-                        accountUsername={account.username}
+                        accountName={account.platform_display_name}
+                        accountUsername={account.platform_username}
                         profileImageUrl={account.profile_image_url}
                       />
                     ))}

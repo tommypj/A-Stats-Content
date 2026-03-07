@@ -138,7 +138,7 @@ export default function SocialHistoryPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className="space-y-6">
       <ConfirmDialog
         isOpen={!!confirmAction}
         onClose={() => setConfirmAction(null)}
@@ -151,7 +151,7 @@ export default function SocialHistoryPage() {
 
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold flex items-center gap-3">
+        <h1 className="text-2xl font-display font-bold text-text-primary flex items-center gap-3">
           <History className="h-8 w-8 text-primary-500" />
           Post History
         </h1>

@@ -655,7 +655,7 @@ async def generate_revenue_report(
         generated_at=datetime.now(UTC),
     )
     db.add(report)
-    await db.flush()
+    await db.commit()
 
     return {
         "report_id": report.id,

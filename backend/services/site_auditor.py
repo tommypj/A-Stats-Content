@@ -38,14 +38,15 @@ CRAWL_DELAY = 0.5  # seconds between requests per slot
 # SSRF Protection
 # ============================================================================
 
-_dns_cache: dict[str, bool] = {}
+_DNS_CACHE_TTL = 60  # seconds
+_dns_cache: dict[str, tuple[bool, float]] = {}
 
 
 def _is_safe_url(url: str) -> bool:
     """
     Block requests to private/internal IPs and hostnames.
     Returns True only for valid public domains.
-    Caches DNS results per hostname to avoid repeated resolution.
+    Caches DNS results per hostname to avoid repeated resolution (TTL-based).
     """
     try:
         parsed = urlparse(url)
@@ -53,23 +54,30 @@ def _is_safe_url(url: str) -> bool:
         if not hostname:
             return False
 
-        # Check cache first
-        if hostname in _dns_cache:
-            return _dns_cache[hostname]
+        # Check cache first (with TTL expiry)
+        cached = _dns_cache.get(hostname)
+        if cached is not None:
+            result, ts = cached
+            if time.monotonic() - ts < _DNS_CACHE_TTL:
+                return result
+            # Expired — remove and re-resolve
+            del _dns_cache[hostname]
+
+        now = time.monotonic()
 
         # Block hostnames without a dot (e.g. "localhost", "internal")
         if "." not in hostname and hostname != "localhost":
-            _dns_cache[hostname] = False
+            _dns_cache[hostname] = (False, now)
             return False
         if hostname == "localhost":
-            _dns_cache[hostname] = False
+            _dns_cache[hostname] = (False, now)
             return False
 
         # Resolve hostname and check all IPs
         try:
             addrinfos = socket.getaddrinfo(hostname, None)
         except socket.gaierror:
-            _dns_cache[hostname] = False
+            _dns_cache[hostname] = (False, now)
             return False
 
         for family, _type, _proto, _canonname, sockaddr in addrinfos:
@@ -77,13 +85,13 @@ def _is_safe_url(url: str) -> bool:
             try:
                 ip = ipaddress.ip_address(ip_str)
             except ValueError:
-                _dns_cache[hostname] = False
+                _dns_cache[hostname] = (False, now)
                 return False
             if ip.is_private or ip.is_loopback or ip.is_reserved or ip.is_link_local:
-                _dns_cache[hostname] = False
+                _dns_cache[hostname] = (False, now)
                 return False
 
-        _dns_cache[hostname] = True
+        _dns_cache[hostname] = (True, now)
         return True
     except Exception:
         return False
