@@ -361,8 +361,6 @@ async def create_personal_project(db: AsyncSession, user: User) -> Project:
         slug=f"personal-{str(user.id)[:8]}",
         owner_id=user.id,
         is_personal=True,
-        subscription_tier=user.subscription_tier or "free",
-        subscription_status=user.subscription_status or "active",
         max_members=1,
     )
     db.add(project)
