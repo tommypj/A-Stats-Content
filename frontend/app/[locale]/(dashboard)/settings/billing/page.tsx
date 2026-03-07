@@ -20,6 +20,7 @@ import { Progress } from "@/components/ui/progress";
 import { useAuthStore } from "@/stores/auth";
 import { api, parseApiError, SubscriptionStatus, PlanInfo } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
+import { openCheckoutOverlay } from "@/lib/lemonsqueezy";
 import { toast } from "sonner";
 
 export default function BillingSettingsPage() {
@@ -64,31 +65,34 @@ export default function BillingSettingsPage() {
     try {
       setActionLoading(true);
       const response = await api.billing.checkout(planId, "monthly");
-      window.open(response.checkout_url, "_blank", "noopener,noreferrer");
 
-      // Poll for subscription changes after checkout
-      if (pollRef.current) clearInterval(pollRef.current);
-      pollRef.current = setInterval(async () => {
-        try {
-          const subData = await api.billing.subscription();
-          if (subData.subscription_tier !== subscription?.subscription_tier) {
-            setSubscription(subData);
-            if (pollRef.current) clearInterval(pollRef.current);
-            pollRef.current = null;
-            toast.success("Subscription updated successfully!");
-          }
-        } catch (error) {
-          // Ignore polling errors
-        }
-      }, 3000);
+      await openCheckoutOverlay(response.checkout_url, () => {
+        // Checkout completed — poll for subscription changes
+        toast.success("Payment successful! Activating your plan...");
 
-      // FE-AUTH-13: clear any existing stop-timeout before setting a new one to prevent duplicate callbacks
-      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
-      // Stop polling after 5 minutes
-      pollTimeoutRef.current = setTimeout(() => {
         if (pollRef.current) clearInterval(pollRef.current);
-        pollRef.current = null;
-      }, 300000);
+        pollRef.current = setInterval(async () => {
+          try {
+            const subData = await api.billing.subscription();
+            if (subData.subscription_tier !== subscription?.subscription_tier) {
+              setSubscription(subData);
+              if (pollRef.current) clearInterval(pollRef.current);
+              pollRef.current = null;
+              toast.success("Subscription updated successfully!");
+            }
+          } catch {
+            // Ignore polling errors
+          }
+        }, 3000);
+
+        // FE-AUTH-13: clear any existing stop-timeout before setting a new one
+        if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+        // Stop polling after 5 minutes
+        pollTimeoutRef.current = setTimeout(() => {
+          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = null;
+        }, 300000);
+      });
     } catch (error) {
       const apiError = parseApiError(error);
       toast.error(apiError.message);

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { api, parseApiError, PlanInfo } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
+import { openCheckoutOverlay } from "@/lib/lemonsqueezy";
 import { toast } from "sonner";
 
 export default function PricingPage() {
@@ -50,7 +51,11 @@ export default function PricingPage() {
     try {
       setCheckoutLoading(planId);
       const response = await api.billing.checkout(planId, billingCycle);
-      window.open(response.checkout_url, "_blank", "noopener,noreferrer");
+      await openCheckoutOverlay(response.checkout_url, () => {
+        toast.success("Payment successful! Your plan is being activated...");
+        // Refresh auth state to pick up new tier
+        setTimeout(() => window.location.reload(), 2000);
+      });
     } catch (error) {
       const apiError = parseApiError(error);
       toast.error(apiError.message);
