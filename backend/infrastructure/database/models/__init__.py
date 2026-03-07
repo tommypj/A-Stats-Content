@@ -16,6 +16,7 @@ from .base import Base, TimestampMixin
 from .blog import BlogCategory, BlogPost, BlogPostStatus, BlogPostTag, BlogTag
 from .bulk import BulkJob, BulkJobItem, ContentTemplate
 from .competitor import CompetitorAnalysis, CompetitorArticle
+from .site_audit import AuditIssue, AuditPage, SiteAudit
 from .content import Article, ArticleRevision, ContentStatus, ContentTone, GeneratedImage, Outline
 from .generation import AdminAlert, GenerationLog
 from .keyword_cache import KeywordResearchCache
@@ -88,4 +89,7 @@ __all__ = [
     "BlogPostStatus",
     "CompetitorAnalysis",
     "CompetitorArticle",
+    "SiteAudit",
+    "AuditPage",
+    "AuditIssue",
 ]

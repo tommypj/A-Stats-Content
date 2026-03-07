@@ -41,6 +41,7 @@ import {
   Building2,
   Lock,
   Target,
+  ScanSearch,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { toast } from "sonner";
@@ -123,6 +124,7 @@ const navigation: NavItem[] = [
   },
   { name: "Knowledge", href: "/knowledge", icon: BookOpen },
   { name: "Competitor Analysis", href: "/competitor-analysis", icon: Target },
+  { name: "Site Audit", href: "/site-audit", icon: ScanSearch },
   {
     name: "Projects",
     icon: FolderOpen,

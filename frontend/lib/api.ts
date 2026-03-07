@@ -1579,6 +1579,49 @@ export const api = {
       }),
   },
 
+  // Site Audit
+  siteAudit: {
+    start: (domain: string) =>
+      apiRequest<SiteAudit>({
+        method: "POST",
+        url: "/site-audit/start",
+        data: { domain },
+      }),
+    list: (params: { page: number; page_size: number }) =>
+      apiRequest<{ items: SiteAudit[]; total: number; pages: number }>({
+        url: `/site-audit/audits?page=${params.page}&page_size=${params.page_size}`,
+      }),
+    get: (id: string) =>
+      apiRequest<SiteAudit>({
+        url: `/site-audit/audits/${id}`,
+      }),
+    pages: (id: string, params: { page: number; page_size: number; has_issues?: boolean }) => {
+      const qs = new URLSearchParams({ page: String(params.page), page_size: String(params.page_size) });
+      if (params.has_issues !== undefined) qs.set("has_issues", String(params.has_issues));
+      return apiRequest<{ items: AuditPage[]; total: number; pages: number }>({
+        url: `/site-audit/audits/${id}/pages?${qs}`,
+      });
+    },
+    issues: (id: string, params: { page: number; page_size: number; severity?: string; issue_type?: string }) => {
+      const qs = new URLSearchParams({ page: String(params.page), page_size: String(params.page_size) });
+      if (params.severity) qs.set("severity", params.severity);
+      if (params.issue_type) qs.set("issue_type", params.issue_type);
+      return apiRequest<{ items: AuditIssue[]; total: number; pages: number }>({
+        url: `/site-audit/audits/${id}/issues?${qs}`,
+      });
+    },
+    delete: (id: string) =>
+      apiRequest<void>({
+        method: "DELETE",
+        url: `/site-audit/audits/${id}`,
+      }),
+    exportCsv: (id: string) =>
+      apiRequest<string>({
+        url: `/site-audit/audits/${id}/export`,
+        responseType: "text",
+      }),
+  },
+
   // Public Blog
   blog: {
     list: (params?: { page?: number; page_size?: number; category_slug?: string; tag_slug?: string; search?: string }) =>
@@ -2910,6 +2953,58 @@ export interface KeywordGapResponse {
   total_competitor_keywords: number;
   total_your_keywords: number;
   total_gaps: number;
+}
+
+// Site Audit
+export interface SiteAudit {
+  id: string;
+  user_id: string;
+  project_id?: string;
+  domain: string;
+  status: string;
+  pages_crawled: number;
+  pages_discovered: number;
+  total_issues: number;
+  critical_issues: number;
+  warning_issues: number;
+  info_issues: number;
+  score: number;
+  error_message?: string;
+  started_at?: string;
+  completed_at?: string;
+  created_at: string;
+}
+
+export interface AuditPage {
+  id: string;
+  audit_id: string;
+  url: string;
+  status_code?: number;
+  response_time_ms?: number;
+  content_type?: string;
+  word_count?: number;
+  title?: string;
+  meta_description?: string;
+  h1_count: number;
+  has_canonical: boolean;
+  has_og_tags: boolean;
+  has_structured_data: boolean;
+  has_robots_meta: boolean;
+  page_size_bytes?: number;
+  issues?: { type: string; severity: string }[];
+  created_at: string;
+}
+
+export interface AuditIssue {
+  id: string;
+  audit_id: string;
+  page_id?: string;
+  issue_type: string;
+  severity: string;
+  message: string;
+  details?: Record<string, unknown>;
+  page_url?: string;
+  created_at: string;
 }
 
 export interface AdminSystemAnalytics {

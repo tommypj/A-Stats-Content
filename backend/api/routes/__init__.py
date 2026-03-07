@@ -23,6 +23,7 @@ from .notifications import router as notifications_router
 from .outlines import router as outlines_router
 from .project_invitations import router as project_invitations_router
 from .projects import router as projects_router
+from .site_audit import router as site_audit_router
 from .social import router as social_router
 from .wordpress import router as wordpress_router
 
@@ -51,6 +52,7 @@ api_router.include_router(notifications_router)
 api_router.include_router(bulk_router)
 api_router.include_router(competitor_router)
 api_router.include_router(agency_router)
+api_router.include_router(site_audit_router)
 api_router.include_router(blog_router)
 api_router.include_router(admin_blog_router)
 

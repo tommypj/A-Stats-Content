@@ -31,6 +31,8 @@ PLANS = {
             "images_per_month": 3,
             "social_posts_per_month": 5,
             "keyword_researches_per_month": 3,
+            "site_audit_pages": 0,
+            "site_audits_per_month": 0,
         },
     },
     "starter": {
@@ -46,6 +48,7 @@ PLANS = {
             f"{ARTICLE_IMPROVE_LIMIT} AI improvements per article",
             "Advanced SEO analysis",
             "WordPress integration",
+            "5 site audits per month (10 pages each)",
             "Priority email support",
         ],
         "limits": {
@@ -54,6 +57,8 @@ PLANS = {
             "images_per_month": 10,
             "social_posts_per_month": 20,
             "keyword_researches_per_month": 30,
+            "site_audit_pages": 10,
+            "site_audits_per_month": 5,
         },
     },
     "professional": {
@@ -72,6 +77,7 @@ PLANS = {
             "Bulk content generation",
             "Knowledge Vault",
             "API access",
+            "15 site audits per month (100 pages each)",
             "Priority support",
         ],
         "limits": {
@@ -80,6 +86,8 @@ PLANS = {
             "images_per_month": 50,
             "social_posts_per_month": 100,
             "keyword_researches_per_month": 100,
+            "site_audit_pages": 100,
+            "site_audits_per_month": 15,
         },
     },
     "enterprise": {
@@ -101,6 +109,7 @@ PLANS = {
             "API access",
             "Dedicated support",
             "Custom integrations",
+            "50 site audits per month (500 pages each)",
             "SLA guarantee",
         ],
         "limits": {
@@ -109,6 +118,8 @@ PLANS = {
             "images_per_month": 200,
             "social_posts_per_month": 300,
             "keyword_researches_per_month": 300,
+            "site_audit_pages": 500,
+            "site_audits_per_month": 50,
         },
     },
 }
