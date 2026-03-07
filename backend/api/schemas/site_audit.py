@@ -71,6 +71,8 @@ class AuditPageResponse(BaseModel):
     has_structured_data: bool = False
     has_robots_meta: bool = False
     page_size_bytes: int | None = None
+    performance_score: int | None = None
+    pagespeed_data: dict | None = None
     issues: list | None = None
     created_at: datetime
 

@@ -846,6 +846,49 @@ async def run_site_audit(audit_id: str) -> None:
                 # ----- Step 8: Site essentials (sitemap, robots) -----
                 essentials_issues = await _check_site_essentials(client, domain)
 
+            # ----- Step 8b: PageSpeed Insights on top pages -----
+            try:
+                from services.pagespeed import fetch_pagespeed
+
+                # Pick homepage + top 4 most-linked pages for PageSpeed analysis
+                # internal_links_map is {source_url: set_of_urls_it_links_to}
+                # We want pages that are linked TO the most (most inbound links)
+                inbound_counts: dict[str, int] = {}
+                for _source_url, targets in internal_links_map.items():
+                    for target in targets:
+                        inbound_counts[target] = inbound_counts.get(target, 0) + 1
+
+                # Start with homepage, add top linked pages
+                homepage = f"https://{domain}"
+                pagespeed_urls = [homepage]
+                sorted_by_inbound = sorted(
+                    ((url, count) for url, count in inbound_counts.items() if url != homepage),
+                    key=lambda x: x[1],
+                    reverse=True,
+                )
+                for ps_url, _ in sorted_by_inbound[:4]:
+                    pagespeed_urls.append(ps_url)
+
+                logger.info("Running PageSpeed Insights on %d pages", len(pagespeed_urls))
+
+                for ps_url in pagespeed_urls:
+                    ps_result = await fetch_pagespeed(ps_url)
+                    if ps_result:
+                        # Find the matching page data and update it
+                        for pdata in all_page_data:
+                            if pdata["url"] == ps_url:
+                                pdata["performance_score"] = ps_result["performance_score"]
+                                pdata["pagespeed_data"] = ps_result
+                                break
+                        logger.info(
+                            "PageSpeed for %s: score=%s",
+                            ps_url, ps_result["performance_score"],
+                        )
+                    await asyncio.sleep(1)  # Rate limit PageSpeed API calls
+
+            except Exception as ps_err:
+                logger.warning("PageSpeed analysis failed: %s", ps_err)
+
             # ----- Step 9: Compute score -----
             critical_count = 0
             warning_count = 0
@@ -898,6 +941,8 @@ async def run_site_audit(audit_id: str) -> None:
                     has_robots_meta=pdata.get("has_robots_meta", False),
                     page_size_bytes=pdata.get("page_size_bytes"),
                     redirect_chain=pdata.get("redirect_chain") or None,
+                    performance_score=pdata.get("performance_score"),
+                    pagespeed_data=pdata.get("pagespeed_data"),
                     issues_json=pdata.get("issues"),
                 )
                 db.add(audit_page)

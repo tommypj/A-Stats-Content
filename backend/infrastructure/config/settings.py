@@ -173,6 +173,9 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-2.5-flash"
 
+    # Google PageSpeed Insights
+    google_pagespeed_api_key: str = ""
+
     # Pipeline feature flags
     enable_serp_analysis: bool = True  # Set False to skip SERP (e.g. bulk jobs)
     enable_research_step: bool = True

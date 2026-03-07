@@ -134,6 +134,10 @@ class AuditPage(Base):
     page_size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     redirect_chain: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
+    # PageSpeed Insights data
+    performance_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    pagespeed_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
     # Per-page issues snapshot
     issues_json: Mapped[dict | None] = mapped_column(
         "issues", JSONB, nullable=True

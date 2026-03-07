@@ -2992,6 +2992,15 @@ export interface AuditPage {
   has_robots_meta: boolean;
   page_size_bytes?: number;
   issues?: { type: string; severity: string }[];
+  performance_score?: number;
+  pagespeed_data?: {
+    performance_score: number;
+    strategy: string;
+    metrics: Record<string, { value: number; display: string; score: number }>;
+    field_data?: Record<string, { percentile: number; category: string }>;
+    opportunities: { id: string; title: string; description: string; display_value: string; savings_ms: number; score: number }[];
+    diagnostics: { id: string; title: string; description: string; display_value: string }[];
+  };
   created_at: string;
 }
 

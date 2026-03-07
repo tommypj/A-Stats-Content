@@ -18,6 +18,7 @@ import {
   Check,
   X as XIcon,
   Filter,
+  Gauge,
 } from "lucide-react";
 import { api, SiteAudit, AuditPage, AuditIssue, parseApiError } from "@/lib/api";
 import { toast } from "sonner";
@@ -111,7 +112,7 @@ function truncateUrl(url: string, maxLen = 60): string {
 // Sub-components: Tabs
 // ---------------------------------------------------------------------------
 
-type ResultTab = "overview" | "issues" | "pages";
+type ResultTab = "overview" | "issues" | "pages" | "performance";
 
 function OverviewTab({ audit }: { audit: SiteAudit }) {
   const [issues, setIssues] = useState<AuditIssue[]>([]);
@@ -589,6 +590,182 @@ function PagesTab({ auditId }: { auditId: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Performance Tab (PageSpeed Insights)
+// ---------------------------------------------------------------------------
+
+const METRIC_NAMES: Record<string, string> = {
+  lcp: "Largest Contentful Paint",
+  cls: "Cumulative Layout Shift",
+  tbt: "Total Blocking Time",
+  fcp: "First Contentful Paint",
+  si: "Speed Index",
+  tti: "Time to Interactive",
+};
+
+function perfScoreClasses(score: number): { bg: string; text: string } {
+  if (score >= 90) return { bg: "bg-green-100", text: "text-green-800" };
+  if (score >= 50) return { bg: "bg-amber-100", text: "text-amber-800" };
+  return { bg: "bg-red-100", text: "text-red-800" };
+}
+
+function perfScoreRing(score: number): string {
+  if (score >= 90) return "border-green-500 bg-green-50 text-green-700";
+  if (score >= 50) return "border-amber-500 bg-amber-50 text-amber-700";
+  return "border-red-500 bg-red-50 text-red-700";
+}
+
+function PerformanceTab({ auditId }: { auditId: string }) {
+  const [pages, setPages] = useState<AuditPage[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    api.siteAudit
+      .pages(auditId, { page: 1, page_size: 20 })
+      .then((data) => {
+        setPages(data.items.filter((p) => p.performance_score != null));
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [auditId]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-6 w-6 animate-spin text-primary-500" />
+      </div>
+    );
+  }
+
+  if (pages.length === 0) {
+    return (
+      <div className="p-8 text-center">
+        <Gauge className="h-10 w-10 text-surface-tertiary mx-auto mb-3" />
+        <p className="text-sm text-text-secondary">
+          PageSpeed data is collected automatically for your top pages during the audit. No data available for this audit.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      {pages.map((pg) => {
+        const psd = pg.pagespeed_data;
+        const score = pg.performance_score ?? 0;
+        const ringClasses = perfScoreRing(score);
+
+        // Extract the 6 core metrics in display order
+        const metricKeys = ["lcp", "cls", "tbt", "fcp", "si", "tti"];
+        const metrics = psd?.metrics ?? {};
+
+        return (
+          <Card key={pg.id} className="p-5 space-y-5">
+            {/* Header: score circle + URL */}
+            <div className="flex items-center gap-4">
+              <div
+                className={cn(
+                  "w-12 h-12 rounded-full border-4 flex items-center justify-center shrink-0 font-bold text-sm",
+                  ringClasses
+                )}
+              >
+                {score}
+              </div>
+              <div className="min-w-0 flex-1">
+                <a
+                  href={pg.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-medium text-primary-600 hover:underline truncate block"
+                  title={pg.url}
+                >
+                  {pg.url}
+                </a>
+                {psd?.strategy && (
+                  <p className="text-xs text-text-muted mt-0.5">
+                    Strategy: {psd.strategy.charAt(0).toUpperCase() + psd.strategy.slice(1)}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Core Web Vitals — 2x3 grid */}
+            {Object.keys(metrics).length > 0 && (
+              <div>
+                <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-3">
+                  Core Web Vitals
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {metricKeys.map((key) => {
+                    const m = metrics[key];
+                    if (!m) return null;
+                    const sc = perfScoreClasses(m.score);
+                    return (
+                      <div
+                        key={key}
+                        className="flex items-center justify-between rounded-lg border border-surface-tertiary px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs text-text-muted truncate">
+                            {METRIC_NAMES[key] ?? key.toUpperCase()}
+                          </p>
+                          <p className="text-sm font-semibold text-text-primary">{m.display}</p>
+                        </div>
+                        <span
+                          className={cn(
+                            "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ml-2",
+                            sc.bg,
+                            sc.text
+                          )}
+                        >
+                          {m.score}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Opportunities */}
+            {psd?.opportunities && psd.opportunities.length > 0 && (
+              <div>
+                <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-3">
+                  Top Opportunities
+                </h4>
+                <div className="space-y-2">
+                  {psd.opportunities
+                    .sort((a, b) => b.savings_ms - a.savings_ms)
+                    .slice(0, 5)
+                    .map((opp) => (
+                      <div
+                        key={opp.id}
+                        className="flex items-center justify-between rounded-lg bg-surface-secondary/50 px-3 py-2"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm text-text-primary truncate">{opp.title}</p>
+                          {opp.description && (
+                            <p className="text-xs text-text-muted truncate mt-0.5">{opp.description}</p>
+                          )}
+                        </div>
+                        {opp.savings_ms > 0 && (
+                          <span className="text-xs font-medium text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full shrink-0 ml-2">
+                            -{opp.savings_ms}ms
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Need Fragment for table row expansion
 // ---------------------------------------------------------------------------
 import { Fragment } from "react";
@@ -871,10 +1048,11 @@ export default function SiteAuditPage() {
   // ---------------------------------------------------------------------------
 
   if (selected && selected.status === "completed") {
-    const tabs: { key: ResultTab; label: string }[] = [
+    const tabs: { key: ResultTab; label: string; icon?: React.ReactNode }[] = [
       { key: "overview", label: "Overview" },
       { key: "issues", label: "Issues" },
       { key: "pages", label: "Pages" },
+      { key: "performance", label: "Performance", icon: <Gauge className="h-3.5 w-3.5" /> },
     ];
 
     return (
@@ -958,6 +1136,7 @@ export default function SiteAuditPage() {
                     : "border-transparent text-text-secondary hover:text-text-primary"
                 )}
               >
+                {tab.icon && <span className="mr-1.5">{tab.icon}</span>}
                 {tab.label}
               </button>
             ))}
@@ -967,6 +1146,7 @@ export default function SiteAuditPage() {
             {activeTab === "overview" && <OverviewTab audit={selected} />}
             {activeTab === "issues" && <IssuesTab auditId={selected.id} />}
             {activeTab === "pages" && <PagesTab auditId={selected.id} />}
+            {activeTab === "performance" && <PerformanceTab auditId={selected.id} />}
           </div>
         </Card>
       </div>
