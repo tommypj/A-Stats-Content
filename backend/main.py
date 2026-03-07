@@ -231,6 +231,33 @@ async def lifespan(app: FastAPI):
         _decay_alert_cleanup_loop(), name="decay-alert-cleanup"
     )
 
+    # Daily cleanup of site audit records older than 90 days
+    async def _site_audit_cleanup_loop():
+        from sqlalchemy import delete as _sa_delete
+        from infrastructure.database.models.site_audit import SiteAudit
+
+        async def _run():
+            try:
+                async with async_session_maker() as _db:
+                    cutoff = datetime.now(UTC) - timedelta(days=90)
+                    result = await _db.execute(
+                        _sa_delete(SiteAudit).where(SiteAudit.created_at < cutoff)
+                    )
+                    await _db.commit()
+                    if result.rowcount:
+                        logger.info("Site audit cleanup: deleted %d audits older than 90 days", result.rowcount)
+            except Exception as e:
+                logger.warning("Site audit cleanup failed: %s", e)
+
+        await _run()
+        while True:
+            await asyncio.sleep(86400)
+            await _run()
+
+    site_audit_cleanup_task = asyncio.create_task(
+        _site_audit_cleanup_loop(), name="site-audit-cleanup"
+    )
+
     logger.info("Application started successfully!")
 
     yield
@@ -242,6 +269,13 @@ async def lifespan(app: FastAPI):
     cleanup_task.cancel()
     try:
         await cleanup_task
+    except asyncio.CancelledError:
+        pass
+
+    # Stop site audit cleanup loop
+    site_audit_cleanup_task.cancel()
+    try:
+        await site_audit_cleanup_task
     except asyncio.CancelledError:
         pass
 
