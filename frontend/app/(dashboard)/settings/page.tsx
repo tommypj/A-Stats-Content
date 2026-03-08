@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { toast } from "sonner";
 import { api, getImageUrl, parseApiError } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
@@ -20,7 +19,6 @@ import {
   CheckCircle,
   AlertCircle,
   Trash2,
-  Upload,
   Download,
   Camera,
 } from "lucide-react";
@@ -335,61 +333,6 @@ function PasswordSection({
   );
 }
 
-// ---------------------------------------------------------------------------
-// BillingSection
-// ---------------------------------------------------------------------------
-
-interface BillingSectionProps {
-  profile: UserProfile | null;
-}
-
-function BillingSection({ profile }: BillingSectionProps) {
-  return (
-    <Card className="p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <CreditCard className="h-5 w-5 text-primary-500" />
-        <h2 className="text-lg font-display font-semibold text-text-primary">Subscription</h2>
-      </div>
-
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-surface-secondary rounded-xl">
-        <div>
-          <p className="font-medium text-text-primary capitalize">
-            {profile?.subscription_tier || "Free"} Plan
-          </p>
-          <p className="text-sm text-text-secondary capitalize">
-            Status: {profile?.subscription_status || "Active"}
-          </p>
-        </div>
-        <Link href="/settings/billing">
-          <Button variant="outline">
-            Manage Plan
-          </Button>
-        </Link>
-      </div>
-
-      <div className="mt-4 grid sm:grid-cols-3 gap-4">
-        <div className="text-center p-3 bg-surface-secondary rounded-xl">
-          <p className="text-2xl font-bold text-text-primary">
-            {profile?.articles_generated_this_month || 0}
-          </p>
-          <p className="text-xs text-text-muted">Articles This Month</p>
-        </div>
-        <div className="text-center p-3 bg-surface-secondary rounded-xl">
-          <p className="text-2xl font-bold text-text-primary">
-            {profile?.outlines_generated_this_month || 0}
-          </p>
-          <p className="text-xs text-text-muted">Outlines This Month</p>
-        </div>
-        <div className="text-center p-3 bg-surface-secondary rounded-xl">
-          <p className="text-2xl font-bold text-text-primary">
-            {profile?.images_generated_this_month || 0}
-          </p>
-          <p className="text-xs text-text-muted">Images This Month</p>
-        </div>
-      </div>
-    </Card>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // DeleteAccountDialog
@@ -627,6 +570,21 @@ export default function SettingsPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabId>(getInitialTab);
 
+  // Sync hash → activeTab after mount and on hash changes.
+  // Fixes: navigating from /settings/integrations to /settings#billing
+  // would land on "profile" because the hash wasn't readable during useState init.
+  useEffect(() => {
+    function syncHash() {
+      const hash = window.location.hash.replace("#", "") as TabId;
+      if (hash && TABS.some((t) => t.id === hash && t.id !== "integrations")) {
+        setActiveTab(hash);
+      }
+    }
+    syncHash();
+    window.addEventListener("hashchange", syncHash);
+    return () => window.removeEventListener("hashchange", syncHash);
+  }, []);
+
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -686,6 +644,10 @@ export default function SettingsPage() {
   const handleTabChange = (tab: TabId) => {
     if (tab === "integrations") {
       router.push("/settings/integrations");
+      return;
+    }
+    if (tab === "billing") {
+      router.push("/settings/billing");
       return;
     }
     setActiveTab(tab);
@@ -873,7 +835,7 @@ export default function SettingsPage() {
         />
       )}
 
-      {activeTab === "billing" && <BillingSection profile={profile} />}
+      {/* Billing tab routes to /settings/billing */}
 
       {/* Account deletion confirmation dialog */}
       <DeleteAccountDialog

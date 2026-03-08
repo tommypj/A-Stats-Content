@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { clsx } from "clsx";
 import { api, parseApiError, PlanInfo, SubscriptionStatus } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -18,7 +20,18 @@ import {
   Share2,
   Search,
   RefreshCw,
+  User,
+  Lock,
+  CreditCard,
+  Plug,
 } from "lucide-react";
+
+const TABS = [
+  { id: "profile", label: "Profile", icon: User },
+  { id: "password", label: "Password", icon: Lock },
+  { id: "billing", label: "Billing", icon: CreditCard },
+  { id: "integrations", label: "Integrations", icon: Plug },
+] as const;
 
 const tierIcons: Record<string, typeof Crown> = {
   free: Zap,
@@ -89,12 +102,22 @@ function UsageBar({ label, icon: Icon, used, limit, color }: UsageBarProps) {
 }
 
 export default function BillingPage() {
+  const router = useRouter();
   const [plans, setPlans] = useState<PlanInfo[]>([]);
   const [currentTier, setCurrentTier] = useState("free");
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">("monthly");
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
+
+  const handleTabChange = (tabId: string) => {
+    if (tabId === "billing") return;
+    if (tabId === "integrations") {
+      router.push("/settings/integrations");
+    } else {
+      router.push(`/settings#${tabId}`);
+    }
+  };
 
   useEffect(() => {
     loadBillingData();
@@ -176,10 +199,29 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="space-y-8 animate-in">
+    <div className="space-y-8 max-w-3xl animate-in">
       <div>
-        <h1 className="text-2xl font-display font-bold text-text-primary">Billing & Plans</h1>
-        <p className="mt-1 text-text-secondary">Manage your subscription and track your usage.</p>
+        <h1 className="text-2xl font-display font-bold text-text-primary">Settings</h1>
+        <p className="mt-1 text-text-secondary">Manage your account settings and preferences.</p>
+      </div>
+
+      {/* Tab bar */}
+      <div className="flex gap-1 p-1 bg-surface-secondary rounded-xl">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => handleTabChange(tab.id)}
+            className={clsx(
+              "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors",
+              tab.id === "billing"
+                ? "bg-surface text-text-primary shadow-sm"
+                : "text-text-secondary hover:text-text-primary"
+            )}
+          >
+            <tab.icon className="h-4 w-4" />
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Current plan + usage */}

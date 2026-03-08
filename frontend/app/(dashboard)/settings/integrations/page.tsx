@@ -33,8 +33,8 @@ export default function IntegrationsSettingsPage() {
 
   const handleTabChange = (tabId: string) => {
     if (tabId === "integrations") return;
-    if (tabId === "profile") {
-      router.push("/settings#profile");
+    if (tabId === "billing") {
+      router.push("/settings/billing");
     } else {
       router.push(`/settings#${tabId}`);
     }

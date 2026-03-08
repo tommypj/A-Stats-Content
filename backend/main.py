@@ -352,6 +352,35 @@ async def limit_request_body_size(request: Request, call_next):
     return await call_next(request)
 
 
+@app.exception_handler(ConnectionError)
+async def connection_error_handler(request: Request, exc: ConnectionError):
+    """Handle ConnectionError explicitly — prevents it from reaching
+    FastAPI's HTTPException handler which would crash on missing .detail/.status_code."""
+    logger.error("ConnectionError on %s %s: %s", request.method, request.url.path, str(exc)[:200])
+
+    try:
+        from infrastructure.database.connection import async_session_maker
+        async with async_session_maker() as db:
+            await log_system_exception(
+                db,
+                exc,
+                service="api",
+                endpoint=str(request.url.path),
+                http_method=request.method,
+                http_status=503,
+                severity="error",
+                ip_address=request.client.host if request.client else None,
+                user_agent=request.headers.get("user-agent"),
+            )
+    except Exception:
+        pass
+
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Service temporarily unavailable"},
+    )
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     # INFRA-05: Log full stack trace in dev only — production logs only type+message to avoid leaking internals.
