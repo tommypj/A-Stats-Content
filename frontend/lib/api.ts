@@ -253,8 +253,19 @@ export interface ApiError {
 export function parseApiError(error: unknown): ApiError {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data;
+    // Pydantic 422 errors return detail as an array of validation errors
+    let message = data?.message || error.message;
+    if (data?.detail) {
+      if (typeof data.detail === "string") {
+        message = data.detail;
+      } else if (Array.isArray(data.detail)) {
+        message = data.detail.map((e: { msg?: string }) => e.msg || String(e)).join("; ");
+      } else {
+        message = String(data.detail);
+      }
+    }
     return {
-      message: data?.detail || data?.message || error.message,
+      message,
       code: data?.code,
       details: data?.details,
     };
