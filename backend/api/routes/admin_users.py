@@ -793,10 +793,10 @@ async def list_audit_logs(
                 action=log.action,
                 target_type=log.target_type,
                 target_id=log.target_id,
-                description=log.description,
-                metadata=log.metadata,
+                description=log.action.replace("_", " ").title(),
+                metadata=log.details,
                 ip_address=log.ip_address,
-                user_agent=log.user_agent,
+                user_agent=None,
                 created_at=log.created_at,
             )
             for log in logs
