@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Sparkles,
   FileText,
@@ -19,9 +19,11 @@ import {
   Clock,
   CreditCard,
   ShieldCheck,
+  Calendar,
 } from "lucide-react";
 import PublicNav from "./PublicNav";
 import PublicFooter from "./PublicFooter";
+import { api, type BlogPostCard } from "@/lib/api";
 
 /* ───────────────────────── Scroll-reveal hook ───────────────────────── */
 
@@ -561,6 +563,26 @@ const integrations = [
 
 export default function LandingPageClient() {
   const [yearlyBilling, setYearlyBilling] = useState(false);
+  const [blogPosts, setBlogPosts] = useState<BlogPostCard[]>([]);
+  const [showStickyCta, setShowStickyCta] = useState(false);
+  const heroRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    api.blog.list({ page_size: 3 }).then((res) => {
+      if (res?.items?.length) setBlogPosts(res.items);
+    }).catch(() => {});
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    if (!heroRef.current) return;
+    const heroBottom = heroRef.current.getBoundingClientRect().bottom;
+    setShowStickyCta(heroBottom < -100);
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [handleScroll]);
 
   return (
     <div className="min-h-screen bg-surface overflow-x-hidden">
@@ -568,7 +590,7 @@ export default function LandingPageClient() {
       <PublicNav />
 
       {/* ─── 2. Hero Section ─── */}
-      <section className="pt-28 pb-20 lg:pt-36 lg:pb-28">
+      <section ref={heroRef} className="pt-28 pb-20 lg:pt-36 lg:pb-28">
         <div className="page-container">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             {/* Left — text */}
@@ -1104,6 +1126,96 @@ export default function LandingPageClient() {
         </div>
       </section>
 
+      {/* ─── 8b. From Our Blog ─── */}
+      {blogPosts.length > 0 && (
+        <section className="py-20 lg:py-28 bg-surface-secondary">
+          <div className="page-container">
+            <RevealSection className="text-center mb-12">
+              <h2 className="text-3xl md:text-4xl font-display font-bold text-text-primary">
+                From Our <span className="gradient-text">Blog</span>
+              </h2>
+              <p className="mt-4 text-text-secondary max-w-2xl mx-auto">
+                SEO tips, content strategy, and product updates from the A-Stats team.
+              </p>
+            </RevealSection>
+
+            <RevealSection>
+              <div className="grid md:grid-cols-3 gap-6">
+                {blogPosts.map((post) => (
+                  <article
+                    key={post.id}
+                    className="stagger-child card overflow-hidden group flex flex-col hover:shadow-soft-lg hover:-translate-y-1 transition-all duration-300"
+                  >
+                    <Link
+                      href={`/blog/${post.slug}`}
+                      className="block relative overflow-hidden aspect-[16/9] bg-surface-secondary flex-shrink-0"
+                    >
+                      {post.featured_image_url ? (
+                        <Image
+                          src={post.featured_image_url}
+                          alt={post.featured_image_alt || post.title}
+                          fill
+                          className="object-cover group-hover:scale-105 transition-transform duration-300"
+                          sizes="(max-width: 768px) 100vw, 33vw"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center">
+                          <span className="text-primary-300 text-4xl font-bold">A</span>
+                        </div>
+                      )}
+                      {post.category && (
+                        <span className="absolute top-3 left-3 px-2.5 py-1 bg-primary-600 text-white text-xs font-semibold rounded-full">
+                          {post.category.name}
+                        </span>
+                      )}
+                    </Link>
+                    <div className="p-5 flex flex-col flex-1">
+                      <Link href={`/blog/${post.slug}`} className="flex-1">
+                        <h3 className="text-base font-bold text-text-primary leading-snug mb-2 group-hover:text-primary-600 transition-colors line-clamp-2">
+                          {post.title}
+                        </h3>
+                      </Link>
+                      {(post.excerpt || post.meta_description) && (
+                        <p className="text-sm text-text-secondary leading-relaxed mb-3 line-clamp-2">
+                          {post.excerpt || post.meta_description}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-3 text-xs text-text-muted mt-auto pt-3 border-t border-surface-tertiary">
+                        {post.published_at && (
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {new Date(post.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                          </span>
+                        )}
+                        {post.reading_time_minutes && (
+                          <>
+                            <span className="text-surface-tertiary">&middot;</span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {post.reading_time_minutes}m read
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+
+              <div className="text-center mt-10">
+                <Link
+                  href="/blog"
+                  className="btn-secondary inline-flex items-center gap-2 text-sm"
+                >
+                  View All Posts
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </RevealSection>
+          </div>
+        </section>
+      )}
+
       {/* ─── 9. FAQ ─── */}
       <section className="py-20 lg:py-28 bg-white">
         <div className="page-container max-w-3xl">
@@ -1165,6 +1277,28 @@ export default function LandingPageClient() {
 
       {/* ─── 11. Footer ─── */}
       <PublicFooter />
+
+      {/* ─── Sticky CTA Bar ─── */}
+      <div
+        className={`fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-lg border-t border-surface-tertiary shadow-[0_-4px_20px_rgba(0,0,0,0.08)] transition-transform duration-300 ${
+          showStickyCta ? "translate-y-0" : "translate-y-full"
+        }`}
+      >
+        <div className="page-container flex items-center justify-between py-3">
+          <p className="hidden sm:block text-sm text-text-secondary">
+            <span className="font-semibold text-text-primary">Start free</span> — no credit card required
+          </p>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <Link
+              href="/register"
+              className="btn-primary text-sm px-6 py-2.5 w-full sm:w-auto text-center"
+            >
+              Get Started Free
+              <ArrowRight className="ml-2 h-4 w-4 inline" />
+            </Link>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
