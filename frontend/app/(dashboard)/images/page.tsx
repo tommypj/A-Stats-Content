@@ -21,6 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  RefreshCw,
 } from "lucide-react";
 import { api, getImageUrl, parseApiError, GeneratedImage } from "@/lib/api";
 import { toast } from "sonner";
@@ -34,6 +35,26 @@ const statusConfig = {
   completed: { label: "Completed", color: "bg-green-100 text-green-700", icon: CheckCircle2 },
   failed: { label: "Failed", color: "bg-red-100 text-red-700", icon: XCircle },
 };
+
+const IMAGE_STYLES = [
+  { value: "realistic", label: "Realistic" },
+  { value: "photographic", label: "Photographic" },
+  { value: "artistic", label: "Artistic" },
+  { value: "minimalist", label: "Minimalist" },
+  { value: "dramatic", label: "Dramatic" },
+  { value: "vintage", label: "Vintage" },
+  { value: "modern", label: "Modern" },
+  { value: "abstract", label: "Abstract" },
+  { value: "watercolor", label: "Watercolor" },
+];
+
+const IMAGE_SIZES = [
+  { value: "1024x1024", label: "Square (1024x1024)", width: 1024, height: 1024 },
+  { value: "1024x768", label: "Landscape (1024x768)", width: 1024, height: 768 },
+  { value: "768x1024", label: "Portrait (768x1024)", width: 768, height: 1024 },
+  { value: "1792x1024", label: "Wide (1792x1024)", width: 1792, height: 1024 },
+  { value: "1024x1792", label: "Tall (1024x1792)", width: 1024, height: 1792 },
+];
 
 const PAGE_SIZE = 20;
 
@@ -55,6 +76,7 @@ export default function ImagesPage() {
     return () => {
       if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
       if (wpErrorTimerRef.current) clearTimeout(wpErrorTimerRef.current);
+      if (regenPollRef.current) clearInterval(regenPollRef.current);
     };
   }, []);
 
@@ -72,6 +94,14 @@ export default function ImagesPage() {
 
   // FE-IMAGES-04: Per-image loading state for copy/download/send operations
   const [loadingImageId, setLoadingImageId] = useState<string | null>(null);
+
+  // Regenerate modal state
+  const [regenImage, setRegenImage] = useState<GeneratedImage | null>(null);
+  const [regenPrompt, setRegenPrompt] = useState("");
+  const [regenStyle, setRegenStyle] = useState("realistic");
+  const [regenSize, setRegenSize] = useState("1024x1024");
+  const [regenLoading, setRegenLoading] = useState(false);
+  const regenPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -290,6 +320,70 @@ export default function ImagesPage() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  }
+
+  function openRegenModal(image: GeneratedImage) {
+    setRegenImage(image);
+    setRegenPrompt(image.prompt);
+    setRegenStyle(image.style || "realistic");
+    // Infer size from dimensions
+    const sizeMatch = IMAGE_SIZES.find(s => s.width === image.width && s.height === image.height);
+    setRegenSize(sizeMatch?.value || "1024x1024");
+    setActiveMenu(null);
+  }
+
+  function closeRegenModal() {
+    if (regenLoading) return;
+    setRegenImage(null);
+    setRegenPrompt("");
+    if (regenPollRef.current) clearInterval(regenPollRef.current);
+  }
+
+  async function handleRegenerate() {
+    if (!regenPrompt.trim() || regenLoading) return;
+    setRegenLoading(true);
+
+    try {
+      const selectedSize = IMAGE_SIZES.find(s => s.value === regenSize);
+      const image = await api.images.generate({
+        prompt: regenPrompt.trim(),
+        style: regenStyle,
+        width: selectedSize?.width,
+        height: selectedSize?.height,
+        article_id: regenImage?.article_id || undefined,
+      });
+
+      // Poll for completion
+      let attempts = 0;
+      if (regenPollRef.current) clearInterval(regenPollRef.current);
+      regenPollRef.current = setInterval(async () => {
+        try {
+          attempts++;
+          const updated = await api.images.get(image.id);
+          if (updated.status === "completed") {
+            if (regenPollRef.current) clearInterval(regenPollRef.current);
+            regenPollRef.current = null;
+            setRegenLoading(false);
+            setRegenImage(null);
+            toast.success("New image generated!");
+            loadImages();
+          } else if (updated.status === "failed" || attempts >= 90) {
+            if (regenPollRef.current) clearInterval(regenPollRef.current);
+            regenPollRef.current = null;
+            setRegenLoading(false);
+            toast.error(updated.status === "failed" ? "Image generation failed" : "Generation timed out");
+          }
+        } catch {
+          if (regenPollRef.current) clearInterval(regenPollRef.current);
+          regenPollRef.current = null;
+          setRegenLoading(false);
+          toast.error("Failed to check generation status");
+        }
+      }, 2000);
+    } catch (err) {
+      setRegenLoading(false);
+      toast.error(parseApiError(err).message);
+    }
   }
 
   return (
@@ -560,6 +654,13 @@ export default function ImagesPage() {
                                 </button>
                               )}
                               <button
+                                onClick={() => openRegenModal(image)}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-surface-secondary"
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                                Regenerate
+                              </button>
+                              <button
                                 onClick={() => handleDelete(image.id)}
                                 className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 border-t border-surface-tertiary"
                               >
@@ -713,6 +814,14 @@ export default function ImagesPage() {
                     <Download className="h-4 w-4 mr-2" />
                     Download
                   </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => { setSelectedImage(null); openRegenModal(selectedImage); }}
+                    className="flex-1"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Regenerate
+                  </Button>
                   {wpConnected && (
                     <Button
                       variant="outline"
@@ -735,6 +844,119 @@ export default function ImagesPage() {
                   <p className="text-sm text-red-600 mt-2">{wpError}</p>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Regenerate Modal */}
+      {regenImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={closeRegenModal} />
+          <div className="relative bg-surface rounded-2xl shadow-xl max-w-lg w-full overflow-hidden">
+            <div className="border-b border-surface-tertiary p-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <RefreshCw className="h-4 w-4 text-primary-600" />
+                <h3 className="font-medium text-text-primary">Regenerate Image</h3>
+              </div>
+              <button
+                onClick={closeRegenModal}
+                disabled={regenLoading}
+                className="p-1.5 rounded-lg hover:bg-surface-secondary disabled:opacity-50"
+              >
+                <X className="h-4 w-4 text-text-muted" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Original image thumbnail */}
+              {regenImage.url && (
+                <div className="relative h-32 bg-surface-secondary rounded-lg overflow-hidden">
+                  <Image
+                    src={getImageUrl(regenImage.url)}
+                    alt={regenImage.alt_text || regenImage.prompt}
+                    fill
+                    className="object-contain"
+                    sizes="480px"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                  Prompt
+                </label>
+                <textarea
+                  value={regenPrompt}
+                  onChange={(e) => setRegenPrompt(e.target.value)}
+                  rows={3}
+                  disabled={regenLoading}
+                  className="w-full px-3 py-2 rounded-lg border border-surface-tertiary text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 disabled:opacity-50 resize-none"
+                  placeholder="Describe the image..."
+                />
+                <p className="text-xs text-text-muted mt-1">
+                  Edit the prompt to change the generated image
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                    Style
+                  </label>
+                  <select
+                    value={regenStyle}
+                    onChange={(e) => setRegenStyle(e.target.value)}
+                    disabled={regenLoading}
+                    className="w-full px-3 py-2 rounded-lg border border-surface-tertiary text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 disabled:opacity-50"
+                  >
+                    {IMAGE_STYLES.map((s) => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                    Size
+                  </label>
+                  <select
+                    value={regenSize}
+                    onChange={(e) => setRegenSize(e.target.value)}
+                    disabled={regenLoading}
+                    className="w-full px-3 py-2 rounded-lg border border-surface-tertiary text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 disabled:opacity-50"
+                  >
+                    {IMAGE_SIZES.map((s) => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-surface-tertiary p-4 flex items-center justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={closeRegenModal}
+                disabled={regenLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleRegenerate}
+                disabled={regenLoading || !regenPrompt.trim()}
+              >
+                {regenLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Generate New Image
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </div>
