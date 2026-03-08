@@ -665,9 +665,8 @@ export const api = {
       }),
     handleCallback: (code: string, state: string) =>
       apiRequest<void>({
-        method: "POST",
-        url: "/analytics/gsc/callback",
-        data: { code, state },
+        method: "GET",
+        url: `/analytics/gsc/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`,
       }),
     status: () =>
       apiRequest<GSCStatus>({
