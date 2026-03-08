@@ -191,6 +191,9 @@ class Settings(BaseSettings):
     # Frontend URL (for email links)
     frontend_url: str = "http://localhost:3000"
 
+    # Backend API base URL (for permanent image URLs served via /uploads/)
+    api_base_url: str = "http://localhost:8000"
+
     # Cookie domain (optional — set to share cookies across subdomains, e.g. ".example.com")
     cookie_domain: str | None = None
 

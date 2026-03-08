@@ -200,9 +200,7 @@ class LocalStorageAdapter(StorageAdapter):
         Returns:
             Public URL (served by the backend)
         """
-        # In development, this would be served by the backend API
-        # In production, might be served by Nginx/CDN
-        api_base = settings.frontend_url.replace(":3000", ":8000")
+        api_base = settings.api_base_url.rstrip("/")
         return f"{api_base}/uploads/{path}"
 
 

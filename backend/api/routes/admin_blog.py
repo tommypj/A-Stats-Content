@@ -20,6 +20,7 @@ from sqlalchemy.orm import selectinload
 from api.deps_admin import get_current_admin_user
 from api.middleware.rate_limit import limiter
 from api.routes.blog import _post_to_detail as _public_post_to_detail
+from adapters.storage.image_storage import download_image, get_storage_adapter
 from api.schemas.blog import (
     AdminBlogCategoryCreate,
     AdminBlogCategoryUpdate,
@@ -44,6 +45,7 @@ from infrastructure.database.models.blog import (
 )
 from infrastructure.database.models.content import Article, GeneratedImage
 from infrastructure.database.models.user import User
+from infrastructure.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +55,13 @@ router = APIRouter(prefix="/admin/blog", tags=["Admin - Blog"])
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _get_permanent_image_url(image: GeneratedImage) -> str | None:
+    """Get a permanent URL for a GeneratedImage, preferring local storage over Replicate."""
+    if image.local_path:
+        return f"{settings.api_base_url.rstrip('/')}/uploads/{image.local_path}"
+    return image.url  # fallback to external URL (may expire)
 
 
 def _slugify(text: str) -> str:
@@ -673,8 +682,8 @@ async def admin_post_from_article(
             )
         )
         img = img_result.scalar_one_or_none()
-        if img and img.url:
-            featured_img_url = img.url
+        if img:
+            featured_img_url = _get_permanent_image_url(img)
             featured_img_alt = img.alt_text or article.title
 
     # Generate unique slug
@@ -719,3 +728,89 @@ async def admin_post_from_article(
         "article_id": body.article_id,
     })
     return _post_to_detail(post)
+
+
+# ---------------------------------------------------------------------------
+# Persist Blog Images (fix expired Replicate URLs)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/posts/persist-images")
+@limiter.limit("5/minute")
+async def admin_persist_blog_images(
+    request: Request,
+    admin_user: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Download and permanently store all blog post featured images that use
+    temporary external URLs (e.g. Replicate). Updates the blog post records
+    to point to the permanent backend-hosted URL.
+    """
+    storage = get_storage_adapter()
+    api_base = settings.api_base_url.rstrip("/")
+
+    # Find blog posts with external featured_image_url (not already on our backend)
+    result = await db.execute(
+        select(BlogPost).where(
+            BlogPost.featured_image_url.isnot(None),
+            BlogPost.featured_image_url != "",
+            ~BlogPost.featured_image_url.startswith(api_base),
+            BlogPost.deleted_at.is_(None),
+        )
+    )
+    posts = result.scalars().all()
+
+    persisted = 0
+    failed = 0
+    already_local = 0
+
+    for post in posts:
+        url = post.featured_image_url
+        if not url:
+            continue
+
+        # Check if there's already a local copy via GeneratedImage
+        # (search by the same Replicate URL)
+        img_result = await db.execute(
+            select(GeneratedImage).where(
+                GeneratedImage.url == url,
+                GeneratedImage.local_path.isnot(None),
+            ).limit(1)
+        )
+        existing_img = img_result.scalar_one_or_none()
+
+        if existing_img and existing_img.local_path:
+            # Use existing permanent copy
+            post.featured_image_url = f"{api_base}/uploads/{existing_img.local_path}"
+            persisted += 1
+            already_local += 1
+            continue
+
+        # Try to download and store permanently
+        try:
+            image_data = await download_image(url)
+            slug_part = (post.slug or "blog")[:40]
+            filename = f"blog_{slug_part}.png"
+            local_path = await storage.save_image(image_data, filename)
+            post.featured_image_url = f"{api_base}/uploads/{local_path}"
+            persisted += 1
+        except Exception as e:
+            logger.warning("Failed to persist image for blog post %s: %s", post.id, str(e)[:200])
+            failed += 1
+
+    await db.commit()
+
+    await _log_audit(db, admin_user, "blog_persist_images", None, {
+        "total_found": len(posts),
+        "persisted": persisted,
+        "already_local": already_local,
+        "failed": failed,
+    })
+
+    return {
+        "total_found": len(posts),
+        "persisted": persisted,
+        "already_local": already_local,
+        "failed": failed,
+    }
