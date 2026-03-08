@@ -10,28 +10,29 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Mail, CheckCircle, XCircle, Clock, Building2, Shield, User as UserIcon, Eye, Crown } from "lucide-react";
+import { Mail, CheckCircle, XCircle, Clock, Building2, Shield, User as UserIcon, Eye, Crown, Pencil } from "lucide-react";
 
 type InvitationInfo = ProjectInvitationPublic;
 
-const roleIcons = {
+const roleIcons: Record<string, typeof Crown> = {
   owner: Crown,
   admin: Shield,
+  editor: Pencil,
   member: UserIcon,
   viewer: Eye,
 };
 
-const roleColors = {
+const roleColors: Record<string, string> = {
   owner: "bg-yellow-100 text-yellow-800",
   admin: "bg-purple-100 text-purple-800",
-  member: "bg-blue-100 text-blue-800",
+  editor: "bg-green-100 text-green-800",
   viewer: "bg-gray-100 text-gray-800",
 };
 
-const roleDescriptions = {
+const roleDescriptions: Record<string, string> = {
   owner: "Full control over project settings and billing",
   admin: "Can manage project members and settings",
-  member: "Can create and manage content",
+  editor: "Can create and manage content",
   viewer: "Can view project content only",
 };
 

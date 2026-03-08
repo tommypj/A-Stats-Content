@@ -45,11 +45,11 @@ export default function AccountsPage() {
   const handleConnect = async (platform: SocialPlatform) => {
     // Prevent duplicate connections — warn if an active account already exists
     const existing = accounts.find(
-      (a) => a.platform === platform && a.is_connected
+      (a) => a.platform === platform && a.is_active
     );
     if (existing) {
       setError(
-        `A ${platform} account (@${existing.username || existing.display_name}) is already connected. Disconnect it first to reconnect.`
+        `A ${platform} account (@${existing.platform_username || existing.platform_display_name}) is already connected. Disconnect it first to reconnect.`
       );
       return;
     }

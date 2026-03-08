@@ -16,6 +16,7 @@ import {
   Shield,
   User as UserIcon,
   Eye,
+  Pencil,
   Building2,
   ArrowRight,
   Loader2,
@@ -23,16 +24,18 @@ import {
 import Image from "next/image";
 
 
-const roleIcons = {
+const roleIcons: Record<string, typeof Crown> = {
   owner: Crown,
   admin: Shield,
+  editor: Pencil,
   member: UserIcon,
   viewer: Eye,
 };
 
-const roleColors = {
+const roleColors: Record<string, string> = {
   owner: "text-yellow-600",
   admin: "text-purple-600",
+  editor: "text-green-600",
   member: "text-blue-600",
   viewer: "text-text-secondary",
 };

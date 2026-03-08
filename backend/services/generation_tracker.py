@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from infrastructure.database.models.generation import AdminAlert, GenerationLog
+from services.error_logger import log_error
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +143,42 @@ class GenerationTracker:
             project_id=log.project_id,
         )
         self.db.add(alert)
-        await self.db.flush()
+
+        # Also log to centralized system error log (no auto-commit — caller manages transaction)
+        await log_error(
+            self.db,
+            error_type=self._extract_error_type(error_message),
+            title=f"{log.resource_type.capitalize()} generation failed",
+            message=error_message,
+            severity="error",
+            service=f"{log.resource_type}_generation",
+            resource_type=log.resource_type,
+            resource_id=log.resource_id,
+            user_id=log.user_id,
+            project_id=log.project_id,
+            auto_commit=False,
+        )
+
+    @staticmethod
+    def _extract_error_type(error_message: str | None) -> str:
+        """Extract a meaningful error type from the error message."""
+        if not error_message:
+            return "UnknownError"
+        msg = error_message.strip()
+        # Common provider error patterns
+        for prefix in ("ReplicateError", "OpenAIError", "GoogleAPIError",
+                        "AnthropicError", "ValidationError", "TimeoutError",
+                        "ConnectionError", "HTTPError"):
+            if prefix in msg:
+                return prefix
+        # Check for HTTP status patterns
+        if "422" in msg[:20]:
+            return "ValidationError"
+        if "429" in msg[:20]:
+            return "RateLimitError"
+        if "500" in msg[:20] or "502" in msg[:20] or "503" in msg[:20]:
+            return "ServerError"
+        return "GenerationError"
 
     async def check_limit(
         self,

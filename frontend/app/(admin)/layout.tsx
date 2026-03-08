@@ -22,6 +22,7 @@ import {
   Bell,
   Rss,
   Tag,
+  Bug,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { api } from "@/lib/api";
@@ -51,6 +52,7 @@ const navigation = [
   { name: "Analytics", href: "/admin/analytics", icon: BarChart3 },
   { name: "Audit Logs", href: "/admin/audit-logs", icon: FileSearch },
   { name: "Generations", href: "/admin/generations", icon: Sparkles },
+  { name: "Error Logs", href: "/admin/error-logs", icon: Bug },
   { name: "Alerts", href: "/admin/alerts", icon: Bell },
 ];
 

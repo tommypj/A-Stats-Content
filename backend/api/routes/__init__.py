@@ -6,6 +6,7 @@ from .admin_alerts import router as admin_alerts_router
 from .admin_analytics import router as admin_analytics_router
 from .admin_blog import router as admin_blog_router
 from .admin_content import router as admin_content_router
+from .admin_error_logs import router as admin_error_logs_router
 from .admin_generations import router as admin_generations_router
 from .admin_users import router as admin_users_router
 from .agency import router as agency_router
@@ -49,6 +50,7 @@ api_router.include_router(admin_content_router)
 api_router.include_router(admin_users_router)
 api_router.include_router(admin_generations_router)
 api_router.include_router(admin_alerts_router)
+api_router.include_router(admin_error_logs_router)
 api_router.include_router(project_invitations_router)
 api_router.include_router(projects_router)
 api_router.include_router(notifications_router)

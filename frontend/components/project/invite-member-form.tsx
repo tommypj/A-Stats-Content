@@ -14,14 +14,14 @@ interface InviteMemberFormProps {
 
 const roleOptions = [
   { value: "admin" as ProjectRole, label: "Admin", icon: Shield, description: "Can manage project members and settings" },
-  { value: "member" as ProjectRole, label: "Member", icon: UserIcon, description: "Can create and manage content" },
+  { value: "editor" as ProjectRole, label: "Member", icon: UserIcon, description: "Can create and manage content" },
   { value: "viewer" as ProjectRole, label: "Viewer", icon: Eye, description: "Can view project content only" },
 ];
 
 export function InviteMemberForm({ onInvite }: InviteMemberFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<ProjectRole>("member");
+  const [role, setRole] = useState<ProjectRole>("editor");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +35,7 @@ export function InviteMemberForm({ onInvite }: InviteMemberFormProps) {
     try {
       await onInvite({ email: email.trim(), role });
       setEmail("");
-      setRole("member");
+      setRole("editor");
     } finally {
       setIsLoading(false);
     }

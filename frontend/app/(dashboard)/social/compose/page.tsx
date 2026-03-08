@@ -89,7 +89,7 @@ export default function ComposePage() {
     try {
       setLoading(true);
       const res = await api.social.accounts();
-      const connected = res.accounts.filter((a) => a.is_connected);
+      const connected = res.accounts.filter((a) => a.is_active);
       setAccounts(connected);
 
       // Restore draft account selection, or auto-select all connected

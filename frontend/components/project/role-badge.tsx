@@ -1,6 +1,6 @@
 import { clsx } from "clsx";
 import type { ProjectRole } from "@/lib/api";
-import { Crown, Shield, Users, Eye } from "lucide-react";
+import { Crown, Shield, Pencil, Eye } from "lucide-react";
 
 interface RoleBadgeProps {
   role: ProjectRole;
@@ -26,10 +26,10 @@ const roleConfig: Record<
     icon: Shield,
     colorClasses: "bg-purple-100 text-purple-700 border-purple-200",
   },
-  member: {
-    label: "Member",
-    icon: Users,
-    colorClasses: "bg-blue-100 text-blue-700 border-blue-200",
+  editor: {
+    label: "Editor",
+    icon: Pencil,
+    colorClasses: "bg-green-100 text-green-700 border-green-200",
   },
   viewer: {
     label: "Viewer",

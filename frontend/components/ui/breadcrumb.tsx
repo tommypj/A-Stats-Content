@@ -32,6 +32,7 @@ const PATH_LABELS: Record<string, string> = {
   keywords: "Keywords",
   pages: "Pages",
   opportunities: "Opportunities",
+  "error-logs": "Error Logs",
   "content-health": "Content Health",
   aeo: "AEO Scores",
   revenue: "Revenue",

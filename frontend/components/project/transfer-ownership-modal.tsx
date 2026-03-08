@@ -27,7 +27,7 @@ export function TransferOwnershipModal({
 
   // Filter out owner and viewers
   const eligibleMembers = members.filter(
-    (m) => m.role === "admin" || m.role === "member"
+    (m) => m.role === "admin" || m.role === "editor"
   );
 
   const handleTransfer = () => {

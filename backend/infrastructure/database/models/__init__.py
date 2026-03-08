@@ -21,6 +21,7 @@ from .report import SEOReport
 from .tag import ArticleTag, OutlineTag, Tag
 from .template import ArticleTemplate
 from .content import Article, ArticleRevision, ContentStatus, ContentTone, GeneratedImage, Outline
+from .error_log import SystemErrorLog
 from .generation import AdminAlert, GenerationLog
 from .keyword_cache import KeywordResearchCache
 from .knowledge import KnowledgeChunk, KnowledgeQuery, KnowledgeSource, SourceStatus
@@ -100,4 +101,5 @@ __all__ = [
     "Tag",
     "ArticleTag",
     "OutlineTag",
+    "SystemErrorLog",
 ]

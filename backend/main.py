@@ -21,6 +21,7 @@ from api.routes import api_router
 from infrastructure.config import get_settings
 from infrastructure.database import close_db, init_db
 from infrastructure.logging_config import setup_logging
+from services.error_logger import log_exception as log_system_exception
 from services.post_queue import post_queue
 from services.social_scheduler import scheduler_service
 from services.task_queue import task_queue
@@ -359,6 +360,26 @@ async def global_exception_handler(request: Request, exc: Exception):
         logger.error("Unhandled exception: %s: %s", type(exc).__name__, str(exc)[:200])
     else:
         logger.error("Unhandled exception: %s", str(exc), exc_info=True)
+
+    # Log to system error log for admin dashboard visibility
+    try:
+        from infrastructure.database.connection import async_session_maker
+        async with async_session_maker() as db:
+            await log_system_exception(
+                db,
+                exc,
+                service="api",
+                endpoint=str(request.url.path),
+                http_method=request.method,
+                http_status=500,
+                severity="critical",
+                ip_address=request.client.host if request.client else None,
+                user_agent=request.headers.get("user-agent"),
+            )
+    except Exception:
+        # Never let error logging prevent the response
+        pass
+
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error"},

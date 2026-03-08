@@ -22,7 +22,7 @@ export interface ProjectPermissions {
   hasMinRole: (minRole: ProjectRole) => boolean;
 }
 
-const roleHierarchy: ProjectRole[] = ["viewer", "member", "admin", "owner"];
+const roleHierarchy: ProjectRole[] = ["viewer", "editor", "admin", "owner"];
 
 function getRoleLevel(role: ProjectRole): number {
   return roleHierarchy.indexOf(role);
@@ -36,7 +36,7 @@ export function useProjectPermissions(): ProjectPermissions {
   // Role checks
   const isOwner = currentRole === "owner";
   const isAdmin = currentRole === "admin" || isOwner;
-  const isMember = currentRole === "member" || isAdmin;
+  const isMember = currentRole === "editor" || isAdmin;
   const isViewer = currentRole === "viewer";
 
   // Permission checks

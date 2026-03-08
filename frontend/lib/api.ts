@@ -1156,6 +1156,31 @@ export const api = {
           url: "/admin/generations/stats",
         }),
     },
+    errorLogs: {
+      list: (params?: AdminErrorLogQueryParams) =>
+        apiRequest<AdminErrorLogListResponse>({
+          url: "/admin/error-logs",
+          params,
+        }),
+      get: (id: string) =>
+        apiRequest<AdminErrorLog>({
+          url: `/admin/error-logs/${id}`,
+        }),
+      stats: () =>
+        apiRequest<AdminErrorStats>({
+          url: "/admin/error-logs/stats",
+        }),
+      update: (id: string, data: { is_resolved: boolean; resolution_notes?: string | null }) =>
+        apiRequest<AdminErrorLog>({
+          method: "PUT",
+          url: `/admin/error-logs/${id}`,
+          data,
+        }),
+      filterOptions: () =>
+        apiRequest<AdminErrorFilterOptions>({
+          url: "/admin/error-logs/filters/options",
+        }),
+    },
     alerts: {
       list: (params?: AdminAlertQueryParams) =>
         apiRequest<AdminAlertListResponse>({
@@ -3259,6 +3284,100 @@ export interface AdminAlertListResponse {
 export interface AdminAlertCount {
   unread_count: number;
   critical_count: number;
+}
+
+// --- Admin Error Logs ---
+
+export interface AdminErrorLogQueryParams {
+  page?: number;
+  page_size?: number;
+  severity?: string;
+  error_type?: string;
+  service?: string;
+  is_resolved?: boolean;
+  search?: string;
+}
+
+export interface AdminErrorLog {
+  id: string;
+  error_type: string;
+  error_code: string | null;
+  severity: string;
+  title: string;
+  message: string | null;
+  stack_trace: string | null;
+  service: string | null;
+  endpoint: string | null;
+  http_method: string | null;
+  http_status: number | null;
+  request_id: string | null;
+  user_id: string | null;
+  project_id: string | null;
+  resource_type: string | null;
+  resource_id: string | null;
+  context: Record<string, unknown> | null;
+  user_agent: string | null;
+  ip_address: string | null;
+  occurrence_count: number;
+  first_seen_at: string;
+  last_seen_at: string;
+  is_resolved: boolean;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  resolution_notes: string | null;
+  error_fingerprint: string | null;
+  created_at: string;
+  user_email: string | null;
+  user_name: string | null;
+  resolver_email: string | null;
+  resolver_name: string | null;
+}
+
+export interface AdminErrorLogListResponse {
+  items: AdminErrorLog[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+export interface AdminErrorTypeStat {
+  error_type: string;
+  count: number;
+  latest: string;
+}
+
+export interface AdminErrorServiceStat {
+  service: string;
+  count: number;
+  latest: string;
+}
+
+export interface AdminErrorTrend {
+  date: string;
+  count: number;
+  critical: number;
+  error: number;
+  warning: number;
+}
+
+export interface AdminErrorStats {
+  total_errors: number;
+  unresolved_errors: number;
+  critical_errors: number;
+  errors_today: number;
+  errors_this_week: number;
+  errors_this_month: number;
+  by_type: AdminErrorTypeStat[];
+  by_service: AdminErrorServiceStat[];
+  daily_trend: AdminErrorTrend[];
+  top_recurring: AdminErrorLog[];
+}
+
+export interface AdminErrorFilterOptions {
+  error_types: string[];
+  services: string[];
+  severities: string[];
 }
 
 // Projects (Multi-tenancy) types

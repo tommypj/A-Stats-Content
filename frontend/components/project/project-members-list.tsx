@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Trash2, Crown, Shield, User as UserIcon, Eye } from "lucide-react";
+import { Trash2, Crown, Shield, Pencil, User as UserIcon, Eye } from "lucide-react";
 import { format } from "date-fns";
 
 interface ProjectMembersListProps {
@@ -16,17 +16,17 @@ interface ProjectMembersListProps {
   onRemove: (userId: string, memberName: string) => Promise<void>;
 }
 
-const roleIcons = {
+const roleIcons: Record<string, typeof Crown> = {
   owner: Crown,
   admin: Shield,
-  member: UserIcon,
+  editor: Pencil,
   viewer: Eye,
 };
 
-const roleColors = {
+const roleColors: Record<string, string> = {
   owner: "bg-yellow-100 text-yellow-800 border-yellow-300",
   admin: "bg-purple-100 text-purple-800 border-purple-300",
-  member: "bg-blue-100 text-blue-800 border-blue-300",
+  editor: "bg-green-100 text-green-800 border-green-300",
   viewer: "bg-surface-tertiary text-text-primary border-surface-tertiary",
 };
 
@@ -128,7 +128,7 @@ export function ProjectMembersList({ members, myRole, onUpdateRole, onRemove }: 
                     className="px-3 py-1.5 rounded-lg border border-surface-tertiary bg-surface text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
                   >
                     <option value="admin">Admin</option>
-                    <option value="member">Member</option>
+                    <option value="editor">Editor</option>
                     <option value="viewer">Viewer</option>
                   </select>
                 ) : (
