@@ -133,7 +133,7 @@ export default function NotificationsSettingsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl animate-in">
+    <div className="space-y-6 max-w-4xl mx-auto animate-in">
       <div>
         <h1 className="text-2xl font-display font-bold text-text-primary">Settings</h1>
         <p className="mt-1 text-text-secondary">Manage your account settings and preferences.</p>

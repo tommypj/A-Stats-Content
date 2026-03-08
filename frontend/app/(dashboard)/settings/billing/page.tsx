@@ -201,7 +201,7 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="space-y-8 animate-in">
+    <div className="space-y-8 max-w-5xl mx-auto animate-in">
       <div>
         <h1 className="text-2xl font-display font-bold text-text-primary">Settings</h1>
         <p className="mt-1 text-text-secondary">Manage your account settings and preferences.</p>
