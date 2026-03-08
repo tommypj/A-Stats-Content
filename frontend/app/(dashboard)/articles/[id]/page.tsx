@@ -773,6 +773,9 @@ export default function ArticleEditorPage() {
   const [aeoScore, setAeoScore] = useState<AEOScore | null>(null);
   const [aeoLoading, setAeoLoading] = useState(false);
 
+  // Sidebar tab state
+  const [sidebarTab, setSidebarTab] = useState<"overview" | "seo" | "aeo" | "history">("overview");
+
   // Confirmation dialog state
   const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string; confirmLabel?: string; variant?: "danger" | "warning" | "default" } | null>(null);
 
@@ -1657,435 +1660,458 @@ export default function ArticleEditorPage() {
           </Card>
         </div>
 
-        {/* SEO Sidebar */}
-        <div className="space-y-4 min-w-0">
-          {/* Word Count Widget */}
-          <WordCountWidget
-            content={content}
-            target={wordCountTarget}
-            onTargetChange={setWordCountTarget}
-          />
-
-          {/* SERP Preview */}
-          <SerpPreview
-            title={title}
-            slug={article.slug || article.title?.toLowerCase().replace(/\s+/g, "-") || "article"}
-            metaDescription={metaDescription}
-            keyword={keyword}
-          />
-
-          {/* SEO Score — live as-you-type, refresh button stores to backend */}
-          <LiveSeoPanel
-            seoScore={liveSeoScore}
-            onRefresh={handleAnalyzeSeo}
-            refreshing={analyzingSeo}
-          />
-
-          {/* AEO Score */}
-          <Card className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-medium text-text-primary flex items-center gap-1.5">
-                <Zap className="h-4 w-4 text-purple-500" />
-                AEO Score
-              </h3>
-              <Button variant="ghost" size="sm" onClick={handleRefreshAeo} disabled={aeoLoading}>
-                <RefreshCw className={`h-4 w-4 ${aeoLoading ? "animate-spin" : ""}`} />
-              </Button>
+        {/* Sidebar — tabbed panels */}
+        <div className="min-w-0">
+          <div className="lg:sticky lg:top-20 space-y-4">
+            {/* Tab bar */}
+            <div className="flex rounded-xl bg-surface-secondary border border-surface-tertiary p-1">
+              {([
+                { key: "overview", label: "Overview" },
+                { key: "seo", label: "SEO" },
+                { key: "aeo", label: "AEO" },
+                { key: "history", label: "History" },
+              ] as const).map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setSidebarTab(tab.key)}
+                  className={clsx(
+                    "flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                    sidebarTab === tab.key
+                      ? "bg-surface text-text-primary shadow-sm"
+                      : "text-text-muted hover:text-text-secondary"
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
 
-            {aeoScore ? (
-              <div>
-                <div className="text-center mb-3">
-                  <div className={clsx(
-                    "inline-flex items-center justify-center w-20 h-20 rounded-full text-2xl font-bold",
-                    aeoScore.aeo_score >= 80 ? "bg-green-100 text-green-700" :
-                    aeoScore.aeo_score >= 50 ? "bg-yellow-100 text-yellow-700" :
-                    "bg-red-100 text-red-700"
-                  )}>
-                    {aeoScore.aeo_score}
-                  </div>
-                  <p className="text-sm text-text-secondary mt-2">
-                    {aeoScore.aeo_score >= 80 ? "Great AI readability!" :
-                     aeoScore.aeo_score >= 50 ? "Good, can be improved" :
-                     "Needs improvement"}
-                  </p>
-                  {aeoScore.previous_score !== null && aeoScore.previous_score !== undefined && (
-                    <p className="text-xs text-text-muted mt-1">
-                      Previous: {aeoScore.previous_score}
-                    </p>
-                  )}
-                </div>
+            {/* Tab content */}
+            <div className="space-y-4">
+              {/* ── Overview Tab ── */}
+              {sidebarTab === "overview" && (
+                <>
+                  <WordCountWidget
+                    content={content}
+                    target={wordCountTarget}
+                    onTargetChange={setWordCountTarget}
+                  />
 
-                {aeoScore.score_breakdown && (
-                  <div className="space-y-2 text-sm">
-                    {Object.entries(aeoScore.score_breakdown).map(([key, value]) => {
-                      const max = key === "entity_score" || key === "citation_readiness" ? 15 : key === "schema_score" ? 10 : 20;
-                      const pct = Math.round((Number(value) / max) * 100);
-                      return (
-                        <div key={key} className="space-y-1">
-                          <div className="flex justify-between text-xs">
-                            <span className="text-text-secondary capitalize">{key.replace(/_/g, " ")}</span>
-                            <span className="text-text-primary font-medium">{value}/{max}</span>
-                          </div>
-                          <div className="h-1.5 bg-surface-secondary rounded-full overflow-hidden">
-                            <div
-                              className={clsx(
-                                "h-full rounded-full",
-                                pct >= 70 ? "bg-green-500" : pct >= 40 ? "bg-yellow-500" : "bg-red-500"
-                              )}
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                  <SerpPreview
+                    title={title}
+                    slug={article.slug || article.title?.toLowerCase().replace(/\s+/g, "-") || "article"}
+                    metaDescription={metaDescription}
+                    keyword={keyword}
+                  />
 
-                {aeoScore.suggestions && aeoScore.suggestions.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-surface-tertiary">
-                    <p className="text-xs font-semibold text-text-secondary mb-2">Suggestions</p>
-                    <ul className="space-y-1.5">
-                      {aeoScore.suggestions.slice(0, 3).map((s, i) => (
-                        <li key={i} className="text-xs text-text-secondary flex items-start gap-1.5">
-                          <span className="text-primary-500 mt-0.5 shrink-0">•</span>
-                          <span className="break-words min-w-0">{typeof s === "string" ? s : s.action || s.description}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-4">
-                <p className="text-sm text-text-muted">
-                  {aeoLoading ? "Calculating..." : "Click refresh to calculate AEO score"}
-                </p>
-              </div>
-            )}
-          </Card>
-
-          {/* AI Answer Preview */}
-          <AiAnswerPreview
-            title={title}
-            content={content}
-            keyword={keyword}
-            url={article?.published_url ?? undefined}
-          />
-
-          {/* SEO Analysis Details */}
-          {seo && (
-            <Card className="p-4">
-              <h3 className="font-medium text-text-primary mb-3">SEO Analysis</h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-text-secondary">Keyword Density</span>
-                  <span className={clsx(
-                    "font-medium",
-                    seo.keyword_density >= 1 && seo.keyword_density <= 3
-                      ? "text-green-600"
-                      : "text-yellow-600"
-                  )}>
-                    {seo.keyword_density.toFixed(1)}%
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-text-secondary">Title Has Keyword</span>
-                  {seo.title_has_keyword ? (
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                  ) : (
-                    <AlertCircle className="h-4 w-4 text-yellow-600" />
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-text-secondary">Meta Description</span>
-                  <span className={clsx(
-                    "font-medium",
-                    seo.meta_description_length >= 120 && seo.meta_description_length <= 160
-                      ? "text-green-600"
-                      : "text-yellow-600"
-                  )}>
-                    {seo.meta_description_length} chars
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-text-secondary">Headings</span>
-                  <span className="text-text-primary">
-                    {seo.h2_count} H2, {seo.h3_count} H3
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-text-secondary">Links</span>
-                  <span className="text-text-primary">
-                    {seo.internal_links} internal, {seo.external_links} external
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-text-secondary">Readability</span>
-                  <span className={clsx(
-                    "font-medium",
-                    seo.readability_score >= 60 ? "text-green-600" : "text-yellow-600"
-                  )}>
-                    {seo.readability_score.toFixed(0)}
-                  </span>
-                </div>
-              </div>
-            </Card>
-          )}
-
-          {/* Suggestions */}
-          {seo?.suggestions && seo.suggestions.length > 0 && (
-            <Card className="p-4">
-              <h3 className="font-medium text-text-primary mb-3">Suggestions</h3>
-              <ul className="space-y-2">
-                {seo.suggestions.map((suggestion) => (
-                  <li key={suggestion} className="flex items-start gap-2 text-sm text-text-secondary">
-                    <AlertCircle className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
-                    <span className="break-words min-w-0">{suggestion}</span>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
-
-          {/* Structured Data Preview */}
-          <StructuredDataPreview schemas={article.schemas} />
-
-          {/* Quick Actions */}
-          <Card className="p-4">
-            <h3 className="font-medium text-text-primary mb-3">Quick Actions</h3>
-            <div className="space-y-2">
-              <button
-                onClick={() => copyToClipboard(content)}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-secondary hover:bg-surface-secondary transition-colors"
-              >
-                <Copy className="h-4 w-4" />
-                Copy Content
-              </button>
-              <button
-                onClick={() => copyToClipboard(article.content_html || "")}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-secondary hover:bg-surface-secondary transition-colors"
-              >
-                <Code className="h-4 w-4" />
-                Copy HTML
-              </button>
-              <button
-                onClick={handleDelete}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition-colors"
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete Article
-              </button>
-            </div>
-          </Card>
-
-          {/* Version History */}
-          <Card className="p-4">
-            <button
-              type="button"
-              onClick={handleToggleVersionHistory}
-              className="w-full flex items-center justify-between text-left"
-            >
-              <div className="flex items-center gap-2">
-                <History className="h-4 w-4 text-text-secondary" />
-                <span className="font-medium text-text-primary text-sm">Version History</span>
-                {revisionsTotal > 0 && (
-                  <span className="text-xs text-text-muted bg-surface-secondary px-1.5 py-0.5 rounded-full">
-                    {revisionsTotal}
-                  </span>
-                )}
-              </div>
-              {showVersionHistory ? (
-                <ChevronUp className="h-4 w-4 text-text-muted" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-text-muted" />
-              )}
-            </button>
-
-            {showVersionHistory && (
-              <div className="mt-3 space-y-2">
-                {loadingRevisions ? (
-                  <div className="flex items-center justify-center py-4">
-                    <Loader2 className="h-4 w-4 animate-spin text-text-muted" />
-                  </div>
-                ) : revisions.length === 0 ? (
-                  <p className="text-xs text-text-muted text-center py-3">
-                    No saved versions yet. Versions are saved automatically before AI improvements and manual edits.
-                  </p>
-                ) : (
-                  <>
-                    {revisions.map((rev) => (
-                      <div
-                        key={rev.id}
-                        className={clsx(
-                          "rounded-lg border p-2.5 transition-colors",
-                          previewRevision?.id === rev.id
-                            ? "border-primary-300 bg-primary-50"
-                            : "border-surface-tertiary bg-surface hover:bg-surface-secondary"
-                        )}
+                  {/* Quick Actions */}
+                  <Card className="p-4">
+                    <h3 className="font-medium text-text-primary mb-3">Quick Actions</h3>
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => copyToClipboard(content)}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-secondary hover:bg-surface-secondary transition-colors"
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="text-xs font-medium text-text-primary truncate">
-                              {formatRevisionType(rev.revision_type)}
-                            </p>
-                            <p className="text-xs text-text-muted mt-0.5">
-                              {new Date(rev.created_at).toLocaleString(undefined, {
-                                month: "short",
-                                day: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                              {" · "}
-                              {rev.word_count.toLocaleString()} words
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            title="Restore this version"
-                            aria-label="Restore this version"
-                            onClick={() => handleRestoreRevision(rev.id)}
-                            disabled={restoringRevisionId === rev.id}
-                            className="flex-shrink-0 p-1 rounded hover:bg-surface-tertiary text-text-muted hover:text-text-primary transition-colors"
-                          >
-                            {restoringRevisionId === rev.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <RotateCcw className="h-3.5 w-3.5" />
-                            )}
-                          </button>
+                        <Copy className="h-4 w-4" />
+                        Copy Content
+                      </button>
+                      <button
+                        onClick={() => copyToClipboard(article.content_html || "")}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-secondary hover:bg-surface-secondary transition-colors"
+                      >
+                        <Code className="h-4 w-4" />
+                        Copy HTML
+                      </button>
+                      <button
+                        onClick={handleDelete}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete Article
+                      </button>
+                    </div>
+                  </Card>
+                </>
+              )}
+
+              {/* ── SEO Tab ── */}
+              {sidebarTab === "seo" && (
+                <>
+                  <LiveSeoPanel
+                    seoScore={liveSeoScore}
+                    onRefresh={handleAnalyzeSeo}
+                    refreshing={analyzingSeo}
+                  />
+
+                  {seo && (
+                    <Card className="p-4">
+                      <h3 className="font-medium text-text-primary mb-3">SEO Analysis</h3>
+                      <div className="space-y-3 text-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="text-text-secondary">Keyword Density</span>
+                          <span className={clsx(
+                            "font-medium",
+                            seo.keyword_density >= 1 && seo.keyword_density <= 3
+                              ? "text-green-600"
+                              : "text-yellow-600"
+                          )}>
+                            {seo.keyword_density.toFixed(1)}%
+                          </span>
                         </div>
 
-                        {/* Preview toggle */}
-                        <button
-                          type="button"
-                          onClick={() => handlePreviewRevision(rev.id)}
-                          className="mt-1.5 text-xs text-primary-600 hover:text-primary-700 transition-colors"
-                        >
-                          {previewRevision?.id === rev.id ? "Hide preview" : "Preview"}
-                          {loadingPreview && previewRevision?.id !== rev.id && " ..."}
-                        </button>
+                        <div className="flex items-center justify-between">
+                          <span className="text-text-secondary">Title Has Keyword</span>
+                          {seo.title_has_keyword ? (
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <AlertCircle className="h-4 w-4 text-yellow-600" />
+                          )}
+                        </div>
 
-                        {/* Inline content preview */}
-                        {previewRevision?.id === rev.id && (
-                          <div className="mt-2 p-2 rounded bg-surface-secondary border border-surface-tertiary max-h-40 overflow-y-auto">
-                            <p className="text-xs font-medium text-text-secondary mb-1 truncate">
-                              {previewRevision.title}
-                            </p>
-                            <p className="text-xs text-text-muted whitespace-pre-wrap font-mono leading-relaxed line-clamp-6">
-                              {previewRevision.content?.slice(0, 600) || "(no content)"}
-                              {(previewRevision.content?.length ?? 0) > 600 && "…"}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                        <div className="flex items-center justify-between">
+                          <span className="text-text-secondary">Meta Description</span>
+                          <span className={clsx(
+                            "font-medium",
+                            seo.meta_description_length >= 120 && seo.meta_description_length <= 160
+                              ? "text-green-600"
+                              : "text-yellow-600"
+                          )}>
+                            {seo.meta_description_length} chars
+                          </span>
+                        </div>
 
-                    {revisionsTotal > revisions.length && (
-                      <p className="text-xs text-text-muted text-center pt-1">
-                        Showing {revisions.length} of {revisionsTotal} versions
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-          </Card>
+                        <div className="flex items-center justify-between">
+                          <span className="text-text-secondary">Headings</span>
+                          <span className="text-text-primary">
+                            {seo.h2_count} H2, {seo.h3_count} H3
+                          </span>
+                        </div>
 
-          {/* Internal Links */}
-          <Card className="p-4">
-            <button
-              type="button"
-              onClick={handleToggleLinkSuggestions}
-              className="w-full flex items-center justify-between text-left"
-            >
-              <div className="flex items-center gap-2">
-                <Link2 className="h-4 w-4 text-text-secondary" />
-                <span className="font-medium text-text-primary text-sm">Internal Links</span>
-              </div>
-              {showLinkSuggestions ? (
-                <ChevronUp className="h-4 w-4 text-text-muted" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-text-muted" />
-              )}
-            </button>
+                        <div className="flex items-center justify-between">
+                          <span className="text-text-secondary">Links</span>
+                          <span className="text-text-primary">
+                            {seo.internal_links} internal, {seo.external_links} external
+                          </span>
+                        </div>
 
-            {showLinkSuggestions && (
-              <div className="mt-3 space-y-2">
-                {loadingLinks ? (
-                  <div className="flex items-center justify-center py-4">
-                    <Loader2 className="h-4 w-4 animate-spin text-text-muted" />
-                  </div>
-                ) : linkSuggestionsError ? (
-                  <div className="text-center py-3 space-y-2">
-                    <p className="text-xs text-red-500">Failed to load link suggestions.</p>
-                    <button
-                      type="button"
-                      onClick={() => { setLinkSuggestionsError(false); handleToggleLinkSuggestions(); }}
-                      className="text-xs text-primary-600 hover:underline"
-                    >
-                      Retry
-                    </button>
-                  </div>
-                ) : linkSuggestions.length === 0 ? (
-                  <p className="text-xs text-text-muted text-center py-3">
-                    No related articles found. Try publishing more articles with overlapping keywords.
-                  </p>
-                ) : (
-                  linkSuggestions.map((suggestion) => (
-                    <div
-                      key={suggestion.id}
-                      className="flex items-start gap-2 p-2 rounded-lg border border-surface-tertiary bg-surface hover:bg-surface-secondary transition-colors"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-text-primary leading-snug line-clamp-2">
-                          {suggestion.title}
-                        </p>
-                        <div className="flex items-center gap-1.5 mt-1">
-                          {suggestion.source === "wordpress" ? (
-                            <span className="text-xs px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded flex-shrink-0">
-                              WP
-                            </span>
-                          ) : suggestion.keyword ? (
-                            <span className="text-xs px-1.5 py-0.5 bg-primary-50 text-primary-700 rounded truncate max-w-[120px]">
-                              {suggestion.keyword}
-                            </span>
-                          ) : null}
-                          {/* Relevance dots: 1-3 filled based on score */}
-                          <span className="flex items-center gap-0.5 flex-shrink-0" title={`Relevance: ${suggestion.relevance_score}`}>
-                            {[1, 2, 3].map((dot) => (
-                              <span
-                                key={dot}
-                                className={clsx(
-                                  "w-1.5 h-1.5 rounded-full",
-                                  suggestion.relevance_score >= dot * 4
-                                    ? "bg-primary-400"
-                                    : "bg-surface-tertiary"
-                                )}
-                              />
-                            ))}
+                        <div className="flex items-center justify-between">
+                          <span className="text-text-secondary">Readability</span>
+                          <span className={clsx(
+                            "font-medium",
+                            seo.readability_score >= 60 ? "text-green-600" : "text-yellow-600"
+                          )}>
+                            {seo.readability_score.toFixed(0)}
                           </span>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        title="Insert link at cursor"
-                        onClick={() => handleInsertLink(suggestion)}
-                        className="flex-shrink-0 px-2 py-1 rounded text-xs font-medium text-primary-600 border border-primary-200 hover:bg-primary-50 transition-colors"
-                      >
-                        Insert
-                      </button>
+                    </Card>
+                  )}
+
+                  {seo?.suggestions && seo.suggestions.length > 0 && (
+                    <Card className="p-4">
+                      <h3 className="font-medium text-text-primary mb-3">Suggestions</h3>
+                      <ul className="space-y-2">
+                        {seo.suggestions.map((suggestion) => (
+                          <li key={suggestion} className="flex items-start gap-2 text-sm text-text-secondary">
+                            <AlertCircle className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                            <span className="break-words min-w-0">{suggestion}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </Card>
+                  )}
+                </>
+              )}
+
+              {/* ── AEO Tab ── */}
+              {sidebarTab === "aeo" && (
+                <>
+                  <Card className="p-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-medium text-text-primary flex items-center gap-1.5">
+                        <Zap className="h-4 w-4 text-purple-500" />
+                        AEO Score
+                      </h3>
+                      <Button variant="ghost" size="sm" onClick={handleRefreshAeo} disabled={aeoLoading}>
+                        <RefreshCw className={`h-4 w-4 ${aeoLoading ? "animate-spin" : ""}`} />
+                      </Button>
                     </div>
-                  ))
-                )}
-              </div>
-            )}
-          </Card>
+
+                    {aeoScore ? (
+                      <div>
+                        <div className="text-center mb-3">
+                          <div className={clsx(
+                            "inline-flex items-center justify-center w-20 h-20 rounded-full text-2xl font-bold",
+                            aeoScore.aeo_score >= 80 ? "bg-green-100 text-green-700" :
+                            aeoScore.aeo_score >= 50 ? "bg-yellow-100 text-yellow-700" :
+                            "bg-red-100 text-red-700"
+                          )}>
+                            {aeoScore.aeo_score}
+                          </div>
+                          <p className="text-sm text-text-secondary mt-2">
+                            {aeoScore.aeo_score >= 80 ? "Great AI readability!" :
+                             aeoScore.aeo_score >= 50 ? "Good, can be improved" :
+                             "Needs improvement"}
+                          </p>
+                          {aeoScore.previous_score !== null && aeoScore.previous_score !== undefined && (
+                            <p className="text-xs text-text-muted mt-1">
+                              Previous: {aeoScore.previous_score}
+                            </p>
+                          )}
+                        </div>
+
+                        {aeoScore.score_breakdown && (
+                          <div className="space-y-2 text-sm">
+                            {Object.entries(aeoScore.score_breakdown).map(([key, value]) => {
+                              const max = key === "entity_score" || key === "citation_readiness" ? 15 : key === "schema_score" ? 10 : 20;
+                              const pct = Math.round((Number(value) / max) * 100);
+                              return (
+                                <div key={key} className="space-y-1">
+                                  <div className="flex justify-between text-xs">
+                                    <span className="text-text-secondary capitalize">{key.replace(/_/g, " ")}</span>
+                                    <span className="text-text-primary font-medium">{value}/{max}</span>
+                                  </div>
+                                  <div className="h-1.5 bg-surface-secondary rounded-full overflow-hidden">
+                                    <div
+                                      className={clsx(
+                                        "h-full rounded-full",
+                                        pct >= 70 ? "bg-green-500" : pct >= 40 ? "bg-yellow-500" : "bg-red-500"
+                                      )}
+                                      style={{ width: `${pct}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {aeoScore.suggestions && aeoScore.suggestions.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-surface-tertiary">
+                            <p className="text-xs font-semibold text-text-secondary mb-2">Suggestions</p>
+                            <ul className="space-y-1.5">
+                              {aeoScore.suggestions.slice(0, 3).map((s, i) => (
+                                <li key={i} className="text-xs text-text-secondary flex items-start gap-1.5">
+                                  <span className="text-primary-500 mt-0.5 shrink-0">•</span>
+                                  <span className="break-words min-w-0">{typeof s === "string" ? s : s.action || s.description}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4">
+                        <p className="text-sm text-text-muted">
+                          {aeoLoading ? "Calculating..." : "Click refresh to calculate AEO score"}
+                        </p>
+                      </div>
+                    )}
+                  </Card>
+
+                  <AiAnswerPreview
+                    title={title}
+                    content={content}
+                    keyword={keyword}
+                    url={article?.published_url ?? undefined}
+                  />
+
+                  <StructuredDataPreview schemas={article.schemas} />
+                </>
+              )}
+
+              {/* ── History Tab ── */}
+              {sidebarTab === "history" && (
+                <>
+                  {/* Version History */}
+                  <Card className="p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <History className="h-4 w-4 text-text-secondary" />
+                      <span className="font-medium text-text-primary text-sm">Version History</span>
+                      {revisionsTotal > 0 && (
+                        <span className="text-xs text-text-muted bg-surface-secondary px-1.5 py-0.5 rounded-full">
+                          {revisionsTotal}
+                        </span>
+                      )}
+                    </div>
+
+                    {!showVersionHistory ? (
+                      <Button variant="outline" size="sm" className="w-full" onClick={handleToggleVersionHistory}>
+                        Load Versions
+                      </Button>
+                    ) : (
+                      <div className="space-y-2">
+                        {loadingRevisions ? (
+                          <div className="flex items-center justify-center py-4">
+                            <Loader2 className="h-4 w-4 animate-spin text-text-muted" />
+                          </div>
+                        ) : revisions.length === 0 ? (
+                          <p className="text-xs text-text-muted text-center py-3">
+                            No saved versions yet. Versions are saved automatically before AI improvements and manual edits.
+                          </p>
+                        ) : (
+                          <>
+                            {revisions.map((rev) => (
+                              <div
+                                key={rev.id}
+                                className={clsx(
+                                  "rounded-lg border p-2.5 transition-colors",
+                                  previewRevision?.id === rev.id
+                                    ? "border-primary-300 bg-primary-50"
+                                    : "border-surface-tertiary bg-surface hover:bg-surface-secondary"
+                                )}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-medium text-text-primary truncate">
+                                      {formatRevisionType(rev.revision_type)}
+                                    </p>
+                                    <p className="text-xs text-text-muted mt-0.5">
+                                      {new Date(rev.created_at).toLocaleString(undefined, {
+                                        month: "short",
+                                        day: "numeric",
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
+                                      {" · "}
+                                      {rev.word_count.toLocaleString()} words
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    title="Restore this version"
+                                    aria-label="Restore this version"
+                                    onClick={() => handleRestoreRevision(rev.id)}
+                                    disabled={restoringRevisionId === rev.id}
+                                    className="flex-shrink-0 p-1 rounded hover:bg-surface-tertiary text-text-muted hover:text-text-primary transition-colors"
+                                  >
+                                    {restoringRevisionId === rev.id ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <RotateCcw className="h-3.5 w-3.5" />
+                                    )}
+                                  </button>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handlePreviewRevision(rev.id)}
+                                  className="mt-1.5 text-xs text-primary-600 hover:text-primary-700 transition-colors"
+                                >
+                                  {previewRevision?.id === rev.id ? "Hide preview" : "Preview"}
+                                  {loadingPreview && previewRevision?.id !== rev.id && " ..."}
+                                </button>
+
+                                {previewRevision?.id === rev.id && (
+                                  <div className="mt-2 p-2 rounded bg-surface-secondary border border-surface-tertiary max-h-40 overflow-y-auto">
+                                    <p className="text-xs font-medium text-text-secondary mb-1 truncate">
+                                      {previewRevision.title}
+                                    </p>
+                                    <p className="text-xs text-text-muted whitespace-pre-wrap font-mono leading-relaxed line-clamp-6">
+                                      {previewRevision.content?.slice(0, 600) || "(no content)"}
+                                      {(previewRevision.content?.length ?? 0) > 600 && "…"}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+
+                            {revisionsTotal > revisions.length && (
+                              <p className="text-xs text-text-muted text-center pt-1">
+                                Showing {revisions.length} of {revisionsTotal} versions
+                              </p>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </Card>
+
+                  {/* Internal Links */}
+                  <Card className="p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Link2 className="h-4 w-4 text-text-secondary" />
+                      <span className="font-medium text-text-primary text-sm">Internal Links</span>
+                    </div>
+
+                    {!showLinkSuggestions ? (
+                      <Button variant="outline" size="sm" className="w-full" onClick={handleToggleLinkSuggestions}>
+                        Find Link Suggestions
+                      </Button>
+                    ) : (
+                      <div className="space-y-2">
+                        {loadingLinks ? (
+                          <div className="flex items-center justify-center py-4">
+                            <Loader2 className="h-4 w-4 animate-spin text-text-muted" />
+                          </div>
+                        ) : linkSuggestionsError ? (
+                          <div className="text-center py-3 space-y-2">
+                            <p className="text-xs text-red-500">Failed to load link suggestions.</p>
+                            <button
+                              type="button"
+                              onClick={() => { setLinkSuggestionsError(false); handleToggleLinkSuggestions(); }}
+                              className="text-xs text-primary-600 hover:underline"
+                            >
+                              Retry
+                            </button>
+                          </div>
+                        ) : linkSuggestions.length === 0 ? (
+                          <p className="text-xs text-text-muted text-center py-3">
+                            No related articles found. Try publishing more articles with overlapping keywords.
+                          </p>
+                        ) : (
+                          linkSuggestions.map((suggestion) => (
+                            <div
+                              key={suggestion.id}
+                              className="flex items-start gap-2 p-2 rounded-lg border border-surface-tertiary bg-surface hover:bg-surface-secondary transition-colors"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-text-primary leading-snug line-clamp-2">
+                                  {suggestion.title}
+                                </p>
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  {suggestion.source === "wordpress" ? (
+                                    <span className="text-xs px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded flex-shrink-0">
+                                      WP
+                                    </span>
+                                  ) : suggestion.keyword ? (
+                                    <span className="text-xs px-1.5 py-0.5 bg-primary-50 text-primary-700 rounded truncate max-w-[120px]">
+                                      {suggestion.keyword}
+                                    </span>
+                                  ) : null}
+                                  <span className="flex items-center gap-0.5 flex-shrink-0" title={`Relevance: ${suggestion.relevance_score}`}>
+                                    {[1, 2, 3].map((dot) => (
+                                      <span
+                                        key={dot}
+                                        className={clsx(
+                                          "w-1.5 h-1.5 rounded-full",
+                                          suggestion.relevance_score >= dot * 4
+                                            ? "bg-primary-400"
+                                            : "bg-surface-tertiary"
+                                        )}
+                                      />
+                                    ))}
+                                  </span>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                title="Insert link at cursor"
+                                onClick={() => handleInsertLink(suggestion)}
+                                className="flex-shrink-0 px-2 py-1 rounded text-xs font-medium text-primary-600 border border-primary-200 hover:bg-primary-50 transition-colors"
+                              >
+                                Insert
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </Card>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
