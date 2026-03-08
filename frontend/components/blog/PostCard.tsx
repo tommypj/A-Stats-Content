@@ -19,11 +19,11 @@ function formatDate(dateStr: string | undefined): string {
 export default function PostCard({ post }: PostCardProps) {
   return (
     <article className="bg-surface border border-surface-tertiary rounded-2xl overflow-hidden hover:shadow-lg transition-all duration-200 group flex flex-col">
-      {/* Image */}
+      {/* Image — padding-bottom trick for Safari/WebKit compatibility */}
       <Link
         href={`/blog/${post.slug}`}
         className="block relative overflow-hidden bg-surface-secondary flex-shrink-0"
-        style={{ aspectRatio: "16 / 9" }}
+        style={{ paddingBottom: "56.25%", height: 0 }}
       >
         {post.featured_image_url ? (
           <Image

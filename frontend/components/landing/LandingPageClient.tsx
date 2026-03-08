@@ -1149,7 +1149,7 @@ export default function LandingPageClient() {
                     <Link
                       href={`/blog/${post.slug}`}
                       className="block relative overflow-hidden bg-surface-secondary flex-shrink-0"
-                      style={{ aspectRatio: "16 / 9" }}
+                      style={{ paddingBottom: "56.25%", height: 0 }}
                     >
                       {post.featured_image_url ? (
                         <Image
