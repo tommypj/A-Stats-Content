@@ -386,7 +386,7 @@ async def update_brand_voice(
                 Project.deleted_at.is_(None),
             )
         )
-        .with_for_update()
+        .with_for_update(of=Project)
     )
     result = await db.execute(stmt)
     project = result.scalar_one_or_none()

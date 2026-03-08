@@ -579,6 +579,8 @@ async def sync_gsc_data(
             sync_started_at=sync_completed_at,
         )
 
+    except HTTPException:
+        raise
     except Exception:
         await db.rollback()
         raise HTTPException(
