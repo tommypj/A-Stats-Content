@@ -9,6 +9,7 @@ import {
   Lock,
   CreditCard,
   Plug,
+  Bell,
   CheckCircle,
   XCircle,
   Loader2,
@@ -26,6 +27,7 @@ const TABS = [
   { id: "password", label: "Password", icon: Lock },
   { id: "billing", label: "Billing", icon: CreditCard },
   { id: "integrations", label: "Integrations", icon: Plug },
+  { id: "notifications", label: "Notifications", icon: Bell },
 ] as const;
 
 export default function IntegrationsSettingsPage() {
@@ -35,6 +37,8 @@ export default function IntegrationsSettingsPage() {
     if (tabId === "integrations") return;
     if (tabId === "billing") {
       router.push("/settings/billing");
+    } else if (tabId === "notifications") {
+      router.push("/settings/notifications");
     } else {
       router.push(`/settings#${tabId}`);
     }

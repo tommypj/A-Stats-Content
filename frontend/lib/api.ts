@@ -1461,6 +1461,16 @@ export const api = {
         url: "/notifications/generation-status",
         params,
       }),
+    getPreferences: () =>
+      apiRequest<NotificationPreferences>({
+        url: "/notifications/preferences",
+      }),
+    updatePreferences: (data: Partial<NotificationPreferences>) =>
+      apiRequest<NotificationPreferences>({
+        method: "PUT",
+        url: "/notifications/preferences",
+        data,
+      }),
   },
 
   // Background task status polling
@@ -3482,6 +3492,18 @@ export interface ProjectInvitationCreateRequest {
   role: ProjectRole;
 }
 
+
+// Notification preferences
+export interface NotificationPreferences {
+  email_generation_completed: boolean;
+  email_generation_failed: boolean;
+  email_usage_80_percent: boolean;
+  email_usage_limit_reached: boolean;
+  email_content_decay: boolean;
+  email_weekly_digest: boolean;
+  email_billing_alerts: boolean;
+  email_product_updates: boolean;
+}
 
 // Notification types
 export interface GenerationNotification {

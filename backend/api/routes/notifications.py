@@ -8,8 +8,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.routes.auth import get_current_user
+from api.schemas.notification_preferences import (
+    NotificationPreferencesResponse,
+    NotificationPreferencesUpdate,
+)
 from infrastructure.database.connection import get_db
-from infrastructure.database.models import User
+from infrastructure.database.models import NotificationPreferences, User
 from services.task_queue import task_queue
 
 logger = logging.getLogger(__name__)
@@ -186,3 +190,58 @@ async def get_task_status(
             detail="Task not found or has expired",
         )
     return info
+
+
+# ---------------------------------------------------------------------------
+# Notification Preferences
+# ---------------------------------------------------------------------------
+
+
+async def _get_or_create_preferences(
+    db: AsyncSession, user_id: str
+) -> NotificationPreferences:
+    """Return existing preferences or create defaults."""
+    result = await db.execute(
+        select(NotificationPreferences).where(
+            NotificationPreferences.user_id == user_id
+        )
+    )
+    prefs = result.scalar_one_or_none()
+    if prefs is None:
+        prefs = NotificationPreferences(user_id=user_id)
+        db.add(prefs)
+        await db.commit()
+        await db.refresh(prefs)
+    return prefs
+
+
+@router.get("/preferences", response_model=NotificationPreferencesResponse)
+async def get_notification_preferences(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get the current user's notification preferences."""
+    prefs = await _get_or_create_preferences(db, current_user.id)
+    return prefs
+
+
+@router.put("/preferences", response_model=NotificationPreferencesResponse)
+async def update_notification_preferences(
+    body: NotificationPreferencesUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update the current user's notification preferences.
+
+    Only fields present in the request body are updated; omitted fields
+    keep their current values.
+    """
+    prefs = await _get_or_create_preferences(db, current_user.id)
+
+    updates = body.model_dump(exclude_unset=True)
+    for field, value in updates.items():
+        setattr(prefs, field, value)
+
+    await db.commit()
+    await db.refresh(prefs)
+    return prefs

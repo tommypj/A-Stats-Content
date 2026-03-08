@@ -14,6 +14,7 @@ import {
   Lock,
   CreditCard,
   Plug,
+  Bell,
   Save,
   Loader2,
   CheckCircle,
@@ -51,6 +52,7 @@ const TABS = [
   { id: "password", label: "Password", icon: Lock },
   { id: "billing", label: "Billing", icon: CreditCard },
   { id: "integrations", label: "Integrations", icon: Plug },
+  { id: "notifications", label: "Notifications", icon: Bell },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -648,6 +650,10 @@ export default function SettingsPage() {
     }
     if (tab === "billing") {
       router.push("/settings/billing");
+      return;
+    }
+    if (tab === "notifications") {
+      router.push("/settings/notifications");
       return;
     }
     setActiveTab(tab);

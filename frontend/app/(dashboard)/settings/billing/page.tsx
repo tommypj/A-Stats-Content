@@ -24,6 +24,7 @@ import {
   Lock,
   CreditCard,
   Plug,
+  Bell,
 } from "lucide-react";
 
 const TABS = [
@@ -31,6 +32,7 @@ const TABS = [
   { id: "password", label: "Password", icon: Lock },
   { id: "billing", label: "Billing", icon: CreditCard },
   { id: "integrations", label: "Integrations", icon: Plug },
+  { id: "notifications", label: "Notifications", icon: Bell },
 ] as const;
 
 const tierIcons: Record<string, typeof Crown> = {
@@ -114,6 +116,8 @@ export default function BillingPage() {
     if (tabId === "billing") return;
     if (tabId === "integrations") {
       router.push("/settings/integrations");
+    } else if (tabId === "notifications") {
+      router.push("/settings/notifications");
     } else {
       router.push(`/settings#${tabId}`);
     }
