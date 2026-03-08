@@ -49,7 +49,6 @@ interface UserProfile {
 
 const TABS = [
   { id: "profile", label: "Profile", icon: User },
-  { id: "password", label: "Password", icon: Lock },
   { id: "billing", label: "Billing", icon: CreditCard },
   { id: "integrations", label: "Integrations", icon: Plug },
   { id: "notifications", label: "Notifications", icon: Bell },
@@ -819,26 +818,24 @@ export default function SettingsPage() {
             isDirty={isDirty}
           />
 
+          <PasswordSection
+            currentPassword={currentPassword}
+            setCurrentPassword={setCurrentPassword}
+            newPassword={newPassword}
+            setNewPassword={setNewPassword}
+            confirmPassword={confirmPassword}
+            setConfirmPassword={setConfirmPassword}
+            passwordError={passwordError}
+            passwordSaved={passwordSaved}
+            onChangePassword={handleChangePassword}
+          />
+
           <DangerZoneSection
             onDeleteAccount={() => setShowDeleteDialog(true)}
             onExportData={handleExportData}
             exporting={exporting}
           />
         </div>
-      )}
-
-      {activeTab === "password" && (
-        <PasswordSection
-          currentPassword={currentPassword}
-          setCurrentPassword={setCurrentPassword}
-          newPassword={newPassword}
-          setNewPassword={setNewPassword}
-          confirmPassword={confirmPassword}
-          setConfirmPassword={setConfirmPassword}
-          passwordError={passwordError}
-          passwordSaved={passwordSaved}
-          onChangePassword={handleChangePassword}
-        />
       )}
 
       {/* Billing tab routes to /settings/billing */}

@@ -6,7 +6,6 @@ import { clsx } from "clsx";
 import { toast } from "sonner";
 import {
   User,
-  Lock,
   CreditCard,
   Plug,
   Bell,
@@ -24,7 +23,6 @@ import { api, parseApiError } from "@/lib/api";
 
 const TABS = [
   { id: "profile", label: "Profile", icon: User },
-  { id: "password", label: "Password", icon: Lock },
   { id: "billing", label: "Billing", icon: CreditCard },
   { id: "integrations", label: "Integrations", icon: Plug },
   { id: "notifications", label: "Notifications", icon: Bell },

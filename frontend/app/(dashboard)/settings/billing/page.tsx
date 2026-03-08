@@ -21,7 +21,6 @@ import {
   Search,
   RefreshCw,
   User,
-  Lock,
   CreditCard,
   Plug,
   Bell,
@@ -29,7 +28,6 @@ import {
 
 const TABS = [
   { id: "profile", label: "Profile", icon: User },
-  { id: "password", label: "Password", icon: Lock },
   { id: "billing", label: "Billing", icon: CreditCard },
   { id: "integrations", label: "Integrations", icon: Plug },
   { id: "notifications", label: "Notifications", icon: Bell },
