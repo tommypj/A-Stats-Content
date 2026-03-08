@@ -8,14 +8,14 @@ import {
   Sparkles,
   Loader2,
   ArrowLeft,
-  Copy,
   Download,
   Save,
   ImageIcon,
   CheckCircle2,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
-import { api, getImageUrl, GeneratedImage, Article } from "@/lib/api";
+import { api, getImageUrl, parseApiError, GeneratedImage, Article } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AIGenerationProgress } from "@/components/ui/ai-generation-progress";
@@ -62,8 +62,10 @@ function GenerateImageContent() {
   const [loadingArticles, setLoadingArticles] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<GeneratedImage | null>(null);
   const [error, setError] = useState("");
-  const [copiedUrl, setCopiedUrl] = useState(false);
   const [promptSource, setPromptSource] = useState<"manual" | "article">("manual");
+  const [wpConnected, setWpConnected] = useState(false);
+  const [wpUploading, setWpUploading] = useState(false);
+  const [wpUploaded, setWpUploaded] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMountedRef = useRef(true);
 
@@ -77,7 +79,34 @@ function GenerateImageContent() {
 
   useEffect(() => {
     loadArticles();
+    checkWpConnection();
   }, []);
+
+  async function checkWpConnection() {
+    try {
+      const status = await api.wordpress.status();
+      setWpConnected(status.is_connected);
+    } catch {
+      setWpConnected(false);
+    }
+  }
+
+  async function handleSendToWordPress() {
+    if (!generatedImage || wpUploading) return;
+    setWpUploading(true);
+    try {
+      await api.wordpress.uploadMedia({
+        image_id: generatedImage.id,
+        alt_text: generatedImage.alt_text || undefined,
+      });
+      setWpUploaded(true);
+      toast.success("Image sent to WordPress!");
+    } catch (err) {
+      toast.error(parseApiError(err).message || "Failed to upload to WordPress");
+    } finally {
+      setWpUploading(false);
+    }
+  }
 
   // Auto-fill prompt when article selection changes
   useEffect(() => {
@@ -120,6 +149,7 @@ function GenerateImageContent() {
     setLoading(true);
     setError("");
     setGeneratedImage(null);
+    setWpUploaded(false);
 
     try {
       const selectedSize = IMAGE_SIZES.find(s => s.value === size);
@@ -182,18 +212,6 @@ function GenerateImageContent() {
         pollRef.current = null;
       }
     }, 2000);
-  }
-
-  async function handleCopyUrl() {
-    if (!generatedImage?.url) return;
-
-    try {
-      await navigator.clipboard.writeText(getImageUrl(generatedImage.url));
-      setCopiedUrl(true);
-      setTimeout(() => setCopiedUrl(false), 2000);
-    } catch {
-      toast.error("Failed to copy URL");
-    }
   }
 
   function handleDownload() {
@@ -406,59 +424,56 @@ function GenerateImageContent() {
                 </div>
               </div>
 
-              {/* Image Details */}
-              <div className="space-y-3 mb-4">
-                <div>
-                  <label className="block text-xs font-medium text-text-muted mb-1">
-                    Prompt
-                  </label>
-                  <p className="text-sm text-text-primary">
-                    {generatedImage.prompt}
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-text-muted mb-1">
-                    Image URL
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={getImageUrl(generatedImage.url)}
-                      readOnly
-                      className="flex-1 px-3 py-2 text-xs rounded-lg border border-surface-tertiary bg-surface-secondary"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleCopyUrl}
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                  {copiedUrl && (
-                    <p className="text-xs text-green-600 mt-1">Copied to clipboard!</p>
-                  )}
-                </div>
+              {/* Prompt */}
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-text-muted mb-1">
+                  Prompt
+                </label>
+                <p className="text-sm text-text-primary">
+                  {generatedImage.prompt}
+                </p>
               </div>
 
               {/* Actions */}
-              <div className="flex gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <Button
                   variant="outline"
                   onClick={handleDownload}
-                  className="flex-1"
                 >
                   <Download className="h-4 w-4 mr-2" />
                   Download
                 </Button>
                 <Button
                   onClick={handleSaveAndReturn}
-                  className="flex-1"
                 >
                   <Save className="h-4 w-4 mr-2" />
                   Save to Gallery
                 </Button>
+                {wpConnected && (
+                  <Button
+                    variant="outline"
+                    onClick={handleSendToWordPress}
+                    disabled={wpUploading || wpUploaded}
+                    className="col-span-2"
+                  >
+                    {wpUploading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : wpUploaded ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />
+                        Sent to WordPress
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Publish to WordPress
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
             </>
           )}
