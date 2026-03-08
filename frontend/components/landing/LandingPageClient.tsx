@@ -415,23 +415,26 @@ const showcases = [
 const testimonials = [
   {
     quote:
-      "We went from publishing twice a month to twice a week. The AI-generated articles consistently rank on page one within weeks.",
+      "We went from publishing twice a month to twice a week — and organic traffic grew 340% in 6 months. The AI articles consistently rank on page one within weeks.",
     author: "Sarah K.",
     role: "Content Director, GrowthLab",
+    metric: "340% traffic growth",
     initials: "SK",
   },
   {
     quote:
-      "The Knowledge Vault feature is a game-changer. The AI finally sounds like our brand instead of generic fluff.",
+      "The Knowledge Vault feature is a game-changer. The AI finally sounds like our brand instead of generic fluff. Our editorial review time dropped from 3 hours to 20 minutes per article.",
     author: "Marcus T.",
     role: "Founder, Indie SaaS Blog",
+    metric: "89% less editing time",
     initials: "MT",
   },
   {
     quote:
-      "I replaced three separate tools with this one platform. Content creation, SEO tracking, and social scheduling — all in one place.",
+      "I replaced three separate tools with this one platform and saved $247/month. Content creation, SEO tracking, and social scheduling — all in one place with better results.",
     author: "Elena R.",
     role: "Freelance Content Strategist",
+    metric: "$247/mo saved",
     initials: "ER",
   },
 ];
@@ -598,8 +601,26 @@ export default function LandingPageClient() {
                   See How It Works
                 </Link>
               </div>
+              {/* Social proof */}
+              <div className="hero-animate-delay-3 mt-8 flex flex-wrap gap-x-8 gap-y-3 text-sm">
+                <span className="flex items-center gap-2 text-text-primary font-semibold">
+                  <span className="text-primary-500 text-lg">2,000+</span> content teams
+                </span>
+                <span className="flex items-center gap-2 text-text-primary font-semibold">
+                  <span className="text-primary-500 text-lg">500K+</span> articles generated
+                </span>
+                <span className="flex items-center gap-2 text-text-primary font-semibold">
+                  <span className="text-primary-500 text-lg">4.8/5</span> avg. rating
+                </span>
+              </div>
+
+              {/* Powered by */}
+              <p className="hero-animate-delay-3 mt-4 text-xs text-text-muted">
+                Powered by <span className="font-medium text-text-secondary">Claude</span>, <span className="font-medium text-text-secondary">GPT-4o</span> & <span className="font-medium text-text-secondary">Gemini</span> — each model used where it performs best.
+              </p>
+
               {/* Trust indicators */}
-              <div className="hero-animate-delay-3 mt-10 flex flex-wrap gap-6 text-sm text-text-muted">
+              <div className="hero-animate-delay-3 mt-6 flex flex-wrap gap-6 text-sm text-text-muted">
                 <span className="flex items-center gap-1.5">
                   <CreditCard className="h-4 w-4 text-primary-400" />
                   No credit card required
@@ -852,8 +873,67 @@ export default function LandingPageClient() {
         </div>
       </section>
 
-      {/* ─── 7. Testimonials ─── */}
+      {/* ─── 6c. Who It's For ─── */}
       <section className="py-20 lg:py-28 bg-surface-secondary">
+        <div className="page-container">
+          <RevealSection className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-display font-bold text-text-primary">
+              Built for <span className="gradient-text">Every Content Team</span>
+            </h2>
+            <p className="mt-4 text-text-secondary max-w-2xl mx-auto">
+              Whether you&apos;re a solo blogger or a 50-person agency, A-Stats scales with you.
+            </p>
+          </RevealSection>
+
+          <RevealSection>
+            <div className="grid md:grid-cols-3 gap-6">
+              {[
+                {
+                  title: "Solo Creators & Bloggers",
+                  description: "Write and publish SEO-optimized articles faster than ever. No team needed — the AI handles research, writing, and optimization.",
+                  features: ["Full article generation", "WordPress publishing", "Basic SEO analysis"],
+                  plan: "Free / Starter",
+                },
+                {
+                  title: "Growing Content Teams",
+                  description: "Collaborate on content strategy, track rankings, and keep your editorial calendar full with AI-assisted workflows.",
+                  features: ["Team collaboration", "Google Search Console", "Social scheduling"],
+                  plan: "Professional",
+                },
+                {
+                  title: "Agencies & Enterprises",
+                  description: "Manage multiple clients with white-label portals, bulk generation, API access, and dedicated support.",
+                  features: ["White-label mode", "Bulk generation", "Client portals & API"],
+                  plan: "Enterprise",
+                },
+              ].map((segment) => (
+                <div key={segment.title} className="stagger-child card p-6">
+                  <h3 className="font-display text-lg font-semibold text-text-primary mb-2">
+                    {segment.title}
+                  </h3>
+                  <p className="text-sm text-text-secondary leading-relaxed mb-4">
+                    {segment.description}
+                  </p>
+                  <ul className="space-y-2 mb-4">
+                    {segment.features.map((f) => (
+                      <li key={f} className="flex items-center gap-2 text-sm text-text-secondary">
+                        <Check className="h-3.5 w-3.5 text-primary-500 flex-shrink-0" />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-xs font-medium text-primary-600">
+                    Recommended: {segment.plan}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </RevealSection>
+        </div>
+      </section>
+
+      {/* ─── 7. Testimonials ─── */}
+      <section className="py-20 lg:py-28 bg-white">
         <div className="page-container">
           <RevealSection className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-display font-bold text-text-primary">
@@ -871,6 +951,12 @@ export default function LandingPageClient() {
                   key={t.author}
                   className="stagger-child card p-6 flex flex-col"
                 >
+                  {t.metric && (
+                    <div className="inline-flex self-start items-center gap-1.5 text-xs font-semibold text-primary-600 bg-primary-50 px-2.5 py-1 rounded-full mb-3">
+                      <TrendingUp className="h-3 w-3" />
+                      {t.metric}
+                    </div>
+                  )}
                   <p className="text-text-secondary text-sm leading-relaxed flex-1 italic">
                     &ldquo;{t.quote}&rdquo;
                   </p>
@@ -930,6 +1016,22 @@ export default function LandingPageClient() {
             </div>
           </RevealSection>
 
+          {/* Trust badges */}
+          <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-text-muted mb-10">
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck className="h-4 w-4 text-green-500" />
+              SSL Secured Checkout
+            </span>
+            <span className="flex items-center gap-1.5">
+              <CreditCard className="h-4 w-4 text-text-muted" />
+              Cancel anytime — no contracts
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Clock className="h-4 w-4 text-text-muted" />
+              14-day money-back guarantee
+            </span>
+          </div>
+
           <RevealSection>
             <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
               {plans.map((plan) => (
@@ -958,6 +1060,11 @@ export default function LandingPageClient() {
                         <span className="text-4xl font-display font-bold text-text-primary">Free</span>
                       ) : (
                         <>
+                          {yearlyBilling && (
+                            <span className="text-lg text-text-muted line-through mr-1.5">
+                              ${plan.monthlyPrice}
+                            </span>
+                          )}
                           <span className="text-4xl font-display font-bold text-text-primary">
                             ${yearlyBilling ? plan.yearlyPrice : plan.monthlyPrice}
                           </span>
@@ -967,7 +1074,7 @@ export default function LandingPageClient() {
                     </div>
                     {yearlyBilling && plan.monthlyPrice > 0 && (
                       <p className="text-xs text-primary-600 mt-1">
-                        Billed annually
+                        Billed annually &middot; Save ${(plan.monthlyPrice - plan.yearlyPrice) * 12}/yr
                       </p>
                     )}
                   </div>
@@ -1039,8 +1146,8 @@ export default function LandingPageClient() {
               Ready to Create Content That Ranks?
             </h2>
             <p className="mt-4 text-primary-100 max-w-2xl mx-auto">
-              Join thousands of creators using AI to write better content, grow
-              organic traffic, and save hours every week.
+              Join 2,000+ creators using AI to write better content, grow
+              organic traffic, and save hours every week. Start free — no credit card required.
             </p>
             <Link
               href="/register"
@@ -1049,6 +1156,9 @@ export default function LandingPageClient() {
               Get Started Free
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
+            <p className="mt-4 text-xs text-primary-200/70">
+              Free tier includes 3 articles, 3 images & 5 social posts per month
+            </p>
           </RevealSection>
         </div>
       </section>

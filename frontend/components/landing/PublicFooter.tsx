@@ -24,8 +24,8 @@ export default function PublicFooter() {
               {[
                 { label: "Features", href: "/#features" },
                 { label: "Pricing", href: "/#pricing" },
-                { label: "Integrations", href: "#" },
-                { label: "Changelog", href: "#" },
+                { label: "How It Works", href: "/#how-it-works" },
+                { label: "Blog", href: "/blog" },
               ].map(({ label, href }) => (
                 <li key={label}>
                   <Link href={href} className="text-sm text-primary-200/60 hover:text-white transition-colors">
@@ -80,14 +80,21 @@ export default function PublicFooter() {
             &copy; {new Date().getFullYear()} A-Stats. All rights reserved.
           </p>
           <div className="flex items-center gap-4">
-            {["X", "Li", "Gh"].map((icon) => (
-              <Link
+            {[
+              { icon: "𝕏", href: "https://x.com/AStatsApp", label: "X (Twitter)" },
+              { icon: "in", href: "https://linkedin.com/company/a-stats", label: "LinkedIn" },
+              { icon: "Gh", href: "https://github.com/a-stats", label: "GitHub" },
+            ].map(({ icon, href, label }) => (
+              <a
                 key={icon}
-                href="#"
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={label}
                 className="h-8 w-8 rounded-full bg-primary-800/50 flex items-center justify-center text-xs text-primary-200/60 hover:bg-primary-700 hover:text-white transition-colors"
               >
                 {icon}
-              </Link>
+              </a>
             ))}
           </div>
         </div>
