@@ -46,6 +46,10 @@ const nextConfig = {
       },
       {
         protocol: "https",
+        hostname: "api.a-stats.app",
+      },
+      {
+        protocol: "https",
         hostname: "picsum.photos",
       },
       {
