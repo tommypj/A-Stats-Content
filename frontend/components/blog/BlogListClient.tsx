@@ -34,8 +34,7 @@ function FeaturedPostCard({ post }: { post: BlogPostCard }) {
         {/* Image */}
         <Link
           href={`/blog/${post.slug}`}
-          className="relative overflow-hidden block bg-surface-secondary"
-          style={{ paddingBottom: "56.25%", minHeight: "240px", height: 0 }}
+          className="relative overflow-hidden block min-h-[240px] md:min-h-full bg-surface-secondary"
         >
           {post.featured_image_url ? (
             <Image
