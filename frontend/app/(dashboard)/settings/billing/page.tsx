@@ -199,14 +199,14 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="space-y-8 max-w-3xl animate-in">
+    <div className="space-y-8 animate-in">
       <div>
         <h1 className="text-2xl font-display font-bold text-text-primary">Settings</h1>
         <p className="mt-1 text-text-secondary">Manage your account settings and preferences.</p>
       </div>
 
       {/* Tab bar */}
-      <div className="flex gap-1 p-1 bg-surface-secondary rounded-xl">
+      <div className="inline-flex gap-1 p-1 bg-surface-secondary rounded-xl">
         {TABS.map((tab) => (
           <button
             key={tab.id}
