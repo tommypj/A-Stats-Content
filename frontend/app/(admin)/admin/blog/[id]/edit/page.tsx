@@ -166,12 +166,20 @@ export default function AdminEditBlogPostPage() {
     }
   };
 
+  const getImagePermanentUrl = (img: { local_path?: string; url: string }) => {
+    if (img.local_path) {
+      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
+      return `${apiBase}/uploads/${img.local_path}`;
+    }
+    return img.url;
+  };
+
   const pollImageStatus = (imageId: string) => {
     pollRef.current = setTimeout(async () => {
       try {
         const img = await api.images.get(imageId);
         if (img.status === "completed" && img.url) {
-          setFeaturedImageUrl(img.url);
+          setFeaturedImageUrl(getImagePermanentUrl(img));
           setFeaturedImageAlt(imagePrompt.slice(0, 120));
           setGeneratingImage(false);
           toast.success("Image generated!");
@@ -188,16 +196,17 @@ export default function AdminEditBlogPostPage() {
     }, 3000);
   };
 
-  const handleGenerateImage = async () => {
-    if (!imagePrompt.trim()) {
-      toast.error("Generate content first to get an image prompt");
+  const handleGenerateImage = async (promptOverride?: string) => {
+    const prompt = promptOverride || imagePrompt;
+    if (!prompt.trim()) {
+      toast.error("Enter an image prompt first");
       return;
     }
     try {
       setGeneratingImage(true);
-      const img = await api.images.generate({ prompt: imagePrompt });
+      const img = await api.images.generate({ prompt });
       if (img.status === "completed" && img.url) {
-        setFeaturedImageUrl(img.url);
+        setFeaturedImageUrl(getImagePermanentUrl(img));
         setFeaturedImageAlt(imagePrompt.slice(0, 120));
         setGeneratingImage(false);
         toast.success("Image generated!");
@@ -455,39 +464,47 @@ export default function AdminEditBlogPostPage() {
                 )}
               </button>
 
-              {/* Image generation */}
-              {imagePrompt && (
-                <div className="border-t border-primary-200 pt-3 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <ImageIcon className="h-4 w-4 text-primary-600" />
-                    <span className="text-xs font-semibold text-primary-700">AI Image</span>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1">Image Prompt</label>
-                    <textarea
-                      value={imagePrompt}
-                      onChange={e => setImagePrompt(e.target.value)}
-                      rows={2}
-                      className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface"
-                    />
-                  </div>
-                  {featuredImageUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={featuredImageUrl} alt="Generated" className="w-full max-h-40 object-cover rounded-lg" />
-                  )}
-                  <button
-                    onClick={handleGenerateImage}
-                    disabled={generatingImage}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-surface border border-primary-300 text-primary-700 rounded-lg text-xs font-medium hover:bg-primary-50 disabled:opacity-50"
-                  >
-                    {generatingImage ? (
-                      <><Loader2 className="h-3 w-3 animate-spin" /> Generating image...</>
-                    ) : (
-                      <><ImageIcon className="h-3 w-3" /> {featuredImageUrl ? "Regenerate Image" : "Generate Image"}</>
-                    )}
-                  </button>
+              {/* Image generation — always visible so users can generate/regenerate images */}
+              <div className="border-t border-primary-200 pt-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <ImageIcon className="h-4 w-4 text-primary-600" />
+                  <span className="text-xs font-semibold text-primary-700">AI Image</span>
                 </div>
-              )}
+                <div>
+                  <label className="block text-xs font-medium text-text-secondary mb-1">Image Prompt</label>
+                  <textarea
+                    value={imagePrompt}
+                    onChange={e => setImagePrompt(e.target.value)}
+                    rows={2}
+                    placeholder={title ? `A professional blog header image for: ${title}` : "Describe the image you want to generate..."}
+                    className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface"
+                  />
+                </div>
+                {featuredImageUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={featuredImageUrl} alt="Generated" className="w-full max-h-40 object-cover rounded-lg" />
+                )}
+                <button
+                  onClick={() => {
+                    // Auto-fill prompt from title if empty
+                    if (!imagePrompt.trim() && title.trim()) {
+                      const autoPrompt = `A professional, modern blog header image for an article titled "${title}". Clean design, subtle gradients, no text overlay.`;
+                      setImagePrompt(autoPrompt);
+                      handleGenerateImage(autoPrompt);
+                      return;
+                    }
+                    handleGenerateImage();
+                  }}
+                  disabled={generatingImage}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-surface border border-primary-300 text-primary-700 rounded-lg text-xs font-medium hover:bg-primary-50 disabled:opacity-50"
+                >
+                  {generatingImage ? (
+                    <><Loader2 className="h-3 w-3 animate-spin" /> Generating image...</>
+                  ) : (
+                    <><ImageIcon className="h-3 w-3" /> {featuredImageUrl ? "Regenerate Image" : "Generate Image"}</>
+                  )}
+                </button>
+              </div>
             </div>
 
             {flaggedStats.length > 0 && (
