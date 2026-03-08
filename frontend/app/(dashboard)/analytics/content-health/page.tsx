@@ -211,7 +211,8 @@ export default function ContentHealthPage() {
         <GscConnectBanner onConnect={async () => {
           try {
             const { auth_url, state } = await api.analytics.getAuthUrl();
-            sessionStorage.setItem("gsc_oauth_state", state);
+            localStorage.setItem("gsc_oauth_state", state);
+            localStorage.setItem("gsc_oauth_state_ts", Date.now().toString());
             window.open(auth_url, "_blank", "noopener,noreferrer");
           } catch (err) {
             toast.error(parseApiError(err).message);

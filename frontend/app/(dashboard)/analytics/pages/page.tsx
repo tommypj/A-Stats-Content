@@ -88,7 +88,8 @@ export default function PagesPage() {
     try {
       setIsConnecting(true);
       const response = await api.analytics.getAuthUrl();
-      sessionStorage.setItem("gsc_oauth_state", response.state);
+      localStorage.setItem("gsc_oauth_state", response.state);
+      localStorage.setItem("gsc_oauth_state_ts", Date.now().toString());
       window.location.href = response.auth_url;
     } catch (error) {
       const apiError = parseApiError(error);

@@ -239,7 +239,21 @@ async def gsc_oauth_callback(
             "connected_at": connection.connected_at,
         }
 
-    except Exception:
+    except HTTPException:
+        raise
+    except Exception as exc:
+        from services.error_logger import log_exception
+
+        await log_exception(
+            exc,
+            service="api",
+            endpoint="/api/v1/analytics/gsc/callback",
+            http_method="POST",
+            http_status=500,
+            user_id=str(current_user.id),
+            severity="high",
+            context={"step": "gsc_oauth_callback"},
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to connect GSC",
@@ -358,6 +372,8 @@ async def get_gsc_sites(
 
         return GSCSiteListResponse(sites=sites)
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"GSC list_sites failed: {type(e).__name__}: {e}", exc_info=True)
         raise HTTPException(
@@ -1530,6 +1546,8 @@ async def suggest_content(
             existing_articles=existing_titles,
             language=user_lang,
         )
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

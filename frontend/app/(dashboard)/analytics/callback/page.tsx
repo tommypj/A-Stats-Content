@@ -42,8 +42,13 @@ function AnalyticsCallbackContent() {
     }
 
     // CSRF state validation: compare URL state against value stored when OAuth
-    // was initiated. Clear the stored value regardless of outcome.
-    const expectedState = sessionStorage.getItem("gsc_oauth_state");
+    // was initiated. Check both localStorage (cross-tab) and sessionStorage
+    // (legacy). Clear stored values regardless of outcome.
+    const expectedState =
+      localStorage.getItem("gsc_oauth_state") ??
+      sessionStorage.getItem("gsc_oauth_state");
+    localStorage.removeItem("gsc_oauth_state");
+    localStorage.removeItem("gsc_oauth_state_ts");
     sessionStorage.removeItem("gsc_oauth_state");
     if (!expectedState || state !== expectedState) {
       setStatus("error");

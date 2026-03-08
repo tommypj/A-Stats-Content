@@ -157,7 +157,8 @@ export default function AnalyticsPage() {
       setIsConnecting(true);
       const response = await api.analytics.getAuthUrl();
       // Store CSRF state in sessionStorage so the callback page can validate it
-      sessionStorage.setItem("gsc_oauth_state", response.state);
+      localStorage.setItem("gsc_oauth_state", response.state);
+      localStorage.setItem("gsc_oauth_state_ts", Date.now().toString());
       window.location.href = response.auth_url;
     } catch (error) {
       const apiError = parseApiError(error);
