@@ -109,18 +109,17 @@ function ShareButton({
 function RelatedPostItem({ post }: { post: BlogPostCard }) {
   return (
     <Link href={`/blog/${post.slug}`} className="flex items-start gap-3 group">
-      <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-surface-secondary">
+      <div className="relative w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-surface-secondary">
         {post.featured_image_url ? (
           <Image
             src={post.featured_image_url}
             alt={post.featured_image_alt || post.title}
-            width={64}
-            height={64}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-200"
             sizes="64px"
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center">
             <span className="text-primary-300 font-bold text-lg">A</span>
           </div>
         )}

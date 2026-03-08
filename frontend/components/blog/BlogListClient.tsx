@@ -34,20 +34,20 @@ function FeaturedPostCard({ post }: { post: BlogPostCard }) {
         {/* Image */}
         <Link
           href={`/blog/${post.slug}`}
-          className="overflow-hidden block min-h-[240px] md:min-h-[360px] bg-surface-secondary"
+          className="relative overflow-hidden block bg-surface-secondary"
+          style={{ minHeight: "240px", aspectRatio: "3 / 2" }}
         >
           {post.featured_image_url ? (
             <Image
               src={post.featured_image_url}
               alt={post.featured_image_alt || post.title}
-              width={960}
-              height={540}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              fill
+              className="object-cover group-hover:scale-105 transition-transform duration-500"
               sizes="(max-width: 768px) 100vw, 60vw"
               priority
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center">
               <span className="text-primary-400 text-7xl font-bold">A</span>
             </div>
           )}

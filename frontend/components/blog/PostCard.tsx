@@ -22,19 +22,19 @@ export default function PostCard({ post }: PostCardProps) {
       {/* Image */}
       <Link
         href={`/blog/${post.slug}`}
-        className="block overflow-hidden aspect-[16/9] bg-surface-secondary flex-shrink-0"
+        className="block relative overflow-hidden bg-surface-secondary flex-shrink-0"
+        style={{ aspectRatio: "16 / 9" }}
       >
         {post.featured_image_url ? (
           <Image
             src={post.featured_image_url}
             alt={post.featured_image_alt || post.title}
-            width={640}
-            height={360}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-300"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center">
             <span className="text-primary-300 text-4xl font-bold">A</span>
           </div>
         )}
