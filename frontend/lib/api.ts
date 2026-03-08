@@ -722,6 +722,10 @@ export const api = {
         url: `/analytics/article-performance/${articleId}`,
         params,
       }),
+    articleIndexStatus: (articleId: string) =>
+      apiRequest<URLInspectionResponse>({
+        url: `/analytics/article-performance/${articleId}/index-status`,
+      }),
     opportunities: (params?: { start_date?: string; end_date?: string }) =>
       apiRequest<ContentOpportunitiesResponse>({
         url: "/analytics/opportunities",
@@ -2260,6 +2264,22 @@ export interface ArticlePerformanceDetailResponse {
   daily_data: ArticleDailyPerformance[];
   start_date: string;
   end_date: string;
+}
+
+// URL Inspection types
+export interface URLInspectionResponse {
+  verdict: string;
+  coverage_state: string;
+  indexing_state: string;
+  last_crawl_time: string | null;
+  page_fetch_state: string;
+  robots_txt_state: string;
+  crawled_as: string;
+  referring_urls: string[];
+  sitemap: string[];
+  mobile_usability_verdict: string;
+  rich_results_verdict: string;
+  inspected_url: string;
 }
 
 // Content Opportunities types

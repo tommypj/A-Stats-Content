@@ -56,6 +56,7 @@ from api.schemas.analytics import (
     RevenueReportResponse,
     RunDecayDetectionResponse,
     TrendData,
+    URLInspectionResponse,
     UpdateConversionGoalRequest,
 )
 from api.utils import escape_like
@@ -1310,6 +1311,113 @@ async def get_article_performance_detail(
         start_date=start_date,
         end_date=end_date,
     )
+
+
+# ============================================================================
+# URL Inspection Endpoint
+# ============================================================================
+
+
+@router.get(
+    "/article-performance/{article_id}/index-status",
+    response_model=URLInspectionResponse,
+)
+async def get_article_index_status(
+    article_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Check the Google index status for an article's published URL
+    using the URL Inspection API.
+    """
+    connection = await get_gsc_connection(current_user.id, db)
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="GSC not connected",
+        )
+
+    # Fetch the article
+    article_result = await db.execute(
+        select(Article).where(
+            and_(
+                Article.id == article_id,
+                Article.user_id == current_user.id,
+            )
+        )
+    )
+    article = article_result.scalar_one_or_none()
+
+    if not article:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
+
+    if not article.published_url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Article has no published URL"
+        )
+
+    from adapters.search.gsc_adapter import GSCAdapter, GSCCredentials, GSCQuotaError
+    from core.security.encryption import decrypt_credential, encrypt_credential
+
+    decrypted_access_token = decrypt_credential(
+        connection.access_token_encrypted, settings.secret_key
+    )
+    decrypted_refresh_token = decrypt_credential(
+        connection.refresh_token_encrypted, settings.secret_key
+    )
+
+    credentials = GSCCredentials(
+        access_token=decrypted_access_token,
+        refresh_token=decrypted_refresh_token,
+        token_expiry=connection.token_expiry,
+        site_url=connection.site_url,
+    )
+
+    gsc_adapter = GSCAdapter()
+
+    try:
+        result, updated_creds = gsc_adapter.inspect_url(
+            credentials, article.published_url, connection.site_url
+        )
+
+        # Persist refreshed tokens if changed
+        if updated_creds.access_token != decrypted_access_token:
+            connection.access_token_encrypted = encrypt_credential(
+                updated_creds.access_token, settings.secret_key
+            )
+            connection.token_expiry = updated_creds.token_expiry
+            await db.commit()
+
+        return URLInspectionResponse(
+            inspected_url=article.published_url,
+            **result,
+        )
+
+    except GSCQuotaError as e:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=str(e),
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        from services.error_logger import log_exception
+
+        await log_exception(
+            exc,
+            service="api",
+            endpoint=f"/api/v1/analytics/article-performance/{article_id}/index-status",
+            http_method="GET",
+            http_status=500,
+            user_id=str(current_user.id),
+            severity="medium",
+            context={"article_id": article_id, "url": article.published_url},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to inspect URL index status",
+        )
 
 
 # ============================================================================

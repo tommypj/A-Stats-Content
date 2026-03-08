@@ -10,6 +10,13 @@ import {
   Target,
   ExternalLink,
   Edit3,
+  Search,
+  Loader2,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  Smartphone,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -17,6 +24,7 @@ import {
   api,
   parseApiError,
   ArticlePerformanceDetailResponse,
+  URLInspectionResponse,
 } from "@/lib/api";
 import { StatCard } from "@/components/analytics/stat-card";
 import { PerformanceChart } from "@/components/analytics/performance-chart";
@@ -34,6 +42,8 @@ export default function ArticlePerformanceDetailPage() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [data, setData] = useState<ArticlePerformanceDetailResponse | null>(null);
   const [dateRange, setDateRange] = useState(28);
+  const [indexStatus, setIndexStatus] = useState<URLInspectionResponse | null>(null);
+  const [isCheckingIndex, setIsCheckingIndex] = useState(false);
 
   useEffect(() => {
     checkStatus();
@@ -87,6 +97,19 @@ export default function ArticlePerformanceDetailPage() {
       const apiError = parseApiError(error);
       toast.error(apiError.message || "Failed to initiate Google connection");
       setIsConnecting(false);
+    }
+  }
+
+  async function checkIndexStatus() {
+    try {
+      setIsCheckingIndex(true);
+      const result = await api.analytics.articleIndexStatus(articleId);
+      setIndexStatus(result);
+    } catch (error) {
+      const apiError = parseApiError(error);
+      toast.error(apiError.message || "Failed to check index status");
+    } finally {
+      setIsCheckingIndex(false);
     }
   }
 
@@ -185,6 +208,119 @@ export default function ArticlePerformanceDetailPage() {
           <DateRangePicker value={dateRange} onChange={setDateRange} />
         </div>
       </div>
+
+      {/* Index Status */}
+      <Card>
+        <CardContent className="py-4">
+          {!indexStatus && !isCheckingIndex ? (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Search className="h-5 w-5 text-text-muted" />
+                <div>
+                  <p className="text-sm font-medium text-text-primary">Google Index Status</p>
+                  <p className="text-xs text-text-muted">Check if this page is indexed by Google</p>
+                </div>
+              </div>
+              <Button variant="outline" size="sm" onClick={checkIndexStatus}>
+                Check Status
+              </Button>
+            </div>
+          ) : isCheckingIndex ? (
+            <div className="flex items-center gap-3">
+              <Loader2 className="h-5 w-5 animate-spin text-primary-500" />
+              <p className="text-sm text-text-secondary">Checking index status...</p>
+            </div>
+          ) : indexStatus ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {indexStatus.verdict === "PASS" ? (
+                    <CheckCircle className="h-5 w-5 text-green-500" />
+                  ) : indexStatus.verdict === "FAIL" ? (
+                    <XCircle className="h-5 w-5 text-red-500" />
+                  ) : (
+                    <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                  )}
+                  <div>
+                    <p className="text-sm font-medium text-text-primary">
+                      {indexStatus.verdict === "PASS"
+                        ? "Indexed"
+                        : indexStatus.verdict === "FAIL"
+                        ? "Not Indexed"
+                        : "Partially Indexed"}
+                    </p>
+                    {indexStatus.coverage_state && (
+                      <p className="text-xs text-text-muted">{indexStatus.coverage_state}</p>
+                    )}
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm" onClick={checkIndexStatus}>
+                  Refresh
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2 border-t border-surface-tertiary">
+                {indexStatus.last_crawl_time && (
+                  <div className="flex items-start gap-2">
+                    <Clock className="h-4 w-4 text-text-muted mt-0.5" />
+                    <div>
+                      <p className="text-xs text-text-muted">Last Crawled</p>
+                      <p className="text-sm font-medium text-text-primary">
+                        {new Date(indexStatus.last_crawl_time).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-start gap-2">
+                  <Smartphone className="h-4 w-4 text-text-muted mt-0.5" />
+                  <div>
+                    <p className="text-xs text-text-muted">Crawled As</p>
+                    <p className="text-sm font-medium text-text-primary">
+                      {indexStatus.crawled_as ? indexStatus.crawled_as.replace("_", " ") : "—"}
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-text-muted">Mobile Usability</p>
+                  <p className={`text-sm font-medium ${
+                    indexStatus.mobile_usability_verdict === "PASS"
+                      ? "text-green-600"
+                      : indexStatus.mobile_usability_verdict === "FAIL"
+                      ? "text-red-600"
+                      : "text-text-muted"
+                  }`}>
+                    {indexStatus.mobile_usability_verdict === "PASS"
+                      ? "Passed"
+                      : indexStatus.mobile_usability_verdict === "FAIL"
+                      ? "Issues Found"
+                      : "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-text-muted">Rich Results</p>
+                  <p className={`text-sm font-medium ${
+                    indexStatus.rich_results_verdict === "PASS"
+                      ? "text-green-600"
+                      : indexStatus.rich_results_verdict === "FAIL"
+                      ? "text-red-600"
+                      : "text-text-muted"
+                  }`}>
+                    {indexStatus.rich_results_verdict === "PASS"
+                      ? "Eligible"
+                      : indexStatus.rich_results_verdict === "FAIL"
+                      ? "Not Eligible"
+                      : "—"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

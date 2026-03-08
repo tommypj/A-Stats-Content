@@ -282,6 +282,28 @@ class ArticlePerformanceDetailResponse(BaseModel):
 
 
 # ============================================================================
+# URL Inspection Schemas
+# ============================================================================
+
+
+class URLInspectionResponse(BaseModel):
+    """Google URL Inspection API result."""
+
+    verdict: str = Field(..., description="PASS, NEUTRAL, FAIL, or VERDICT_UNSPECIFIED")
+    coverage_state: str = Field(default="", description="e.g. 'Submitted and indexed'")
+    indexing_state: str = Field(default="", description="e.g. 'INDEXING_ALLOWED'")
+    last_crawl_time: str | None = Field(default=None, description="ISO timestamp of last crawl")
+    page_fetch_state: str = Field(default="", description="e.g. 'SUCCESSFUL'")
+    robots_txt_state: str = Field(default="", description="e.g. 'ALLOWED'")
+    crawled_as: str = Field(default="", description="e.g. 'MOBILE'")
+    referring_urls: list[str] = Field(default_factory=list)
+    sitemap: list[str] = Field(default_factory=list)
+    mobile_usability_verdict: str = Field(default="VERDICT_UNSPECIFIED")
+    rich_results_verdict: str = Field(default="VERDICT_UNSPECIFIED")
+    inspected_url: str = Field(default="", description="The URL that was inspected")
+
+
+# ============================================================================
 # Content Opportunities Schemas
 # ============================================================================
 

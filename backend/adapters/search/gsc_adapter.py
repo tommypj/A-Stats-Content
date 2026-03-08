@@ -684,6 +684,76 @@ class GSCAdapter:
         logger.info(f"Retrieved top {len(countries)} countries")
         return countries
 
+    def inspect_url(
+        self, credentials: GSCCredentials, url: str, site_url: str
+    ) -> tuple[dict[str, Any], "GSCCredentials"]:
+        """
+        Inspect a URL's index status using the URL Inspection API.
+
+        Args:
+            credentials: OAuth credentials
+            url: The URL to inspect
+            site_url: The GSC property URL
+
+        Returns:
+            Tuple of (inspection result dict, potentially refreshed credentials)
+
+        Raises:
+            GSCAPIError: If the API call fails
+            GSCQuotaError: If quota is exceeded
+        """
+        try:
+            service, credentials = self._get_service(credentials)
+
+            request_body = {
+                "inspectionUrl": url,
+                "siteUrl": site_url,
+            }
+
+            response = (
+                service.urlInspection()
+                .index()
+                .inspect(body=request_body)
+                .execute()
+            )
+
+            inspection = response.get("inspectionResult", {})
+            index_status_result = inspection.get("indexStatusResult", {})
+            mobile_result = inspection.get("mobileUsabilityResult", {})
+            rich_results = inspection.get("richResultsResult", {})
+
+            result = {
+                "verdict": index_status_result.get("verdict", "VERDICT_UNSPECIFIED"),
+                "coverage_state": index_status_result.get("coverageState", ""),
+                "indexing_state": index_status_result.get("indexingState", ""),
+                "last_crawl_time": index_status_result.get("lastCrawlTime"),
+                "page_fetch_state": index_status_result.get("pageFetchState", ""),
+                "robots_txt_state": index_status_result.get("robotsTxtState", ""),
+                "crawled_as": index_status_result.get("crawledAs", ""),
+                "referring_urls": index_status_result.get("referringUrls", []),
+                "sitemap": index_status_result.get("sitemap", []),
+                "mobile_usability_verdict": mobile_result.get("verdict", "VERDICT_UNSPECIFIED"),
+                "rich_results_verdict": rich_results.get("verdict", "VERDICT_UNSPECIFIED"),
+            }
+
+            logger.info(f"URL inspection for {url}: verdict={result['verdict']}")
+            return result, credentials
+
+        except HttpError as e:
+            if e.resp.status == 403:
+                logger.warning(f"Quota exceeded for URL inspection: {e}")
+                raise GSCQuotaError("URL Inspection API quota exceeded")
+            elif e.resp.status == 429:
+                logger.warning(f"Rate limited for URL inspection: {e}")
+                raise GSCQuotaError("URL Inspection API rate limited — try again later")
+            logger.error(f"URL inspection API error: {e}")
+            raise GSCAPIError(f"URL inspection failed: {e}")
+        except (GSCAuthError, GSCQuotaError):
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error during URL inspection: {e}")
+            raise GSCAPIError(f"URL inspection failed: {e}")
+
 
 # Factory function for easy instantiation
 def create_gsc_adapter(
