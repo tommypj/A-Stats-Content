@@ -2,8 +2,9 @@
  * LemonSqueezy overlay checkout helper.
  *
  * The lemon.js script is loaded statically in app/layout.tsx via next/script.
- * This module provides a typed wrapper for opening checkout overlays
- * and listening for success events.
+ * This module uses the documented `.lemonsqueezy-button` class approach:
+ * lemon.js automatically intercepts clicks on elements with that class
+ * and opens the checkout as an in-app overlay.
  */
 
 declare global {
@@ -24,17 +25,17 @@ export interface LemonSqueezyEvent {
 /**
  * Open a LemonSqueezy checkout URL as an in-app overlay.
  *
- * The checkout URL must come from the LemonSqueezy Checkouts API
- * (POST /v1/checkouts) — manually constructed /checkout/buy/ URLs
- * do not support overlay mode.
+ * Uses the `.lemonsqueezy-button` approach: creates a hidden <a> element
+ * with the checkout URL and the class that lemon.js intercepts, then
+ * programmatically clicks it to trigger the overlay.
  *
- * Falls back to window.open if lemon.js hasn't loaded yet.
+ * Falls back to window.open if lemon.js hasn't loaded.
  */
 export async function openCheckoutOverlay(
   checkoutUrl: string,
   onSuccess?: () => void
 ): Promise<void> {
-  // Re-initialize in case SPA navigation happened after script load
+  // Re-initialize lemon.js for SPA navigation
   window.createLemonSqueezy?.();
 
   if (window.LemonSqueezy) {
@@ -49,7 +50,17 @@ export async function openCheckoutOverlay(
       });
     }
 
-    window.LemonSqueezy.Url.Open(checkoutUrl);
+    // Create a hidden anchor with the lemonsqueezy-button class
+    // that lemon.js will intercept and open as an overlay
+    const anchor = document.createElement("a");
+    anchor.href = checkoutUrl;
+    anchor.classList.add("lemonsqueezy-button");
+    anchor.style.display = "none";
+    document.body.appendChild(anchor);
+    anchor.click();
+
+    // Clean up after a short delay
+    setTimeout(() => anchor.remove(), 500);
   } else {
     // Fallback: open in new tab if script failed to load
     console.warn("LemonSqueezy overlay not available, opening in new tab");
