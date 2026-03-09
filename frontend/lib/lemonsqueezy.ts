@@ -1,8 +1,9 @@
 /**
  * LemonSqueezy overlay checkout helper.
  *
- * Loads the lemon.js script once and provides a function to open
- * checkout URLs as an in-app overlay instead of redirecting away.
+ * The lemon.js script is loaded statically in app/layout.tsx via next/script.
+ * This module provides a typed wrapper for opening checkout overlays
+ * and listening for success events.
  */
 
 declare global {
@@ -20,50 +21,6 @@ export interface LemonSqueezyEvent {
   data?: Record<string, unknown>;
 }
 
-let scriptLoaded = false;
-let scriptLoading = false;
-const loadCallbacks: (() => void)[] = [];
-
-function ensureScript(): Promise<void> {
-  if (scriptLoaded && window.LemonSqueezy) {
-    return Promise.resolve();
-  }
-
-  return new Promise((resolve) => {
-    if (scriptLoading) {
-      loadCallbacks.push(resolve);
-      return;
-    }
-
-    // Check if script tag already exists
-    if (document.querySelector('script[src*="lemonsqueezy"]')) {
-      scriptLoaded = true;
-      window.createLemonSqueezy?.();
-      resolve();
-      return;
-    }
-
-    scriptLoading = true;
-    const script = document.createElement("script");
-    script.src = "https://app.lemonsqueezy.com/js/lemon.js";
-    script.defer = true;
-    script.onload = () => {
-      scriptLoaded = true;
-      scriptLoading = false;
-      window.createLemonSqueezy?.();
-      resolve();
-      loadCallbacks.forEach((cb) => cb());
-      loadCallbacks.length = 0;
-    };
-    script.onerror = () => {
-      scriptLoading = false;
-      // Fallback: resolve anyway so callers can fall back to redirect
-      resolve();
-    };
-    document.head.appendChild(script);
-  });
-}
-
 /**
  * Open a LemonSqueezy checkout URL as an in-app overlay.
  *
@@ -71,13 +28,14 @@ function ensureScript(): Promise<void> {
  * (POST /v1/checkouts) — manually constructed /checkout/buy/ URLs
  * do not support overlay mode.
  *
- * Falls back to window.open if the overlay script fails to load.
+ * Falls back to window.open if lemon.js hasn't loaded yet.
  */
 export async function openCheckoutOverlay(
   checkoutUrl: string,
   onSuccess?: () => void
 ): Promise<void> {
-  await ensureScript();
+  // Re-initialize in case SPA navigation happened after script load
+  window.createLemonSqueezy?.();
 
   if (window.LemonSqueezy) {
     // Listen for checkout success
@@ -93,7 +51,8 @@ export async function openCheckoutOverlay(
 
     window.LemonSqueezy.Url.Open(checkoutUrl);
   } else {
-    // Fallback: open in new tab
+    // Fallback: open in new tab if script failed to load
+    console.warn("LemonSqueezy overlay not available, opening in new tab");
     window.open(checkoutUrl, "_blank", "noopener,noreferrer");
   }
 }
