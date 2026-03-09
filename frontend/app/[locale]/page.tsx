@@ -76,7 +76,7 @@ const jsonLd = {
           name: "Is there a free trial?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Yes. Every account starts on the free tier with no credit card required. You get 3 articles, 3 images, and 5 social posts per month to explore the platform before upgrading. No time limit on the free tier.",
+            text: "Yes. Every account starts on the free tier with no credit card required. You get 3 articles, 3 images, and 3 keyword researches per month to explore the platform before upgrading. No time limit on the free tier.",
           },
         },
         {

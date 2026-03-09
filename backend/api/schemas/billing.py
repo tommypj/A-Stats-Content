@@ -23,6 +23,15 @@ class PlanLimits(BaseModel):
     social_posts_per_month: int = Field(
         ..., description="Number of social post sets allowed per month (-1 for unlimited)"
     )
+    keyword_researches_per_month: int = Field(
+        0, description="Number of keyword researches allowed per month"
+    )
+    site_audits_per_month: int = Field(
+        0, description="Number of site audits allowed per month"
+    )
+    site_audit_pages: int = Field(
+        0, description="Number of pages per site audit"
+    )
 
 
 class PlanInfo(BaseModel):

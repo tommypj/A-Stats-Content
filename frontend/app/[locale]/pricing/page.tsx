@@ -215,7 +215,13 @@ export default function PricingPage() {
                   {/* Features */}
                   <div className="space-y-3">
                     <p className="text-sm font-medium text-text-primary">
-                      {plan.id === "free" ? "Includes:" : "Everything in Free, plus:"}
+                      {plan.id === "free"
+                        ? "Includes:"
+                        : plan.id === "starter"
+                        ? "Everything in Free, plus:"
+                        : plan.id === "professional"
+                        ? "Everything in Starter, plus:"
+                        : "Everything in Professional, plus:"}
                     </p>
                     <ul className="space-y-2">
                       <li className="flex items-start gap-2 text-sm text-text-secondary">
@@ -287,64 +293,55 @@ export default function PricingPage() {
                 </tr>
               </thead>
               <tbody>
-                <tr className="border-b border-surface-tertiary">
-                  <td className="p-4 text-sm text-text-secondary">Articles per month</td>
-                  {plans.map((plan) => (
-                    <td key={plan.id} className="text-center p-4 text-sm text-text-primary">
-                      {plan.limits.articles_per_month === -1
-                        ? "Unlimited"
-                        : plan.limits.articles_per_month}
-                    </td>
-                  ))}
-                </tr>
-                <tr className="border-b border-surface-tertiary">
-                  <td className="p-4 text-sm text-text-secondary">Outlines per month</td>
-                  {plans.map((plan) => (
-                    <td key={plan.id} className="text-center p-4 text-sm text-text-primary">
-                      {plan.limits.outlines_per_month === -1
-                        ? "Unlimited"
-                        : plan.limits.outlines_per_month}
-                    </td>
-                  ))}
-                </tr>
-                <tr className="border-b border-surface-tertiary">
-                  <td className="p-4 text-sm text-text-secondary">Images per month</td>
-                  {plans.map((plan) => (
-                    <td key={plan.id} className="text-center p-4 text-sm text-text-primary">
-                      {plan.limits.images_per_month === -1
-                        ? "Unlimited"
-                        : plan.limits.images_per_month}
-                    </td>
-                  ))}
-                </tr>
-                <tr className="border-b border-surface-tertiary">
-                  <td className="p-4 text-sm text-text-secondary">SEO Analysis</td>
-                  {plans.map((plan) => (
-                    <td key={plan.id} className="text-center p-4">
-                      <Check className="h-5 w-5 text-green-500 mx-auto" />
-                    </td>
-                  ))}
-                </tr>
-                <tr className="border-b border-surface-tertiary">
-                  <td className="p-4 text-sm text-text-secondary">WordPress Integration</td>
-                  {plans.map((plan) => (
-                    <td key={plan.id} className="text-center p-4">
-                      <Check className="h-5 w-5 text-green-500 mx-auto" />
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <td className="p-4 text-sm text-text-secondary">Priority Support</td>
-                  {plans.map((plan) => (
-                    <td key={plan.id} className="text-center p-4">
-                      {plan.id === "professional" || plan.id === "enterprise" ? (
-                        <Check className="h-5 w-5 text-green-500 mx-auto" />
-                      ) : (
-                        <span className="text-text-muted">-</span>
-                      )}
-                    </td>
-                  ))}
-                </tr>
+                {[
+                  { label: "Articles per month", key: "articles_per_month" as const },
+                  { label: "Outlines per month", key: "outlines_per_month" as const },
+                  { label: "Images per month", key: "images_per_month" as const },
+                  { label: "Social posts per month", key: "social_posts_per_month" as const },
+                  { label: "Keyword researches per month", key: "keyword_researches_per_month" as const },
+                  { label: "Site audits per month", key: "site_audits_per_month" as const },
+                ].map((row) => (
+                  <tr key={row.key} className="border-b border-surface-tertiary">
+                    <td className="p-4 text-sm text-text-secondary">{row.label}</td>
+                    {plans.map((plan) => (
+                      <td key={plan.id} className="text-center p-4 text-sm text-text-primary">
+                        {plan.limits[row.key] === -1
+                          ? "Unlimited"
+                          : plan.limits[row.key] === 0
+                          ? <span className="text-text-muted">—</span>
+                          : plan.limits[row.key]}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+                {[
+                  { label: "WordPress Integration", tiers: ["starter", "professional", "enterprise"] },
+                  { label: "Google Search Console", tiers: ["starter", "professional", "enterprise"] },
+                  { label: "Social media scheduling", tiers: ["starter", "professional", "enterprise"] },
+                  { label: "Content calendar & auto-publish", tiers: ["professional", "enterprise"] },
+                  { label: "Competitor analysis", tiers: ["professional", "enterprise"] },
+                  { label: "Bulk content generation", tiers: ["professional", "enterprise"] },
+                  { label: "Knowledge Vault", tiers: ["professional", "enterprise"] },
+                  { label: "Templates & tags", tiers: ["professional", "enterprise"] },
+                  { label: "GA4 & revenue attribution", tiers: ["professional", "enterprise"] },
+                  { label: "API access", tiers: ["professional", "enterprise"] },
+                  { label: "White-label agency mode", tiers: ["enterprise"] },
+                  { label: "Custom integrations", tiers: ["enterprise"] },
+                  { label: "SLA guarantee", tiers: ["enterprise"] },
+                ].map((row) => (
+                  <tr key={row.label} className="border-b border-surface-tertiary last:border-b-0">
+                    <td className="p-4 text-sm text-text-secondary">{row.label}</td>
+                    {plans.map((plan) => (
+                      <td key={plan.id} className="text-center p-4">
+                        {row.tiers.includes(plan.id) ? (
+                          <Check className="h-5 w-5 text-green-500 mx-auto" />
+                        ) : (
+                          <span className="text-text-muted">—</span>
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

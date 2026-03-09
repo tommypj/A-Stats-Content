@@ -2644,6 +2644,8 @@ export interface PlanLimits {
   images_per_month: number;
   social_posts_per_month: number;
   keyword_researches_per_month: number;
+  site_audits_per_month: number;
+  site_audit_pages: number;
 }
 
 export interface PlanInfo {
