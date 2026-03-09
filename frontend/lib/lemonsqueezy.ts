@@ -29,7 +29,6 @@ export interface LemonSqueezyEvent {
  */
 function waitForLemonSqueezy(timeoutMs = 5000): Promise<boolean> {
   return new Promise((resolve) => {
-    // Try calling createLemonSqueezy to force init
     window.createLemonSqueezy?.();
 
     if (window.LemonSqueezy) {
@@ -63,26 +62,16 @@ export async function openCheckoutOverlay(
   checkoutUrl: string,
   onSuccess?: () => void
 ): Promise<void> {
-  console.log("[LS] openCheckoutOverlay called with:", checkoutUrl);
-  console.log("[LS] window.createLemonSqueezy exists:", !!window.createLemonSqueezy);
-  console.log("[LS] window.LemonSqueezy exists:", !!window.LemonSqueezy);
-
-  // Wait for lemon.js to fully initialize
   const ready = await waitForLemonSqueezy();
 
-  console.log("[LS] After wait — ready:", ready, "LemonSqueezy:", !!window.LemonSqueezy);
-
   if (!ready || !window.LemonSqueezy) {
-    console.warn("[LS] LemonSqueezy overlay not available, opening in new tab");
     window.open(checkoutUrl, "_blank", "noopener,noreferrer");
     return;
   }
 
-  // Listen for checkout success
   if (onSuccess) {
     window.LemonSqueezy.Setup({
       eventHandler: (event: LemonSqueezyEvent) => {
-        console.log("[LS] Event received:", event.event);
         if (event.event === "Checkout.Success") {
           onSuccess();
         }
@@ -90,7 +79,5 @@ export async function openCheckoutOverlay(
     });
   }
 
-  console.log("[LS] Calling LemonSqueezy.Url.Open()...");
   window.LemonSqueezy.Url.Open(checkoutUrl);
-  console.log("[LS] Url.Open() called successfully");
 }

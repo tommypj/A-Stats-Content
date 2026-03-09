@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
 import { api, parseApiError, PlanInfo, SubscriptionStatus } from "@/lib/api";
+import { openCheckoutOverlay } from "@/lib/lemonsqueezy";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -155,7 +156,10 @@ export default function BillingPage() {
     try {
       const { checkout_url } = await api.billing.checkout(tier, billingPeriod);
       if (checkout_url) {
-        window.location.href = checkout_url;
+        await openCheckoutOverlay(checkout_url, () => {
+          toast.success("Subscription activated! Refreshing...");
+          loadBillingData();
+        });
       }
     } catch {
       toast.error("Failed to start checkout. Please try again.");
