@@ -248,15 +248,25 @@ export default function BillingPage() {
                 <p className="text-lg font-semibold text-text-primary capitalize">{currentTier}</p>
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    TIER_COLORS[currentTier] || TIER_COLORS.free
+                    subscription?.subscription_status === "cancelled"
+                      ? "bg-yellow-100 text-yellow-700"
+                      : TIER_COLORS[currentTier] || TIER_COLORS.free
                   }`}
                 >
-                  {subscription?.subscription_status === "active" ? "Active" : currentTier === "free" ? "Free" : subscription?.subscription_status || "Active"}
+                  {subscription?.subscription_status === "cancelled"
+                    ? "Cancelling"
+                    : subscription?.subscription_status === "active"
+                    ? "Active"
+                    : currentTier === "free"
+                    ? "Free"
+                    : subscription?.subscription_status || "Active"}
                 </span>
               </div>
               {currentTier !== "free" && subscription?.subscription_expires && (
                 <p className="text-xs text-text-muted mt-0.5">
-                  Renews {new Date(subscription.subscription_expires).toLocaleDateString()}
+                  {subscription.subscription_status === "cancelled"
+                    ? `Access until ${new Date(subscription.subscription_expires).toLocaleDateString()}`
+                    : `Renews ${new Date(subscription.subscription_expires).toLocaleDateString()}`}
                 </p>
               )}
               {currentTier === "free" && (

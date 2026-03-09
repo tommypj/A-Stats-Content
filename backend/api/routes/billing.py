@@ -161,10 +161,13 @@ async def get_subscription_status(current_user: Annotated[User, Depends(get_curr
 
     if current_user.subscription_tier != SubscriptionTier.FREE.value:
         if current_user.lemonsqueezy_subscription_id:
-            # Check if subscription has expired
             if current_user.subscription_expires:
                 if current_user.subscription_expires > datetime.now(UTC):
-                    subscription_status = "active"
+                    # Still within paid period — distinguish active vs cancelled (grace period)
+                    if current_user.subscription_status == "cancelled":
+                        subscription_status = "cancelled"
+                    else:
+                        subscription_status = "active"
                 else:
                     subscription_status = "expired"
             else:
@@ -428,6 +431,7 @@ async def handle_webhook(
     variant_id = attributes.get("variant_id")
     subscription_status = attributes.get("status")
     renews_at = attributes.get("renews_at")
+    ends_at = attributes.get("ends_at")
 
     # BILL-21: Validate subscription_status from webhook payload
     if subscription_status and subscription_status not in VALID_SUBSCRIPTION_STATUSES:
@@ -537,10 +541,19 @@ async def handle_webhook(
                 )
 
         elif event_name == WebhookEventType.SUBSCRIPTION_CANCELLED.value:
-            # BILL-04: Revoke features immediately on cancellation
-            user.subscription_status = "cancelled"  # BILL-08
-            user.subscription_expires = datetime.now(UTC)
-            logger.info(f"Subscription cancelled for user {user_id}, access revoked immediately")
+            # Grace period: keep tier access until billing period ends.
+            # LemonSqueezy sets ends_at to the next renewal date.
+            # The subscription_expired webhook will downgrade to free.
+            user.subscription_status = "cancelled"
+            if ends_at:
+                user.subscription_expires = _parse_iso_datetime(ends_at)
+            elif renews_at:
+                user.subscription_expires = _parse_iso_datetime(renews_at)
+            logger.info(
+                "Subscription cancelled for user %s, access until %s",
+                user_id,
+                user.subscription_expires,
+            )
 
         elif event_name == WebhookEventType.SUBSCRIPTION_EXPIRED.value:
             # Subscription expired - downgrade to free
