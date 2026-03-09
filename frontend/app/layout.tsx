@@ -5,6 +5,7 @@ import { Toaster } from "sonner";
 import { Providers } from "@/components/providers";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { CookieBanner } from "@/components/ui/cookie-banner";
+import { LemonSqueezyInit } from "@/components/LemonSqueezyInit";
 import "./globals.css";
 
 const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
@@ -121,6 +122,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(globalJsonLd) }}
         />
         <Providers>
+          <LemonSqueezyInit />
           <ErrorBoundary>
             {children}
           </ErrorBoundary>
