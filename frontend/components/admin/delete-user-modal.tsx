@@ -5,7 +5,7 @@ import { api, AdminUserDetail, parseApiError } from "@/lib/api";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, AlertTriangle } from "lucide-react";
+import { X, AlertTriangle, Trash2 } from "lucide-react";
 
 interface DeleteUserModalProps {
   user: AdminUserDetail;
@@ -21,6 +21,7 @@ export function DeleteUserModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmEmail, setConfirmEmail] = useState("");
+  const [hardDelete, setHardDelete] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +35,7 @@ export function DeleteUserModal({
     setError(null);
 
     try {
-      await api.admin.users.delete(user.id);
+      await api.admin.users.delete(user.id, hardDelete);
       onSuccess();
     } catch (err) {
       const apiError = parseApiError(err);
@@ -50,9 +51,15 @@ export function DeleteUserModal({
           <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
             <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-red-700">
-              <p className="font-semibold mb-1">This action cannot be undone!</p>
+              <p className="font-semibold mb-1">
+                {hardDelete
+                  ? "Permanent deletion — cannot be undone!"
+                  : "This will deactivate the user account."}
+              </p>
               <p>
-                Deleting <strong>{user.name}</strong> will permanently remove:
+                {hardDelete ? "Hard deleting" : "Soft deleting"}{" "}
+                <strong>{user.name}</strong> will{" "}
+                {hardDelete ? "permanently remove" : "mark as deleted"}:
               </p>
               <ul className="list-disc list-inside mt-2 space-y-1">
                 <li>User account and profile</li>
@@ -61,8 +68,31 @@ export function DeleteUserModal({
                 <li>All images ({user.total_images})</li>
                 <li>All subscription data</li>
               </ul>
+              {hardDelete && (
+                <p className="mt-2 font-semibold">
+                  The email address will be freed up for re-registration.
+                </p>
+              )}
             </div>
           </div>
+
+          {/* Hard delete toggle */}
+          <label className="flex items-center gap-3 p-3 rounded-lg border border-surface-tertiary bg-surface-secondary cursor-pointer hover:border-red-300 transition-colors">
+            <input
+              type="checkbox"
+              checked={hardDelete}
+              onChange={(e) => setHardDelete(e.target.checked)}
+              className="h-4 w-4 rounded border-surface-tertiary text-red-600 focus:ring-red-500"
+            />
+            <div>
+              <span className="text-sm font-medium text-text-primary">
+                Hard delete (permanent)
+              </span>
+              <p className="text-xs text-text-secondary mt-0.5">
+                Permanently removes all data from the database. The email can be reused for a new account.
+              </p>
+            </div>
+          </label>
 
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
@@ -92,8 +122,9 @@ export function DeleteUserModal({
               isLoading={loading}
               disabled={confirmEmail !== user.email}
               className="flex-1"
+              leftIcon={<Trash2 className="h-4 w-4" />}
             >
-              Delete User
+              {hardDelete ? "Permanently Delete" : "Soft Delete"} User
             </Button>
             <Button type="button" variant="outline" onClick={onClose} className="flex-1">
               Cancel

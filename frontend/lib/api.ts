@@ -1075,10 +1075,11 @@ export const api = {
           method: "POST",
           url: `/admin/users/${id}/unsuspend`,
         }),
-      delete: (id: string) =>
+      delete: (id: string, hardDelete = false) =>
         apiRequest<void>({
           method: "DELETE",
           url: `/admin/users/${id}`,
+          params: hardDelete ? { soft_delete: false } : undefined,
         }),
       resetPassword: (id: string, sendEmail: boolean = true) =>
         apiRequest<{ success: boolean; message: string }>({
