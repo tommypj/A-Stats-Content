@@ -725,6 +725,14 @@ async def handle_webhook(
         logger.error(f"User {user_id} not found for webhook")
         return {"status": "error", "message": "User not found"}
 
+    # Skip webhook processing for refunded users — refund handler already downgraded them.
+    # Without this, the subscription_updated webhook (fired by cancel) would re-set the tier.
+    if user.subscription_status == "refunded":
+        logger.info(
+            "Skipping webhook %s for refunded user %s", event_name, user_id
+        )
+        return {"status": "ok", "message": "Skipped — user was refunded"}
+
     # BILL-02: Validate customer_id in webhook matches the one stored on the user.
     # Prevents an attacker who knows another user's user_id from spoofing events
     # by crafting a webhook with their customer_id but a victim's user_id.
