@@ -550,6 +550,9 @@ class LemonSqueezyAdapter:
             "data": {
                 "type": "checkouts",
                 "attributes": {
+                    "checkout_options": {
+                        "embed": True,
+                    },
                     "checkout_data": {
                         "email": email,
                         "custom": {
