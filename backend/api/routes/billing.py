@@ -236,7 +236,11 @@ async def create_checkout(
             redirect_url=f"{frontend_url}/billing/success",
         )
     except LemonSqueezyError as e:
-        logger.error(f"Failed to create checkout session: {e}")
+        logger.error(
+            "Failed to create checkout session: %s "
+            "(store_id=%s, variant_id=%s, plan=%s, cycle=%s)",
+            e, settings.lemonsqueezy_store_id, variant_id, body.plan, body.billing_cycle,
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Failed to create checkout session. Please try again.",

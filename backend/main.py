@@ -234,6 +234,7 @@ async def lifespan(app: FastAPI):
 
     # Daily cleanup of site audit records older than 90 days
     async def _site_audit_cleanup_loop():
+        from datetime import UTC, datetime, timedelta
         from sqlalchemy import delete as _sa_delete
         from infrastructure.database.models.site_audit import SiteAudit
 
