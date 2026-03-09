@@ -140,11 +140,12 @@ export default function BillingPage() {
       if (pricingRes?.plans) {
         setPlans(pricingRes.plans);
       }
-      if (profileRes) {
-        setCurrentTier(profileRes.subscription_tier || "free");
-      }
       if (subRes) {
         setSubscription(subRes);
+        // Prefer subscription tier (most up-to-date after refund/cancel)
+        setCurrentTier(subRes.subscription_tier || "free");
+      } else if (profileRes) {
+        setCurrentTier(profileRes.subscription_tier || "free");
       }
     } catch (error) {
       const apiError = parseApiError(error);
@@ -188,12 +189,12 @@ export default function BillingPage() {
       const result = await api.billing.refund();
       toast.success(result.message || "Refund processed successfully");
       setShowRefundConfirm(false);
-      await loadBillingData();
+      // Force full reload to clear all cached state
+      window.location.reload();
     } catch (error) {
+      setRefunding(false);
       const apiError = parseApiError(error);
       toast.error(apiError.message || "Failed to process refund");
-    } finally {
-      setRefunding(false);
     }
   };
 
