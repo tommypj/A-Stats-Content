@@ -114,6 +114,7 @@ class User(Base, TimestampMixin):
     )
     lemonsqueezy_subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     lemonsqueezy_variant_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    refund_count: Mapped[int] = mapped_column(default=0, nullable=False)
 
     # Preferences
     language: Mapped[str] = mapped_column(String(10), default="en", nullable=False)

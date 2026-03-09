@@ -23,6 +23,7 @@ from .template import ArticleTemplate
 from .content import Article, ArticleRevision, ContentStatus, ContentTone, GeneratedImage, Outline
 from .error_log import SystemErrorLog
 from .notification_preferences import NotificationPreferences
+from .refund_blocked_email import RefundBlockedEmail
 from .generation import AdminAlert, GenerationLog
 from .keyword_cache import KeywordResearchCache
 from .knowledge import KnowledgeChunk, KnowledgeQuery, KnowledgeSource, SourceStatus
@@ -104,4 +105,5 @@ __all__ = [
     "OutlineTag",
     "SystemErrorLog",
     "NotificationPreferences",
+    "RefundBlockedEmail",
 ]

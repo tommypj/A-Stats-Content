@@ -12,9 +12,10 @@ from urllib.parse import urlencode
 
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.deps_admin import get_current_admin_user
 from api.middleware.rate_limit import limiter
 from api.routes.auth import get_current_user
 from adapters.payments.lemonsqueezy_adapter import LemonSqueezyAdapter, LemonSqueezyAPIError
@@ -33,6 +34,7 @@ from api.schemas.billing import (
 from core.plans import PLANS
 from infrastructure.config.settings import settings
 from infrastructure.database.connection import get_db
+from infrastructure.database.models.refund_blocked_email import RefundBlockedEmail
 from infrastructure.database.models.user import SubscriptionTier, User
 
 # Configure logging
@@ -159,7 +161,10 @@ REFUND_WINDOW_DAYS = 14  # EU right of withdrawal
 
 
 @router.get("/subscription", response_model=SubscriptionStatus)
-async def get_subscription_status(current_user: Annotated[User, Depends(get_current_user)]):
+async def get_subscription_status(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
     """Get current user's subscription status and usage."""
     subscription_status = "none"
     refund_eligible = False
@@ -178,23 +183,30 @@ async def get_subscription_status(current_user: Annotated[User, Depends(get_curr
             else:
                 subscription_status = "active"
 
-            # Check refund eligibility via LemonSqueezy subscription created_at
-            if subscription_status == "active":
-                try:
-                    adapter = LemonSqueezyAdapter()
-                    sub_data = await adapter._make_request(
-                        "GET",
-                        f"subscriptions/{current_user.lemonsqueezy_subscription_id}",
+            # Check refund eligibility: active, first refund, not blocked, within 14 days
+            if subscription_status == "active" and (current_user.refund_count or 0) == 0:
+                # Check blocked email list
+                blocked = await db.scalar(
+                    select(RefundBlockedEmail.id).where(
+                        func.lower(RefundBlockedEmail.email) == func.lower(current_user.email)
                     )
-                    created_at_str = sub_data.get("data", {}).get("attributes", {}).get("created_at")
-                    if created_at_str:
-                        created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
-                        deadline = created_at + timedelta(days=REFUND_WINDOW_DAYS)
-                        if datetime.now(UTC) < deadline:
-                            refund_eligible = True
-                            refund_deadline = deadline
-                except Exception:
-                    logger.debug("Could not check refund eligibility", exc_info=True)
+                )
+                if not blocked:
+                    try:
+                        adapter = LemonSqueezyAdapter()
+                        sub_data = await adapter._make_request(
+                            "GET",
+                            f"subscriptions/{current_user.lemonsqueezy_subscription_id}",
+                        )
+                        created_at_str = sub_data.get("data", {}).get("attributes", {}).get("created_at")
+                        if created_at_str:
+                            created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+                            deadline = created_at + timedelta(days=REFUND_WINDOW_DAYS)
+                            if datetime.now(UTC) < deadline:
+                                refund_eligible = True
+                                refund_deadline = deadline
+                    except Exception:
+                        logger.debug("Could not check refund eligibility", exc_info=True)
 
     return SubscriptionStatus(
         subscription_tier=current_user.subscription_tier,
@@ -373,8 +385,9 @@ async def refund_subscription(
     """
     Request a full refund within the 14-day EU right of withdrawal period.
 
-    Cancels the subscription and refunds the most recent invoice.
-    The user is immediately downgraded to the free tier.
+    - First refund: processed automatically
+    - Subsequent refunds: rejected (must contact support)
+    - Blocked emails: rejected outright
     """
     if not current_user.lemonsqueezy_subscription_id:
         raise HTTPException(
@@ -386,6 +399,27 @@ async def refund_subscription(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Free tier subscriptions cannot be refunded",
+        )
+
+    # Check if email is blocked from refunds
+    blocked = await db.scalar(
+        select(RefundBlockedEmail.id).where(
+            func.lower(RefundBlockedEmail.email) == func.lower(current_user.email)
+        )
+    )
+    if blocked:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account is not eligible for self-service refunds. "
+            "Please contact billing@astats.app for assistance.",
+        )
+
+    # Only first refund is automatic; subsequent ones require manual approval
+    if current_user.refund_count > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You have already used your automatic refund. "
+            "For additional refund requests, please contact billing@astats.app.",
         )
 
     adapter = LemonSqueezyAdapter()
@@ -448,21 +482,116 @@ async def refund_subscription(
         await adapter.cancel_subscription(current_user.lemonsqueezy_subscription_id)
     except Exception as e:
         logger.error("Refund succeeded but cancellation failed: %s", e)
-        # Refund went through — don't fail the request, just log
 
-    # Immediately downgrade to free
+    # Immediately downgrade to free and increment refund count
     current_user.subscription_tier = SubscriptionTier.FREE.value
     current_user.subscription_status = "refunded"
     current_user.subscription_expires = None
     current_user.lemonsqueezy_subscription_id = None
+    current_user.refund_count = (current_user.refund_count or 0) + 1
     await db.commit()
 
-    logger.info("Refund processed for user %s", current_user.id)
+    logger.info(
+        "Refund processed for user %s (refund_count=%d)",
+        current_user.id,
+        current_user.refund_count,
+    )
 
     return RefundResponse(
         success=True,
         message="Your subscription has been refunded. You have been downgraded to the free plan.",
     )
+
+
+# --- Admin: Refund Blocked Emails ---
+
+
+@router.get("/admin/refund-blocked-emails")
+async def list_blocked_emails(
+    current_user: Annotated[User, Depends(get_current_admin_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    """List all emails blocked from self-service refunds (admin only)."""
+    result = await db.execute(
+        select(RefundBlockedEmail).order_by(RefundBlockedEmail.created_at.desc())
+    )
+    rows = result.scalars().all()
+    return [
+        {
+            "id": r.id,
+            "email": r.email,
+            "reason": r.reason,
+            "blocked_by": r.blocked_by,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+
+
+@router.post("/admin/refund-blocked-emails")
+async def block_email_from_refunds(
+    request: Request,
+    current_user: Annotated[User, Depends(get_current_admin_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    """Block an email from requesting self-service refunds (admin only)."""
+    body = await request.json()
+    email = body.get("email", "").strip().lower()
+    reason = body.get("reason", "").strip() or None
+
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email is required",
+        )
+
+    # Check if already blocked
+    existing = await db.scalar(
+        select(RefundBlockedEmail.id).where(
+            func.lower(RefundBlockedEmail.email) == email
+        )
+    )
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email is already blocked",
+        )
+
+    blocked = RefundBlockedEmail(
+        email=email,
+        reason=reason,
+        blocked_by=current_user.id,
+    )
+    db.add(blocked)
+    await db.commit()
+
+    logger.info("Admin %s blocked email %s from refunds", current_user.id, email)
+    return {"success": True, "message": f"Email {email} blocked from self-service refunds"}
+
+
+@router.delete("/admin/refund-blocked-emails/{blocked_id}")
+async def unblock_email_from_refunds(
+    blocked_id: str,
+    current_user: Annotated[User, Depends(get_current_admin_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    """Remove an email from the refund block list (admin only)."""
+    result = await db.execute(
+        select(RefundBlockedEmail).where(RefundBlockedEmail.id == blocked_id)
+    )
+    blocked = result.scalar_one_or_none()
+    if not blocked:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Blocked email entry not found",
+        )
+
+    email = blocked.email
+    await db.delete(blocked)
+    await db.commit()
+
+    logger.info("Admin %s unblocked email %s from refunds", current_user.id, email)
+    return {"success": True, "message": f"Email {email} unblocked"}
 
 
 @router.post("/webhook")
