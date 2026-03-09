@@ -16,61 +16,61 @@ export const metadata: Metadata = {
   },
 };
 
-const jsonLd = {
+const softwareAppJsonLd = {
   "@context": "https://schema.org",
-  "@graph": [
+  "@type": "SoftwareApplication",
+  name: "A-Stats",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web",
+  url: SITE_URL,
+  description:
+    "AI-powered SEO content creation and optimization platform. Generate articles, track rankings, and optimize for AI answer engines.",
+  aggregateRating: {
+    "@type": "AggregateRating",
+    ratingValue: "4.8",
+    ratingCount: "127",
+    bestRating: "5",
+    worstRating: "1",
+  },
+  offers: [
     {
-      "@type": "SoftwareApplication",
-      name: "A-Stats",
-      applicationCategory: "BusinessApplication",
-      operatingSystem: "Web",
-      url: SITE_URL,
-      description:
-        "AI-powered SEO content creation and optimization platform. Generate articles, track rankings, and optimize for AI answer engines.",
-      aggregateRating: {
-        "@type": "AggregateRating",
-        ratingValue: "4.8",
-        ratingCount: "127",
-        bestRating: "5",
-        worstRating: "1",
-      },
-      offers: [
-        {
-          "@type": "Offer",
-          name: "Free",
-          price: "0",
-          priceCurrency: "USD",
-          availability: "https://schema.org/InStock",
-        },
-        {
-          "@type": "Offer",
-          name: "Starter",
-          price: "29.00",
-          priceCurrency: "USD",
-          availability: "https://schema.org/InStock",
-          priceValidUntil: "2026-12-31",
-        },
-        {
-          "@type": "Offer",
-          name: "Professional",
-          price: "79.00",
-          priceCurrency: "USD",
-          availability: "https://schema.org/InStock",
-          priceValidUntil: "2026-12-31",
-        },
-        {
-          "@type": "Offer",
-          name: "Enterprise",
-          price: "199.00",
-          priceCurrency: "USD",
-          availability: "https://schema.org/InStock",
-          priceValidUntil: "2026-12-31",
-        },
-      ],
+      "@type": "Offer",
+      name: "Free",
+      price: "0",
+      priceCurrency: "USD",
+      availability: "https://schema.org/InStock",
     },
     {
-      "@type": "FAQPage",
-      mainEntity: [
+      "@type": "Offer",
+      name: "Starter",
+      price: "29.00",
+      priceCurrency: "USD",
+      availability: "https://schema.org/InStock",
+      priceValidUntil: "2026-12-31",
+    },
+    {
+      "@type": "Offer",
+      name: "Professional",
+      price: "79.00",
+      priceCurrency: "USD",
+      availability: "https://schema.org/InStock",
+      priceValidUntil: "2026-12-31",
+    },
+    {
+      "@type": "Offer",
+      name: "Enterprise",
+      price: "199.00",
+      priceCurrency: "USD",
+      availability: "https://schema.org/InStock",
+      priceValidUntil: "2026-12-31",
+    },
+  ],
+};
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: [
         {
           "@type": "Question",
           name: "Is there a free trial?",
@@ -136,8 +136,6 @@ const jsonLd = {
           },
         },
       ],
-    },
-  ],
 };
 
 export default function HomePage() {
@@ -145,7 +143,11 @@ export default function HomePage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareAppJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
       <LandingPageClient />
     </>
