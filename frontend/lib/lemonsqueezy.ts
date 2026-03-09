@@ -65,8 +65,12 @@ function ensureScript(): Promise<void> {
 }
 
 /**
- * Open a LemonSqueezy checkout URL as an overlay.
- * Appends `embed=1` to enable overlay mode.
+ * Open a LemonSqueezy checkout URL as an in-app overlay.
+ *
+ * The checkout URL must come from the LemonSqueezy Checkouts API
+ * (POST /v1/checkouts) — manually constructed /checkout/buy/ URLs
+ * do not support overlay mode.
+ *
  * Falls back to window.open if the overlay script fails to load.
  */
 export async function openCheckoutOverlay(
@@ -74,10 +78,6 @@ export async function openCheckoutOverlay(
   onSuccess?: () => void
 ): Promise<void> {
   await ensureScript();
-
-  // Append embed=1 to enable overlay mode
-  const separator = checkoutUrl.includes("?") ? "&" : "?";
-  const overlayUrl = `${checkoutUrl}${separator}embed=1`;
 
   if (window.LemonSqueezy) {
     // Listen for checkout success
@@ -91,7 +91,7 @@ export async function openCheckoutOverlay(
       });
     }
 
-    window.LemonSqueezy.Url.Open(overlayUrl);
+    window.LemonSqueezy.Url.Open(checkoutUrl);
   } else {
     // Fallback: open in new tab
     window.open(checkoutUrl, "_blank", "noopener,noreferrer");

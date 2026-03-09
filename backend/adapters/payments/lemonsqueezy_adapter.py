@@ -517,6 +517,75 @@ class LemonSqueezyAdapter:
         logger.info("Retrieved customer portal URL")
         return portal_url
 
+    async def create_checkout(
+        self,
+        variant_id: str,
+        email: str,
+        user_id: str,
+        plan: str,
+        redirect_url: str | None = None,
+    ) -> str:
+        """
+        Create a checkout session via the LemonSqueezy Checkouts API.
+
+        Uses the API instead of manually constructing URLs so the returned
+        URL works with the LemonSqueezy.Url.Open() overlay.
+
+        Args:
+            variant_id: LemonSqueezy variant ID
+            email: Customer email address
+            user_id: User ID to include in custom data
+            plan: Plan name (starter/professional/enterprise)
+            redirect_url: Optional URL to redirect after checkout
+
+        Returns:
+            Checkout URL from the API response
+
+        Raises:
+            LemonSqueezyAPIError: If API request fails
+        """
+        logger.info(f"Creating checkout session for variant {variant_id}, user {user_id}")
+
+        payload: dict[str, Any] = {
+            "data": {
+                "type": "checkouts",
+                "attributes": {
+                    "checkout_data": {
+                        "email": email,
+                        "custom": {
+                            "user_id": user_id,
+                            "plan": plan,
+                        },
+                    },
+                },
+                "relationships": {
+                    "store": {
+                        "data": {
+                            "type": "stores",
+                            "id": str(self.store_id),
+                        }
+                    },
+                    "variant": {
+                        "data": {
+                            "type": "variants",
+                            "id": str(variant_id),
+                        }
+                    },
+                },
+            }
+        }
+
+        if redirect_url:
+            payload["data"]["attributes"]["product_options"] = {
+                "redirect_url": redirect_url,
+            }
+
+        response = await self._make_request("POST", "checkouts", data=payload)
+        checkout_url = response["data"]["attributes"]["url"]
+
+        logger.info(f"Created checkout session for user {user_id}: {checkout_url}")
+        return checkout_url
+
     def get_checkout_url(
         self,
         variant_id: str,
@@ -526,7 +595,9 @@ class LemonSqueezyAdapter:
         custom_data: dict[str, Any] | None = None,
     ) -> str:
         """
-        Generate checkout URL for a product variant.
+        Generate checkout URL for a product variant (legacy, manual URL construction).
+
+        Prefer create_checkout() for overlay-compatible URLs.
 
         Args:
             variant_id: LemonSqueezy variant ID

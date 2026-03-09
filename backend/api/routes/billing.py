@@ -221,23 +221,26 @@ async def create_checkout(
     # Get variant ID for the plan and billing cycle
     variant_id = get_variant_id(body.plan, body.billing_cycle)
 
-    # Build checkout URL using the store slug
-    store_slug = settings.lemonsqueezy_store_slug or settings.lemonsqueezy_store_id
-    if not store_slug:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Payment system not configured",
-        )
     frontend_url = settings.frontend_url.rstrip("/")
-    params = urlencode(
-        {
-            "checkout[email]": current_user.email,
-            "checkout[custom][user_id]": str(current_user.id),
-            "checkout[custom][plan]": body.plan,
-            "checkout[redirect_url]": f"{frontend_url}/billing/success",
-        }
-    )
-    checkout_url = f"https://{store_slug}.lemonsqueezy.com/checkout/buy/{variant_id}?{params}"
+
+    # Use the Checkouts API to get an overlay-compatible URL
+    from adapters.payments.lemonsqueezy_adapter import LemonSqueezyAdapter, LemonSqueezyError
+
+    adapter = LemonSqueezyAdapter()
+    try:
+        checkout_url = await adapter.create_checkout(
+            variant_id=variant_id,
+            email=current_user.email,
+            user_id=str(current_user.id),
+            plan=body.plan,
+            redirect_url=f"{frontend_url}/billing/success",
+        )
+    except LemonSqueezyError as e:
+        logger.error(f"Failed to create checkout session: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to create checkout session. Please try again.",
+        )
 
     logger.info(
         f"Created checkout session for user {current_user.id}, "
