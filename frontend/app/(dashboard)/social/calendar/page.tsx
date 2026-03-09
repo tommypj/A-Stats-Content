@@ -10,6 +10,7 @@ import { Calendar, Filter, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { startOfToday, startOfMonth, endOfMonth, format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { TierGate } from "@/components/ui/tier-gate";
 
 type ViewMode = "month" | "week" | "day";
 
@@ -85,6 +86,7 @@ export default function SocialCalendarPage() {
   };
 
   return (
+    <TierGate minimum="starter" feature="Content Calendar">
     <div className="space-y-6 max-w-7xl">
       {/* Header */}
       <div className="mb-6">
@@ -208,5 +210,6 @@ export default function SocialCalendarPage() {
         </div>
       </div>
     </div>
+    </TierGate>
   );
 }

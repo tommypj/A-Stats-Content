@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { api, parseApiError, GeneratedReport, ClientWorkspace } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TierGate } from "@/components/ui/tier-gate";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -126,6 +127,7 @@ export default function AgencyReportsPage() {
   };
 
   return (
+    <TierGate minimum="enterprise" feature="Agency Mode">
     <div className="space-y-6 animate-in">
       {/* Header */}
       <div className="flex items-center gap-3">
@@ -291,5 +293,6 @@ export default function AgencyReportsPage() {
         </Card>
       )}
     </div>
+    </TierGate>
   );
 }

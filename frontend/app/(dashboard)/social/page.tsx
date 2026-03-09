@@ -17,6 +17,7 @@ import {
   TrendingUp,
   AlertCircle,
 } from "lucide-react";
+import { TierGate } from "@/components/ui/tier-gate";
 
 export default function SocialDashboard() {
   const router = useRouter();
@@ -129,6 +130,7 @@ export default function SocialDashboard() {
   }
 
   return (
+    <TierGate minimum="starter" feature="Social Media">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -341,5 +343,6 @@ export default function SocialDashboard() {
         </Button>
       </div>
     </div>
+    </TierGate>
   );
 }

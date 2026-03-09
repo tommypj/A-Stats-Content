@@ -30,6 +30,7 @@ import { GscConnectBanner } from "@/components/analytics/gsc-connect-banner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { TierGate } from "@/components/ui/tier-gate";
 
 type SortField = "total_clicks" | "total_impressions" | "avg_position" | "avg_ctr" | "published_at";
 type SortOrder = "asc" | "desc";
@@ -165,6 +166,7 @@ export default function ArticlePerformancePage() {
   , data.items[0]);
 
   return (
+    <TierGate minimum="starter" feature="Analytics">
     <div className="space-y-6">
       {/* Header */}
       <div>
@@ -328,5 +330,6 @@ export default function ArticlePerformancePage() {
         </CardContent>
       </Card>
     </div>
+    </TierGate>
   );
 }

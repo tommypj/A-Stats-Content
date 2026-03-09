@@ -18,6 +18,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TierGate } from "@/components/ui/tier-gate";
 
 // -------------------------------------------------------------------------
 // Types
@@ -679,6 +680,7 @@ export default function ContentCalendarPage() {
   // Render
   // ---------------------------------------------------------------------------
   return (
+    <TierGate minimum="professional" feature="Content Calendar">
     <div className="space-y-6 max-w-7xl">
       {/* Page header */}
       <div className="mb-6">
@@ -890,5 +892,6 @@ export default function ContentCalendarPage() {
         />
       )}
     </div>
+    </TierGate>
   );
 }

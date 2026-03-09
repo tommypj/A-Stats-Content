@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog } from "@/components/ui/dialog";
+import { TierGate } from "@/components/ui/tier-gate";
 
 const FILE_TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   pdf: FileType,
@@ -150,6 +151,7 @@ export default function SourceDetailPage() {
   const StatusIcon = statusStyle.icon;
 
   return (
+    <TierGate minimum="professional" feature="Knowledge Vault">
     <div className="space-y-6">
       {/* Header */}
       <div>
@@ -394,5 +396,6 @@ export default function SourceDetailPage() {
         </div>
       </Dialog>
     </div>
+    </TierGate>
   );
 }

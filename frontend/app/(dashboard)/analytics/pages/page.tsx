@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GscConnectBanner } from "@/components/analytics/gsc-connect-banner";
 import { cn } from "@/lib/utils";
+import { TierGate } from "@/components/ui/tier-gate";
 
 type SortField = "page_url" | "clicks" | "impressions" | "ctr" | "position";
 type SortOrder = "asc" | "desc";
@@ -205,6 +206,7 @@ export default function PagesPage() {
   const displayedPages = getSortedAndFilteredPages();
 
   return (
+    <TierGate minimum="starter" feature="Analytics">
     <div className="space-y-6">
       {/* Header */}
       <div>
@@ -466,5 +468,6 @@ export default function PagesPage() {
         </CardContent>
       </Card>
     </div>
+    </TierGate>
   );
 }

@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/card";
 import { useRequireAuth } from "@/lib/auth";
 import { useProject } from "@/contexts/ProjectContext";
+import { TierGate } from "@/components/ui/tier-gate";
 
 const REPORT_TYPES = [
   { value: "overview", label: "SEO Overview" },
@@ -155,6 +156,7 @@ export default function ReportsPage() {
   if (authLoading) return null;
 
   return (
+    <TierGate minimum="professional" feature="SEO Reports">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -395,5 +397,6 @@ export default function ReportsPage() {
         </div>
       </Dialog>
     </div>
+    </TierGate>
   );
 }

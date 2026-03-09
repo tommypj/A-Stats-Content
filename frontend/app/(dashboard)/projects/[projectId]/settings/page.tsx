@@ -42,6 +42,7 @@ import {
   Unplug,
   Loader2,
 } from "lucide-react";
+import { TierGate } from "@/components/ui/tier-gate";
 
 type Tab = "general" | "members" | "invitations" | "integrations" | "danger";
 
@@ -402,6 +403,7 @@ export default function ProjectSettingsPage() {
   }
 
   return (
+    <TierGate minimum="starter" feature="Project Management">
     <div className="space-y-6">
       <ConfirmDialog
         isOpen={!!confirmAction}
@@ -739,5 +741,6 @@ export default function ProjectSettingsPage() {
         </>
       )}
     </div>
+    </TierGate>
   );
 }

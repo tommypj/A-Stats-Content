@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { api, parseApiError, ContentTemplate, TemplateConfig } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TierGate } from "@/components/ui/tier-gate";
 
 const DEFAULT_CONFIG: TemplateConfig = {
   tone: "professional",
@@ -104,6 +105,7 @@ export default function TemplatesPage() {
   };
 
   return (
+    <TierGate minimum="professional" feature="Bulk Content">
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Link href="/bulk">
@@ -255,5 +257,6 @@ export default function TemplatesPage() {
         </div>
       )}
     </div>
+    </TierGate>
   );
 }

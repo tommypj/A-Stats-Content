@@ -9,6 +9,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { useRequireAuth } from "@/lib/auth";
 import { useProject } from "@/contexts/ProjectContext";
+import { TierGate } from "@/components/ui/tier-gate";
 
 const PRESET_COLORS = [
   "#6366f1", "#8b5cf6", "#ec4899", "#ef4444",
@@ -100,6 +101,7 @@ export default function TagsPage() {
   if (authLoading) return null;
 
   return (
+    <TierGate minimum="professional" feature="Content Tags">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -244,5 +246,6 @@ export default function TagsPage() {
         </div>
       </Dialog>
     </div>
+    </TierGate>
   );
 }

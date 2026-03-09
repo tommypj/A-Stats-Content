@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from api.middleware.rate_limit import limiter
+from api.dependencies import require_tier
 from api.routes.auth import get_current_user
 from api.schemas.competitor import (
     AnalyzeCompetitorRequest,
@@ -49,6 +50,7 @@ async def analyze_competitor(
     Start a competitor analysis for the given domain.
     Returns cached result if a non-expired analysis exists.
     """
+    require_tier("professional")(current_user)
     domain = body.domain
     project_id = body.project_id
 
@@ -93,6 +95,7 @@ async def list_analyses(
     db: AsyncSession = Depends(get_db),
 ):
     """List user's competitor analyses, newest first."""
+    require_tier("professional")(current_user)
     base_query = select(CompetitorAnalysis).where(
         CompetitorAnalysis.user_id == current_user.id
     )
@@ -127,6 +130,7 @@ async def get_analysis(
     db: AsyncSession = Depends(get_db),
 ):
     """Get analysis detail with all articles."""
+    require_tier("professional")(current_user)
     result = await db.execute(
         select(CompetitorAnalysis)
         .options(selectinload(CompetitorAnalysis.articles))
@@ -154,6 +158,7 @@ async def delete_analysis(
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a competitor analysis and all its articles."""
+    require_tier("professional")(current_user)
     result = await db.execute(
         select(CompetitorAnalysis).where(
             CompetitorAnalysis.id == analysis_id,
@@ -178,6 +183,7 @@ async def get_keywords(
     db: AsyncSession = Depends(get_db),
 ):
     """Get aggregated keywords from a completed analysis."""
+    require_tier("professional")(current_user)
     # Verify ownership
     analysis = await db.execute(
         select(CompetitorAnalysis).where(
@@ -226,6 +232,7 @@ async def get_keyword_gaps(
     db: AsyncSession = Depends(get_db),
 ):
     """Get keyword gap analysis — keywords the competitor covers but user does not."""
+    require_tier("professional")(current_user)
     # Verify ownership
     result = await db.execute(
         select(CompetitorAnalysis).where(

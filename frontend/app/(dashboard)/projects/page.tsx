@@ -22,6 +22,7 @@ import {
   Loader2,
 } from "lucide-react";
 import Image from "next/image";
+import { TierGate } from "@/components/ui/tier-gate";
 
 
 const roleIcons: Record<string, typeof Crown> = {
@@ -120,6 +121,7 @@ export default function ProjectsPage() {
   }
 
   return (
+    <TierGate minimum="starter" feature="Project Management">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -293,5 +295,6 @@ export default function ProjectsPage() {
         </Card>
       )}
     </div>
+    </TierGate>
   );
 }

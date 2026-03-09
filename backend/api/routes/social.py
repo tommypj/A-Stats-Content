@@ -22,6 +22,7 @@ from sqlalchemy.orm import selectinload
 from api.middleware.rate_limit import limiter
 from api.oauth_helpers import store_oauth_state as _store_oauth_state
 from api.oauth_helpers import verify_oauth_state_full as _verify_oauth_state_full
+from api.dependencies import require_tier
 from api.routes.auth import get_current_user
 from api.schemas.social import (
     BestTimeSlot,
@@ -106,6 +107,7 @@ async def list_connected_accounts(
     db: AsyncSession = Depends(get_db),
 ):
     """List user's connected social media accounts."""
+    require_tier("starter")(current_user)
     # SM-06: Scope to current project to prevent cross-project IDOR.
     query = select(SocialAccount).where(SocialAccount.user_id == current_user.id)
     if current_user.current_project_id:
@@ -130,6 +132,7 @@ async def initiate_connection(
     Get OAuth authorization URL for connecting a social account.
     Currently supports Facebook (which also covers Instagram Business accounts).
     """
+    require_tier("starter")(current_user)
     # Validate platform
     try:
         Platform(platform)
@@ -629,6 +632,7 @@ async def disconnect_account(
     db: AsyncSession = Depends(get_db),
 ):
     """Disconnect a social media account."""
+    require_tier("starter")(current_user)
     result = await db.execute(
         select(SocialAccount).where(
             and_(
@@ -666,6 +670,7 @@ async def verify_account(
     NOTE: Placeholder implementation.
     In production, make API call to platform to verify token.
     """
+    require_tier("starter")(current_user)
     result = await db.execute(
         select(SocialAccount).where(
             and_(
@@ -713,6 +718,7 @@ async def create_scheduled_post(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new scheduled post."""
+    require_tier("starter")(current_user)
     # Validate account_ids belong to user
     result = await db.execute(
         select(SocialAccount).where(
@@ -837,6 +843,7 @@ async def list_scheduled_posts(
     db: AsyncSession = Depends(get_db),
 ):
     """List scheduled posts with filtering."""
+    require_tier("starter")(current_user)
     # Build query with eager loading of targets to avoid N+1
     query = (
         select(ScheduledPost)
@@ -926,6 +933,7 @@ async def get_scheduled_post(
     db: AsyncSession = Depends(get_db),
 ):
     """Get details of a scheduled post."""
+    require_tier("starter")(current_user)
     result = await db.execute(
         select(ScheduledPost).where(
             and_(
@@ -991,6 +999,7 @@ async def update_scheduled_post(
     db: AsyncSession = Depends(get_db),
 ):
     """Update a scheduled post (only if not yet posted)."""
+    require_tier("starter")(current_user)
     result = await db.execute(
         select(ScheduledPost).where(
             and_(
@@ -1097,6 +1106,7 @@ async def delete_scheduled_post(
     db: AsyncSession = Depends(get_db),
 ):
     """Cancel/delete a scheduled post."""
+    require_tier("starter")(current_user)
     result = await db.execute(
         select(ScheduledPost).where(
             and_(
@@ -1132,6 +1142,7 @@ async def publish_post_now(
     In production, this would trigger the actual publishing to platforms
     via background jobs/workers (Celery, etc.)
     """
+    require_tier("starter")(current_user)
     result = await db.execute(
         select(ScheduledPost).where(
             and_(
@@ -1184,6 +1195,7 @@ async def get_calendar(
     db: AsyncSession = Depends(get_db),
 ):
     """Get posts for calendar view."""
+    require_tier("starter")(current_user)
     # Build query with eager loading of targets to avoid N+1
     query = (
         select(ScheduledPost)
@@ -1258,6 +1270,7 @@ async def get_post_stats(
     db: AsyncSession = Depends(get_db),
 ):
     """Get post statistics for the current user."""
+    require_tier("starter")(current_user)
     # Count posts by status
     result = await db.execute(
         select(ScheduledPost.status, func.count(ScheduledPost.id).label("count"))
@@ -1313,6 +1326,7 @@ async def get_post_analytics(
     NOTE: Placeholder implementation.
     In production, fetch real analytics from each platform's API.
     """
+    require_tier("starter")(current_user)
     result = await db.execute(
         select(ScheduledPost).where(
             and_(
@@ -1457,6 +1471,7 @@ async def get_best_posting_times(
     engagement data from PostTarget.analytics_data (if available) or
     raw post count as a fallback proxy.
     """
+    require_tier("starter")(current_user)
     # Validate platform
     if platform not in PLATFORM_LIMITS:
         raise HTTPException(

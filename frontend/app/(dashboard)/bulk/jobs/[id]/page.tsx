@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { api, parseApiError, BulkJobDetail, BulkJobItem } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TierGate } from "@/components/ui/tier-gate";
 
 const ITEM_STATUS: Record<string, { icon: typeof CheckCircle2; color: string }> = {
   pending: { icon: Clock, color: "text-text-muted" },
@@ -113,6 +114,7 @@ export default function BulkJobDetailPage() {
     : 0;
 
   return (
+    <TierGate minimum="professional" feature="Bulk Content">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
@@ -251,5 +253,6 @@ export default function BulkJobDetailPage() {
         </CardContent>
       </Card>
     </div>
+    </TierGate>
   );
 }

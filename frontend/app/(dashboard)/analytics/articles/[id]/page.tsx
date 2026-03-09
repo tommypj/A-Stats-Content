@@ -32,6 +32,7 @@ import { DateRangePicker } from "@/components/analytics/date-range-picker";
 import { GscConnectBanner } from "@/components/analytics/gsc-connect-banner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TierGate } from "@/components/ui/tier-gate";
 
 export default function ArticlePerformanceDetailPage() {
   const params = useParams();
@@ -168,6 +169,7 @@ export default function ArticlePerformanceDetailPage() {
   }));
 
   return (
+    <TierGate minimum="starter" feature="Analytics">
     <div className="space-y-6">
       {/* Header */}
       <div>
@@ -371,5 +373,6 @@ export default function ArticlePerformanceDetailPage() {
         </Card>
       )}
     </div>
+    </TierGate>
   );
 }

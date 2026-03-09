@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/card";
 import { useRequireAuth } from "@/lib/auth";
 import { useProject } from "@/contexts/ProjectContext";
+import { TierGate } from "@/components/ui/tier-gate";
 
 const TONE_OPTIONS = [
   "professional",
@@ -196,6 +197,7 @@ export default function TemplatesPage() {
   if (authLoading) return null;
 
   return (
+    <TierGate minimum="professional" feature="Article Templates">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -538,5 +540,6 @@ export default function TemplatesPage() {
         </div>
       </Dialog>
     </div>
+    </TierGate>
   );
 }

@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import and_, delete, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.dependencies import require_tier
 from api.oauth_helpers import require_valid_oauth_state, store_oauth_state
 from api.routes.auth import get_current_user
 from api.schemas.analytics import (
@@ -144,6 +145,7 @@ async def get_gsc_auth_url(
     """
     Get Google OAuth authorization URL for GSC connection.
     """
+    require_tier("starter")(current_user)
     if not settings.google_client_id or not settings.google_client_secret:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -180,6 +182,7 @@ async def gsc_oauth_callback(
     OAuth callback handler for GSC connection.
     This endpoint exchanges the authorization code for tokens.
     """
+    require_tier("starter")(current_user)
     if not code or not state:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -269,6 +272,7 @@ async def disconnect_gsc(
     """
     Disconnect Google Search Console integration.
     """
+    require_tier("starter")(current_user)
     connection = await get_gsc_connection(current_user.id, db)
 
     if not connection:
@@ -291,6 +295,7 @@ async def get_gsc_status(
     """
     Get current GSC connection status.
     """
+    require_tier("starter")(current_user)
     connection = await get_gsc_connection(current_user.id, db)
 
     if not connection:
@@ -312,6 +317,7 @@ async def get_gsc_sites(
     """
     List verified sites from Google Search Console.
     """
+    require_tier("starter")(current_user)
     import logging
 
     logger = logging.getLogger(__name__)
@@ -392,6 +398,7 @@ async def select_gsc_site(
     """
     Select a site to track from verified GSC sites.
     """
+    require_tier("starter")(current_user)
     connection = await get_gsc_connection(current_user.id, db)
 
     if not connection:
@@ -421,6 +428,7 @@ async def sync_gsc_data(
     Trigger a data sync from Google Search Console.
     Fetches keyword rankings, page performance, and daily stats for the last 28 days.
     """
+    require_tier("starter")(current_user)
     connection = await get_gsc_connection(current_user.id, db)
 
     if not connection:
@@ -624,6 +632,7 @@ async def get_keyword_rankings(
     """
     Get keyword ranking data with pagination and date filtering.
     """
+    require_tier("starter")(current_user)
     connection = await get_gsc_connection(current_user.id, db)
 
     if not connection:
@@ -674,6 +683,7 @@ async def get_page_performances(
     """
     Get page performance data with pagination and date filtering.
     """
+    require_tier("starter")(current_user)
     connection = await get_gsc_connection(current_user.id, db)
 
     if not connection:
@@ -723,6 +733,7 @@ async def get_daily_analytics(
     """
     Get daily aggregated analytics data with pagination and date filtering.
     """
+    require_tier("starter")(current_user)
     connection = await get_gsc_connection(current_user.id, db)
 
     if not connection:
@@ -765,6 +776,7 @@ async def get_device_breakdown(
     db: AsyncSession = Depends(get_db),
 ):
     """Get performance breakdown by device type (mobile, desktop, tablet)."""
+    require_tier("starter")(current_user)
     connection = await get_gsc_connection(current_user.id, db)
     if not connection:
         raise HTTPException(
@@ -803,6 +815,7 @@ async def get_country_breakdown(
     db: AsyncSession = Depends(get_db),
 ):
     """Get performance breakdown by country."""
+    require_tier("starter")(current_user)
     connection = await get_gsc_connection(current_user.id, db)
     if not connection:
         raise HTTPException(
@@ -848,6 +861,7 @@ async def get_analytics_summary(
     """
     Get analytics overview/dashboard summary with trends and top performers.
     """
+    require_tier("starter")(current_user)
     connection = await get_gsc_connection(current_user.id, db)
 
     if not connection:
@@ -997,6 +1011,7 @@ async def get_article_performance(
     """
     List published articles cross-referenced with GSC page performance data.
     """
+    require_tier("starter")(current_user)
     connection = await get_gsc_connection(current_user.id, db)
     if not connection:
         raise HTTPException(
@@ -1198,6 +1213,7 @@ async def get_article_performance_detail(
     """
     Get detailed performance data for a single article.
     """
+    require_tier("starter")(current_user)
     connection = await get_gsc_connection(current_user.id, db)
     if not connection:
         raise HTTPException(
@@ -1331,6 +1347,7 @@ async def get_article_index_status(
     Check the Google index status for an article's published URL
     using the URL Inspection API.
     """
+    require_tier("starter")(current_user)
     connection = await get_gsc_connection(current_user.id, db)
     if not connection:
         raise HTTPException(
@@ -1437,6 +1454,7 @@ async def get_content_opportunities(
     Categories: quick wins (positions 5-20), content gaps (high impressions, low CTR),
     rising keywords (improved position).
     """
+    require_tier("professional")(current_user)
     connection = await get_gsc_connection(current_user.id, db)
     if not connection:
         raise HTTPException(
@@ -1586,6 +1604,7 @@ async def suggest_content(
     """
     Generate AI-powered content suggestions based on selected keywords.
     """
+    require_tier("professional")(current_user)
     connection = await get_gsc_connection(current_user.id, db)
     if not connection:
         raise HTTPException(
@@ -1691,6 +1710,7 @@ async def get_content_health(
     db: AsyncSession = Depends(get_db),
 ):
     """Get overall content health score and summary."""
+    require_tier("professional")(current_user)
     from services.content_decay import get_content_health_score
 
     health_data = await get_content_health_score(db, current_user.id)
@@ -1758,6 +1778,7 @@ async def list_decay_alerts(
     db: AsyncSession = Depends(get_db),
 ):
     """List content decay alerts with filtering and pagination."""
+    require_tier("professional")(current_user)
     conditions = [ContentDecayAlert.user_id == current_user.id]
 
     if alert_type:
@@ -1843,6 +1864,7 @@ async def trigger_decay_detection(
     db: AsyncSession = Depends(get_db),
 ):
     """Manually trigger content decay detection for the current user."""
+    require_tier("professional")(current_user)
     connection = await get_gsc_connection(current_user.id, db)
     if not connection:
         raise HTTPException(
@@ -1867,6 +1889,7 @@ async def mark_alert_read(
     db: AsyncSession = Depends(get_db),
 ):
     """Mark a decay alert as read."""
+    require_tier("professional")(current_user)
     result = await db.execute(
         select(ContentDecayAlert).where(
             and_(
@@ -1891,6 +1914,7 @@ async def resolve_alert(
     db: AsyncSession = Depends(get_db),
 ):
     """Mark a decay alert as resolved."""
+    require_tier("professional")(current_user)
     result = await db.execute(
         select(ContentDecayAlert).where(
             and_(
@@ -1916,6 +1940,7 @@ async def suggest_recovery(
     db: AsyncSession = Depends(get_db),
 ):
     """Generate AI-powered recovery suggestions for a specific decay alert."""
+    require_tier("professional")(current_user)
     from services.content_decay import generate_recovery_suggestions
 
     result = await generate_recovery_suggestions(db, alert_id, current_user.id)
@@ -1928,6 +1953,7 @@ async def mark_all_alerts_read(
     db: AsyncSession = Depends(get_db),
 ):
     """Mark all unread decay alerts as read."""
+    require_tier("professional")(current_user)
     from sqlalchemy import update
 
     await db.execute(
@@ -1955,6 +1981,7 @@ async def get_aeo_overview(
     db: AsyncSession = Depends(get_db),
 ):
     """Get AEO overview for all user articles."""
+    require_tier("professional")(current_user)
     from services.aeo_scoring import get_aeo_overview as _get_aeo_overview
 
     data = await _get_aeo_overview(db, current_user.id)
@@ -1984,6 +2011,7 @@ async def get_revenue_overview_endpoint(
     db: AsyncSession = Depends(get_db),
 ):
     """Get revenue attribution overview for the current user."""
+    require_tier("professional")(current_user)
     from services.revenue_attribution import get_revenue_overview
 
     data = await get_revenue_overview(current_user.id, db, start_date, end_date)
@@ -2000,6 +2028,7 @@ async def get_revenue_by_article_endpoint(
     db: AsyncSession = Depends(get_db),
 ):
     """Get revenue attribution broken down by article."""
+    require_tier("professional")(current_user)
     from services.revenue_attribution import get_revenue_by_article
 
     data = await get_revenue_by_article(current_user.id, db, start_date, end_date, page, page_size)
@@ -2016,6 +2045,7 @@ async def get_revenue_by_keyword_endpoint(
     db: AsyncSession = Depends(get_db),
 ):
     """Get revenue attribution broken down by keyword."""
+    require_tier("professional")(current_user)
     from services.revenue_attribution import get_revenue_by_keyword
 
     data = await get_revenue_by_keyword(current_user.id, db, start_date, end_date, page, page_size)
@@ -2029,6 +2059,7 @@ async def create_conversion_goal(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new conversion goal."""
+    require_tier("professional")(current_user)
     # ANA-36: Explicitly validate goal_config is a dict (Pydantic already rejects non-dicts,
     # but this guard is here for defence-in-depth against unexpected type coercions)
     if body.goal_config is not None and not isinstance(body.goal_config, dict):
@@ -2052,6 +2083,7 @@ async def list_conversion_goals(
     db: AsyncSession = Depends(get_db),
 ):
     """List conversion goals scoped to the current project (or all user goals if no project set)."""
+    require_tier("professional")(current_user)
     # ANA-11: scope to current project to avoid cross-project data leaks
     conditions = [ConversionGoal.user_id == current_user.id]
     if current_user.current_project_id:
@@ -2074,6 +2106,7 @@ async def update_conversion_goal(
     db: AsyncSession = Depends(get_db),
 ):
     """Update an existing conversion goal."""
+    require_tier("professional")(current_user)
     result = await db.execute(
         select(ConversionGoal).where(
             and_(
@@ -2108,6 +2141,7 @@ async def delete_conversion_goal(
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a conversion goal."""
+    require_tier("professional")(current_user)
     result = await db.execute(
         select(ConversionGoal).where(
             and_(
@@ -2135,6 +2169,7 @@ async def import_conversions_endpoint(
     db: AsyncSession = Depends(get_db),
 ):
     """Import conversion records for a given goal."""
+    require_tier("professional")(current_user)
     from services.revenue_attribution import import_conversions
 
     data = await import_conversions(current_user.id, db, body.goal_id, body.conversions)
@@ -2148,6 +2183,7 @@ async def generate_revenue_report_endpoint(
     db: AsyncSession = Depends(get_db),
 ):
     """Generate a pre-computed revenue attribution report."""
+    require_tier("professional")(current_user)
     from services.revenue_attribution import generate_revenue_report
 
     data = await generate_revenue_report(current_user.id, db, report_type)

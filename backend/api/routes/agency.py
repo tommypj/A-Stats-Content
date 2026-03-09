@@ -17,6 +17,7 @@ from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.middleware.rate_limit import limiter
+from api.dependencies import require_tier
 from api.routes.auth import get_current_user
 from infrastructure.database.connection import get_db
 from infrastructure.database.models import User
@@ -215,6 +216,7 @@ async def create_agency_profile(
     db: AsyncSession = Depends(get_db),
 ):
     """Create an agency profile for the current user (one per user)."""
+    require_tier("enterprise")(current_user)
     existing = await db.execute(
         select(AgencyProfile).where(AgencyProfile.user_id == current_user.id)
     )
@@ -245,6 +247,7 @@ async def get_profile(
     db: AsyncSession = Depends(get_db),
 ):
     """Get the current user's agency profile."""
+    require_tier("enterprise")(current_user)
     return await get_agency_profile(current_user.id, db)
 
 
@@ -255,6 +258,7 @@ async def update_agency_profile(
     db: AsyncSession = Depends(get_db),
 ):
     """Update the current user's agency profile."""
+    require_tier("enterprise")(current_user)
     profile = await get_agency_profile(current_user.id, db)
 
     if body.agency_name is not None:
@@ -279,6 +283,7 @@ async def delete_agency_profile(
     db: AsyncSession = Depends(get_db),
 ):
     """Delete the current user's agency profile (and all associated data)."""
+    require_tier("enterprise")(current_user)
     profile = await get_agency_profile(current_user.id, db)
     await db.delete(profile)
     await db.commit()
@@ -296,6 +301,7 @@ async def list_client_workspaces(
     db: AsyncSession = Depends(get_db),
 ):
     """List all client workspaces belonging to the current user's agency."""
+    require_tier("enterprise")(current_user)
     profile = await get_agency_profile(current_user.id, db)
 
     result = await db.execute(
@@ -318,6 +324,7 @@ async def create_client_workspace(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a client workspace for a project owned by the current user."""
+    require_tier("enterprise")(current_user)
     profile = await get_agency_profile(current_user.id, db)
 
     # Validate the target project exists and belongs to the current user
@@ -379,6 +386,7 @@ async def get_client_workspace(
     db: AsyncSession = Depends(get_db),
 ):
     """Get a single client workspace by ID."""
+    require_tier("enterprise")(current_user)
     profile = await get_agency_profile(current_user.id, db)
     return await get_client_workspace_for_agency(workspace_id, profile.id, db)
 
@@ -391,6 +399,7 @@ async def update_client_workspace(
     db: AsyncSession = Depends(get_db),
 ):
     """Update a client workspace."""
+    require_tier("enterprise")(current_user)
     profile = await get_agency_profile(current_user.id, db)
     workspace = await get_client_workspace_for_agency(workspace_id, profile.id, db)
 
@@ -417,6 +426,7 @@ async def delete_client_workspace(
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a client workspace."""
+    require_tier("enterprise")(current_user)
     profile = await get_agency_profile(current_user.id, db)
     workspace = await get_client_workspace_for_agency(workspace_id, profile.id, db)
     await db.delete(workspace)
@@ -433,6 +443,7 @@ async def enable_client_portal(
     db: AsyncSession = Depends(get_db),
 ):
     """Generate a portal access token and enable the client portal."""
+    require_tier("enterprise")(current_user)
     profile = await get_agency_profile(current_user.id, db)
     workspace = await get_client_workspace_for_agency(workspace_id, profile.id, db)
 
@@ -452,6 +463,7 @@ async def disable_client_portal(
     db: AsyncSession = Depends(get_db),
 ):
     """Disable the client portal and clear the access token."""
+    require_tier("enterprise")(current_user)
     profile = await get_agency_profile(current_user.id, db)
     workspace = await get_client_workspace_for_agency(workspace_id, profile.id, db)
 
@@ -474,6 +486,7 @@ async def list_report_templates(
     db: AsyncSession = Depends(get_db),
 ):
     """List all report templates for the current agency."""
+    require_tier("enterprise")(current_user)
     profile = await get_agency_profile(current_user.id, db)
 
     result = await db.execute(
@@ -496,6 +509,7 @@ async def create_report_template(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new report template for the current agency."""
+    require_tier("enterprise")(current_user)
     profile = await get_agency_profile(current_user.id, db)
 
     template = ReportTemplate(
@@ -518,6 +532,7 @@ async def update_report_template(
     db: AsyncSession = Depends(get_db),
 ):
     """Update a report template."""
+    require_tier("enterprise")(current_user)
     profile = await get_agency_profile(current_user.id, db)
 
     result = await db.execute(
@@ -552,6 +567,7 @@ async def delete_report_template(
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a report template."""
+    require_tier("enterprise")(current_user)
     profile = await get_agency_profile(current_user.id, db)
 
     result = await db.execute(
@@ -596,6 +612,7 @@ async def generate_report(
     for the workspace's project over the requested date range and persists the
     result as a GeneratedReport record.
     """
+    require_tier("enterprise")(current_user)
     from infrastructure.database.models.analytics import DailyAnalytics, PagePerformance
     from infrastructure.database.models.revenue import ContentConversion
 
@@ -764,6 +781,7 @@ async def list_generated_reports(
     db: AsyncSession = Depends(get_db),
 ):
     """List generated reports for the current agency (paginated)."""
+    require_tier("enterprise")(current_user)
     profile = await get_agency_profile(current_user.id, db)
 
     conditions = [GeneratedReport.agency_id == profile.id]
@@ -813,6 +831,7 @@ async def get_generated_report(
     db: AsyncSession = Depends(get_db),
 ):
     """Get a single generated report by ID."""
+    require_tier("enterprise")(current_user)
     profile = await get_agency_profile(current_user.id, db)
 
     result = await db.execute(

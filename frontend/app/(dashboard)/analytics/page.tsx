@@ -31,6 +31,7 @@ import { DateRangePicker } from "@/components/analytics/date-range-picker";
 import { GscConnectBanner } from "@/components/analytics/gsc-connect-banner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TierGate } from "@/components/ui/tier-gate";
 
 export default function AnalyticsPage() {
   const [isConnected, setIsConnected] = useState(false);
@@ -299,6 +300,7 @@ export default function AnalyticsPage() {
   }
 
   return (
+    <TierGate minimum="starter" feature="Analytics">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -539,5 +541,6 @@ export default function AnalyticsPage() {
         </CardContent>
       </Card>
     </div>
+    </TierGate>
   );
 }

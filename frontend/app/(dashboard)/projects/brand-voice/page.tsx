@@ -13,6 +13,7 @@ import {
   AlertCircle,
   Info,
 } from "lucide-react";
+import { TierGate } from "@/components/ui/tier-gate";
 
 const TONE_OPTIONS = [
   { value: "", label: "Not set" },
@@ -162,6 +163,7 @@ export default function BrandVoicePage() {
   }
 
   return (
+    <TierGate minimum="starter" feature="Project Management">
     <div className="max-w-2xl mx-auto space-y-6">
       {/* Page header */}
       <div className="flex items-center gap-3">
@@ -331,5 +333,6 @@ export default function BrandVoicePage() {
         </span>
       </div>
     </div>
+    </TierGate>
   );
 }

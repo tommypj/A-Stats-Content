@@ -15,6 +15,7 @@ from PIL import Image as PILImage
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.dependencies import require_tier
 from api.routes.auth import get_current_user
 from api.schemas.wordpress import (
     WordPressCategoryResponse,
@@ -171,6 +172,7 @@ async def connect_wordpress(
     """
     Store WordPress credentials for the current project.
     """
+    require_tier("starter")(current_user)
     # Load current project
     if not current_user.current_project_id:
         raise HTTPException(
@@ -241,6 +243,7 @@ async def disconnect_wordpress(
     """
     Remove WordPress credentials from the current project.
     """
+    require_tier("starter")(current_user)
     if not current_user.current_project_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -276,6 +279,7 @@ async def get_wordpress_status(
     Args:
         test_connection: If True, test the actual connection to WordPress
     """
+    require_tier("starter")(current_user)
     if not current_user.current_project_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -338,6 +342,7 @@ async def get_wordpress_categories(
     """
     Fetch categories from connected WordPress site.
     """
+    require_tier("starter")(current_user)
     if not current_user.current_project_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -397,6 +402,7 @@ async def get_wordpress_tags(
     """
     Fetch tags from connected WordPress site.
     """
+    require_tier("starter")(current_user)
     if not current_user.current_project_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -456,6 +462,7 @@ async def publish_to_wordpress(
     """
     Publish an article to WordPress.
     """
+    require_tier("starter")(current_user)
     # Require an active project — WordPress credentials are project-scoped
     if not current_user.current_project_id:
         raise HTTPException(
@@ -909,6 +916,7 @@ async def upload_media_to_wordpress(
     Upload a generated image to the WordPress media library.
     Downloads the image from its URL and uploads it to WordPress.
     """
+    require_tier("starter")(current_user)
     # Get WordPress credentials from the current project
     if not current_user.current_project_id:
         raise HTTPException(

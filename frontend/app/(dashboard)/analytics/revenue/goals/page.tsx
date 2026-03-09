@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { api, parseApiError, ConversionGoal } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TierGate } from "@/components/ui/tier-gate";
 
 const GOAL_TYPES = [
   { value: "page_visit", label: "Page Visit" },
@@ -213,6 +214,7 @@ export default function ConversionGoalsPage() {
   }
 
   return (
+    <TierGate minimum="professional" feature="Revenue Attribution">
     <div className="space-y-6">
       {/* Header */}
       <div>
@@ -455,5 +457,6 @@ export default function ConversionGoalsPage() {
         </div>
       )}
     </div>
+    </TierGate>
   );
 }

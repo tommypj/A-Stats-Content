@@ -16,6 +16,7 @@ import {
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
+import { TierGate } from "@/components/ui/tier-gate";
 
 const DRAFT_KEY = "social_compose_draft";
 
@@ -229,6 +230,7 @@ export default function ComposePage() {
   }
 
   return (
+    <TierGate minimum="starter" feature="Social Media">
     <div className="space-y-6">
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Header */}
@@ -420,5 +422,6 @@ export default function ComposePage() {
         </div>
       </form>
     </div>
+    </TierGate>
   );
 }

@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.dependencies import require_tier
 from api.deps_project import get_project_member
 from api.middleware.rate_limit import limiter
 from api.routes.auth import get_current_user
@@ -135,6 +136,7 @@ async def list_templates(
     db: AsyncSession = Depends(get_db),
 ):
     """List all content templates for the current user/project."""
+    require_tier("professional")(current_user)
     conditions = [ContentTemplate.user_id == current_user.id]
     if current_user.current_project_id:
         conditions.append(ContentTemplate.project_id == current_user.current_project_id)
@@ -171,6 +173,7 @@ async def create_template(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new content template."""
+    require_tier("professional")(current_user)
     # BULK-04: Verify project membership before creating resources under it.
     if current_user.current_project_id:
         await get_project_member(current_user.current_project_id, current_user.id, db)
@@ -209,6 +212,7 @@ async def update_template(
     db: AsyncSession = Depends(get_db),
 ):
     """Update a content template."""
+    require_tier("professional")(current_user)
     result = await db.execute(
         select(ContentTemplate).where(
             and_(ContentTemplate.id == template_id, ContentTemplate.user_id == current_user.id)
@@ -253,6 +257,7 @@ async def delete_template(
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a content template."""
+    require_tier("professional")(current_user)
     result = await db.execute(
         select(ContentTemplate).where(
             and_(ContentTemplate.id == template_id, ContentTemplate.user_id == current_user.id)
@@ -290,6 +295,7 @@ async def list_jobs(
     db: AsyncSession = Depends(get_db),
 ):
     """List bulk jobs for the current user."""
+    require_tier("professional")(current_user)
     conditions = [BulkJob.user_id == current_user.id]
     if status_filter:
         conditions.append(BulkJob.status == status_filter)
@@ -340,6 +346,7 @@ async def get_job(
     db: AsyncSession = Depends(get_db),
 ):
     """Get a bulk job with all its items."""
+    require_tier("professional")(current_user)
     from services.bulk_generation import get_job_with_items
 
     data = await get_job_with_items(db, job_id, current_user.id)
@@ -358,6 +365,7 @@ async def create_bulk_outline_job(
     db: AsyncSession = Depends(get_db),
 ):
     """Create and start a bulk outline generation job."""
+    require_tier("professional")(current_user)
     from services.bulk_generation import create_bulk_outline_job as _create_job
     from services.bulk_generation import process_bulk_outline_job
 
@@ -455,6 +463,7 @@ async def cancel_job(
     db: AsyncSession = Depends(get_db),
 ):
     """Cancel a bulk job (stops pending items)."""
+    require_tier("professional")(current_user)
     from services.bulk_generation import cancel_job as _cancel
 
     success = await _cancel(db, job_id, current_user.id)
@@ -475,6 +484,7 @@ async def retry_failed_items(
     db: AsyncSession = Depends(get_db),
 ):
     """Retry failed items in a bulk job."""
+    require_tier("professional")(current_user)
     from sqlalchemy import update as sql_update
 
     from services.bulk_generation import process_bulk_outline_job

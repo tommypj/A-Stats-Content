@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from adapters.email.resend_adapter import email_service
+from api.dependencies import require_tier
 from api.middleware.rate_limit import limiter
 from api.routes.auth import get_current_user
 from api.schemas.project import (
@@ -203,6 +204,7 @@ async def create_project_invitation(
     - Sets expiration to 7 days from now
     - Sends invitation email
     """
+    require_tier("starter")(current_user)
     # PROJ-26: personal workspaces cannot have invited members
     if project.is_personal:
         raise HTTPException(
@@ -332,6 +334,7 @@ async def revoke_project_invitation(
     - Sets status to REVOKED
     - Only works for PENDING invitations
     """
+    require_tier("starter")(current_user)
     # Get invitation
     result = await db.execute(
         select(ProjectInvitation).where(
@@ -381,6 +384,7 @@ async def resend_project_invitation(
     - Resets expires_at to 7 days from now
     - Sends new email with same token
     """
+    require_tier("starter")(current_user)
     # Get invitation
     result = await db.execute(
         select(ProjectInvitation)
@@ -519,6 +523,7 @@ async def accept_invitation(
     - If user is not logged in: Return redirect URL to register/login
     - Validates invitation is still pending and not expired
     """
+    require_tier("starter")(current_user)
     # Get invitation
     result = await db.execute(
         select(ProjectInvitation)

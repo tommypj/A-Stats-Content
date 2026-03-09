@@ -9,6 +9,7 @@ import { api, parseApiError, AgencyProfile } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { TierGate } from "@/components/ui/tier-gate";
 
 // ---------------------------------------------------------------------------
 // Defaults
@@ -197,6 +198,7 @@ export default function AgencyBrandingPage() {
   }
 
   return (
+    <TierGate minimum="enterprise" feature="Agency Mode">
     <div className="space-y-6 animate-in max-w-3xl">
       {/* Back nav */}
       <div className="flex items-center gap-3">
@@ -409,5 +411,6 @@ export default function AgencyBrandingPage() {
         )}
       </div>
     </div>
+    </TierGate>
   );
 }

@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.middleware.rate_limit import limiter
+from api.dependencies import require_tier
 from api.routes.auth import get_current_user
 from api.schemas.report import ReportCreateRequest, ReportListResponse, ReportResponse
 from infrastructure.database.connection import get_db, get_db_context
@@ -94,6 +95,7 @@ async def list_reports(
     page_size: Annotated[int, Query(ge=1, le=50)] = 20,
     project_id: str | None = None,
 ) -> dict:
+    require_tier("professional")(current_user)
     base = select(SEOReport).where(
         SEOReport.user_id == current_user.id,
         SEOReport.deleted_at.is_(None),
@@ -128,6 +130,7 @@ async def create_report(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> SEOReport:
+    require_tier("professional")(current_user)
     report = SEOReport(
         id=str(uuid4()),
         user_id=current_user.id,
@@ -149,6 +152,7 @@ async def get_report(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> SEOReport:
+    require_tier("professional")(current_user)
     result = await db.execute(
         select(SEOReport).where(
             SEOReport.id == report_id,
@@ -168,6 +172,7 @@ async def delete_report(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
+    require_tier("professional")(current_user)
     result = await db.execute(
         select(SEOReport).where(
             SEOReport.id == report_id,

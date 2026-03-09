@@ -19,6 +19,7 @@ import { api, parseApiError, AgencyProfile, ClientWorkspace, Project } from "@/l
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TierGate } from "@/components/ui/tier-gate";
 
 const ALLOWED_FEATURE_OPTIONS = [
   { key: "analytics", label: "Analytics" },
@@ -336,6 +337,7 @@ export default function AgencyPage() {
   const activePortals = clients.filter((c) => c.is_portal_enabled).length;
 
   return (
+    <TierGate minimum="enterprise" feature="Agency Mode">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -712,5 +714,6 @@ export default function AgencyPage() {
         </CardContent>
       </Card>
     </div>
+    </TierGate>
   );
 }

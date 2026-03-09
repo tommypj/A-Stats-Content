@@ -25,6 +25,7 @@ from sqlalchemy import and_, delete, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.middleware.rate_limit import limiter
+from api.dependencies import require_tier
 from api.routes.auth import get_current_user
 from api.schemas.knowledge import (
     KnowledgeSourceListResponse,
@@ -195,6 +196,7 @@ async def upload_document(
     Text is extracted and chunked synchronously; the source is marked
     COMPLETED (or FAILED) before the response is returned.
     """
+    require_tier("professional")(current_user)
     # Validate extension
     file_ext = get_file_extension(file.filename or "")
     if file_ext not in ALLOWED_EXTENSIONS:
@@ -311,6 +313,7 @@ async def list_sources(
     """
     List user's knowledge sources with pagination and filtering.
     """
+    require_tier("professional")(current_user)
     query = select(KnowledgeSource).where(_build_ownership_filter(current_user))
 
     if status:
@@ -377,6 +380,7 @@ async def get_source(
     db: AsyncSession = Depends(get_db),
 ):
     """Get details of a specific knowledge source."""
+    require_tier("professional")(current_user)
     result = await db.execute(
         select(KnowledgeSource).where(
             KnowledgeSource.id == source_id,
@@ -422,6 +426,7 @@ async def update_source(
     db: AsyncSession = Depends(get_db),
 ):
     """Update knowledge source metadata (title, description, tags)."""
+    require_tier("professional")(current_user)
     result = await db.execute(
         select(KnowledgeSource).where(
             KnowledgeSource.id == source_id,
@@ -474,6 +479,7 @@ async def delete_source(
     """
     Delete a knowledge source, its on-disk file, and all associated chunks.
     """
+    require_tier("professional")(current_user)
     result = await db.execute(
         select(KnowledgeSource).where(
             KnowledgeSource.id == source_id,
@@ -530,6 +536,7 @@ async def query_knowledge(
     Splits the query into words, scores every stored chunk, and returns
     the top matching passages together with a synthesised answer text.
     """
+    require_tier("professional")(current_user)
     start_time = time.time()
 
     ownership_filter = _build_ownership_filter(current_user)
@@ -663,6 +670,7 @@ async def get_knowledge_stats(
     db: AsyncSession = Depends(get_db),
 ):
     """Get knowledge vault statistics for the current user/project."""
+    require_tier("professional")(current_user)
     ownership_filter = _build_ownership_filter(current_user)
 
     source_stats = await db.execute(
@@ -745,6 +753,7 @@ async def reprocess_source(
 
     Use *force=true* to reprocess sources that are already in COMPLETED status.
     """
+    require_tier("professional")(current_user)
     # KV-08: Use with_for_update() to prevent race condition between ownership check
     # and chunk loading — ensures no concurrent reprocess can interleave
     result = await db.execute(

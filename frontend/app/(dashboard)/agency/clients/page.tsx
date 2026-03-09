@@ -16,6 +16,7 @@ import { api, parseApiError, ClientWorkspace, Project } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TierGate } from "@/components/ui/tier-gate";
 
 const INPUT_CLASS =
   "w-full text-sm border border-surface-tertiary rounded-lg px-3 py-2 bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500";
@@ -120,6 +121,7 @@ export default function AgencyClientsPage() {
   }
 
   return (
+    <TierGate minimum="enterprise" feature="Agency Mode">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -274,5 +276,6 @@ export default function AgencyClientsPage() {
         </div>
       </Dialog>
     </div>
+    </TierGate>
   );
 }

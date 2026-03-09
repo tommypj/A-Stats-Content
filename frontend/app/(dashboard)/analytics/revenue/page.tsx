@@ -24,6 +24,7 @@ import {
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TierGate } from "@/components/ui/tier-gate";
 
 const GOAL_TYPES = [
   { value: "page_visit", label: "Page Visit" },
@@ -259,6 +260,7 @@ export default function RevenueAttributionPage() {
   };
 
   return (
+    <TierGate minimum="professional" feature="Revenue Attribution">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -742,5 +744,6 @@ export default function RevenueAttributionPage() {
         </CardContent>
       </Card>
     </div>
+    </TierGate>
   );
 }

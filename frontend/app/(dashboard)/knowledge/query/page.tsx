@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryInput } from "@/components/knowledge/query-input";
 import { SourceSnippet } from "@/components/knowledge/source-snippet";
+import { TierGate } from "@/components/ui/tier-gate";
 
 interface QueryHistoryItem {
   query: string;
@@ -20,9 +21,11 @@ interface QueryHistoryItem {
 
 export default function QueryPage() {
   return (
+    <TierGate minimum="professional" feature="Knowledge Vault">
     <Suspense fallback={<div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-primary-500" /></div>}>
       <QueryPageContent />
     </Suspense>
+    </TierGate>
   );
 }
 

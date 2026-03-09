@@ -10,6 +10,7 @@ import { api, SocialPost, SocialPostStatus, SocialPlatform } from "@/lib/api";
 import { History, Search, Filter, Download, Trash2, List, Grid } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { TierGate } from "@/components/ui/tier-gate";
 
 export default function SocialHistoryPage() {
   const router = useRouter();
@@ -138,6 +139,7 @@ export default function SocialHistoryPage() {
   };
 
   return (
+    <TierGate minimum="starter" feature="Social Media">
     <div className="space-y-6">
       <ConfirmDialog
         isOpen={!!confirmAction}
@@ -356,5 +358,6 @@ export default function SocialHistoryPage() {
         </div>
       )}
     </div>
+    </TierGate>
   );
 }

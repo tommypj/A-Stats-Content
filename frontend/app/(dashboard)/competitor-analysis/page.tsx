@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { clsx } from "clsx";
+import { TierGate } from "@/components/ui/tier-gate";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -634,6 +635,7 @@ export default function CompetitorAnalysisPage() {
   // ---------------------------------------------------------------------------
 
   return (
+    <TierGate minimum="professional" feature="Competitor Analysis">
     <div className="max-w-4xl mx-auto space-y-8">
       {/* Page header */}
       <div>
@@ -757,6 +759,7 @@ export default function CompetitorAnalysisPage() {
         )}
       </div>
     </div>
+    </TierGate>
   );
 }
 

@@ -16,6 +16,7 @@ import {
   KeywordSuggestionsResponse,
   KeywordHistoryEntry,
 } from "@/lib/api";
+import { TierGate } from "@/components/ui/tier-gate";
 
 // Badge color helpers
 function intentBadgeClass(intent: KeywordSuggestion["intent"]): string {
@@ -104,6 +105,7 @@ export default function KeywordResearchPage() {
   }
 
   return (
+    <TierGate minimum="starter" feature="Keyword Research">
     <div className="max-w-5xl mx-auto space-y-8">
       {/* Page header */}
       <div>
@@ -292,5 +294,6 @@ export default function KeywordResearchPage() {
         </div>
       )}
     </div>
+    </TierGate>
   );
 }

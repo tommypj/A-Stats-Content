@@ -24,6 +24,7 @@ from sqlalchemy.orm import defer
 
 from adapters.ai.anthropic_adapter import GeneratedArticle, content_ai_service
 from api.middleware.rate_limit import limiter
+from api.dependencies import require_tier
 from api.routes.auth import get_current_user
 from api.schemas.content import (
     ArticleCreateRequest,
@@ -971,6 +972,7 @@ async def get_keyword_suggestions(
     db: AsyncSession = Depends(get_db),
 ):
     """Get AI-powered keyword suggestions based on a seed keyword."""
+    require_tier("starter")(current_user)
     normalized = body.seed_keyword.strip().lower()
     redis_key = f"kw_research:{current_user.id}:{normalized}"
 

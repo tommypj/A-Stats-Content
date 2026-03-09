@@ -17,6 +17,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { parseApiError } from "@/lib/api";
+import { TierGate } from "@/components/ui/tier-gate";
 
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
@@ -143,6 +144,7 @@ export default function AccountsPage() {
   }
 
   return (
+    <TierGate minimum="starter" feature="Social Media">
     <div className="space-y-8">
       <ConfirmDialog
         isOpen={!!confirmAction}
@@ -332,5 +334,6 @@ export default function AccountsPage() {
         </div>
       </Card>
     </div>
+    </TierGate>
   );
 }

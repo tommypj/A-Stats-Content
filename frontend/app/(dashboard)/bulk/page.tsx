@@ -28,6 +28,7 @@ import {
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TierGate } from "@/components/ui/tier-gate";
 
 const STATUS_CONFIG: Record<string, { icon: typeof CheckCircle2; color: string; label: string }> = {
   pending: { icon: Clock, color: "text-text-muted", label: "Pending" },
@@ -151,6 +152,7 @@ export default function BulkContentPage() {
   const keywordCount = parseKeywords().length;
 
   return (
+    <TierGate minimum="professional" feature="Bulk Content">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -324,5 +326,6 @@ export default function BulkContentPage() {
         )}
       </div>
     </div>
+    </TierGate>
   );
 }

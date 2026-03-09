@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SourceCard } from "@/components/knowledge/source-card";
 import { UploadModal } from "@/components/knowledge/upload-modal";
+import { TierGate } from "@/components/ui/tier-gate";
 
 const STATUS_OPTIONS = [
   { value: "all", label: "All" },
@@ -117,6 +118,7 @@ export default function SourcesPage() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
+    <TierGate minimum="professional" feature="Knowledge Vault">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -288,5 +290,6 @@ export default function SourcesPage() {
         }}
       />
     </div>
+    </TierGate>
   );
 }

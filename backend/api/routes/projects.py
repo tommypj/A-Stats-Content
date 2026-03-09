@@ -14,6 +14,7 @@ from sqlalchemy import update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, selectinload
 
+from api.dependencies import require_tier
 from api.deps_project import (
     get_project_by_id,
     get_project_member,
@@ -107,6 +108,7 @@ async def create_project(
     The current user becomes the owner of the project.
     Project is initialized with free tier subscription.
     """
+    require_tier("starter")(current_user)
     # Generate slug if not provided
     slug = data.slug or generate_unique_slug(data.name)
 
@@ -172,6 +174,7 @@ async def list_projects(
 
     Returns projects with the user's role in each project.
     """
+    require_tier("starter")(current_user)
     # SQL-level filter: active memberships in non-deleted projects
     base_where = and_(
         ProjectMember.user_id == current_user.id,
@@ -262,6 +265,7 @@ async def get_current_project(
 
     Returns null if using personal workspace.
     """
+    require_tier("starter")(current_user)
     if not hasattr(current_user, "current_project_id") or not current_user.current_project_id:
         return CurrentProjectResponse(
             project=None,
@@ -337,6 +341,7 @@ async def get_brand_voice(
 
     Returns empty defaults if no project is selected or brand voice is not set.
     """
+    require_tier("starter")(current_user)
     project_id = getattr(current_user, "current_project_id", None)
     if not project_id:
         return BrandVoiceSettings()
@@ -367,6 +372,7 @@ async def update_brand_voice(
 
     Requires an active project to be selected and ADMIN or OWNER role.
     """
+    require_tier("starter")(current_user)
     project_id = getattr(current_user, "current_project_id", None)
     if not project_id:
         raise HTTPException(
@@ -416,6 +422,7 @@ async def switch_project_by_body(
 
     Accepts project_id in the request body. Pass null to switch to personal workspace.
     """
+    require_tier("starter")(current_user)
     if request.project_id is None:
         # Switch to personal workspace — find the user's personal project
         personal_result = await db.execute(
@@ -460,6 +467,7 @@ async def get_project(
 
     Requires project membership to access.
     """
+    require_tier("starter")(current_user)
     # Verify membership
     membership = await get_project_member(project_id, current_user.id, db)
 
@@ -533,6 +541,7 @@ async def update_project(
 
     Requires owner or admin role.
     """
+    require_tier("starter")(current_user)
     # Verify admin access
     await require_project_admin(project_id, current_user, db)
 
@@ -585,6 +594,7 @@ async def delete_project(
 
     Only the project owner can delete the project.
     """
+    require_tier("starter")(current_user)
     # Verify owner access
     await require_project_owner(project_id, current_user, db)
 
@@ -659,6 +669,7 @@ async def update_member_role(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Update a project member's role. Requires admin or owner."""
+    require_tier("starter")(current_user)
     # Verify caller is admin/owner
     caller = await require_project_admin(project_id, current_user, db)
 
@@ -710,6 +721,7 @@ async def remove_member(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Remove a member from the project. Requires admin or owner. Cannot remove owner."""
+    require_tier("starter")(current_user)
     # PROJ-38: Verify project exists and is not deleted before proceeding
     project_check = await db.execute(
         select(Project).where(
@@ -760,6 +772,7 @@ async def leave_project(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Leave a project. The owner cannot leave — transfer ownership first."""
+    require_tier("starter")(current_user)
     membership = await get_project_member(project_id, current_user.id, db)
 
     if membership.role == ProjectMemberRole.OWNER.value:
@@ -787,6 +800,7 @@ async def transfer_ownership(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Transfer project ownership to another member. Only the current owner can do this."""
+    require_tier("starter")(current_user)
     await require_project_owner(project_id, current_user, db)
 
     # Get new owner's membership
@@ -835,6 +849,7 @@ async def switch_project(
     Updates the user's current_project_id.
     Must be a member of the project to switch to it.
     """
+    require_tier("starter")(current_user)
     # Verify membership
     await get_project_member(project_id, current_user.id, db)
 

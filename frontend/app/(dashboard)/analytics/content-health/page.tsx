@@ -30,6 +30,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GscConnectBanner } from "@/components/analytics/gsc-connect-banner";
+import { TierGate } from "@/components/ui/tier-gate";
 
 const ALERT_TYPE_LABELS: Record<string, string> = {
   position_drop: "Position Drop",
@@ -237,6 +238,7 @@ export default function ContentHealthPage() {
         : "bg-red-50 border-red-200";
 
   return (
+    <TierGate minimum="professional" feature="Content Health">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -544,5 +546,6 @@ export default function ContentHealthPage() {
         </div>
       )}
     </div>
+    </TierGate>
   );
 }

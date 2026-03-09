@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Building2, Sparkles } from "lucide-react";
+import { TierGate } from "@/components/ui/tier-gate";
 
 function generateSlug(name: string): string {
   return name
@@ -79,6 +80,7 @@ export default function NewProjectPage() {
   };
 
   return (
+    <TierGate minimum="starter" feature="Project Management">
     <div className="max-w-2xl mx-auto space-y-6">
       {/* Header */}
       <div>
@@ -200,5 +202,6 @@ export default function NewProjectPage() {
         </ul>
       </Card>
     </div>
+    </TierGate>
   );
 }

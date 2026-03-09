@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.middleware.rate_limit import limiter
+from api.dependencies import require_tier
 from api.routes.auth import get_current_user
 from api.schemas.template import (
     TemplateCreateRequest,
@@ -34,6 +35,7 @@ async def list_templates(
     page_size: Annotated[int, Query(ge=1, le=50)] = 20,
     project_id: str | None = None,
 ) -> dict:
+    require_tier("professional")(current_user)
     base = select(ArticleTemplate).where(
         ArticleTemplate.user_id == current_user.id,
         ArticleTemplate.deleted_at.is_(None),
@@ -68,6 +70,7 @@ async def create_template(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ArticleTemplate:
+    require_tier("professional")(current_user)
     # Check uniqueness on (user_id, name)
     existing = await db.execute(
         select(ArticleTemplate).where(
@@ -99,6 +102,7 @@ async def get_template(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ArticleTemplate:
+    require_tier("professional")(current_user)
     result = await db.execute(
         select(ArticleTemplate).where(
             ArticleTemplate.id == template_id,
@@ -121,6 +125,7 @@ async def update_template(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ArticleTemplate:
+    require_tier("professional")(current_user)
     result = await db.execute(
         select(ArticleTemplate).where(
             ArticleTemplate.id == template_id,
@@ -149,6 +154,7 @@ async def delete_template(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
+    require_tier("professional")(current_user)
     result = await db.execute(
         select(ArticleTemplate).where(
             ArticleTemplate.id == template_id,

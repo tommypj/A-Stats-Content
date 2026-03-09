@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
+import { TierGate } from "@/components/ui/tier-gate";
 
 const PLATFORM_ICONS: Record<SocialPlatform, React.ReactNode> = {
   twitter: <Twitter className="h-5 w-5 text-[#1DA1F2]" />,
@@ -164,6 +165,7 @@ export default function PostDetailPage() {
   const hasFailed = post.status === "failed" || post.targets?.some((t) => t.status === "failed");
 
   return (
+    <TierGate minimum="starter" feature="Social Media">
     <div className="space-y-6 max-w-5xl">
       <ConfirmDialog
         isOpen={!!confirmAction}
@@ -419,5 +421,6 @@ export default function PostDetailPage() {
         </div>
       </div>
     </div>
+    </TierGate>
   );
 }

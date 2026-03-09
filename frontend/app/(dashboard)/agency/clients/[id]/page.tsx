@@ -31,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TierGate } from "@/components/ui/tier-gate";
 
 const FEATURE_OPTIONS = [
   { key: "analytics", label: "Analytics", icon: BarChart3, description: "View traffic, rankings, and performance data" },
@@ -243,6 +244,7 @@ export default function ClientDetailPage() {
   const allowedFeatures = workspace.allowed_features ?? {};
 
   return (
+    <TierGate minimum="enterprise" feature="Agency Mode">
     <div className="space-y-6">
       {/* Header */}
       <div>
@@ -804,5 +806,6 @@ export default function ClientDetailPage() {
         </div>
       </Dialog>
     </div>
+    </TierGate>
   );
 }

@@ -10,6 +10,7 @@ from sqlalchemy import delete, func, select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.middleware.rate_limit import limiter
+from api.dependencies import require_tier
 from api.routes.auth import get_current_user
 from api.schemas.tag import (
     TagAssignRequest,
@@ -37,6 +38,7 @@ async def list_tags(
     page_size: Annotated[int, Query(ge=1, le=100)] = 100,
     project_id: str | None = None,
 ) -> dict:
+    require_tier("professional")(current_user)
     base = select(Tag).where(
         Tag.user_id == current_user.id,
         Tag.deleted_at.is_(None),
@@ -71,6 +73,7 @@ async def create_tag(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Tag:
+    require_tier("professional")(current_user)
     # Check uniqueness (case-insensitive)
     existing = await db.execute(
         select(Tag).where(
@@ -101,6 +104,7 @@ async def update_tag(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Tag:
+    require_tier("professional")(current_user)
     result = await db.execute(
         select(Tag).where(
             Tag.id == tag_id,
@@ -146,6 +150,7 @@ async def delete_tag(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
+    require_tier("professional")(current_user)
     result = await db.execute(
         select(Tag).where(
             Tag.id == tag_id,
@@ -172,6 +177,7 @@ async def set_article_tags(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[Tag]:
+    require_tier("professional")(current_user)
     # Verify article ownership
     art = await db.execute(
         select(Article).where(
@@ -208,6 +214,7 @@ async def get_article_tags(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[Tag]:
+    require_tier("professional")(current_user)
     result = await db.execute(
         select(Tag)
         .join(ArticleTag, ArticleTag.tag_id == Tag.id)
@@ -229,6 +236,7 @@ async def set_outline_tags(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[Tag]:
+    require_tier("professional")(current_user)
     out = await db.execute(
         select(Outline).where(
             Outline.id == outline_id,
@@ -262,6 +270,7 @@ async def get_outline_tags(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[Tag]:
+    require_tier("professional")(current_user)
     result = await db.execute(
         select(Tag)
         .join(OutlineTag, OutlineTag.tag_id == Tag.id)

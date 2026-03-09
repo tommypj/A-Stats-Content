@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { api, parseApiError, AEOOverviewResponse, AEOArticleSummary } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TierGate } from "@/components/ui/tier-gate";
 
 const CATEGORY_ICONS: Record<string, typeof Sparkles> = {
   structure_score: Layout,
@@ -98,6 +99,7 @@ export default function AEOPage() {
     score >= 80 ? "bg-green-50 border-green-200" : score >= 50 ? "bg-yellow-50 border-yellow-200" : "bg-red-50 border-red-200";
 
   return (
+    <TierGate minimum="professional" feature="AEO Tracking">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -284,5 +286,6 @@ export default function AEOPage() {
         </>
       )}
     </div>
+    </TierGate>
   );
 }
