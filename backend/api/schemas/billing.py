@@ -63,6 +63,10 @@ class SubscriptionStatus(BaseModel):
     subscription_id: str | None = Field(None, description="LemonSqueezy subscription ID")
     can_manage: bool = Field(..., description="Whether user can access customer portal")
 
+    # Refund eligibility (14-day EU right of withdrawal)
+    refund_eligible: bool = Field(False, description="Whether user can request a self-service refund")
+    refund_deadline: datetime | None = Field(None, description="Deadline to request a refund")
+
     # Usage tracking
     articles_generated_this_month: int = Field(0, description="Articles generated this month")
     outlines_generated_this_month: int = Field(0, description="Outlines generated this month")
@@ -114,4 +118,11 @@ class SubscriptionCancelResponse(BaseModel):
     """Response after cancelling subscription."""
 
     success: bool = Field(..., description="Whether cancellation was successful")
+    message: str = Field(..., description="Status message")
+
+
+class RefundResponse(BaseModel):
+    """Response after processing a refund."""
+
+    success: bool = Field(..., description="Whether refund was successful")
     message: str = Field(..., description="Status message")

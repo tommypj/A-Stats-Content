@@ -926,6 +926,11 @@ export const api = {
         method: "POST",
         url: "/billing/cancel",
       }),
+    refund: () =>
+      apiRequest<{ success: boolean; message: string }>({
+        method: "POST",
+        url: "/billing/refund",
+      }),
   },
 
   // Knowledge Vault
@@ -2667,7 +2672,10 @@ export interface SubscriptionStatus {
   subscription_status: string;
   subscription_expires: string | null;
   customer_id: string | null;
+  subscription_id: string | null;
   can_manage: boolean;
+  refund_eligible: boolean;
+  refund_deadline: string | null;
   articles_generated_this_month: number;
   outlines_generated_this_month: number;
   images_generated_this_month: number;

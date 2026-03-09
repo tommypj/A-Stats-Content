@@ -109,6 +109,8 @@ export default function BillingPage() {
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">("monthly");
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
+  const [refunding, setRefunding] = useState(false);
+  const [showRefundConfirm, setShowRefundConfirm] = useState(false);
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
 
   const handleTabChange = (tabId: string) => {
@@ -177,6 +179,21 @@ export default function BillingPage() {
       toast.error(apiError.message || "Failed to cancel subscription");
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const handleRefund = async () => {
+    try {
+      setRefunding(true);
+      const result = await api.billing.refund();
+      toast.success(result.message || "Refund processed successfully");
+      setShowRefundConfirm(false);
+      await loadBillingData();
+    } catch (error) {
+      const apiError = parseApiError(error);
+      toast.error(apiError.message || "Failed to process refund");
+    } finally {
+      setRefunding(false);
     }
   };
 
@@ -276,18 +293,90 @@ export default function BillingPage() {
           </div>
 
           {currentTier !== "free" && subscription && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCancel}
-              disabled={cancelling}
-              isLoading={cancelling}
-              leftIcon={<AlertTriangle className="h-4 w-4" />}
-            >
-              Cancel
-            </Button>
+            <div className="flex items-center gap-2">
+              {subscription.refund_eligible && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setShowRefundConfirm(true)}
+                  disabled={refunding}
+                  isLoading={refunding}
+                >
+                  Request Refund
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCancel}
+                disabled={cancelling}
+                isLoading={cancelling}
+                leftIcon={<AlertTriangle className="h-4 w-4" />}
+              >
+                Cancel
+              </Button>
+            </div>
           )}
         </div>
+
+        {/* Refund confirmation */}
+        {showRefundConfirm && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <h4 className="text-sm font-semibold text-red-800 mb-1">Confirm Refund</h4>
+            <p className="text-sm text-red-700 mb-3">
+              This will immediately cancel your subscription and issue a full refund.
+              You will be downgraded to the free plan. This action cannot be undone.
+            </p>
+            {subscription?.refund_deadline && (
+              <p className="text-xs text-red-600 mb-3">
+                Refund window expires on{" "}
+                {new Date(subscription.refund_deadline).toLocaleDateString(undefined, {
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </p>
+            )}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleRefund}
+                disabled={refunding}
+                isLoading={refunding}
+              >
+                Yes, Refund &amp; Cancel
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowRefundConfirm(false)}
+                disabled={refunding}
+              >
+                Keep Subscription
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Refund eligibility notice */}
+        {subscription?.refund_eligible && !showRefundConfirm && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+            <p className="text-sm text-blue-800">
+              You are eligible for a full refund until{" "}
+              <span className="font-medium">
+                {subscription.refund_deadline
+                  ? new Date(subscription.refund_deadline).toLocaleDateString(undefined, {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    })
+                  : "the end of your refund period"}
+              </span>{" "}
+              under the 14-day right of withdrawal.
+            </p>
+          </div>
+        )}
 
         {/* Divider */}
         <div className="border-t border-surface-tertiary" />

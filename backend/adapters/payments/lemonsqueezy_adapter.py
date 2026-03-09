@@ -415,6 +415,51 @@ class LemonSqueezyAdapter:
         logger.info(f"Successfully cancelled subscription {subscription_id}")
         return True
 
+    async def get_subscription_invoices(
+        self, subscription_id: str
+    ) -> list[dict[str, Any]]:
+        """
+        Get invoices for a subscription, most recent first.
+
+        Args:
+            subscription_id: LemonSqueezy subscription ID
+
+        Returns:
+            List of invoice data dicts
+        """
+        logger.info(f"Fetching invoices for subscription {subscription_id}")
+        response = await self._make_request(
+            "GET",
+            f"subscription-invoices?filter[subscription_id]={subscription_id}&sort=-createdAt",
+        )
+        return response.get("data", [])
+
+    async def refund_invoice(self, invoice_id: str) -> dict[str, Any]:
+        """
+        Issue a full refund for a subscription invoice.
+
+        Args:
+            invoice_id: LemonSqueezy subscription invoice ID
+
+        Returns:
+            Updated invoice data
+
+        Raises:
+            LemonSqueezyAPIError: If refund fails
+        """
+        logger.info(f"Issuing refund for invoice {invoice_id}")
+        payload = {
+            "data": {
+                "type": "subscription-invoices",
+                "id": str(invoice_id),
+            }
+        }
+        response = await self._make_request(
+            "POST", f"subscription-invoices/{invoice_id}/refund", data=payload
+        )
+        logger.info(f"Successfully refunded invoice {invoice_id}")
+        return response
+
     async def pause_subscription(
         self,
         subscription_id: str,

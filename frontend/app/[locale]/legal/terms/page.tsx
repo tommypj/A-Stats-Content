@@ -6,7 +6,7 @@ export const metadata: Metadata = {
 };
 
 export default function TermsOfServicePage() {
-  const lastUpdated = "February 28, 2026";
+  const lastUpdated = "March 9, 2026";
 
   return (
     <article className="prose prose-neutral max-w-none">
@@ -62,10 +62,19 @@ export default function TermsOfServicePage() {
           </a>
           .
         </p>
+        <p className="text-text-secondary leading-relaxed mb-4">
+          <strong>14-Day Right of Withdrawal.</strong> In accordance with EU consumer protection law
+          (including Romanian Government Ordinance 34/2014), you have the right to withdraw from your
+          subscription within 14 calendar days of purchase, without giving any reason. To exercise this
+          right, you can use the self-service refund option available on the Billing page in your account
+          settings. Upon refund, your subscription will be cancelled immediately and you will be
+          downgraded to the free plan.
+        </p>
         <p className="text-text-secondary leading-relaxed">
-          <strong>Refunds.</strong> We offer a 7-day money-back guarantee on your first purchase.
-          After that period, subscriptions are non-refundable except where required by applicable law.
-          To request a refund, contact{" "}
+          <strong>Refunds After 14 Days.</strong> After the 14-day withdrawal period, subscriptions are
+          non-refundable. You may cancel your subscription at any time, and you will retain access to
+          your paid features until the end of the current billing period. For any refund-related
+          questions, contact{" "}
           <a href="mailto:billing@astats.app" className="text-primary-600 hover:underline">
             billing@astats.app
           </a>

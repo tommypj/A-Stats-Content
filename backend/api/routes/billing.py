@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.middleware.rate_limit import limiter
 from api.routes.auth import get_current_user
+from adapters.payments.lemonsqueezy_adapter import LemonSqueezyAdapter, LemonSqueezyAPIError
 from api.schemas.billing import (
     CheckoutRequest,
     CheckoutResponse,
@@ -24,6 +25,7 @@ from api.schemas.billing import (
     PlanInfo,
     PlanLimits,
     PricingResponse,
+    RefundResponse,
     SubscriptionCancelResponse,
     SubscriptionStatus,
     WebhookEventType,
@@ -153,17 +155,20 @@ async def get_pricing():
     return PricingResponse(plans=plans)
 
 
+REFUND_WINDOW_DAYS = 14  # EU right of withdrawal
+
+
 @router.get("/subscription", response_model=SubscriptionStatus)
 async def get_subscription_status(current_user: Annotated[User, Depends(get_current_user)]):
     """Get current user's subscription status and usage."""
-    # Determine subscription status
     subscription_status = "none"
+    refund_eligible = False
+    refund_deadline = None
 
     if current_user.subscription_tier != SubscriptionTier.FREE.value:
         if current_user.lemonsqueezy_subscription_id:
             if current_user.subscription_expires:
                 if current_user.subscription_expires > datetime.now(UTC):
-                    # Still within paid period — distinguish active vs cancelled (grace period)
                     if current_user.subscription_status == "cancelled":
                         subscription_status = "cancelled"
                     else:
@@ -173,6 +178,24 @@ async def get_subscription_status(current_user: Annotated[User, Depends(get_curr
             else:
                 subscription_status = "active"
 
+            # Check refund eligibility via LemonSqueezy subscription created_at
+            if subscription_status == "active":
+                try:
+                    adapter = LemonSqueezyAdapter()
+                    sub_data = await adapter._make_request(
+                        "GET",
+                        f"subscriptions/{current_user.lemonsqueezy_subscription_id}",
+                    )
+                    created_at_str = sub_data.get("data", {}).get("attributes", {}).get("created_at")
+                    if created_at_str:
+                        created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+                        deadline = created_at + timedelta(days=REFUND_WINDOW_DAYS)
+                        if datetime.now(UTC) < deadline:
+                            refund_eligible = True
+                            refund_deadline = deadline
+                except Exception:
+                    logger.debug("Could not check refund eligibility", exc_info=True)
+
     return SubscriptionStatus(
         subscription_tier=current_user.subscription_tier,
         subscription_status=subscription_status,
@@ -180,6 +203,8 @@ async def get_subscription_status(current_user: Annotated[User, Depends(get_curr
         customer_id=current_user.lemonsqueezy_customer_id,
         subscription_id=current_user.lemonsqueezy_subscription_id,
         can_manage=current_user.lemonsqueezy_customer_id is not None,
+        refund_eligible=refund_eligible,
+        refund_deadline=refund_deadline,
         articles_generated_this_month=current_user.articles_generated_this_month,
         outlines_generated_this_month=current_user.outlines_generated_this_month,
         images_generated_this_month=current_user.images_generated_this_month,
@@ -337,6 +362,107 @@ async def cancel_subscription(
         message="Subscription will be cancelled at the end of the billing period.",
     )
 
+
+@router.post("/refund", response_model=RefundResponse)
+@limiter.limit("3/minute")
+async def refund_subscription(
+    request: Request,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Request a full refund within the 14-day EU right of withdrawal period.
+
+    Cancels the subscription and refunds the most recent invoice.
+    The user is immediately downgraded to the free tier.
+    """
+    if not current_user.lemonsqueezy_subscription_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active subscription to refund",
+        )
+
+    if current_user.subscription_tier == SubscriptionTier.FREE.value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Free tier subscriptions cannot be refunded",
+        )
+
+    adapter = LemonSqueezyAdapter()
+
+    # Verify the subscription is within the 14-day refund window
+    try:
+        sub_data = await adapter._make_request(
+            "GET",
+            f"subscriptions/{current_user.lemonsqueezy_subscription_id}",
+        )
+        created_at_str = sub_data.get("data", {}).get("attributes", {}).get("created_at")
+        if not created_at_str:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Could not verify subscription creation date",
+            )
+
+        created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+        deadline = created_at + timedelta(days=REFUND_WINDOW_DAYS)
+
+        if datetime.now(UTC) >= deadline:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"The {REFUND_WINDOW_DAYS}-day refund window has expired. "
+                "You can still cancel your subscription to stop future charges.",
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to verify refund eligibility: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not verify refund eligibility. Please contact support.",
+        )
+
+    # Find the most recent invoice and refund it
+    try:
+        invoices = await adapter.get_subscription_invoices(
+            current_user.lemonsqueezy_subscription_id
+        )
+        if not invoices:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No invoice found to refund. Please contact support.",
+            )
+
+        invoice_id = invoices[0]["id"]
+        await adapter.refund_invoice(invoice_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to issue refund: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to process refund. Please contact billing@astats.app.",
+        )
+
+    # Cancel the subscription
+    try:
+        await adapter.cancel_subscription(current_user.lemonsqueezy_subscription_id)
+    except Exception as e:
+        logger.error("Refund succeeded but cancellation failed: %s", e)
+        # Refund went through — don't fail the request, just log
+
+    # Immediately downgrade to free
+    current_user.subscription_tier = SubscriptionTier.FREE.value
+    current_user.subscription_status = "refunded"
+    current_user.subscription_expires = None
+    current_user.lemonsqueezy_subscription_id = None
+    await db.commit()
+
+    logger.info("Refund processed for user %s", current_user.id)
+
+    return RefundResponse(
+        success=True,
+        message="Your subscription has been refunded. You have been downgraded to the free plan.",
+    )
 
 
 @router.post("/webhook")
