@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   Calendar,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import PublicNav from "./PublicNav";
 import PublicFooter from "./PublicFooter";
 import { api, type BlogPostCard } from "@/lib/api";
@@ -74,7 +75,7 @@ function RevealSection({
 
 /* ───────────────────────── Mockup components ───────────────────────── */
 
-function HeroMockup() {
+function HeroMockup({ t }: { t: (key: string) => string }) {
   return (
     <div className="relative pt-6 pb-6 px-4">
       {/* Integration badges — stacked above the card on mobile, overlapping top-left on desktop */}
@@ -83,24 +84,24 @@ function HeroMockup() {
         <div className="bg-white rounded-xl shadow-soft border border-surface-tertiary px-3 py-2 flex items-center gap-2">
           <div className="h-6 w-6 rounded flex items-center justify-center text-white text-xs font-bold" style={{ backgroundColor: "#21759B" }}>W</div>
           <div>
-            <div className="text-xs font-semibold text-text-primary leading-none">WordPress</div>
-            <div className="text-xs text-green-500 leading-none mt-0.5">Connected</div>
+            <div className="text-xs font-semibold text-text-primary leading-none">{t("hero.mockupWordPress")}</div>
+            <div className="text-xs text-green-500 leading-none mt-0.5">{t("hero.mockupConnected")}</div>
           </div>
         </div>
         {/* Google Search Console */}
         <div className="bg-white rounded-xl shadow-soft border border-surface-tertiary px-3 py-2 flex items-center gap-2">
           <div className="h-6 w-6 rounded flex items-center justify-center text-white text-xs font-bold" style={{ backgroundColor: "#4285F4" }}>G</div>
           <div>
-            <div className="text-xs font-semibold text-text-primary leading-none">Search Console</div>
-            <div className="text-xs text-green-500 leading-none mt-0.5">Connected</div>
+            <div className="text-xs font-semibold text-text-primary leading-none">{t("hero.mockupSearchConsole")}</div>
+            <div className="text-xs text-green-500 leading-none mt-0.5">{t("hero.mockupConnected")}</div>
           </div>
         </div>
         {/* PageSpeed */}
         <div className="bg-white rounded-xl shadow-soft border border-surface-tertiary px-3 py-2 flex items-center gap-2">
           <div className="h-6 w-6 rounded flex items-center justify-center text-white text-xs font-bold" style={{ backgroundColor: "#F4B400" }}>⚡</div>
           <div>
-            <div className="text-xs font-semibold text-text-primary leading-none">PageSpeed</div>
-            <div className="text-xs text-green-500 leading-none mt-0.5">Score: 94</div>
+            <div className="text-xs font-semibold text-text-primary leading-none">{t("hero.mockupPageSpeed")}</div>
+            <div className="text-xs text-green-500 leading-none mt-0.5">{t("hero.mockupPageSpeedScore")}</div>
           </div>
         </div>
       </div>
@@ -111,25 +112,25 @@ function HeroMockup() {
         <div className="flex items-center justify-between px-4 py-3 bg-surface-secondary border-b border-surface-tertiary">
           <div className="flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-green-400" />
-            <span className="text-xs font-medium text-text-primary">Article Ready</span>
+            <span className="text-xs font-medium text-text-primary">{t("hero.mockupArticleReady")}</span>
           </div>
-          <span className="text-xs text-text-muted">2,847 words · ~11 min read</span>
+          <span className="text-xs text-text-muted">{t("hero.mockupWordCount")}</span>
         </div>
 
         {/* Content */}
         <div className="p-5">
           <div className="inline-flex items-center gap-1.5 text-xs bg-primary-50 text-primary-600 px-2.5 py-1 rounded-full mb-3 font-medium">
-            Keyword: seo best practices 2026
+            {t("hero.mockupKeyword")}
           </div>
           <h4 className="text-sm font-bold text-text-primary mb-2 leading-snug">
-            10 Best SEO Practices for 2026: A Complete Guide
+            {t("hero.mockupArticleTitle")}
           </h4>
           <div className="space-y-1.5 mb-3">
             <div className="h-1.5 w-full rounded-full bg-surface-tertiary" />
             <div className="h-1.5 w-11/12 rounded-full bg-surface-tertiary" />
             <div className="h-1.5 w-4/5 rounded-full bg-surface-tertiary" />
           </div>
-          <div className="text-xs font-semibold text-text-primary mb-1.5">1. Optimize for Search Intent</div>
+          <div className="text-xs font-semibold text-text-primary mb-1.5">{t("hero.mockupHeading1")}</div>
           <div className="space-y-1.5 mb-4">
             <div className="h-1.5 w-full rounded-full bg-surface-tertiary" />
             <div className="h-1.5 w-10/12 rounded-full bg-surface-tertiary" />
@@ -138,15 +139,15 @@ function HeroMockup() {
           <div className="flex items-center gap-4 pt-3 border-t border-surface-tertiary">
             <div className="flex-1">
               <div className="flex justify-between text-xs mb-1.5">
-                <span className="text-text-muted">SEO Score</span>
-                <span className="font-semibold text-primary-600">94 / 100</span>
+                <span className="text-text-muted">{t("hero.mockupSeoScore")}</span>
+                <span className="font-semibold text-primary-600">{t("hero.mockupSeoScoreValue")}</span>
               </div>
               <div className="h-1.5 rounded-full bg-surface-tertiary overflow-hidden">
                 <div className="h-full w-[94%] rounded-full bg-gradient-to-r from-primary-400 to-primary-500" />
               </div>
             </div>
             <div className="text-xs bg-primary-500 text-white px-3 py-1.5 rounded-lg font-medium whitespace-nowrap">
-              Publish →
+              {t("hero.mockupPublish")}
             </div>
           </div>
         </div>
@@ -156,41 +157,41 @@ function HeroMockup() {
       <div className="absolute -bottom-2 -right-2 z-10 bg-primary-950 rounded-2xl shadow-soft p-4 text-center">
         <div className="flex items-center gap-1 mb-1 justify-center">
           <Zap className="h-3 w-3 text-primary-400" />
-          <span className="text-xs text-primary-300 font-medium">AEO Score</span>
+          <span className="text-xs text-primary-300 font-medium">{t("hero.mockupAeoScore")}</span>
         </div>
-        <div className="text-3xl font-bold text-primary-400 leading-none mb-1">82</div>
+        <div className="text-3xl font-bold text-primary-400 leading-none mb-1">{t("hero.mockupAeoValue")}</div>
         <div className="text-xs text-primary-300">
-          <span className="text-green-400 font-semibold">+12</span> this month
+          <span className="text-green-400 font-semibold">{t("hero.mockupAeoChange")}</span> {t("hero.mockupAeoThisMonth")}
         </div>
       </div>
     </div>
   );
 }
 
-function ContentGenMockup() {
+function ContentGenMockup({ t }: { t: (key: string) => string }) {
   return (
     <div className="aspect-[4/3] rounded-2xl bg-gradient-to-br from-primary-50 via-cream-100 to-terra-400/10 p-4 flex items-center justify-center">
       <div className="w-full bg-white/80 backdrop-blur-sm rounded-xl shadow-soft border border-surface-tertiary overflow-hidden">
         <div className="flex items-center justify-between px-3 py-2.5 bg-surface-secondary border-b border-surface-tertiary">
-          <span className="text-xs font-semibold text-text-primary">New Article</span>
+          <span className="text-xs font-semibold text-text-primary">{t("showcases.mockupNewArticle")}</span>
           <div className="flex items-center gap-1.5">
             <div className="h-1.5 w-1.5 rounded-full bg-yellow-400 animate-pulse" />
-            <span className="text-xs text-yellow-600 font-medium">Generating…</span>
+            <span className="text-xs text-yellow-600 font-medium">{t("showcases.mockupGenerating")}</span>
           </div>
         </div>
         <div className="p-3 space-y-2.5">
           {/* Keyword input */}
           <div className="rounded-lg border border-primary-300 bg-primary-50/60 px-2.5 py-1.5 text-xs text-primary-700 font-medium">
-            content marketing strategy for startups
+            {t("showcases.mockupKeyword")}
           </div>
           {/* Steps */}
           <div className="flex items-center gap-1.5">
             {[
-              { label: "Outline", done: true },
-              { label: "Article", active: true },
-              { label: "Images", pending: true },
+              { label: t("showcases.mockupStepOutline"), done: true },
+              { label: t("showcases.mockupStepArticle"), active: true },
+              { label: t("showcases.mockupStepImages"), pending: true },
             ].map((step, i) => (
-              <div key={step.label} className="flex items-center gap-1.5">
+              <div key={i} className="flex items-center gap-1.5">
                 <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                   step.done ? "bg-green-100 text-green-700" :
                   step.active ? "bg-yellow-100 text-yellow-700" :
@@ -206,12 +207,12 @@ function ContentGenMockup() {
           {/* Outline preview */}
           <div className="space-y-1">
             {[
-              { text: "Introduction", active: true },
-              { text: "What is Content Marketing?", active: false },
-              { text: "5 Key Strategies", active: false },
-              { text: "Case Studies & Examples", active: false },
-            ].map((h) => (
-              <div key={h.text} className={`flex items-center gap-1.5 text-xs ${h.active ? "text-text-primary font-medium" : "text-text-muted"}`}>
+              { text: t("showcases.mockupOutline1"), active: true },
+              { text: t("showcases.mockupOutline2"), active: false },
+              { text: t("showcases.mockupOutline3"), active: false },
+              { text: t("showcases.mockupOutline4"), active: false },
+            ].map((h, i) => (
+              <div key={i} className={`flex items-center gap-1.5 text-xs ${h.active ? "text-text-primary font-medium" : "text-text-muted"}`}>
                 <div className={`h-1 w-1 rounded-full flex-shrink-0 ${h.active ? "bg-primary-500" : "bg-surface-tertiary"}`} />
                 {h.text}
               </div>
@@ -223,26 +224,26 @@ function ContentGenMockup() {
   );
 }
 
-function SeoAnalyticsMockup() {
+function SeoAnalyticsMockup({ t }: { t: (key: string) => string }) {
   return (
     <div className="aspect-[4/3] rounded-2xl bg-gradient-to-br from-primary-50 via-cream-100 to-terra-400/10 p-4 flex items-center justify-center">
       <div className="w-full bg-white/80 backdrop-blur-sm rounded-xl shadow-soft border border-surface-tertiary overflow-hidden">
         <div className="flex items-center justify-between px-3 py-2.5 bg-surface-secondary border-b border-surface-tertiary">
-          <span className="text-xs font-semibold text-text-primary">SEO Analytics</span>
+          <span className="text-xs font-semibold text-text-primary">{t("showcases.mockupSeoAnalytics")}</span>
           <div className="flex items-center gap-1 text-xs text-green-600 font-medium">
             <div className="h-1.5 w-1.5 rounded-full bg-green-400" />
-            GSC Live
+            {t("showcases.mockupGscLive")}
           </div>
         </div>
         <div className="p-3 space-y-2.5">
           {/* Stats */}
           <div className="grid grid-cols-3 gap-1.5">
             {[
-              { label: "Impressions", value: "18.4K" },
-              { label: "Clicks", value: "1,203" },
-              { label: "Avg. Pos.", value: "6.2" },
-            ].map((s) => (
-              <div key={s.label} className="text-center p-1.5 rounded-lg bg-surface-secondary">
+              { label: t("showcases.mockupImpressions"), value: t("showcases.mockupImpressionsValue") },
+              { label: t("showcases.mockupClicks"), value: t("showcases.mockupClicksValue") },
+              { label: t("showcases.mockupAvgPos"), value: t("showcases.mockupAvgPosValue") },
+            ].map((s, i) => (
+              <div key={i} className="text-center p-1.5 rounded-lg bg-surface-secondary">
                 <div className="text-sm font-bold text-text-primary">{s.value}</div>
                 <div className="text-xs text-text-muted leading-tight">{s.label}</div>
               </div>
@@ -272,12 +273,12 @@ function SeoAnalyticsMockup() {
   );
 }
 
-function SocialMediaMockup() {
+function SocialMediaMockup({ t }: { t: (key: string) => string }) {
   return (
     <div className="aspect-[4/3] rounded-2xl bg-gradient-to-br from-primary-50 via-cream-100 to-terra-400/10 p-4 flex items-center justify-center">
       <div className="w-full bg-white/80 backdrop-blur-sm rounded-xl shadow-soft border border-surface-tertiary overflow-hidden">
         <div className="flex items-center justify-between px-3 py-2.5 bg-surface-secondary border-b border-surface-tertiary">
-          <span className="text-xs font-semibold text-text-primary">Social Scheduler</span>
+          <span className="text-xs font-semibold text-text-primary">{t("showcases.mockupSocialScheduler")}</span>
           <div className="flex items-center gap-1">
             {[["in", "#0077B5"], ["𝕏", "#000"], ["f", "#1877F2"]].map(([l, c]) => (
               <div key={l} style={{ backgroundColor: c }} className="h-5 w-5 rounded text-white flex items-center justify-center font-bold text-[10px] leading-none">
@@ -292,22 +293,22 @@ function SocialMediaMockup() {
             <div className="flex items-center gap-2 mb-1.5">
               <div className="h-6 w-6 rounded-full bg-primary-100 flex items-center justify-center text-xs font-bold text-primary-600 flex-shrink-0">A</div>
               <div>
-                <div className="text-xs font-semibold text-text-primary leading-none">A-Stats</div>
-                <div className="text-xs text-text-muted leading-none mt-0.5">Today · 2:00 PM</div>
+                <div className="text-xs font-semibold text-text-primary leading-none">{t("showcases.mockupPostBy")}</div>
+                <div className="text-xs text-text-muted leading-none mt-0.5">{t("showcases.mockupPostTime")}</div>
               </div>
             </div>
             <p className="text-xs text-text-secondary leading-relaxed">
-              Just published: &quot;10 Best SEO Practices for 2026&quot; 🚀 Our AI-generated article hit page 1 in 3 weeks...
+              {t("showcases.mockupPostText")}
             </p>
           </div>
           {/* Platform row */}
           <div className="flex items-center justify-between text-xs">
-            <span className="text-text-muted">Posting to 3 platforms</span>
-            <span className="text-primary-600 font-medium">View Calendar →</span>
+            <span className="text-text-muted">{t("showcases.mockupPostingTo")}</span>
+            <span className="text-primary-600 font-medium">{t("showcases.mockupViewCalendar")}</span>
           </div>
           {/* Queue */}
           <div className="flex gap-1.5">
-            {["Mon", "Tue", "Wed", "Thu", "Fri"].map((d, i) => (
+            {[t("showcases.mockupMon"), t("showcases.mockupTue"), t("showcases.mockupWed"), t("showcases.mockupThu"), t("showcases.mockupFri")].map((d, i) => (
               <div key={d} className={`flex-1 rounded py-1 text-center text-xs font-medium ${i < 2 ? "bg-primary-100 text-primary-600" : i === 2 ? "bg-primary-500 text-white" : "bg-surface-tertiary text-text-muted"}`}>
                 {d}
               </div>
@@ -321,240 +322,6 @@ function SocialMediaMockup() {
 
 /* ───────────────────────── Data ───────────────────────── */
 
-const features = [
-  {
-    icon: Sparkles,
-    title: "AI Article Generation",
-    description:
-      "Generate full-length, SEO-optimized articles from a single keyword or topic — ready to publish.",
-  },
-  {
-    icon: FileText,
-    title: "Smart Outlines",
-    description:
-      "Create structured content plans with headings, subheadings, and key points before writing.",
-  },
-  {
-    icon: Zap,
-    title: "AEO Tracking",
-    description:
-      "Track when ChatGPT, Perplexity, and Google AI Overviews cite your content. Be the first to know when AI engines discover — or drop — your pages.",
-  },
-  {
-    icon: BarChart3,
-    title: "SEO Analytics",
-    description:
-      "Track rankings with Google Search Console integration and actionable performance insights.",
-  },
-  {
-    icon: Share2,
-    title: "Social Media Scheduling",
-    description:
-      "Create and schedule social posts across platforms — all from one dashboard.",
-  },
-  {
-    icon: BookOpen,
-    title: "Knowledge Vault",
-    description:
-      "Upload brand documents and style guides so the AI writes in your voice, every time.",
-  },
-];
-
-const steps = [
-  {
-    number: "1",
-    title: "Define your topic",
-    description:
-      "Enter a keyword, choose your tone and audience, and let the AI understand your goals.",
-  },
-  {
-    number: "2",
-    title: "AI generates content",
-    description:
-      "Get outlines, full articles, and matching images — all optimized for search engines.",
-  },
-  {
-    number: "3",
-    title: "Publish & track",
-    description:
-      "Push to WordPress, schedule social posts, and monitor performance with built-in analytics.",
-  },
-];
-
-const showcases = [
-  {
-    title: "Content Generation That Actually Ranks",
-    description:
-      "Our AI doesn't just write — it researches. Every article is built on keyword analysis, competitor insights, and SEO best practices so you rank from day one.",
-    bullets: [
-      "Full-length articles from a single keyword",
-      "Built-in keyword density and readability scoring",
-      "Auto-generated meta titles, descriptions & schema",
-    ],
-  },
-  {
-    title: "SEO Analytics You Can Act On",
-    description:
-      "Connect Google Search Console and get a clear view of what's working. Track impressions, clicks, and rankings — then let AI suggest your next move.",
-    bullets: [
-      "Google Search Console integration",
-      "Keyword ranking & click-through tracking",
-      "AI-powered content recommendations",
-    ],
-  },
-  {
-    title: "Social Media, Simplified",
-    description:
-      "Turn every article into a week of social content. Schedule posts across platforms and keep your audience engaged without the extra work.",
-    bullets: [
-      "Auto-generate social posts from articles",
-      "Multi-platform scheduling (LinkedIn, X, Facebook)",
-      "Calendar view for planning & coordination",
-    ],
-  },
-];
-
-const testimonials = [
-  {
-    quote:
-      "We went from publishing twice a month to twice a week — and organic traffic grew 340% in 6 months. The AI articles consistently rank on page one within weeks.",
-    author: "Sarah K.",
-    role: "Content Director, GrowthLab",
-    metric: "340% traffic growth",
-    initials: "SK",
-  },
-  {
-    quote:
-      "The Knowledge Vault feature is a game-changer. The AI finally sounds like our brand instead of generic fluff. Our editorial review time dropped from 3 hours to 20 minutes per article.",
-    author: "Marcus T.",
-    role: "Founder, Indie SaaS Blog",
-    metric: "89% less editing time",
-    initials: "MT",
-  },
-  {
-    quote:
-      "I replaced three separate tools with this one platform and saved $247/month. Content creation, SEO tracking, and social scheduling — all in one place with better results.",
-    author: "Elena R.",
-    role: "Freelance Content Strategist",
-    metric: "$247/mo saved",
-    initials: "ER",
-  },
-];
-
-const plans = [
-  {
-    name: "Free",
-    monthlyPrice: 0,
-    yearlyPrice: 0,
-    description: "Try it out, no credit card needed",
-    features: [
-      "3 articles per month",
-      "3 AI images per month",
-      "3 keyword researches per month",
-      "3 AI improvements per article",
-      "Basic SEO analysis",
-      "Community support",
-    ],
-    cta: "Get Started Free",
-    href: "/register",
-  },
-  {
-    name: "Starter",
-    monthlyPrice: 29,
-    yearlyPrice: 24,
-    description: "For solo creators & bloggers",
-    features: [
-      "30 articles per month",
-      "60 AI images per month",
-      "30 social posts per month",
-      "60 keyword researches per month",
-      "3 AI improvements per article",
-      "Advanced SEO analysis",
-      "Google Search Console integration",
-      "WordPress integration",
-      "Social media scheduling",
-      "5 site audits per month",
-      "Project management & collaboration",
-      "Priority email support",
-    ],
-    cta: "Start Starter",
-    href: "/register",
-  },
-  {
-    name: "Professional",
-    monthlyPrice: 79,
-    yearlyPrice: 66,
-    description: "For growing content teams",
-    features: [
-      "100 articles per month",
-      "200 AI images per month",
-      "100 social posts per month",
-      "200 keyword researches per month",
-      "3 AI improvements per article",
-      "Content decay detection & auto-alerts",
-      "SEO reports & content calendar",
-      "Competitor analysis",
-      "Bulk content generation",
-      "Knowledge Vault",
-      "Article templates & tags",
-      "GA4 integration & API access",
-      "15 site audits per month",
-      "Priority support",
-    ],
-    popular: true,
-    cta: "Start Professional",
-    href: "/register",
-  },
-  {
-    name: "Enterprise",
-    monthlyPrice: 199,
-    yearlyPrice: 166,
-    description: "For agencies & large teams",
-    features: [
-      "300 articles per month",
-      "600 AI images per month",
-      "300 social posts per month",
-      "600 keyword researches per month",
-      "3 AI improvements per article",
-      "All Professional features",
-      "White-label agency mode",
-      "Client portals & branding",
-      "Custom integrations",
-      "50 site audits per month",
-      "Dedicated support & SLA",
-    ],
-    cta: "Start Enterprise",
-    href: "/register",
-  },
-];
-
-const faqs = [
-  {
-    q: "Is there a free trial?",
-    a: "Yes. Every account starts on the free tier with no credit card required. You can generate articles and explore the platform before upgrading.",
-  },
-  {
-    q: "Can I cancel my subscription anytime?",
-    a: "Yes. There are no contracts or cancellation fees. You can downgrade or cancel from your account settings at any time.",
-  },
-  {
-    q: "Who owns the content generated by A-Stats?",
-    a: "You do — 100%. All content generated on our platform belongs to you to publish, repurpose, or sell.",
-  },
-  {
-    q: "What is Answer Engine Optimization (AEO)?",
-    a: "AEO is the practice of optimizing your content to be cited by AI systems like ChatGPT, Perplexity, and Google AI Overviews. A-Stats tracks your AEO score and alerts you when AI engines start or stop citing your pages.",
-  },
-  {
-    q: "Does A-Stats integrate with WordPress?",
-    a: "Yes. Connect your WordPress site in your project settings. Once linked, you can publish articles directly from the A-Stats editor complete with formatting, images, and metadata.",
-  },
-  {
-    q: "What languages are supported?",
-    a: "A-Stats supports content generation in English, Spanish, French, German, Romanian, and more languages are being added regularly.",
-  },
-];
-
 const integrations = [
   { name: "WordPress", abbr: "W", bg: "#21759B" },
   { name: "Google Search Console", abbr: "G", bg: "#4285F4" },
@@ -567,6 +334,7 @@ const integrations = [
 /* ───────────────────────── Page Component ───────────────────────── */
 
 export default function LandingPageClient() {
+  const t = useTranslations("landing");
   const [yearlyBilling, setYearlyBilling] = useState(false);
   const [blogPosts, setBlogPosts] = useState<BlogPostCard[]>([]);
   const [showStickyCta, setShowStickyCta] = useState(false);
@@ -589,6 +357,240 @@ export default function LandingPageClient() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [handleScroll]);
 
+  const features = [
+    {
+      icon: Sparkles,
+      title: t("features.feature1Title"),
+      description: t("features.feature1Description"),
+    },
+    {
+      icon: FileText,
+      title: t("features.feature2Title"),
+      description: t("features.feature2Description"),
+    },
+    {
+      icon: Zap,
+      title: t("features.feature3Title"),
+      description: t("features.feature3Description"),
+    },
+    {
+      icon: BarChart3,
+      title: t("features.feature4Title"),
+      description: t("features.feature4Description"),
+    },
+    {
+      icon: Share2,
+      title: t("features.feature5Title"),
+      description: t("features.feature5Description"),
+    },
+    {
+      icon: BookOpen,
+      title: t("features.feature6Title"),
+      description: t("features.feature6Description"),
+    },
+  ];
+
+  const steps = [
+    {
+      number: "1",
+      title: t("howItWorks.step1Title"),
+      description: t("howItWorks.step1Description"),
+    },
+    {
+      number: "2",
+      title: t("howItWorks.step2Title"),
+      description: t("howItWorks.step2Description"),
+    },
+    {
+      number: "3",
+      title: t("howItWorks.step3Title"),
+      description: t("howItWorks.step3Description"),
+    },
+  ];
+
+  const showcases = [
+    {
+      title: t("showcases.showcase1Title"),
+      description: t("showcases.showcase1Description"),
+      bullets: [
+        t("showcases.showcase1Bullet1"),
+        t("showcases.showcase1Bullet2"),
+        t("showcases.showcase1Bullet3"),
+      ],
+    },
+    {
+      title: t("showcases.showcase2Title"),
+      description: t("showcases.showcase2Description"),
+      bullets: [
+        t("showcases.showcase2Bullet1"),
+        t("showcases.showcase2Bullet2"),
+        t("showcases.showcase2Bullet3"),
+      ],
+    },
+    {
+      title: t("showcases.showcase3Title"),
+      description: t("showcases.showcase3Description"),
+      bullets: [
+        t("showcases.showcase3Bullet1"),
+        t("showcases.showcase3Bullet2"),
+        t("showcases.showcase3Bullet3"),
+      ],
+    },
+  ];
+
+  const testimonials = [
+    {
+      quote: t("testimonials.testimonial1Quote"),
+      author: t("testimonials.testimonial1Author"),
+      role: t("testimonials.testimonial1Role"),
+      metric: t("testimonials.testimonial1Metric"),
+      initials: "SK",
+    },
+    {
+      quote: t("testimonials.testimonial2Quote"),
+      author: t("testimonials.testimonial2Author"),
+      role: t("testimonials.testimonial2Role"),
+      metric: t("testimonials.testimonial2Metric"),
+      initials: "MT",
+    },
+    {
+      quote: t("testimonials.testimonial3Quote"),
+      author: t("testimonials.testimonial3Author"),
+      role: t("testimonials.testimonial3Role"),
+      metric: t("testimonials.testimonial3Metric"),
+      initials: "ER",
+    },
+  ];
+
+  const plans = [
+    {
+      name: t("pricing.planFreeName"),
+      monthlyPrice: 0,
+      yearlyPrice: 0,
+      description: t("pricing.planFreeDescription"),
+      features: [
+        t("pricing.planFreeFeature1"),
+        t("pricing.planFreeFeature2"),
+        t("pricing.planFreeFeature3"),
+        t("pricing.planFreeFeature4"),
+        t("pricing.planFreeFeature5"),
+        t("pricing.planFreeFeature6"),
+      ],
+      cta: t("pricing.planFreeCta"),
+      href: "/register",
+    },
+    {
+      name: t("pricing.planStarterName"),
+      monthlyPrice: 29,
+      yearlyPrice: 24,
+      description: t("pricing.planStarterDescription"),
+      features: [
+        t("pricing.planStarterFeature1"),
+        t("pricing.planStarterFeature2"),
+        t("pricing.planStarterFeature3"),
+        t("pricing.planStarterFeature4"),
+        t("pricing.planStarterFeature5"),
+        t("pricing.planStarterFeature6"),
+        t("pricing.planStarterFeature7"),
+        t("pricing.planStarterFeature8"),
+        t("pricing.planStarterFeature9"),
+        t("pricing.planStarterFeature10"),
+        t("pricing.planStarterFeature11"),
+        t("pricing.planStarterFeature12"),
+      ],
+      cta: t("pricing.planStarterCta"),
+      href: "/register",
+    },
+    {
+      name: t("pricing.planProfessionalName"),
+      monthlyPrice: 79,
+      yearlyPrice: 66,
+      description: t("pricing.planProfessionalDescription"),
+      features: [
+        t("pricing.planProfessionalFeature1"),
+        t("pricing.planProfessionalFeature2"),
+        t("pricing.planProfessionalFeature3"),
+        t("pricing.planProfessionalFeature4"),
+        t("pricing.planProfessionalFeature5"),
+        t("pricing.planProfessionalFeature6"),
+        t("pricing.planProfessionalFeature7"),
+        t("pricing.planProfessionalFeature8"),
+        t("pricing.planProfessionalFeature9"),
+        t("pricing.planProfessionalFeature10"),
+        t("pricing.planProfessionalFeature11"),
+        t("pricing.planProfessionalFeature12"),
+        t("pricing.planProfessionalFeature13"),
+        t("pricing.planProfessionalFeature14"),
+      ],
+      popular: true,
+      cta: t("pricing.planProfessionalCta"),
+      href: "/register",
+    },
+    {
+      name: t("pricing.planEnterpriseName"),
+      monthlyPrice: 199,
+      yearlyPrice: 166,
+      description: t("pricing.planEnterpriseDescription"),
+      features: [
+        t("pricing.planEnterpriseFeature1"),
+        t("pricing.planEnterpriseFeature2"),
+        t("pricing.planEnterpriseFeature3"),
+        t("pricing.planEnterpriseFeature4"),
+        t("pricing.planEnterpriseFeature5"),
+        t("pricing.planEnterpriseFeature6"),
+        t("pricing.planEnterpriseFeature7"),
+        t("pricing.planEnterpriseFeature8"),
+        t("pricing.planEnterpriseFeature9"),
+        t("pricing.planEnterpriseFeature10"),
+        t("pricing.planEnterpriseFeature11"),
+      ],
+      cta: t("pricing.planEnterpriseCta"),
+      href: "/register",
+    },
+  ];
+
+  const faqs = [
+    { q: t("faq.faq1Question"), a: t("faq.faq1Answer") },
+    { q: t("faq.faq2Question"), a: t("faq.faq2Answer") },
+    { q: t("faq.faq3Question"), a: t("faq.faq3Answer") },
+    { q: t("faq.faq4Question"), a: t("faq.faq4Answer") },
+    { q: t("faq.faq5Question"), a: t("faq.faq5Answer") },
+    { q: t("faq.faq6Question"), a: t("faq.faq6Answer") },
+  ];
+
+  const whoItsForSegments = [
+    {
+      title: t("whoItsFor.segment1Title"),
+      description: t("whoItsFor.segment1Description"),
+      features: [
+        t("whoItsFor.segment1Feature1"),
+        t("whoItsFor.segment1Feature2"),
+        t("whoItsFor.segment1Feature3"),
+      ],
+      plan: t("whoItsFor.segment1Plan"),
+    },
+    {
+      title: t("whoItsFor.segment2Title"),
+      description: t("whoItsFor.segment2Description"),
+      features: [
+        t("whoItsFor.segment2Feature1"),
+        t("whoItsFor.segment2Feature2"),
+        t("whoItsFor.segment2Feature3"),
+      ],
+      plan: t("whoItsFor.segment2Plan"),
+    },
+    {
+      title: t("whoItsFor.segment3Title"),
+      description: t("whoItsFor.segment3Description"),
+      features: [
+        t("whoItsFor.segment3Feature1"),
+        t("whoItsFor.segment3Feature2"),
+        t("whoItsFor.segment3Feature3"),
+      ],
+      plan: t("whoItsFor.segment3Plan"),
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-surface overflow-x-hidden">
       {/* ─── 1. Navigation ─── */}
@@ -602,70 +604,74 @@ export default function LandingPageClient() {
             <div>
               <div className="hero-animate inline-flex items-center gap-2 rounded-full bg-primary-50 px-4 py-1.5 text-sm text-primary-600 mb-6">
                 <Sparkles className="h-4 w-4" />
-                <span>AI-Powered Content & SEO Platform</span>
+                <span>{t("hero.badge")}</span>
               </div>
               <h1 className="hero-animate-delay-1 text-4xl md:text-5xl lg:text-6xl font-display font-bold text-text-primary leading-[1.1] tracking-tight">
-                Rank on Google.{" "}
-                <span className="gradient-text">Get Cited by AI.</span>
+                {t("hero.titleLine1")}{" "}
+                <span className="gradient-text">{t("hero.titleHighlight")}</span>
               </h1>
               <p className="hero-animate-delay-2 mt-6 text-lg text-text-secondary max-w-lg leading-relaxed">
-                From keyword to published article — AI-generated content that
-                ranks on Google <em>and</em> gets cited by ChatGPT, Perplexity,
-                and Google AI Overviews. All from one platform.
+                {t.rich("hero.description", {
+                  em: (chunks) => <em>{chunks}</em>,
+                })}
               </p>
               <div className="hero-animate-delay-3 mt-8 flex flex-col sm:flex-row gap-4">
                 <Link
                   href="/register"
                   className="btn-primary text-base px-8 py-3"
                 >
-                  Get Started Free
+                  {t("hero.cta")}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
                 <Link
                   href="#how-it-works"
                   className="btn-secondary text-base px-8 py-3"
                 >
-                  See How It Works
+                  {t("hero.secondaryCta")}
                 </Link>
               </div>
               {/* Social proof */}
               <div className="hero-animate-delay-3 mt-8 flex flex-wrap gap-x-8 gap-y-3 text-sm">
                 <span className="flex items-center gap-2 text-text-primary font-semibold">
-                  <span className="text-primary-500 text-lg">2,000+</span> content teams
+                  <span className="text-primary-500 text-lg">{t("hero.socialProofTeamsCount")}</span> {t("hero.socialProofTeamsLabel")}
                 </span>
                 <span className="flex items-center gap-2 text-text-primary font-semibold">
-                  <span className="text-primary-500 text-lg">500K+</span> articles generated
+                  <span className="text-primary-500 text-lg">{t("hero.socialProofArticlesCount")}</span> {t("hero.socialProofArticlesLabel")}
                 </span>
                 <span className="flex items-center gap-2 text-text-primary font-semibold">
-                  <span className="text-primary-500 text-lg">4.8/5</span> avg. rating
+                  <span className="text-primary-500 text-lg">{t("hero.socialProofRatingCount")}</span> {t("hero.socialProofRatingLabel")}
                 </span>
               </div>
 
               {/* Powered by */}
               <p className="hero-animate-delay-3 mt-4 text-xs text-text-muted">
-                Powered by <span className="font-medium text-text-secondary">Claude</span>, <span className="font-medium text-text-secondary">GPT-4o</span> & <span className="font-medium text-text-secondary">Gemini</span> — each model used where it performs best.
+                {t.rich("hero.poweredBy", {
+                  claude: (chunks) => <span className="font-medium text-text-secondary">{chunks}</span>,
+                  gpt: (chunks) => <span className="font-medium text-text-secondary">{chunks}</span>,
+                  gemini: (chunks) => <span className="font-medium text-text-secondary">{chunks}</span>,
+                })}
               </p>
 
               {/* Trust indicators */}
               <div className="hero-animate-delay-3 mt-6 flex flex-wrap gap-6 text-sm text-text-muted">
                 <span className="flex items-center gap-1.5">
                   <CreditCard className="h-4 w-4 text-primary-400" />
-                  No credit card required
+                  {t("hero.trustNoCreditCard")}
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Clock className="h-4 w-4 text-terra-400" />
-                  Setup in under 5 minutes
+                  {t("hero.trustSetup")}
                 </span>
                 <span className="flex items-center gap-1.5">
                   <ShieldCheck className="h-4 w-4 text-earth-400" />
-                  Cancel anytime
+                  {t("hero.trustCancel")}
                 </span>
               </div>
             </div>
 
             {/* Right — product mockup */}
             <div className="hero-animate-delay-2 relative mx-auto max-w-sm lg:max-w-none">
-              <HeroMockup />
+              <HeroMockup t={t} />
             </div>
           </div>
         </div>
@@ -675,7 +681,7 @@ export default function LandingPageClient() {
       <section className="py-10 bg-white border-y border-surface-tertiary/50">
         <div className="page-container">
           <p className="text-center text-xs font-semibold text-text-muted uppercase tracking-widest mb-7">
-            Works with the tools you already use
+            {t("integrations.heading")}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-6 lg:gap-10">
             {integrations.map(({ name, abbr, bg }) => (
@@ -698,12 +704,11 @@ export default function LandingPageClient() {
         <div className="page-container">
           <RevealSection className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-display font-bold text-text-primary">
-              Everything You Need for{" "}
-              <span className="gradient-text">Content Success</span>
+              {t("features.title")}{" "}
+              <span className="gradient-text">{t("features.titleHighlight")}</span>
             </h2>
             <p className="mt-4 text-text-secondary max-w-2xl mx-auto">
-              One platform to research, write, optimize, publish, and track —
-              powered by AI that understands SEO.
+              {t("features.description")}
             </p>
           </RevealSection>
 
@@ -738,10 +743,10 @@ export default function LandingPageClient() {
         <div className="page-container">
           <RevealSection className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-display font-bold text-text-primary">
-              How It Works
+              {t("howItWorks.title")}
             </h2>
             <p className="mt-4 text-text-secondary max-w-2xl mx-auto">
-              Three simple steps from idea to published, ranking content.
+              {t("howItWorks.description")}
             </p>
           </RevealSection>
 
@@ -775,7 +780,7 @@ export default function LandingPageClient() {
             const Visual = i === 0 ? ContentGenMockup : i === 1 ? SeoAnalyticsMockup : SocialMediaMockup;
             return (
               <div
-                key={item.title}
+                key={i}
                 className={`grid lg:grid-cols-2 gap-12 lg:gap-16 items-center ${
                   i % 2 === 1 ? "lg:[direction:rtl]" : ""
                 }`}
@@ -792,9 +797,9 @@ export default function LandingPageClient() {
                     {item.description}
                   </p>
                   <ul className="space-y-3">
-                    {item.bullets.map((b) => (
+                    {item.bullets.map((b, j) => (
                       <li
-                        key={b}
+                        key={j}
                         className="flex items-start gap-3 text-sm text-text-secondary"
                       >
                         <ChevronRight className="h-4 w-4 text-primary-500 mt-0.5 flex-shrink-0" />
@@ -809,7 +814,7 @@ export default function LandingPageClient() {
                   direction={i % 2 === 0 ? "right" : "left"}
                   className={i % 2 === 1 ? "lg:[direction:ltr]" : ""}
                 >
-                  <Visual />
+                  <Visual t={t} />
                 </RevealSection>
               </div>
             );
@@ -823,15 +828,13 @@ export default function LandingPageClient() {
           <RevealSection className="text-center mb-16">
             <div className="inline-flex items-center gap-2 rounded-full bg-primary-800/60 px-4 py-1.5 text-sm text-primary-300 mb-6 border border-primary-700/50">
               <Zap className="h-4 w-4" />
-              <span>NEW — Answer Engine Optimization</span>
+              <span>{t("aeo.badge")}</span>
             </div>
             <h2 className="text-3xl md:text-4xl font-display font-bold text-cream-100">
-              Get Found by AI, Not Just Google
+              {t("aeo.title")}
             </h2>
             <p className="mt-4 text-primary-200/70 max-w-2xl mx-auto leading-relaxed">
-              The next wave of search happens inside ChatGPT, Perplexity, and
-              Google AI Overviews. A-Stats tracks your AEO score so you know
-              exactly when — and how — AI engines cite your content.
+              {t("aeo.description")}
             </p>
           </RevealSection>
 
@@ -842,11 +845,10 @@ export default function LandingPageClient() {
                   <Zap className="h-6 w-6 text-primary-300" />
                 </div>
                 <h3 className="font-display text-lg font-semibold text-cream-100 mb-2">
-                  AEO Score Tracking
+                  {t("aeo.card1Title")}
                 </h3>
                 <p className="text-sm text-primary-200/70 leading-relaxed">
-                  See how AI answer engines perceive each of your pages with a
-                  0–100 AEO score updated regularly.
+                  {t("aeo.card1Description")}
                 </p>
               </div>
 
@@ -855,11 +857,10 @@ export default function LandingPageClient() {
                   <Bell className="h-6 w-6 text-primary-300" />
                 </div>
                 <h3 className="font-display text-lg font-semibold text-cream-100 mb-2">
-                  Citation Alerts
+                  {t("aeo.card2Title")}
                 </h3>
                 <p className="text-sm text-primary-200/70 leading-relaxed">
-                  Get notified when AI systems start or stop citing your content
-                  so you can act before rankings drop.
+                  {t("aeo.card2Description")}
                 </p>
               </div>
 
@@ -868,11 +869,10 @@ export default function LandingPageClient() {
                   <TrendingUp className="h-6 w-6 text-primary-300" />
                 </div>
                 <h3 className="font-display text-lg font-semibold text-cream-100 mb-2">
-                  Answer-Ready Structure
+                  {t("aeo.card3Title")}
                 </h3>
                 <p className="text-sm text-primary-200/70 leading-relaxed">
-                  Get AI recommendations on how to restructure your content to
-                  win featured AI answers.
+                  {t("aeo.card3Description")}
                 </p>
               </div>
             </div>
@@ -880,14 +880,14 @@ export default function LandingPageClient() {
             {/* AEO Score mockup card */}
             <div className="max-w-sm mx-auto rounded-2xl bg-primary-900 border border-primary-800/60 p-8 text-center">
               <p className="text-sm font-medium text-primary-300 mb-4 uppercase tracking-widest">
-                AEO Score
+                {t("aeo.scoreLabel")}
               </p>
               <div className="text-7xl font-display font-bold text-primary-400 mb-2">
-                82
+                {t("aeo.scoreValue")}
               </div>
               <p className="text-sm text-primary-300 mb-6">
-                <span className="text-primary-400 font-medium">+12</span> this
-                month
+                <span className="text-primary-400 font-medium">{t("aeo.scoreChange")}</span>{" "}
+                {t("aeo.scoreThisMonth")}
               </p>
               <div className="w-full h-2 rounded-full bg-primary-800 overflow-hidden">
                 <div
@@ -905,35 +905,16 @@ export default function LandingPageClient() {
         <div className="page-container">
           <RevealSection className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-display font-bold text-text-primary">
-              Built for <span className="gradient-text">Every Content Team</span>
+              {t("whoItsFor.title")} <span className="gradient-text">{t("whoItsFor.titleHighlight")}</span>
             </h2>
             <p className="mt-4 text-text-secondary max-w-2xl mx-auto">
-              Whether you&apos;re a solo blogger or a 50-person agency, A-Stats scales with you.
+              {t("whoItsFor.description")}
             </p>
           </RevealSection>
 
           <RevealSection>
             <div className="grid md:grid-cols-3 gap-6">
-              {[
-                {
-                  title: "Solo Creators & Bloggers",
-                  description: "Write and publish SEO-optimized articles faster than ever. No team needed — the AI handles research, writing, and optimization.",
-                  features: ["Full article generation", "WordPress publishing", "Basic SEO analysis"],
-                  plan: "Free / Starter",
-                },
-                {
-                  title: "Growing Content Teams",
-                  description: "Collaborate on content strategy, track rankings, and keep your editorial calendar full with AI-assisted workflows.",
-                  features: ["Team collaboration", "Google Search Console", "Social scheduling"],
-                  plan: "Professional",
-                },
-                {
-                  title: "Agencies & Enterprises",
-                  description: "Manage multiple clients with white-label portals, bulk generation, API access, and dedicated support.",
-                  features: ["White-label mode", "Bulk generation", "Client portals & API"],
-                  plan: "Enterprise",
-                },
-              ].map((segment) => (
+              {whoItsForSegments.map((segment) => (
                 <div key={segment.title} className="stagger-child card p-6">
                   <h3 className="font-display text-lg font-semibold text-text-primary mb-2">
                     {segment.title}
@@ -942,15 +923,15 @@ export default function LandingPageClient() {
                     {segment.description}
                   </p>
                   <ul className="space-y-2 mb-4">
-                    {segment.features.map((f) => (
-                      <li key={f} className="flex items-center gap-2 text-sm text-text-secondary">
+                    {segment.features.map((f, i) => (
+                      <li key={i} className="flex items-center gap-2 text-sm text-text-secondary">
                         <Check className="h-3.5 w-3.5 text-primary-500 flex-shrink-0" />
                         {f}
                       </li>
                     ))}
                   </ul>
                   <p className="text-xs font-medium text-primary-600">
-                    Recommended: {segment.plan}
+                    {t("whoItsFor.recommended", { plan: segment.plan })}
                   </p>
                 </div>
               ))}
@@ -964,38 +945,38 @@ export default function LandingPageClient() {
         <div className="page-container">
           <RevealSection className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-display font-bold text-text-primary">
-              Loved by Content Creators
+              {t("testimonials.title")}
             </h2>
             <p className="mt-4 text-text-secondary max-w-2xl mx-auto">
-              See what our users have to say about the platform.
+              {t("testimonials.description")}
             </p>
           </RevealSection>
 
           <RevealSection>
             <div className="grid md:grid-cols-3 gap-6">
-              {testimonials.map((t) => (
+              {testimonials.map((tm) => (
                 <div
-                  key={t.author}
+                  key={tm.author}
                   className="stagger-child card p-6 flex flex-col"
                 >
-                  {t.metric && (
+                  {tm.metric && (
                     <div className="inline-flex self-start items-center gap-1.5 text-xs font-semibold text-primary-600 bg-primary-50 px-2.5 py-1 rounded-full mb-3">
                       <TrendingUp className="h-3 w-3" />
-                      {t.metric}
+                      {tm.metric}
                     </div>
                   )}
                   <p className="text-text-secondary text-sm leading-relaxed flex-1 italic">
-                    &ldquo;{t.quote}&rdquo;
+                    &ldquo;{tm.quote}&rdquo;
                   </p>
                   <div className="mt-6 flex items-center gap-3">
                     <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center text-sm font-semibold text-primary-600">
-                      {t.initials}
+                      {tm.initials}
                     </div>
                     <div>
                       <p className="text-sm font-medium text-text-primary">
-                        {t.author}
+                        {tm.author}
                       </p>
-                      <p className="text-xs text-text-muted">{t.role}</p>
+                      <p className="text-xs text-text-muted">{tm.role}</p>
                     </div>
                   </div>
                 </div>
@@ -1010,11 +991,10 @@ export default function LandingPageClient() {
         <div className="page-container">
           <RevealSection className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-display font-bold text-text-primary">
-              Simple, Transparent Pricing
+              {t("pricing.title")}
             </h2>
             <p className="mt-4 text-text-secondary max-w-2xl mx-auto">
-              Choose the plan that fits your content needs. Upgrade or downgrade
-              anytime.
+              {t("pricing.description")}
             </p>
 
             {/* Billing toggle */}
@@ -1027,7 +1007,7 @@ export default function LandingPageClient() {
                 }`}
                 onClick={() => setYearlyBilling(false)}
               >
-                Monthly
+                {t("pricing.monthly")}
               </button>
               <button
                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
@@ -1037,8 +1017,8 @@ export default function LandingPageClient() {
                 }`}
                 onClick={() => setYearlyBilling(true)}
               >
-                Yearly
-                <span className="ml-1.5 text-xs opacity-80">Save 17%</span>
+                {t("pricing.yearly")}
+                <span className="ml-1.5 text-xs opacity-80">{t("pricing.yearlySave")}</span>
               </button>
             </div>
           </RevealSection>
@@ -1047,15 +1027,15 @@ export default function LandingPageClient() {
           <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-text-muted mb-10">
             <span className="flex items-center gap-1.5">
               <ShieldCheck className="h-4 w-4 text-green-500" />
-              SSL Secured Checkout
+              {t("pricing.trustSsl")}
             </span>
             <span className="flex items-center gap-1.5">
               <CreditCard className="h-4 w-4 text-text-muted" />
-              Cancel anytime — no contracts
+              {t("pricing.trustCancel")}
             </span>
             <span className="flex items-center gap-1.5">
               <Clock className="h-4 w-4 text-text-muted" />
-              14-day money-back guarantee
+              {t("pricing.trustMoneyBack")}
             </span>
           </div>
 
@@ -1072,7 +1052,7 @@ export default function LandingPageClient() {
                 >
                   {plan.popular && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-primary-500 to-terra-500 text-white text-xs font-medium px-4 py-1 rounded-full">
-                      Most Popular
+                      {t("pricing.mostPopular")}
                     </div>
                   )}
                   <div className="text-center mb-6">
@@ -1084,7 +1064,7 @@ export default function LandingPageClient() {
                     </p>
                     <div className="mt-4">
                       {plan.monthlyPrice === 0 ? (
-                        <span className="text-4xl font-display font-bold text-text-primary">Free</span>
+                        <span className="text-4xl font-display font-bold text-text-primary">{t("pricing.free")}</span>
                       ) : (
                         <>
                           {yearlyBilling && (
@@ -1095,20 +1075,20 @@ export default function LandingPageClient() {
                           <span className="text-4xl font-display font-bold text-text-primary">
                             ${yearlyBilling ? plan.yearlyPrice : plan.monthlyPrice}
                           </span>
-                          <span className="text-text-muted">/month</span>
+                          <span className="text-text-muted">{t("pricing.perMonth")}</span>
                         </>
                       )}
                     </div>
                     {yearlyBilling && plan.monthlyPrice > 0 && (
                       <p className="text-xs text-primary-600 mt-1">
-                        Billed annually &middot; Save ${(plan.monthlyPrice - plan.yearlyPrice) * 12}/yr
+                        {t("pricing.billedAnnually", { amount: (plan.monthlyPrice - plan.yearlyPrice) * 12 })}
                       </p>
                     )}
                   </div>
                   <ul className="space-y-3 mb-8 flex-1">
-                    {plan.features.map((feature) => (
+                    {plan.features.map((feature, i) => (
                       <li
-                        key={feature}
+                        key={i}
                         className="flex items-center gap-3 text-sm"
                       >
                         <Check className="h-4 w-4 text-primary-500 flex-shrink-0" />
@@ -1137,10 +1117,10 @@ export default function LandingPageClient() {
           <div className="page-container">
             <RevealSection className="text-center mb-12">
               <h2 className="text-3xl md:text-4xl font-display font-bold text-text-primary">
-                From Our <span className="gradient-text">Blog</span>
+                {t("blog.title")} <span className="gradient-text">{t("blog.titleHighlight")}</span>
               </h2>
               <p className="mt-4 text-text-secondary max-w-2xl mx-auto">
-                SEO tips, content strategy, and product updates from the A-Stats team.
+                {t("blog.description")}
               </p>
             </RevealSection>
 
@@ -1197,7 +1177,7 @@ export default function LandingPageClient() {
                             <span className="text-surface-tertiary">&middot;</span>
                             <span className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
-                              {post.reading_time_minutes}m read
+                              {t("blog.minuteRead", { minutes: post.reading_time_minutes })}
                             </span>
                           </>
                         )}
@@ -1212,7 +1192,7 @@ export default function LandingPageClient() {
                   href="/blog"
                   className="btn-secondary inline-flex items-center gap-2 text-sm"
                 >
-                  View All Posts
+                  {t("blog.viewAllPosts")}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
@@ -1226,15 +1206,15 @@ export default function LandingPageClient() {
         <div className="page-container max-w-3xl">
           <RevealSection className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-display font-bold text-text-primary">
-              Frequently Asked Questions
+              {t("faq.title")}
             </h2>
           </RevealSection>
 
           <RevealSection>
             <div className="space-y-3">
-              {faqs.map((faq) => (
+              {faqs.map((faq, i) => (
                 <details
-                  key={faq.q}
+                  key={i}
                   className="faq-item card overflow-hidden group"
                 >
                   <summary className="flex items-center justify-between px-6 py-4 cursor-pointer">
@@ -1260,21 +1240,20 @@ export default function LandingPageClient() {
         <div className="page-container text-center">
           <RevealSection>
             <h2 className="text-3xl md:text-4xl font-display font-bold text-white">
-              Ready to Create Content That Ranks?
+              {t("cta.title")}
             </h2>
             <p className="mt-4 text-primary-100 max-w-2xl mx-auto">
-              Join 2,000+ creators using AI to write better content, grow
-              organic traffic, and save hours every week. Start free — no credit card required.
+              {t("cta.description")}
             </p>
             <Link
               href="/register"
               className="mt-8 inline-flex btn bg-white text-primary-600 hover:bg-primary-50 text-base px-8 py-3 shadow-soft"
             >
-              Get Started Free
+              {t("cta.button")}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
             <p className="mt-4 text-xs text-primary-200/70">
-              Free tier includes 3 articles, 3 images & 5 social posts per month
+              {t("cta.subtext")}
             </p>
           </RevealSection>
         </div>
@@ -1291,14 +1270,16 @@ export default function LandingPageClient() {
       >
         <div className="page-container flex items-center justify-between py-3">
           <p className="hidden sm:block text-sm text-text-secondary">
-            <span className="font-semibold text-text-primary">Start free</span> — no credit card required
+            {t.rich("stickyCta.text", {
+              bold: (chunks) => <span className="font-semibold text-text-primary">{chunks}</span>,
+            })}
           </p>
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <Link
               href="/register"
               className="btn-primary text-sm px-6 py-2.5 w-full sm:w-auto text-center"
             >
-              Get Started Free
+              {t("stickyCta.button")}
               <ArrowRight className="ml-2 h-4 w-4 inline" />
             </Link>
           </div>

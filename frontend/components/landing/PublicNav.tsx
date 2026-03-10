@@ -4,16 +4,18 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Menu, X } from "lucide-react";
-
-const NAV_LINKS = [
-  { label: "Features", href: "/#features" },
-  { label: "How It Works", href: "/#how-it-works" },
-  { label: "Pricing", href: "/#pricing" },
-  { label: "Blog", href: "/blog" },
-];
+import { useTranslations } from "next-intl";
 
 export default function PublicNav() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const t = useTranslations("landing");
+
+  const NAV_LINKS = [
+    { label: t("nav.features"), href: "/#features" },
+    { label: t("nav.howItWorks"), href: "/#how-it-works" },
+    { label: t("nav.pricing"), href: "/#pricing" },
+    { label: t("nav.blog"), href: "/blog" },
+  ];
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/70 backdrop-blur-xl border-b border-surface-tertiary/60">
@@ -29,7 +31,7 @@ export default function PublicNav() {
           <div className="hidden md:flex items-center gap-8">
             {NAV_LINKS.map((link) => (
               <Link
-                key={link.label}
+                key={link.href}
                 href={link.href}
                 className="text-sm text-text-secondary hover:text-text-primary transition-colors"
               >
@@ -41,10 +43,10 @@ export default function PublicNav() {
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-4">
             <Link href="/login" className="text-sm text-text-secondary hover:text-text-primary transition-colors">
-              Sign In
+              {t("nav.signIn")}
             </Link>
             <Link href="/register" className="btn-primary text-sm">
-              Get Started Free
+              {t("nav.getStartedFree")}
             </Link>
           </div>
 
@@ -65,7 +67,7 @@ export default function PublicNav() {
           <div className="page-container py-4 flex flex-col gap-3">
             {NAV_LINKS.map((link) => (
               <Link
-                key={link.label}
+                key={link.href}
                 href={link.href}
                 className="text-sm text-text-secondary hover:text-text-primary py-2"
                 onClick={() => setMobileMenuOpen(false)}
@@ -75,10 +77,10 @@ export default function PublicNav() {
             ))}
             <hr className="border-surface-tertiary" />
             <Link href="/login" className="text-sm text-text-secondary py-2" onClick={() => setMobileMenuOpen(false)}>
-              Sign In
+              {t("nav.signIn")}
             </Link>
             <Link href="/register" className="btn-primary text-sm text-center" onClick={() => setMobileMenuOpen(false)}>
-              Get Started Free
+              {t("nav.getStartedFree")}
             </Link>
           </div>
         </div>
