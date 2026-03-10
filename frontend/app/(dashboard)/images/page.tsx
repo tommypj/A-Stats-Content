@@ -140,7 +140,7 @@ export default function ImagesPage() {
       setTotalCount(response.total);
       setTotalPages(Math.ceil(response.total / pageSize));
     } catch (error) {
-      toast.error("Failed to load images. Please try again.");
+      toast.error(parseApiError(error).message);
     } finally {
       setLoading(false);
     }
@@ -186,7 +186,7 @@ export default function ImagesPage() {
           setImages((prev) => prev.filter((img) => img.id !== id));
           setTotalCount((prev) => prev - 1);
         } catch (error) {
-          toast.error("Failed to delete image.");
+          toast.error(parseApiError(error).message);
         }
       },
       title: "Delete Image",
@@ -291,7 +291,7 @@ export default function ImagesPage() {
           setSelectedIds(new Set());
           await loadImages();
         } catch (error) {
-          toast.error("Failed to delete images. Please try again.");
+          toast.error(parseApiError(error).message);
         } finally {
           setIsBulkDeleting(false);
         }
@@ -373,11 +373,11 @@ export default function ImagesPage() {
             setRegenLoading(false);
             toast.error(updated.status === "failed" ? "Image generation failed" : "Generation timed out");
           }
-        } catch {
+        } catch (error) {
           if (regenPollRef.current) clearInterval(regenPollRef.current);
           regenPollRef.current = null;
           setRegenLoading(false);
-          toast.error("Failed to check generation status");
+          toast.error(parseApiError(error).message);
         }
       }, 2000);
     } catch (err) {

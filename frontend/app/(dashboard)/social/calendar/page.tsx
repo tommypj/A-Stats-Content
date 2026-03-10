@@ -5,7 +5,7 @@ import { CalendarView } from "@/components/social/calendar-view";
 import { DateNavigation } from "@/components/social/date-navigation";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { api, SocialPost, SocialPlatform } from "@/lib/api";
+import { api, parseApiError, SocialPost, SocialPlatform } from "@/lib/api";
 import { Calendar, Filter, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { startOfToday, startOfMonth, endOfMonth, format } from "date-fns";
@@ -56,7 +56,7 @@ export default function SocialCalendarPage() {
 
       setPosts(response.items);
     } catch (error) {
-      toast.error("Failed to load posts");
+      toast.error(parseApiError(error).message);
     } finally {
       setLoading(false);
     }
@@ -77,7 +77,7 @@ export default function SocialCalendarPage() {
       // Reload posts
       loadPosts();
     } catch (error) {
-      toast.error("Failed to reschedule post");
+      toast.error(parseApiError(error).message);
     }
   };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { SocialPost, SocialPlatform } from "@/lib/api";
+import { SocialPost, SocialPlatform, getPostPlatforms, getTargetStatus } from "@/lib/api";
 import { PostStatusBadge } from "./post-status-badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -71,7 +71,7 @@ export function PostListItem({
           {/* Platforms and Actions */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {post.platforms.map((platform) => (
+              {getPostPlatforms(post).map((platform) => (
                 <span
                   key={platform}
                   className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-surface-secondary"
@@ -82,7 +82,7 @@ export function PostListItem({
               ))}
               {post.targets && post.targets.length > 0 && (
                 <span className="text-xs text-text-secondary ml-2">
-                  {post.targets.filter((t) => t.status === "posted").length}/{post.targets.length} accounts
+                  {post.targets.filter((t) => getTargetStatus(t) === "posted").length}/{post.targets.length} accounts
                 </span>
               )}
             </div>

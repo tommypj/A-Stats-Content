@@ -518,7 +518,11 @@ class ContentPipeline:
                         for kw in ["faq", "frequently asked", "conclusion"]
                     )
                 ]
-                target_section = body_sections[-1] if body_sections else outline.sections[-2]
+                target_section = (
+                    body_sections[-1]
+                    if body_sections
+                    else outline.sections[-2] if len(outline.sections) >= 2 else outline.sections[-1]
+                )
                 reason = f"SEO gap — cover missing topics: {', '.join(missing_topics[:3])}"
 
                 repaired_article = await asyncio.wait_for(
@@ -573,7 +577,7 @@ class ContentPipeline:
                         word_count=len(repaired_content.split()),
                         url_slug=article.url_slug,
                     )
-                    models_used["fact_repair"] = "claude-haiku-4-5-20251001"
+                    models_used["fact_repair"] = settings.anthropic_haiku_model
                     logger.info(
                         "Fact-check repair applied (%d claims fixed)", len(flagged_stats)
                     )

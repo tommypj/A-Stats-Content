@@ -63,7 +63,7 @@ function ToggleRow({ label, description, icon: Icon, checked, onChange, disabled
       >
         <span
           className={clsx(
-            "inline-block h-4 w-4 rounded-full bg-white transition-transform shadow-sm",
+            "inline-block h-4 w-4 rounded-full bg-surface transition-transform shadow-sm",
             checked ? "translate-x-6" : "translate-x-1"
           )}
         />

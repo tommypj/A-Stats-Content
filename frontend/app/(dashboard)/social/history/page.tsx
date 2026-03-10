@@ -6,7 +6,7 @@ import { PostListItem } from "@/components/social/post-list-item";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { api, SocialPost, SocialPostStatus, SocialPlatform } from "@/lib/api";
+import { api, parseApiError, SocialPost, SocialPostStatus, SocialPlatform, getPostPlatforms } from "@/lib/api";
 import { History, Search, Filter, Download, Trash2, List, Grid } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -47,7 +47,7 @@ export default function SocialHistoryPage() {
       setTotal(response.total);
       setTotalPages(response.pages);
     } catch (error) {
-      toast.error("Failed to load post history");
+      toast.error(parseApiError(error).message);
     } finally {
       setLoading(false);
     }
@@ -68,7 +68,7 @@ export default function SocialHistoryPage() {
           await api.social.deletePost(id);
           loadPosts();
         } catch (error) {
-          toast.error("Failed to delete post");
+          toast.error(parseApiError(error).message);
         }
       },
       title: "Delete Post",
@@ -81,7 +81,7 @@ export default function SocialHistoryPage() {
       await api.social.retryFailed(id);
       loadPosts();
     } catch (error) {
-      toast.error("Failed to retry post");
+      toast.error(parseApiError(error).message);
     }
   };
 
@@ -97,7 +97,7 @@ export default function SocialHistoryPage() {
           setSelectedPosts(new Set());
           loadPosts();
         } catch (error) {
-          toast.error("Failed to delete some posts");
+          toast.error(parseApiError(error).message);
         }
       },
       title: `Delete ${count} Post${count !== 1 ? "s" : ""}`,
@@ -122,7 +122,7 @@ export default function SocialHistoryPage() {
         [
           post.id,
           `"${post.content.replace(/"/g, '""')}"`,
-          post.platforms.join(";"),
+          getPostPlatforms(post).join(";"),
           post.status,
           post.scheduled_at,
           post.published_at || "",

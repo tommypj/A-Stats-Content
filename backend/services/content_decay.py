@@ -91,10 +91,14 @@ async def detect_keyword_decay(
     prev_data = {row.keyword: row for row in prev_result.all()}
 
     # ANA-29: No N+1 here — keywords and articles are each loaded in a single batch query.
-    # Match articles to keywords
+    # Match articles to keywords — only load articles whose keywords appear in current_data
     articles_q = select(
         Article.id, Article.keyword, Article.project_id, Article.published_url
-    ).where(Article.user_id == user_id)
+    ).where(
+        Article.user_id == user_id,
+        Article.keyword.in_(list(current_data.keys())),
+        Article.deleted_at.is_(None),
+    )
     articles_result = await db.execute(articles_q)
     article_map = {
         row.keyword.lower(): (row.id, row.project_id, row.published_url)

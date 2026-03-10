@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { SocialPost, SocialPlatform } from "@/lib/api";
+import { SocialPost, SocialPlatform, getPostPlatforms } from "@/lib/api";
 import { PostStatusBadge } from "./post-status-badge";
 import {
   format,
@@ -66,7 +66,7 @@ export function CalendarView({
 
   // Filter posts by platform
   const filteredPosts = posts.filter((post) =>
-    filterPlatform === "all" ? true : post.platforms.includes(filterPlatform)
+    filterPlatform === "all" ? true : getPostPlatforms(post).includes(filterPlatform)
   );
 
   // Group posts by date
@@ -168,7 +168,7 @@ export function CalendarView({
                   title={post.content}
                 >
                   <div className="flex items-center gap-1 mb-0.5">
-                    {post.platforms.map((platform) => (
+                    {getPostPlatforms(post).map((platform) => (
                       <span
                         key={platform}
                         className={cn(
@@ -276,7 +276,7 @@ export function CalendarView({
                 className="p-2 bg-surface-secondary rounded-lg cursor-pointer hover:bg-surface-tertiary transition-colors border border-surface-tertiary"
               >
                 <div className="flex items-center gap-2 mb-2">
-                  {post.platforms.map((platform) => (
+                  {getPostPlatforms(post).map((platform) => (
                     <span
                       key={platform}
                       className={cn(
@@ -329,7 +329,7 @@ export function CalendarView({
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    {post.platforms.map((platform) => (
+                    {getPostPlatforms(post).map((platform) => (
                       <span
                         key={platform}
                         className={cn(

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { api, SocialPost, SocialAnalytics, SocialPlatform } from "@/lib/api";
+import { api, parseApiError, SocialPost, SocialAnalytics, SocialPlatform, getPostPlatforms, getTargetStatus } from "@/lib/api";
 import { toast } from "sonner";
 import { PostStatusBadge } from "@/components/social/post-status-badge";
 import { PostAnalyticsCard } from "@/components/social/post-analytics-card";
@@ -64,7 +64,7 @@ export default function PostDetailPage() {
         loadAnalytics();
       }
     } catch (error) {
-      toast.error("Failed to load post");
+      toast.error(parseApiError(error).message);
       router.push("/social/history");
     } finally {
       setLoading(false);
@@ -77,7 +77,7 @@ export default function PostDetailPage() {
       const data = await api.social.analytics(postId);
       setAnalytics([data]);
     } catch (error) {
-      toast.error("Failed to load post analytics");
+      toast.error(parseApiError(error).message);
     } finally {
       setAnalyticsLoading(false);
     }
@@ -94,7 +94,7 @@ export default function PostDetailPage() {
           await api.social.deletePost(postId);
           router.push("/social/history");
         } catch (error) {
-          toast.error("Failed to delete post");
+          toast.error(parseApiError(error).message);
         }
       },
       title: "Delete Post",
@@ -111,7 +111,7 @@ export default function PostDetailPage() {
           await api.social.publishNow(postId);
           loadPost();
         } catch (error) {
-          toast.error("Failed to publish post");
+          toast.error(parseApiError(error).message);
         }
       },
       title: "Publish Now",
@@ -126,7 +126,7 @@ export default function PostDetailPage() {
       await api.social.retryFailed(postId, targetIds);
       loadPost();
     } catch (error) {
-      toast.error("Failed to retry post");
+      toast.error(parseApiError(error).message);
     }
   };
 
@@ -162,7 +162,7 @@ export default function PostDetailPage() {
 
   const canEdit = post.status === "pending" || post.status === "failed";
   const canPublishNow = post.status === "pending";
-  const hasFailed = post.status === "failed" || post.targets?.some((t) => t.status === "failed");
+  const hasFailed = post.status === "failed" || post.targets?.some((t) => getTargetStatus(t) === "failed");
 
   return (
     <TierGate minimum="starter" feature="Social Media">
@@ -295,21 +295,21 @@ export default function PostDetailPage() {
                       </span>
                       <div>
                         <p className="font-medium capitalize">{target.platform}</p>
-                        {target.posted_at && (
+                        {target.published_at && (
                           <p className="text-xs text-text-secondary">
-                            Posted {format(parseISO(target.posted_at), "MMM d, h:mm a")}
+                            Posted {format(parseISO(target.published_at), "MMM d, h:mm a")}
                           </p>
                         )}
                       </div>
                     </div>
 
                     <div className="flex items-center gap-3">
-                      {target.status === "posted" && (
+                      {getTargetStatus(target) === "posted" && (
                         <>
                           <Badge variant="success">Posted</Badge>
-                          {target.posted_url && (
+                          {target.platform_post_url && (
                             <a
-                              href={target.posted_url}
+                              href={target.platform_post_url}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-primary-500 hover:text-primary-600"
@@ -319,7 +319,7 @@ export default function PostDetailPage() {
                           )}
                         </>
                       )}
-                      {target.status === "failed" && (
+                      {getTargetStatus(target) === "failed" && (
                         <div className="flex items-center gap-2">
                           <Badge variant="danger">Failed</Badge>
                           <Button
@@ -331,8 +331,7 @@ export default function PostDetailPage() {
                           </Button>
                         </div>
                       )}
-                      {target.status === "pending" && <Badge variant="warning">Pending</Badge>}
-                      {target.status === "posting" && <Badge variant="default">Posting...</Badge>}
+                      {getTargetStatus(target) === "pending" && <Badge variant="warning">Pending</Badge>}
                     </div>
                   </div>
                 ))
@@ -342,21 +341,21 @@ export default function PostDetailPage() {
             </div>
 
             {/* Error Messages */}
-            {post.targets?.some((t) => t.error_message) && (
+            {post.targets?.some((t) => t.publish_error) && (
               <div className="mt-4 space-y-2">
                 <h3 className="text-sm font-semibold text-red-600 flex items-center gap-2">
                   <AlertCircle className="h-4 w-4" />
                   Errors
                 </h3>
                 {post.targets
-                  .filter((t) => t.error_message)
+                  .filter((t) => t.publish_error)
                   .map((target) => (
                     <div
                       key={target.id}
                       className="p-3 bg-red-50 border border-red-200 rounded-lg"
                     >
                       <p className="text-sm font-medium capitalize">{target.platform}</p>
-                      <p className="text-sm text-red-700 mt-1">{target.error_message}</p>
+                      <p className="text-sm text-red-700 mt-1">{target.publish_error}</p>
                     </div>
                   ))}
               </div>
@@ -392,7 +391,7 @@ export default function PostDetailPage() {
           <Card className="p-6">
             <h3 className="text-sm font-semibold text-text-secondary mb-3">Platforms</h3>
             <div className="flex flex-wrap gap-2">
-              {post.platforms.map((platform) => (
+              {getPostPlatforms(post).map((platform) => (
                 <Badge key={platform} variant="default" className="capitalize">
                   {platform}
                 </Badge>

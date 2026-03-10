@@ -106,6 +106,7 @@ class Settings(BaseSettings):
     # Anthropic (AI Content Generation)
     anthropic_api_key: str | None = None
     anthropic_model: str = "claude-sonnet-4-6"
+    anthropic_haiku_model: str = "claude-haiku-4-5-20251001"
     anthropic_max_tokens: int = 4096
     anthropic_timeout: int = (
         600  # Non-English articles can request 7000+ tokens and need up to 10 min

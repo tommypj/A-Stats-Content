@@ -24,7 +24,7 @@ import {
   Download,
   X,
 } from "lucide-react";
-import { api, Article } from "@/lib/api";
+import { api, parseApiError, Article } from "@/lib/api";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -197,7 +197,7 @@ export default function ArticlesPage() {
       setTotalArticles(response.total);
       setTotalPages(response.pages ?? Math.ceil(response.total / pageSize));
     } catch (error) {
-      toast.error("Failed to load articles. Please try again.");
+      toast.error(parseApiError(error).message);
     } finally {
       setLoading(false);
     }
@@ -216,7 +216,7 @@ export default function ArticlesPage() {
           setArticles((prev) => prev.filter((a) => a.id !== id));
           setTotalArticles((prev) => Math.max(0, prev - 1));
         } catch (error) {
-          toast.error("Failed to delete article.");
+          toast.error(parseApiError(error).message);
         }
       },
       title: "Delete Article",
@@ -265,7 +265,7 @@ export default function ArticlesPage() {
           setSelectedIds(new Set());
           await loadArticles();
         } catch (error) {
-          toast.error("Failed to delete articles. Please try again.");
+          toast.error(parseApiError(error).message);
         } finally {
           setIsBulkDeleting(false);
         }
@@ -294,8 +294,8 @@ export default function ArticlesPage() {
         `articles-${new Date().toISOString().slice(0, 10)}.csv`
       );
       toast.success("Articles exported as CSV");
-    } catch {
-      toast.error("Failed to export articles");
+    } catch (error) {
+      toast.error(parseApiError(error).message);
     }
   }
 

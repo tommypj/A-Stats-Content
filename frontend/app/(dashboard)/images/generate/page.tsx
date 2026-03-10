@@ -130,7 +130,7 @@ function GenerateImageContent() {
       const response = await api.articles.list({ page_size: 100 });
       setArticles(response.items.filter(a => a.status === "completed" || a.status === "published"));
     } catch (err) {
-      toast.error("Failed to load articles");
+      toast.error(parseApiError(err).message);
     } finally {
       setLoadingArticles(false);
     }

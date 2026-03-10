@@ -823,45 +823,47 @@ async def bulk_delete_content(
     model, audit_action, target_type = content_mapping[body.content_type]
 
     # Track results
-    deleted_count = 0
     failed_ids = []
 
-    # ADM-03: Delete each item in its own savepoint so one failure doesn't abort all others
+    # Fetch all items in one batch query
+    result = await db.execute(select(model).where(model.id.in_(body.ids)))
+    found_items = {item.id: item for item in result.scalars().all()}
+
+    # Identify missing IDs
     for item_id in body.ids:
-        try:
-            async with db.begin_nested():
-                # Get item to verify existence
-                result = await db.execute(select(model).where(model.id == item_id))
-                item = result.scalar_one_or_none()
-
-                if not item:
-                    failed_ids.append(item_id)
-                    continue
-
-                # Store user_id before deletion
-                item_user_id = item.user_id
-
-                # Delete item
-                await db.execute(delete(model).where(model.id == item_id))
-
-                # Log to audit (inside savepoint so it rolls back with the delete)
-                audit_log = AdminAuditLog(
-                    admin_user_id=admin_user.id,
-                    action=audit_action.value,
-                    target_type=target_type.value,
-                    target_id=item_id,
-                    target_user_id=item_user_id,
-                    details={"bulk_delete": True, "deleted_by_admin": admin_user.email},
-                )
-                db.add(audit_log)
-
-            deleted_count += 1
-
-        except Exception as e:
-            logger.error(f"Failed to delete {body.content_type} {item_id}: {e}")
+        if item_id not in found_items:
             failed_ids.append(item_id)
 
-    # Commit all successful savepoints
+    # Collect audit data from found items before deletion
+    audit_entries = []
+    for item_id, item in found_items.items():
+        audit_entries.append(
+            AdminAuditLog(
+                admin_user_id=admin_user.id,
+                action=audit_action.value,
+                target_type=target_type.value,
+                target_id=item_id,
+                target_user_id=item.user_id,
+                details={"bulk_delete": True, "deleted_by_admin": admin_user.email},
+            )
+        )
+
+    # Delete all found items in one batch query
+    if found_items:
+        try:
+            await db.execute(delete(model).where(model.id.in_(list(found_items.keys()))))
+            for audit_log in audit_entries:
+                db.add(audit_log)
+        except Exception as e:
+            logger.error(f"Failed to bulk delete {body.content_type}: {e}")
+            await db.rollback()
+            # All found items failed
+            failed_ids.extend(list(found_items.keys()))
+            found_items = {}
+
+    deleted_count = len(found_items)
+
+    # Commit all changes
     await db.commit()
 
     # Log bulk operation summary

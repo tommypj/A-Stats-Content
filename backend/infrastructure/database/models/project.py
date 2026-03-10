@@ -82,7 +82,7 @@ class Project(Base, TimestampMixin):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
-    owner = relationship("User", foreign_keys=[owner_id], lazy="joined")
+    owner = relationship("User", foreign_keys=[owner_id], lazy="select")
     members = relationship(
         "ProjectMember",
         back_populates="project",
@@ -162,8 +162,8 @@ class ProjectMember(Base, TimestampMixin):
 
     # Relationships
     project = relationship("Project", back_populates="members")
-    user = relationship("User", foreign_keys=[user_id], lazy="joined")
-    inviter = relationship("User", foreign_keys=[invited_by], lazy="joined")
+    user = relationship("User", foreign_keys=[user_id], lazy="select")
+    inviter = relationship("User", foreign_keys=[invited_by], lazy="select")
 
     # Indexes and constraints
     # Note: project_id and user_id already have index=True on the column definition
@@ -259,9 +259,9 @@ class ProjectInvitation(Base, TimestampMixin):
 
     # Relationships
     project = relationship("Project", back_populates="invitations")
-    inviter = relationship("User", foreign_keys=[invited_by], lazy="joined")
-    accepted_by = relationship("User", foreign_keys=[accepted_by_user_id], lazy="joined")
-    revoker = relationship("User", foreign_keys=[revoked_by], lazy="joined")
+    inviter = relationship("User", foreign_keys=[invited_by], lazy="select")
+    accepted_by = relationship("User", foreign_keys=[accepted_by_user_id], lazy="select")
+    revoker = relationship("User", foreign_keys=[revoked_by], lazy="select")
 
     # Indexes
     # Note: project_id, invited_by, email, and token already have index=True on their column definitions

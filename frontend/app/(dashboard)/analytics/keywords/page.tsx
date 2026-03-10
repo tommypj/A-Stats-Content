@@ -52,7 +52,7 @@ export default function KeywordsPage() {
     if (isConnected) {
       loadKeywords();
     }
-  }, [isConnected, currentPage]);
+  }, [isConnected, currentPage, sortField, sortOrder]);
 
   async function checkStatus() {
     try {
@@ -60,7 +60,7 @@ export default function KeywordsPage() {
       const status = await api.analytics.status();
       setIsConnected(status.connected);
     } catch (error) {
-      toast.error("Failed to check analytics status");
+      toast.error(parseApiError(error).message);
     } finally {
       setIsLoading(false);
     }
@@ -105,6 +105,8 @@ export default function KeywordsPage() {
       setSortField(field);
       setSortOrder("desc");
     }
+    // Reset to first page when sort changes
+    setCurrentPage(1);
   }
 
   function getSortedAndFilteredKeywords() {

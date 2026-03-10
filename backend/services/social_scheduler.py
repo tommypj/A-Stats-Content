@@ -37,6 +37,7 @@ class SocialSchedulerService:
         self.is_running = False
         self.check_interval = 60  # Check every minute
         self._task: asyncio.Task | None = None
+        self._redis = None
 
     async def start(self):
         """Start the scheduler background loop."""
@@ -58,12 +59,24 @@ class SocialSchedulerService:
             # Sleep until next check
             await asyncio.sleep(self.check_interval)
 
+    async def _get_redis(self):
+        """Get or create a reusable Redis connection."""
+        if self._redis is None and settings.redis_url:
+            self._redis = aioredis.from_url(settings.redis_url, socket_timeout=2)
+        return self._redis
+
     async def stop(self):
         """Stop the scheduler."""
         if not self.is_running:
             return
 
         self.is_running = False
+        if self._redis is not None:
+            try:
+                await self._redis.aclose()
+            except Exception:
+                pass
+            self._redis = None
         logger.info("Social scheduler stopped")
 
     async def process_due_posts(self):
@@ -74,8 +87,8 @@ class SocialSchedulerService:
         lock_acquired = False
         lock_key = "scheduler:process_due_posts:lock"
         try:
-            if settings.redis_url:
-                redis_client = aioredis.from_url(settings.redis_url, socket_timeout=2)
+            redis_client = await self._get_redis()
+            if redis_client is not None:
                 lock_acquired = await redis_client.set(lock_key, "1", nx=True, ex=60)
                 if not lock_acquired:
                     logger.debug("process_due_posts already running in another instance, skipping")
@@ -90,13 +103,11 @@ class SocialSchedulerService:
         try:
             await self._process_due_posts_inner()
         finally:
-            if redis_client is not None:
+            if redis_client is not None and lock_acquired:
                 try:
-                    if lock_acquired:
-                        await redis_client.delete(lock_key)
+                    await redis_client.delete(lock_key)
                 except Exception:
                     pass
-                await redis_client.aclose()
 
     async def _process_due_posts_inner(self):
         """Internal implementation of process_due_posts (called after lock is acquired)."""

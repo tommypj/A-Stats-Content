@@ -507,7 +507,9 @@ async def retry_failed_items(
     from services.generation_tracker import GenerationTracker
 
     tracker = GenerationTracker(db)
-    can_generate = await tracker.check_limit(str(current_user.id), "article")
+    can_generate = await tracker.check_limit(
+        current_user.current_project_id, "article", user_id=current_user.id
+    )
     if not can_generate:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,

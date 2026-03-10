@@ -8,7 +8,6 @@ import json
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
-from urllib.parse import urlencode
 
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
@@ -313,9 +312,15 @@ async def get_customer_portal(current_user: Annotated[User, Depends(get_current_
             detail="Payment system not configured",
         )
 
+    if not settings.lemonsqueezy_store_slug:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Billing portal not configured.",
+        )
+
     # Build customer portal URL
     # Format: https://YOUR_STORE.lemonsqueezy.com/billing
-    portal_url = f"https://{settings.lemonsqueezy_store_id}.lemonsqueezy.com/billing"
+    portal_url = f"https://{settings.lemonsqueezy_store_slug}.lemonsqueezy.com/billing"
 
     logger.info(f"Generated customer portal URL for user {current_user.id}")
 
@@ -350,24 +355,15 @@ async def cancel_subscription(
 
     logger.info(f"Subscription cancellation requested for user {current_user.id}")
 
-    async with httpx.AsyncClient() as client:
-        response = await client.delete(
-            f"https://api.lemonsqueezy.com/v1/subscriptions/{current_user.lemonsqueezy_subscription_id}",
-            headers={
-                "Authorization": f"Bearer {settings.lemonsqueezy_api_key}",
-                "Accept": "application/vnd.api+json",
-            },
+    adapter = LemonSqueezyAdapter()
+    try:
+        await adapter.cancel_subscription(current_user.lemonsqueezy_subscription_id)
+    except Exception as e:
+        logger.error("Failed to cancel subscription for user %s: %s", current_user.id, str(e))
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to cancel subscription. Please try again or contact support.",
         )
-        if response.status_code not in (200, 204):
-            logger.error(
-                "LemonSqueezy cancel failed: %s %s",
-                response.status_code,
-                response.text,
-            )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to cancel subscription. Please try again or contact support.",
-            )
 
     return SubscriptionCancelResponse(
         success=True,
@@ -654,15 +650,11 @@ async def handle_webhook(
         try:
             import redis.asyncio as aioredis
 
-            from infrastructure.config.settings import settings as _settings
-
-            r = aioredis.from_url(_settings.redis_url)
+            r = aioredis.from_url(settings.redis_url)
             redis_key = f"webhook:processed:{event_id}"
-            already_processed = await r.exists(redis_key)
-            if not already_processed:
-                await r.setex(redis_key, 86400, "1")  # 24h TTL
+            is_new = await r.set(redis_key, "1", nx=True, ex=86400)
             await r.aclose()
-            if already_processed:
+            if not is_new:
                 logger.info("Duplicate webhook event %s — skipping", event_id)
                 return {"status": "ok", "message": "already processed"}
         except Exception as redis_err:

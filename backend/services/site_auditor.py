@@ -42,7 +42,7 @@ _DNS_CACHE_TTL = 60  # seconds
 _dns_cache: dict[str, tuple[bool, float]] = {}
 
 
-def _is_safe_url(url: str) -> bool:
+async def _is_safe_url(url: str) -> bool:
     """
     Block requests to private/internal IPs and hostnames.
     Returns True only for valid public domains.
@@ -75,7 +75,8 @@ def _is_safe_url(url: str) -> bool:
 
         # Resolve hostname and check all IPs
         try:
-            addrinfos = socket.getaddrinfo(hostname, None)
+            loop = asyncio.get_running_loop()
+            addrinfos = await loop.run_in_executor(None, socket.getaddrinfo, hostname, None)
         except socket.gaierror:
             _dns_cache[hostname] = (False, now)
             return False
@@ -613,7 +614,7 @@ async def _crawl_site(
         """Fetch a single page, respecting concurrency and SSRF."""
         async with semaphore:
             # SSRF check
-            if not _is_safe_url(page_url):
+            if not await _is_safe_url(page_url):
                 logger.debug("Blocked unsafe URL: %s", page_url)
                 return None
 

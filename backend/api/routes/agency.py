@@ -878,7 +878,9 @@ class PortalSummaryResponse(BaseModel):
 
 
 @router.get("/portal/{token}", response_model=PortalSummaryResponse)
+@limiter.limit("30/minute")
 async def get_portal_data(
+    request: Request,
     token: str,
     db: AsyncSession = Depends(get_db),
 ):

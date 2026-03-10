@@ -92,15 +92,15 @@ export function ProjectMembersList({ members, myRole, onUpdateRole, onRemove }: 
               <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
                 {/* Avatar */}
                 <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
-                  {member.avatar_url ? (
+                  {member.user_avatar_url ? (
                     <img
-                      src={member.avatar_url}
-                      alt={member.name}
+                      src={member.user_avatar_url}
+                      alt={member.user_name}
                       className="h-full w-full rounded-full object-cover"
                     />
                   ) : (
                     <span className="text-base sm:text-lg font-medium text-primary-600">
-                      {member.name.charAt(0).toUpperCase()}
+                      {(member.user_name?.charAt(0) || "?").toUpperCase()}
                     </span>
                   )}
                 </div>
@@ -108,10 +108,10 @@ export function ProjectMembersList({ members, myRole, onUpdateRole, onRemove }: 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="font-medium text-text-primary truncate">{member.name}</p>
+                    <p className="font-medium text-text-primary truncate">{member.user_name}</p>
                     {isOwner && <Crown className="h-4 w-4 text-yellow-500 flex-shrink-0" />}
                   </div>
-                  <p className="text-sm text-text-muted truncate">{member.email}</p>
+                  <p className="text-sm text-text-muted truncate">{member.user_email}</p>
                   <p className="text-xs text-text-muted mt-1">
                     Joined {format(new Date(member.joined_at), "MMM d, yyyy")}
                   </p>
@@ -143,7 +143,7 @@ export function ProjectMembersList({ members, myRole, onUpdateRole, onRemove }: 
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => handleRemove(member.user_id, member.name)}
+                    onClick={() => handleRemove(member.user_id, member.user_name || "this member")}
                     disabled={loadingMember === member.user_id}
                     className="text-red-500 hover:text-red-600 hover:bg-red-50 min-h-[44px] min-w-[44px]"
                     aria-label="Remove member"

@@ -50,7 +50,7 @@ import { clsx } from "clsx";
 import { toast } from "sonner";
 import { ProjectProvider, useProject } from "@/contexts/ProjectContext";
 import { ProjectSwitcher } from "@/components/project/project-switcher";
-import { api, UserResponse, GenerationNotification } from "@/lib/api";
+import { api, parseApiError, UserResponse, GenerationNotification } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { KeyboardShortcutsDialog } from "@/components/ui/keyboard-shortcuts-dialog";
@@ -132,11 +132,11 @@ const navigation: NavItem[] = [
       { name: "Accounts", href: "/social/accounts", icon: Users },
     ],
   },
-  { name: "Tags", href: "/tags", icon: Tags },
+  { name: "Tags", href: "/tags", icon: Tags, minTier: "professional" },
   { name: "Knowledge", href: "/knowledge", icon: BookOpen },
   { name: "Competitor Analysis", href: "/competitor-analysis", icon: Target },
   { name: "Site Audit", href: "/site-audit", icon: ScanSearch },
-  { name: "Reports", href: "/reports", icon: ClipboardList },
+  { name: "Reports", href: "/reports", icon: ClipboardList, minTier: "professional" },
   {
     name: "Projects",
     icon: FolderOpen,
@@ -442,8 +442,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       await api.auth.logout();
       useAuthStore.getState().logout();
       router.push("/login");
-    } catch {
-      toast.error("Failed to sign out. Please try again.");
+    } catch (error) {
+      toast.error(parseApiError(error).message);
     }
   };
 

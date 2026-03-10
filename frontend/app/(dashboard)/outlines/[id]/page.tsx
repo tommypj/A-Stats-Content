@@ -16,7 +16,7 @@ import {
   ChevronUp,
   Download,
 } from "lucide-react";
-import { api, Outline, OutlineSection } from "@/lib/api";
+import { api, parseApiError, Outline, OutlineSection } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -48,7 +48,7 @@ export default function OutlineDetailPage() {
       setOutline(data);
       setEditedSections(data.sections || []);
     } catch (error) {
-      toast.error("Failed to load outline. Please try again.");
+      toast.error(parseApiError(error).message);
     } finally {
       setLoading(false);
     }
@@ -64,7 +64,7 @@ export default function OutlineDetailPage() {
       });
       setOutline(updated);
     } catch (error) {
-      toast.error("Failed to save changes.");
+      toast.error(parseApiError(error).message);
     } finally {
       setSaving(false);
     }
@@ -79,7 +79,7 @@ export default function OutlineDetailPage() {
       setOutline(updated);
       setEditedSections(updated.sections || []);
     } catch (error) {
-      toast.error("Failed to regenerate outline. Please try again.");
+      toast.error(parseApiError(error).message);
     } finally {
       setRegenerating(false);
     }
@@ -156,8 +156,8 @@ export default function OutlineDetailPage() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
       toast.success(`Outline exported as ${format.toUpperCase()}`);
-    } catch {
-      toast.error("Failed to export outline");
+    } catch (error) {
+      toast.error(parseApiError(error).message);
     }
   }
 

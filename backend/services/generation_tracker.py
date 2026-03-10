@@ -16,6 +16,13 @@ from services.error_logger import log_error
 
 logger = logging.getLogger(__name__)
 
+_USAGE_FIELD_MAP: dict[str, str] = {
+    "article": "articles_generated_this_month",
+    "outline": "outlines_generated_this_month",
+    "image": "images_generated_this_month",
+    "social_post": "social_posts_generated_this_month",
+}
+
 
 class GenerationTracker:
     """Tracks generation events and manages usage billing."""
@@ -64,8 +71,13 @@ class GenerationTracker:
         log_id: str,
         ai_model: str | None = None,
         duration_ms: int | None = None,
+        user=None,
     ) -> None:
-        """Mark generation as successful and increment usage."""
+        """Mark generation as successful and increment usage.
+
+        Args:
+            user: Optional pre-loaded User object to avoid redundant DB fetch.
+        """
         result = await self.db.execute(select(GenerationLog).where(GenerationLog.id == log_id))
         log = result.scalar_one_or_none()
         if not log:
@@ -81,16 +93,11 @@ class GenerationTracker:
         try:
             from infrastructure.database.models.user import User
 
-            user_result = await self.db.execute(select(User).where(User.id == log.user_id))
-            user = user_result.scalar_one_or_none()
+            if user is None:
+                user_result = await self.db.execute(select(User).where(User.id == log.user_id))
+                user = user_result.scalar_one_or_none()
             if user:
-                ALLOWED_USAGE_FIELDS = {
-                    "article": "articles_generated_this_month",
-                    "outline": "outlines_generated_this_month",
-                    "image": "images_generated_this_month",
-                    "social_post": "social_posts_generated_this_month",
-                }
-                usage_field = ALLOWED_USAGE_FIELDS.get(log.resource_type)
+                usage_field = _USAGE_FIELD_MAP.get(log.resource_type)
                 if usage_field:
                     current = getattr(user, usage_field, 0) or 0
                     setattr(user, usage_field, current + 1)
@@ -109,10 +116,6 @@ class GenerationTracker:
         self,
         log_id: str,
         error_message: str,
-        user_id: str | None = None,
-        project_id: str | None = None,
-        resource_type: str | None = None,
-        resource_id: str | None = None,
         duration_ms: int | None = None,
     ) -> None:
         """Mark generation as failed. Creates an admin alert. Does NOT increment usage."""
@@ -185,6 +188,7 @@ class GenerationTracker:
         project_id: str | None,
         resource_type: str,
         user_id: str | None = None,
+        user=None,
     ) -> bool:
         """Check if the user can generate more of this resource type.
         Returns True if allowed, False if limit reached.
@@ -200,8 +204,9 @@ class GenerationTracker:
         try:
             from infrastructure.database.models.user import User
 
-            user_result = await self.db.execute(select(User).where(User.id == user_id))
-            user = user_result.scalar_one_or_none()
+            if user is None:
+                user_result = await self.db.execute(select(User).where(User.id == user_id))
+                user = user_result.scalar_one_or_none()
             if not user:
                 # User row not found — this is an invalid auth state;
                 # deny generation rather than silently allowing it.
@@ -229,13 +234,7 @@ class GenerationTracker:
                 return True  # unlimited
 
             # Get current month's usage count for this user
-            ALLOWED_USAGE_FIELDS = {
-                "article": "articles_generated_this_month",
-                "outline": "outlines_generated_this_month",
-                "image": "images_generated_this_month",
-                "social_post": "social_posts_generated_this_month",
-            }
-            usage_field = ALLOWED_USAGE_FIELDS.get(resource_type)
+            usage_field = _USAGE_FIELD_MAP.get(resource_type)
             if not usage_field:
                 logger.warning(
                     "Unknown resource_type '%s' for limit check — denying", resource_type

@@ -189,9 +189,9 @@ export default function AdminEditBlogPostPage() {
         } else {
           pollImageStatus(imageId);
         }
-      } catch {
+      } catch (error) {
         setGeneratingImage(false);
-        toast.error("Image polling error");
+        toast.error(parseApiError(error).message);
       }
     }, 3000);
   };

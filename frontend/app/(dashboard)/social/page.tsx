@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { api, SocialAccount, SocialPost } from "@/lib/api";
+import { api, parseApiError, SocialAccount, SocialPost, getPostPlatforms } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -62,7 +62,7 @@ export default function SocialDashboard() {
         totalPosted: recentRes.total,
       });
     } catch (error) {
-      toast.error("Failed to load dashboard data");
+      toast.error(parseApiError(error).message);
     } finally {
       setLoading(false);
     }
@@ -297,7 +297,7 @@ export default function SocialDashboard() {
                         {formatDate(post.scheduled_at)}
                       </span>
                       <div className="flex items-center gap-2">
-                        {post.platforms.map((platform) => (
+                        {getPostPlatforms(post).map((platform) => (
                           <span
                             key={platform}
                             className={getPlatformColor(platform)}

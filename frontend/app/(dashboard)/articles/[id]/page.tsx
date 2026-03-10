@@ -39,7 +39,7 @@ import {
   Zap,
   Bot,
 } from "lucide-react";
-import { api, Article, ArticleRevision, ArticleRevisionDetail, LinkSuggestion, AEOScore } from "@/lib/api";
+import { api, parseApiError, Article, ArticleRevision, ArticleRevisionDetail, LinkSuggestion, AEOScore } from "@/lib/api";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { calculateSEOScore, SEOScore } from "@/lib/seo-score";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -835,7 +835,7 @@ export default function ArticleEditorPage() {
         }
       }
     } catch (error) {
-      toast.error("Failed to load article. Please try again.");
+      toast.error(parseApiError(error).message);
     } finally {
       setLoading(false);
     }
@@ -847,7 +847,7 @@ export default function ArticleEditorPage() {
       const status = await api.wordpress.status();
       setWpConnected(status.is_connected);
     } catch (error) {
-      toast.error("Failed to check WordPress connection.");
+      toast.error(parseApiError(error).message);
       setWpConnected(false);
     } finally {
       setCheckingWpConnection(false);
@@ -876,7 +876,7 @@ export default function ArticleEditorPage() {
       });
       setArticle(updated);
     } catch (error) {
-      toast.error("Failed to save changes.");
+      toast.error(parseApiError(error).message);
     } finally {
       setSaving(false);
     }
@@ -917,7 +917,7 @@ export default function ArticleEditorPage() {
       setArticle(updated);
       setContent(updated.content || "");
     } catch (error) {
-      toast.error("AI improvement failed. Please try again.");
+      toast.error(parseApiError(error).message);
     } finally {
       setImproving(false);
     }
@@ -932,7 +932,7 @@ export default function ArticleEditorPage() {
       const updated = await api.articles.analyzeSeo(article.id);
       setArticle(updated);
     } catch (error) {
-      toast.error("SEO analysis failed. Please try again.");
+      toast.error(parseApiError(error).message);
     } finally {
       setAnalyzingSeo(false);
     }
@@ -946,7 +946,7 @@ export default function ArticleEditorPage() {
           await api.articles.delete(article.id);
           router.push("/articles");
         } catch (error) {
-          toast.error("Failed to delete article");
+          toast.error(parseApiError(error).message);
         }
       },
       title: "Delete Article",
@@ -1107,7 +1107,7 @@ export default function ArticleEditorPage() {
       setRevisions(data.items);
       setRevisionsTotal(data.total);
     } catch (error) {
-      toast.error("Failed to load version history");
+      toast.error(parseApiError(error).message);
     } finally {
       setLoadingRevisions(false);
     }
@@ -1125,7 +1125,7 @@ export default function ArticleEditorPage() {
       const detail = await api.articles.getRevision(article.id, revisionId);
       setPreviewRevision(detail);
     } catch (error) {
-      toast.error("Failed to load revision content");
+      toast.error(parseApiError(error).message);
     } finally {
       setLoadingPreview(false);
     }
@@ -1153,7 +1153,7 @@ export default function ArticleEditorPage() {
           await loadRevisions();
           toast.success("Article restored to selected version");
         } catch (error) {
-          toast.error("Failed to restore revision");
+          toast.error(parseApiError(error).message);
         } finally {
           setRestoringRevisionId(null);
           isRestoringRef.current = false;
@@ -1176,7 +1176,7 @@ export default function ArticleEditorPage() {
         const data = await api.articles.linkSuggestions(articleId);
         setLinkSuggestions(data.suggestions);
       } catch (error) {
-        toast.error("Failed to load link suggestions");
+        toast.error(parseApiError(error).message);
         setLinkSuggestionsError(true);
       } finally {
         setLoadingLinks(false);
@@ -1207,8 +1207,8 @@ export default function ArticleEditorPage() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
       toast.success(`Article exported as ${format.toUpperCase()}`);
-    } catch {
-      toast.error("Failed to export article");
+    } catch (error) {
+      toast.error(parseApiError(error).message);
     }
   }
 
@@ -1232,8 +1232,8 @@ export default function ArticleEditorPage() {
       const data = await api.articles.refreshAeoScore(params.id as string);
       setAeoScore(data);
       toast.success("AEO score updated");
-    } catch {
-      toast.error("Failed to refresh AEO score");
+    } catch (error) {
+      toast.error(parseApiError(error).message);
     } finally {
       setAeoLoading(false);
     }

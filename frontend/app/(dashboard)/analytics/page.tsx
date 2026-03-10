@@ -40,6 +40,7 @@ export default function AnalyticsPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [dateRange, setDateRange] = useState(28);
+  const [debouncedDateRange, setDebouncedDateRange] = useState(dateRange);
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [dailyData, setDailyData] = useState<DailyAnalyticsData[]>([]);
   const [lastSync, setLastSync] = useState<string | null>(null);
@@ -60,11 +61,16 @@ export default function AnalyticsPage() {
   }, []);
 
   useEffect(() => {
+    const timer = setTimeout(() => setDebouncedDateRange(dateRange), 300);
+    return () => clearTimeout(timer);
+  }, [dateRange]);
+
+  useEffect(() => {
     if (isConnected && siteUrl) {
       loadAnalytics();
       loadBreakdowns();
     }
-  }, [isConnected, siteUrl, dateRange]);
+  }, [isConnected, siteUrl, debouncedDateRange]);
 
   useEffect(() => {
     if (isConnected && !siteUrl) {
@@ -81,7 +87,7 @@ export default function AnalyticsPage() {
       setLastSync(status.last_sync || null);
     } catch (error) {
       console.error("Failed to check analytics status:", error);
-      toast.error("Failed to load analytics status");
+      toast.error(parseApiError(error).message);
     } finally {
       setIsLoading(false);
     }
@@ -124,7 +130,7 @@ export default function AnalyticsPage() {
       setIsLoading(true);
       const [summaryData, dailyResponse] = await Promise.all([
         api.analytics.summary(),
-        api.analytics.daily({ page: 1, page_size: dateRange }),
+        api.analytics.daily({ page: 1, page_size: debouncedDateRange }),
       ]);
       setSummary(summaryData);
       setDailyData(dailyResponse.items);
@@ -140,14 +146,14 @@ export default function AnalyticsPage() {
     try {
       setIsLoadingBreakdown(true);
       const [deviceRes, countryRes] = await Promise.all([
-        api.analytics.deviceBreakdown(dateRange),
-        api.analytics.countryBreakdown(dateRange, 10),
+        api.analytics.deviceBreakdown(debouncedDateRange),
+        api.analytics.countryBreakdown(debouncedDateRange, 10),
       ]);
       setDeviceData(deviceRes.items);
       setCountryData(countryRes.items);
     } catch (error) {
       // Breakdowns are supplementary — soft toast instead of blocking
-      toast.error("Failed to load device/country breakdowns");
+      toast.error(parseApiError(error).message);
     } finally {
       setIsLoadingBreakdown(false);
     }

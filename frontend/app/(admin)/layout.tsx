@@ -25,7 +25,7 @@ import {
   Bug,
 } from "lucide-react";
 import { clsx } from "clsx";
-import { api } from "@/lib/api";
+import { api, parseApiError } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 
@@ -83,8 +83,8 @@ export default function AdminLayout({
       await api.auth.logout();
       useAuthStore.getState().logout();
       router.push("/login");
-    } catch {
-      toast.error("Failed to sign out. Please try again.");
+    } catch (error) {
+      toast.error(parseApiError(error).message);
     }
   }, [router]);
 

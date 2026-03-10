@@ -27,8 +27,8 @@ function getCached<T>(key: string, ttlMs: number): T | null {
 function setCache(key: string, data: unknown): void {
   apiCache.set(key, { data, timestamp: Date.now() });
   if (apiCache.size > MAX_CACHE_SIZE) {
-    const firstKey = Array.from(apiCache.keys())[0];
-    apiCache.delete(firstKey);
+    const firstKey = apiCache.keys().next().value;
+    if (firstKey !== undefined) apiCache.delete(firstKey);
   }
 }
 
@@ -1418,15 +1418,9 @@ export const api = {
         apiRequest<ProjectMember[]>({
           url: `/projects/${projectId}/members`,
         }),
-      add: (projectId: string, data: ProjectMemberAddRequest) =>
-        apiRequest<ProjectMember>({
-          method: "POST",
-          url: `/projects/${projectId}/members`,
-          data,
-        }),
       update: (projectId: string, userId: string, data: ProjectMemberUpdateRequest) =>
-        apiRequest<ProjectMember>({
-          method: "PUT",
+        apiRequest<{ success: boolean; message: string; member_id: string; new_role: string }>({
+          method: "PATCH",
           url: `/projects/${projectId}/members/${userId}`,
           data,
         }),
@@ -2776,12 +2770,16 @@ export interface ConnectSocialAccountInput {
 
 export interface SocialPostTarget {
   id: string;
-  account_id: string;
+  social_account_id: string;
   platform: SocialPlatform;
-  status: SocialPostStatus;
-  posted_url?: string;
-  posted_at?: string;
-  error_message?: string;
+  platform_username?: string;
+  platform_content?: string;
+  is_published: boolean;
+  published_at?: string;
+  platform_post_id?: string;
+  platform_post_url?: string;
+  publish_error?: string;
+  analytics_data?: Record<string, unknown>;
 }
 
 export interface SocialPost {
@@ -2792,11 +2790,22 @@ export interface SocialPost {
   media_urls?: string[];
   scheduled_at: string;
   status: SocialPostStatus;
-  platforms: SocialPlatform[];
   targets: SocialPostTarget[];
   created_at: string;
   updated_at: string;
   published_at?: string;
+}
+
+/** Derive unique platforms from a post's targets */
+export function getPostPlatforms(post: SocialPost): SocialPlatform[] {
+  return [...new Set(post.targets?.map((t) => t.platform) || [])];
+}
+
+/** Derive a status label from a target's boolean fields */
+export function getTargetStatus(target: SocialPostTarget): string {
+  if (target.is_published) return "posted";
+  if (target.publish_error) return "failed";
+  return "pending";
 }
 
 export interface SocialPostListResponse {
@@ -3458,9 +3467,9 @@ export interface BrandVoiceSettings {
 export interface ProjectMember {
   id: string;
   user_id: string;
-  email: string;
-  name: string;
-  avatar_url?: string;
+  user_email: string;
+  user_name: string;
+  user_avatar_url?: string;
   role: ProjectRole;
   joined_at: string;
 }
@@ -3498,11 +3507,6 @@ export interface ProjectUpdateRequest {
   slug?: string;
   description?: string;
   logo_url?: string;
-}
-
-export interface ProjectMemberAddRequest {
-  user_id: string;
-  role: ProjectRole;
 }
 
 export interface ProjectMemberUpdateRequest {

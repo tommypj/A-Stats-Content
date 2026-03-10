@@ -9,7 +9,6 @@ from .lemonsqueezy_adapter import (
     LemonSqueezySubscription,
     LemonSqueezyWebhookError,
     WebhookEvent,
-    create_lemonsqueezy_adapter,
 )
 
 __all__ = [
@@ -21,5 +20,4 @@ __all__ = [
     "LemonSqueezyAPIError",
     "LemonSqueezyWebhookError",
     "LemonSqueezyAuthError",
-    "create_lemonsqueezy_adapter",
 ]

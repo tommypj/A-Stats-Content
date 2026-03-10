@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { api, Article } from "@/lib/api";
+import { api, parseApiError, Article } from "@/lib/api";
 import { toast } from "sonner";
 import {
   Calendar,
@@ -320,8 +320,8 @@ function DayPanel({ date, items, onClose, onRefresh, onOpenSchedule }: DayPanelP
       toast.success("Article unscheduled");
       onClose();
       onRefresh();
-    } catch {
-      toast.error("Failed to unschedule article");
+    } catch (error) {
+      toast.error(parseApiError(error).message);
     }
   };
 
@@ -655,8 +655,8 @@ export default function ContentCalendarPage() {
       setShowScheduleModal(false);
       setScheduleDate(null);
       loadData();
-    } catch {
-      toast.error("Failed to schedule article");
+    } catch (error) {
+      toast.error(parseApiError(error).message);
     } finally {
       setScheduling(false);
     }

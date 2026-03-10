@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from math import ceil
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -579,8 +579,8 @@ class BlogGenerateRequest(BaseModel):
     list_usage: str = "balanced"
     custom_instructions: str | None = None
     language: str = "en"
-    secondary_keywords: list[str] = []
-    entities: list[str] = []
+    secondary_keywords: list[str] = Field(default_factory=list)
+    entities: list[str] = Field(default_factory=list)
 
 
 class BlogGenerateResponse(BaseModel):

@@ -16,6 +16,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import StreamingResponse
 
+from api.dependencies import get_effective_tier
 from api.middleware.rate_limit import limiter
 from api.routes.auth import get_current_user
 from api.schemas.site_audit import (
@@ -56,15 +57,6 @@ def _normalize_domain(raw: str) -> str:
     ):
         raise HTTPException(status_code=422, detail="Invalid domain format")
     return d
-
-
-def _get_user_tier(user: User) -> str:
-    """Resolve the user's effective subscription tier, falling back to free."""
-    tier = user.subscription_tier or "free"
-    now = datetime.now(UTC)
-    if user.subscription_expires and user.subscription_expires < now:
-        tier = "free"
-    return tier
 
 
 async def _get_audit_or_404(
@@ -117,7 +109,7 @@ async def start_audit(
     domain = _normalize_domain(body.domain)
 
     # ---- Tier gate --------------------------------------------------------
-    tier = _get_user_tier(current_user)
+    tier = get_effective_tier(current_user)
     plan = PLANS.get(tier, PLANS["free"])
     limits = plan.get("limits", {})
     audits_per_month = limits.get("site_audits_per_month", 0)

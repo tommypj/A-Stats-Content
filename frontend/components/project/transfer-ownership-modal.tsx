@@ -50,7 +50,7 @@ export function TransferOwnershipModal({
         }
       },
       title: "Transfer Ownership",
-      message: `Are you sure you want to transfer ownership to ${member.name}? This action cannot be undone and you will become an Admin.`,
+      message: `Are you sure you want to transfer ownership to ${member.user_name}? This action cannot be undone and you will become an Admin.`,
     });
   };
 
@@ -111,21 +111,21 @@ export function TransferOwnershipModal({
                     disabled={isLoading}
                   />
                   <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
-                    {member.avatar_url ? (
+                    {member.user_avatar_url ? (
                       <img
-                        src={member.avatar_url}
-                        alt={member.name}
+                        src={member.user_avatar_url}
+                        alt={member.user_name}
                         className="h-full w-full rounded-full object-cover"
                       />
                     ) : (
                       <span className="text-sm font-medium text-primary-600">
-                        {member.name.charAt(0).toUpperCase()}
+                        {(member.user_name?.charAt(0) || "?").toUpperCase()}
                       </span>
                     )}
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium text-text-primary">{member.name}</p>
-                    <p className="text-sm text-text-muted">{member.email}</p>
+                    <p className="font-medium text-text-primary">{member.user_name}</p>
+                    <p className="text-sm text-text-muted">{member.user_email}</p>
                   </div>
                   <Crown
                     className={`h-5 w-5 ${

@@ -20,7 +20,7 @@ import {
   Download,
   X,
 } from "lucide-react";
-import { api, Outline } from "@/lib/api";
+import { api, parseApiError, Outline } from "@/lib/api";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -118,7 +118,7 @@ export default function OutlinesPage() {
       setTotalItems(response.total);
       setTotalPages(response.pages);
     } catch (error) {
-      toast.error("Failed to load outlines. Please try again.");
+      toast.error(parseApiError(error).message);
     } finally {
       setLoading(false);
     }
@@ -138,7 +138,7 @@ export default function OutlinesPage() {
           setOutlines((prev) => prev.filter((o) => o.id !== id));
           setTotalItems((prev) => Math.max(0, prev - 1));
         } catch (error) {
-          toast.error("Failed to delete outline.");
+          toast.error(parseApiError(error).message);
         }
       },
       title: "Delete Outline",
@@ -151,7 +151,7 @@ export default function OutlinesPage() {
       const updated = await api.outlines.regenerate(id);
       setOutlines(outlines.map((o) => (o.id === id ? updated : o)));
     } catch (error) {
-      toast.error("Failed to regenerate outline. Please try again.");
+      toast.error(parseApiError(error).message);
     }
     setActiveMenu(null);
   }
@@ -197,7 +197,7 @@ export default function OutlinesPage() {
           setSelectedIds(new Set());
           await loadOutlines();
         } catch (error) {
-          toast.error("Failed to delete outlines. Please try again.");
+          toast.error(parseApiError(error).message);
         } finally {
           setIsBulkDeleting(false);
         }
@@ -226,8 +226,8 @@ export default function OutlinesPage() {
         `outlines-${new Date().toISOString().slice(0, 10)}.csv`
       );
       toast.success("Outlines exported as CSV");
-    } catch {
-      toast.error("Failed to export outlines");
+    } catch (error) {
+      toast.error(parseApiError(error).message);
     }
   }
 

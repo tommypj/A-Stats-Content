@@ -660,6 +660,43 @@ async def delete_project(
 # =============================================================================
 
 
+@router.get("/{project_id}/members")
+async def list_project_members(
+    project_id: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """List all members of a project. Requires starter tier and project membership."""
+    require_tier("starter")(current_user)
+
+    # Verify caller is a member of the project
+    await get_project_member(project_id, str(current_user.id), db)
+
+    # Query members with user relationship
+    result = await db.execute(
+        select(ProjectMember)
+        .where(
+            ProjectMember.project_id == project_id,
+            ProjectMember.deleted_at.is_(None),
+        )
+        .options(selectinload(ProjectMember.user))
+    )
+    members = result.scalars().all()
+
+    return [
+        {
+            "id": str(m.id),
+            "user_id": str(m.user_id),
+            "user_email": m.user.email if m.user else None,
+            "user_name": m.user.name if m.user else None,
+            "user_avatar_url": m.user.avatar_url if m.user else None,
+            "role": m.role,
+            "joined_at": m.joined_at.isoformat() if m.joined_at else None,
+        }
+        for m in members
+    ]
+
+
 @router.patch("/{project_id}/members/{member_user_id}", response_model=UpdateMemberRoleResponse)
 async def update_member_role(
     project_id: str,

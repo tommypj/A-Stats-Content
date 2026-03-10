@@ -164,8 +164,8 @@ export default function BillingPage() {
           loadBillingData();
         });
       }
-    } catch {
-      toast.error("Failed to start checkout. Please try again.");
+    } catch (error) {
+      toast.error(parseApiError(error).message);
     }
   };
 

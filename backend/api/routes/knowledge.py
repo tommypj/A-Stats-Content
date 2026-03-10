@@ -586,7 +586,10 @@ async def query_knowledge(
     source_title_map = {s.id: s.title for s in sources}
 
     chunks_result = await db.execute(
-        select(KnowledgeChunk).where(KnowledgeChunk.source_id.in_(source_ids)).limit(50)
+        select(KnowledgeChunk)
+        .where(KnowledgeChunk.source_id.in_(source_ids))
+        .order_by(KnowledgeChunk.source_id, KnowledgeChunk.chunk_index)
+        .limit(50)
     )
     all_chunks = chunks_result.scalars().all()
 

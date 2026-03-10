@@ -62,7 +62,7 @@ export default function ArticlePerformancePage() {
       const status = await api.analytics.status();
       setIsConnected(status.connected && !!status.site_url);
     } catch (error) {
-      toast.error("Failed to check analytics status");
+      toast.error(parseApiError(error).message);
     } finally {
       setIsLoading(false);
     }

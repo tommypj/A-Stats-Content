@@ -14,6 +14,8 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from xml.sax.saxutils import escape as xml_escape
+
 from api.middleware.rate_limit import limiter
 from api.schemas.blog import (
     BlogCategoryOut,
@@ -272,10 +274,10 @@ async def rss_feed(
         )
         desc = post.excerpt or post.meta_description or ""
         # Escape XML special chars
-        title_esc = post.title.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        desc_esc = desc.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        author_tag = f"      <author>{post.author_name}</author>\n" if post.author_name else ""
-        category_tag = f"      <category>{post.category.name}</category>\n" if post.category else ""
+        title_esc = xml_escape(post.title)
+        desc_esc = xml_escape(desc)
+        author_tag = f"      <author>{xml_escape(post.author_name)}</author>\n" if post.author_name else ""
+        category_tag = f"      <category>{xml_escape(post.category.name)}</category>\n" if post.category else ""
         items_xml += f"""
     <item>
       <title>{title_esc}</title>

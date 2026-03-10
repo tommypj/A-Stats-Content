@@ -11,7 +11,6 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
-from urllib.parse import urlencode
 
 import httpx
 
@@ -66,11 +65,15 @@ class LemonSqueezyCustomer:
             email=attributes.get("email", ""),
             name=attributes.get("name", ""),
             status=attributes.get("status", ""),
-            created_at=datetime.fromisoformat(
-                attributes.get("created_at", "").replace("Z", "+00:00")
+            created_at=(
+                datetime.fromisoformat(attributes["created_at"].replace("Z", "+00:00"))
+                if attributes.get("created_at")
+                else datetime.now(UTC)
             ),
-            updated_at=datetime.fromisoformat(
-                attributes.get("updated_at", "").replace("Z", "+00:00")
+            updated_at=(
+                datetime.fromisoformat(attributes["updated_at"].replace("Z", "+00:00"))
+                if attributes.get("updated_at")
+                else None
             ),
         )
 
@@ -218,7 +221,6 @@ class LemonSqueezyAdapter:
 
     # API settings
     API_BASE_URL = "https://api.lemonsqueezy.com/v1"
-    CHECKOUT_BASE_URL = "https://{store_slug}.lemonsqueezy.com/checkout/buy/{variant_id}"
 
     def __init__(
         self,
@@ -281,7 +283,7 @@ class LemonSqueezyAdapter:
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                logger.info(f"Making {method} request to {endpoint}")
+                logger.info("Making %s request to %s", method, endpoint)
 
                 if method == "GET":
                     response = await client.get(url, headers=headers)
@@ -312,13 +314,13 @@ class LemonSqueezyAdapter:
             except Exception:
                 error_detail = str(e)
 
-            logger.error(f"LemonSqueezy API error: {error_detail}")
+            logger.error("LemonSqueezy API error: %s", error_detail)
             raise LemonSqueezyAPIError(f"API request failed: {error_detail}")
         except httpx.RequestError as e:
-            logger.error(f"HTTP request error: {e}")
+            logger.error("HTTP request error: %s", e)
             raise LemonSqueezyAPIError(f"Request failed: {e}")
         except Exception as e:
-            logger.error(f"Unexpected error during API request: {e}")
+            logger.error("Unexpected error during API request: %s", e)
             raise LemonSqueezyAPIError(f"API request failed: {e}")
 
     async def get_customer(self, customer_id: str) -> LemonSqueezyCustomer:
@@ -334,7 +336,7 @@ class LemonSqueezyAdapter:
         Raises:
             LemonSqueezyAPIError: If API request fails
         """
-        logger.info(f"Fetching customer {customer_id}")
+        logger.info("Fetching customer %s", customer_id)
         response = await self._make_request("GET", f"customers/{customer_id}")
 
         data = response.get("data", {})
@@ -353,7 +355,7 @@ class LemonSqueezyAdapter:
         Raises:
             LemonSqueezyAPIError: If API request fails
         """
-        logger.info(f"Fetching subscription {subscription_id}")
+        logger.info("Fetching subscription %s", subscription_id)
         response = await self._make_request("GET", f"subscriptions/{subscription_id}")
 
         data = response.get("data", {})
@@ -388,7 +390,7 @@ class LemonSqueezyAdapter:
         if filters:
             endpoint += "?" + "&".join(filters)
 
-        logger.info(f"Listing subscriptions with filters: {filters}")
+        logger.info("Listing subscriptions with filters: %s", filters)
         response = await self._make_request("GET", endpoint)
 
         data_list = response.get("data", [])
@@ -407,12 +409,12 @@ class LemonSqueezyAdapter:
         Raises:
             LemonSqueezyAPIError: If API request fails
         """
-        logger.info(f"Cancelling subscription {subscription_id}")
+        logger.info("Cancelling subscription %s", subscription_id)
 
         # LemonSqueezy uses DELETE to cancel subscriptions
         await self._make_request("DELETE", f"subscriptions/{subscription_id}")
 
-        logger.info(f"Successfully cancelled subscription {subscription_id}")
+        logger.info("Successfully cancelled subscription %s", subscription_id)
         return True
 
     async def get_subscription_invoices(
@@ -427,7 +429,7 @@ class LemonSqueezyAdapter:
         Returns:
             List of invoice data dicts
         """
-        logger.info(f"Fetching invoices for subscription {subscription_id}")
+        logger.info("Fetching invoices for subscription %s", subscription_id)
         response = await self._make_request(
             "GET",
             f"subscription-invoices?filter[subscription_id]={subscription_id}&sort=-createdAt",
@@ -447,7 +449,7 @@ class LemonSqueezyAdapter:
         Raises:
             LemonSqueezyAPIError: If refund fails
         """
-        logger.info(f"Issuing refund for invoice {invoice_id}")
+        logger.info("Issuing refund for invoice %s", invoice_id)
         payload = {
             "data": {
                 "type": "subscription-invoices",
@@ -457,7 +459,7 @@ class LemonSqueezyAdapter:
         response = await self._make_request(
             "POST", f"subscription-invoices/{invoice_id}/refund", data=payload
         )
-        logger.info(f"Successfully refunded invoice {invoice_id}")
+        logger.info("Successfully refunded invoice %s", invoice_id)
         return response
 
     async def pause_subscription(
@@ -478,7 +480,7 @@ class LemonSqueezyAdapter:
         Raises:
             LemonSqueezyAPIError: If API request fails
         """
-        logger.info(f"Pausing subscription {subscription_id} with mode {mode}")
+        logger.info("Pausing subscription %s with mode %s", subscription_id, mode)
 
         data = {
             "data": {
@@ -499,7 +501,7 @@ class LemonSqueezyAdapter:
         )
 
         response_data = response.get("data", {})
-        logger.info(f"Successfully paused subscription {subscription_id}")
+        logger.info("Successfully paused subscription %s", subscription_id)
         return LemonSqueezySubscription.from_api_response(response_data)
 
     async def resume_subscription(self, subscription_id: str) -> LemonSqueezySubscription:
@@ -515,7 +517,7 @@ class LemonSqueezyAdapter:
         Raises:
             LemonSqueezyAPIError: If API request fails
         """
-        logger.info(f"Resuming subscription {subscription_id}")
+        logger.info("Resuming subscription %s", subscription_id)
 
         data = {
             "data": {
@@ -534,33 +536,8 @@ class LemonSqueezyAdapter:
         )
 
         response_data = response.get("data", {})
-        logger.info(f"Successfully resumed subscription {subscription_id}")
+        logger.info("Successfully resumed subscription %s", subscription_id)
         return LemonSqueezySubscription.from_api_response(response_data)
-
-    async def get_customer_portal_url(self, customer_id: str) -> str:
-        """
-        Get customer portal URL for managing subscription.
-
-        Args:
-            customer_id: LemonSqueezy customer ID
-
-        Returns:
-            Customer portal URL
-
-        Raises:
-            LemonSqueezyAPIError: If API request fails
-        """
-        logger.info(f"Fetching customer portal URL for {customer_id}")
-
-        # Fetch customer to get the portal URL from attributes
-        await self.get_customer(customer_id)
-
-        # The portal URL is typically in the customer data
-        # For now, return a constructed URL (may need adjustment based on actual API)
-        portal_url = "https://app.lemonsqueezy.com/my-orders"
-
-        logger.info("Retrieved customer portal URL")
-        return portal_url
 
     async def create_checkout(
         self,
@@ -589,7 +566,7 @@ class LemonSqueezyAdapter:
         Raises:
             LemonSqueezyAPIError: If API request fails
         """
-        logger.info(f"Creating checkout session for variant {variant_id}, user {user_id}")
+        logger.info("Creating checkout session for variant %s, user %s", variant_id, user_id)
 
         payload: dict[str, Any] = {
             "data": {
@@ -631,55 +608,7 @@ class LemonSqueezyAdapter:
         response = await self._make_request("POST", "checkouts", data=payload)
         checkout_url = response["data"]["attributes"]["url"]
 
-        logger.info(f"Created checkout session for user {user_id}: {checkout_url}")
-        return checkout_url
-
-    def get_checkout_url(
-        self,
-        variant_id: str,
-        email: str,
-        user_id: str,
-        store_slug: str = "astats",
-        custom_data: dict[str, Any] | None = None,
-    ) -> str:
-        """
-        Generate checkout URL for a product variant (legacy, manual URL construction).
-
-        Prefer create_checkout() for overlay-compatible URLs.
-
-        Args:
-            variant_id: LemonSqueezy variant ID
-            email: Customer email address
-            user_id: User ID to include in custom data
-            store_slug: Store slug (subdomain)
-            custom_data: Additional custom data to pass through checkout
-
-        Returns:
-            Checkout URL
-        """
-        logger.info(f"Generating checkout URL for variant {variant_id}")
-
-        # Build checkout URL base
-        base_url = self.CHECKOUT_BASE_URL.format(
-            store_slug=store_slug,
-            variant_id=variant_id,
-        )
-
-        # Build checkout parameters
-        checkout_params = {
-            "checkout[email]": email,
-            "checkout[custom][user_id]": user_id,
-        }
-
-        # Add custom data if provided
-        if custom_data:
-            for key, value in custom_data.items():
-                checkout_params[f"checkout[custom][{key}]"] = value
-
-        # Construct full URL with query parameters
-        checkout_url = f"{base_url}?{urlencode(checkout_params)}"
-
-        logger.info(f"Generated checkout URL for user {user_id}")
+        logger.info("Created checkout session for user %s", user_id)
         return checkout_url
 
     def verify_webhook_signature(self, payload: bytes, signature: str) -> bool:
@@ -720,7 +649,7 @@ class LemonSqueezyAdapter:
             return is_valid
 
         except Exception as e:
-            logger.error(f"Error verifying webhook signature: {e}")
+            logger.error("Error verifying webhook signature: %s", e)
             raise LemonSqueezyWebhookError(f"Signature verification failed: {e}")
 
     def parse_webhook_event(self, payload: dict[str, Any]) -> WebhookEvent:
@@ -739,33 +668,9 @@ class LemonSqueezyAdapter:
         try:
             logger.info("Parsing webhook event")
             event = WebhookEvent.from_webhook_payload(payload)
-            logger.info(f"Parsed webhook event: {event.event_name}")
+            logger.info("Parsed webhook event: %s", event.event_name)
             return event
 
         except Exception as e:
-            logger.error(f"Error parsing webhook event: {e}")
+            logger.error("Error parsing webhook event: %s", e)
             raise LemonSqueezyWebhookError(f"Failed to parse webhook event: {e}")
-
-
-# Factory function for easy instantiation
-def create_lemonsqueezy_adapter(
-    api_key: str | None = None,
-    store_id: str | None = None,
-    webhook_secret: str | None = None,
-) -> LemonSqueezyAdapter:
-    """
-    Create a LemonSqueezy adapter instance.
-
-    Args:
-        api_key: LemonSqueezy API key (defaults to settings)
-        store_id: LemonSqueezy store ID (defaults to settings)
-        webhook_secret: Webhook signing secret (defaults to settings)
-
-    Returns:
-        LemonSqueezyAdapter instance
-    """
-    return LemonSqueezyAdapter(
-        api_key=api_key,
-        store_id=store_id,
-        webhook_secret=webhook_secret,
-    )

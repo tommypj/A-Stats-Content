@@ -733,8 +733,8 @@ export default function SettingsPage() {
       useAuthStore.getState().logout();
       toast.success("Your account has been deleted.");
       router.push("/login");
-    } catch {
-      toast.error("Failed to delete account. Please try again.");
+    } catch (error) {
+      toast.error(parseApiError(error).message);
       setIsDeleting(false);
     }
   };
@@ -745,8 +745,8 @@ export default function SettingsPage() {
       const updated = await api.auth.uploadAvatar(file);
       setProfile((prev) => (prev ? { ...prev, avatar_url: updated.avatar_url } : prev));
       toast.success("Avatar updated successfully.");
-    } catch {
-      toast.error("Failed to upload avatar. Please try again.");
+    } catch (error) {
+      toast.error(parseApiError(error).message);
     } finally {
       setAvatarUploading(false);
     }
@@ -757,8 +757,8 @@ export default function SettingsPage() {
     try {
       await api.auth.exportData();
       toast.success("Data export downloaded.");
-    } catch {
-      toast.error("Failed to export data. Please try again.");
+    } catch (error) {
+      toast.error(parseApiError(error).message);
     } finally {
       setExporting(false);
     }
