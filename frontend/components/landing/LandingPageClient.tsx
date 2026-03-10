@@ -1140,6 +1140,7 @@ export default function LandingPageClient() {
                           src={post.featured_image_url}
                           alt={post.featured_image_alt || post.title}
                           fill
+                          loading="lazy"
                           className="object-cover group-hover:scale-105 transition-transform duration-300"
                           sizes="(max-width: 768px) 100vw, 33vw"
                         />

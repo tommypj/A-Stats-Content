@@ -104,7 +104,7 @@ export default function RootLayout({
         <GoogleAnalytics />
         <Script
           src="https://app.lemonsqueezy.com/js/lemon.js"
-          strategy="afterInteractive"
+          strategy="lazyOnload"
         />
         <script
           type="application/ld+json"

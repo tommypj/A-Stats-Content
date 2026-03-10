@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { api, parseApiError } from "@/lib/api";
 import type { AdminUserAnalytics, AdminContentAnalytics, AdminRevenueAnalytics, AdminAnalyticsParams } from "@/lib/api";
 import { Calendar, TrendingUp, DollarSign, Users, FileText } from "lucide-react";
-import { UserGrowthChart } from "@/components/admin/charts/user-growth-chart";
-import { ContentChart } from "@/components/admin/charts/content-chart";
-import { RevenueChart } from "@/components/admin/charts/revenue-chart";
-import { SubscriptionChart } from "@/components/admin/charts/subscription-chart";
+import dynamic from "next/dynamic";
+
+const UserGrowthChart = dynamic(() => import("@/components/admin/charts/user-growth-chart").then(m => m.UserGrowthChart), { ssr: false });
+const ContentChart = dynamic(() => import("@/components/admin/charts/content-chart").then(m => m.ContentChart), { ssr: false });
+const RevenueChart = dynamic(() => import("@/components/admin/charts/revenue-chart").then(m => m.RevenueChart), { ssr: false });
+const SubscriptionChart = dynamic(() => import("@/components/admin/charts/subscription-chart").then(m => m.SubscriptionChart), { ssr: false });
 
 export default function AdminAnalyticsPage() {
   const [userAnalytics, setUserAnalytics] = useState<AdminUserAnalytics | null>(null);
