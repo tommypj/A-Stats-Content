@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -11,7 +11,6 @@ import { locales, localeNames, localeFlags, type Locale } from "@/i18n/config";
 export default function PublicNav() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
-  const langRef = useRef<HTMLDivElement>(null);
   const t = useTranslations("landing");
   const currentLocale = useLocale();
   const router = useRouter();
@@ -20,7 +19,8 @@ export default function PublicNav() {
   // Close language dropdown on outside click
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      if (langRef.current && !langRef.current.contains(e.target as Node)) {
+      const target = e.target as HTMLElement;
+      if (!target.closest("[data-lang-switcher]")) {
         setLangOpen(false);
       }
     };
@@ -75,7 +75,7 @@ export default function PublicNav() {
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-4">
             {/* Language switcher */}
-            <div ref={langRef} className="relative">
+            <div data-lang-switcher className="relative">
               <button
                 onClick={() => setLangOpen(!langOpen)}
                 className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors p-1.5 rounded-lg hover:bg-surface-secondary"
@@ -111,14 +111,45 @@ export default function PublicNav() {
             </Link>
           </div>
 
-          {/* Mobile menu button */}
-          <button
-            className="md:hidden p-2 text-text-secondary hover:text-text-primary"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Toggle menu"
-          >
-            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+          {/* Mobile: language + hamburger */}
+          <div className="md:hidden flex items-center gap-1">
+            {/* Mobile language switcher (always visible) */}
+            <div data-lang-switcher className="relative">
+              <button
+                onClick={() => setLangOpen(!langOpen)}
+                className="flex items-center gap-1 p-2 text-text-secondary hover:text-text-primary rounded-lg hover:bg-surface-secondary transition-colors"
+                aria-label="Change language"
+              >
+                <Globe className="h-4 w-4" />
+                <span className="text-xs">{localeFlags[currentLocale as Locale]}</span>
+              </button>
+              {langOpen && (
+                <div className="absolute right-0 top-full mt-2 w-44 bg-white rounded-xl border border-surface-tertiary shadow-lg py-1 z-50">
+                  {locales.map((locale) => (
+                    <button
+                      key={locale}
+                      onClick={() => switchLocale(locale)}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                        locale === currentLocale
+                          ? "text-primary-600 bg-primary-50 font-medium"
+                          : "text-text-secondary hover:bg-surface-secondary hover:text-text-primary"
+                      }`}
+                    >
+                      <span>{localeFlags[locale]}</span>
+                      <span>{localeNames[locale]}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button
+              className="p-2 text-text-secondary hover:text-text-primary"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -136,24 +167,6 @@ export default function PublicNav() {
                 {link.label}
               </Link>
             ))}
-            <hr className="border-surface-tertiary" />
-            {/* Mobile language switcher */}
-            <div className="flex flex-wrap gap-2 py-2">
-              {locales.map((locale) => (
-                <button
-                  key={locale}
-                  onClick={() => switchLocale(locale)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm transition-colors ${
-                    locale === currentLocale
-                      ? "bg-primary-50 text-primary-600 font-medium"
-                      : "text-text-secondary hover:bg-surface-secondary"
-                  }`}
-                >
-                  <span>{localeFlags[locale]}</span>
-                  <span>{localeNames[locale]}</span>
-                </button>
-              ))}
-            </div>
             <hr className="border-surface-tertiary" />
             <Link href="/login" className="text-sm text-text-secondary py-2" onClick={() => setMobileMenuOpen(false)}>
               {t("nav.signIn")}
