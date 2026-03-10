@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { api, parseApiError, SocialPost, SocialAnalytics, SocialPlatform, getPostPlatforms, getTargetStatus } from "@/lib/api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api, parseApiError, SocialPlatform, getPostPlatforms, getTargetStatus } from "@/lib/api";
 import { toast } from "sonner";
 import { PostStatusBadge } from "@/components/social/post-status-badge";
 import { PostAnalyticsCard } from "@/components/social/post-analytics-card";
@@ -40,48 +41,66 @@ const PLATFORM_ICONS: Record<SocialPlatform, React.ReactNode> = {
 export default function PostDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const rawId = params.id;
   const postId = Array.isArray(rawId) ? rawId[0] : (rawId ?? "");
 
-  const [post, setPost] = useState<SocialPost | null>(null);
-  const [analytics, setAnalytics] = useState<SocialAnalytics[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string; confirmLabel?: string; variant?: "danger" | "warning" | "default" } | null>(null);
 
-  useEffect(() => {
-    loadPost();
-  }, [postId]);
+  // --- React Query hooks ---
 
-  const loadPost = async () => {
-    setLoading(true);
-    try {
-      const data = await api.social.getPost(postId);
-      setPost(data);
+  const { data: post, isLoading: loading } = useQuery({
+    queryKey: ["social", "post", postId],
+    queryFn: () => api.social.getPost(postId),
+    enabled: !!postId,
+    staleTime: 60_000,
+    meta: { onError: true },
+  });
 
-      // Load analytics if post is published
-      if (data.status === "posted") {
-        loadAnalytics();
-      }
-    } catch (error) {
-      toast.error(parseApiError(error).message);
+  const { data: analyticsData, isLoading: analyticsLoading } = useQuery({
+    queryKey: ["social", "analytics", postId],
+    queryFn: () => api.social.analytics(postId),
+    enabled: !!postId && post?.status === "posted",
+    staleTime: 60_000,
+  });
+
+  const analytics = analyticsData ? [analyticsData] : [];
+
+  // --- Mutations ---
+
+  const deleteMutation = useMutation({
+    mutationFn: () => api.social.deletePost(postId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["social"] });
       router.push("/social/history");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadAnalytics = async () => {
-    setAnalyticsLoading(true);
-    try {
-      const data = await api.social.analytics(postId);
-      setAnalytics([data]);
-    } catch (error) {
+    },
+    onError: (error) => {
       toast.error(parseApiError(error).message);
-    } finally {
-      setAnalyticsLoading(false);
-    }
-  };
+    },
+  });
+
+  const publishNowMutation = useMutation({
+    mutationFn: () => api.social.publishNow(postId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["social", "post", postId] });
+      queryClient.invalidateQueries({ queryKey: ["social", "analytics", postId] });
+    },
+    onError: (error) => {
+      toast.error(parseApiError(error).message);
+    },
+  });
+
+  const retryMutation = useMutation({
+    mutationFn: (targetIds?: string[]) => api.social.retryFailed(postId, targetIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["social", "post", postId] });
+    },
+    onError: (error) => {
+      toast.error(parseApiError(error).message);
+    },
+  });
+
+  // --- Handlers ---
 
   const handleEdit = () => {
     router.push(`/social/compose?edit=${postId}`);
@@ -89,14 +108,7 @@ export default function PostDetailPage() {
 
   const handleDelete = () => {
     setConfirmAction({
-      action: async () => {
-        try {
-          await api.social.deletePost(postId);
-          router.push("/social/history");
-        } catch (error) {
-          toast.error(parseApiError(error).message);
-        }
-      },
+      action: () => deleteMutation.mutate(),
       title: "Delete Post",
       message: "Are you sure you want to delete this post? This action cannot be undone.",
       confirmLabel: "Delete",
@@ -106,14 +118,7 @@ export default function PostDetailPage() {
 
   const handlePublishNow = () => {
     setConfirmAction({
-      action: async () => {
-        try {
-          await api.social.publishNow(postId);
-          loadPost();
-        } catch (error) {
-          toast.error(parseApiError(error).message);
-        }
-      },
+      action: () => publishNowMutation.mutate(),
       title: "Publish Now",
       message: "Are you sure you want to publish this post now?",
       confirmLabel: "Publish",
@@ -121,13 +126,8 @@ export default function PostDetailPage() {
     });
   };
 
-  const handleRetry = async (targetIds?: string[]) => {
-    try {
-      await api.social.retryFailed(postId, targetIds);
-      loadPost();
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-    }
+  const handleRetry = (targetIds?: string[]) => {
+    retryMutation.mutate(targetIds);
   };
 
   if (!postId) {

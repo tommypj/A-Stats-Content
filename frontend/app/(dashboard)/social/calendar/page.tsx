@@ -1,66 +1,77 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { CalendarView } from "@/components/social/calendar-view";
 import { DateNavigation } from "@/components/social/date-navigation";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { api, parseApiError, SocialPost, SocialPlatform } from "@/lib/api";
+import { api, parseApiError, SocialPlatform } from "@/lib/api";
 import { Calendar, Filter, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { startOfToday, startOfMonth, endOfMonth, format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { TierGate } from "@/components/ui/tier-gate";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 type ViewMode = "month" | "week" | "day";
 
+function getDateRange(selectedDate: Date, view: ViewMode) {
+  let startDate: Date;
+  let endDate: Date;
+
+  if (view === "month") {
+    startDate = startOfMonth(selectedDate);
+    endDate = endOfMonth(selectedDate);
+  } else if (view === "week") {
+    const weekStart = new Date(selectedDate);
+    weekStart.setDate(selectedDate.getDate() - selectedDate.getDay());
+    startDate = weekStart;
+    endDate = new Date(weekStart);
+    endDate.setDate(weekStart.getDate() + 6);
+  } else {
+    // day view
+    startDate = new Date(selectedDate);
+    endDate = new Date(selectedDate);
+  }
+
+  return {
+    start_date: format(startDate, "yyyy-MM-dd"),
+    end_date: format(endDate, "yyyy-MM-dd"),
+  };
+}
+
 export default function SocialCalendarPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [view, setView] = useState<ViewMode>("month");
   const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
-  const [posts, setPosts] = useState<SocialPost[]>([]);
-  const [loading, setLoading] = useState(true);
   const [filterPlatform, setFilterPlatform] = useState<SocialPlatform | "all">("all");
 
-  useEffect(() => {
-    loadPosts();
-  }, [selectedDate, view]);
+  const { start_date, end_date } = getDateRange(selectedDate, view);
 
-  const loadPosts = async () => {
-    setLoading(true);
-    try {
-      // Calculate date range based on view
-      let startDate: Date;
-      let endDate: Date;
+  const { data: postsData, isLoading: loading } = useQuery({
+    queryKey: ["social", "posts", { start_date, end_date }],
+    queryFn: () =>
+      api.social.posts({
+        start_date,
+        end_date,
+        page_size: 200,
+      }),
+    staleTime: 30_000,
+  });
 
-      if (view === "month") {
-        startDate = startOfMonth(selectedDate);
-        endDate = endOfMonth(selectedDate);
-      } else if (view === "week") {
-        const weekStart = new Date(selectedDate);
-        weekStart.setDate(selectedDate.getDate() - selectedDate.getDay());
-        startDate = weekStart;
-        endDate = new Date(weekStart);
-        endDate.setDate(weekStart.getDate() + 6);
-      } else {
-        // day view
-        startDate = new Date(selectedDate);
-        endDate = new Date(selectedDate);
-      }
+  const posts = postsData?.items ?? [];
 
-      const response = await api.social.posts({
-        start_date: format(startDate, "yyyy-MM-dd"),
-        end_date: format(endDate, "yyyy-MM-dd"),
-        page_size: 200, // FE-SM-05: Request only what's needed for the visible period
-      });
-
-      setPosts(response.items);
-    } catch (error) {
+  const rescheduleMutation = useMutation({
+    mutationFn: ({ postId, newDate }: { postId: string; newDate: Date }) =>
+      api.social.reschedule(postId, newDate.toISOString()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["social", "posts"] });
+    },
+    onError: (error) => {
       toast.error(parseApiError(error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+  });
 
   const handlePostClick = (postId: string) => {
     router.push(`/social/posts/${postId}`);
@@ -72,13 +83,7 @@ export default function SocialCalendarPage() {
   };
 
   const handleReschedule = async (postId: string, newDate: Date) => {
-    try {
-      await api.social.reschedule(postId, newDate.toISOString());
-      // Reload posts
-      loadPosts();
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-    }
+    rescheduleMutation.mutate({ postId, newDate });
   };
 
   const handleToday = () => {

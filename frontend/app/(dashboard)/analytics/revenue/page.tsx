@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import {
   DollarSign,
   TrendingUp,
@@ -14,6 +14,7 @@ import {
   ArrowDownRight,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   api,
   parseApiError,
@@ -62,6 +63,8 @@ function TrendBadge({
 }
 
 export default function RevenueAttributionPage() {
+  const queryClient = useQueryClient();
+
   const today = new Date();
   const thirtyDaysAgo = new Date(today);
   thirtyDaysAgo.setDate(today.getDate() - 30);
@@ -69,17 +72,7 @@ export default function RevenueAttributionPage() {
   const [startDate, setStartDate] = useState(thirtyDaysAgo.toISOString().slice(0, 10));
   const [endDate, setEndDate] = useState(today.toISOString().slice(0, 10));
 
-  const [overview, setOverview] = useState<RevenueOverview | null>(null);
-  const [goals, setGoals] = useState<ConversionGoal[]>([]);
-  const [topArticles, setTopArticles] = useState<RevenueByArticleItem[]>([]);
-  const [topKeywords, setTopKeywords] = useState<RevenueByKeywordItem[]>([]);
-
-  const [isLoading, setIsLoading] = useState(true);
-  const [isCreatingGoal, setIsCreatingGoal] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [showGoalForm, setShowGoalForm] = useState(false);
-  const [deletingGoalId, setDeletingGoalId] = useState<string | null>(null);
 
   const [newGoal, setNewGoal] = useState({
     name: "",
@@ -92,111 +85,129 @@ export default function RevenueAttributionPage() {
     csvText: "",
   });
 
-  const loadOverview = useCallback(async () => {
-    try {
-      const data = await api.analytics.revenueOverview({
-        start_date: startDate,
-        end_date: endDate,
-      });
-      setOverview(data);
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    }
-  }, [startDate, endDate]);
+  // --- React Query hooks ---
 
-  const loadGoals = useCallback(async () => {
-    try {
-      const data = await api.analytics.revenueGoals();
-      setGoals(data.items);
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    }
-  }, []);
+  const { data: overview, isLoading: overviewLoading } = useQuery<RevenueOverview>({
+    queryKey: ["revenue", "overview", { startDate, endDate }],
+    queryFn: () => api.analytics.revenueOverview({ start_date: startDate, end_date: endDate }),
+    staleTime: 60_000,
+  });
 
-  const loadArticles = useCallback(async () => {
-    try {
-      const data = await api.analytics.revenueByArticle({
+  const { data: goalsData, isLoading: goalsLoading } = useQuery({
+    queryKey: ["revenue", "goals"],
+    queryFn: () => api.analytics.revenueGoals(),
+    staleTime: 60_000,
+  });
+
+  const { data: articlesData, isLoading: articlesLoading } = useQuery({
+    queryKey: ["revenue", "articles", { startDate, endDate }],
+    queryFn: () =>
+      api.analytics.revenueByArticle({
         start_date: startDate,
         end_date: endDate,
         page: 1,
         page_size: 10,
-      });
-      setTopArticles(data.items);
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    }
-  }, [startDate, endDate]);
+      }),
+    staleTime: 60_000,
+  });
 
-  const loadKeywords = useCallback(async () => {
-    try {
-      const data = await api.analytics.revenueByKeyword({
+  const { data: keywordsData, isLoading: keywordsLoading } = useQuery({
+    queryKey: ["revenue", "keywords", { startDate, endDate }],
+    queryFn: () =>
+      api.analytics.revenueByKeyword({
         start_date: startDate,
         end_date: endDate,
         page: 1,
         page_size: 10,
-      });
-      setTopKeywords(data.items);
-    } catch (err) {
+      }),
+    staleTime: 60_000,
+  });
+
+  const goals: ConversionGoal[] = goalsData?.items ?? [];
+  const topArticles: RevenueByArticleItem[] = articlesData?.items ?? [];
+  const topKeywords: RevenueByKeywordItem[] = keywordsData?.items ?? [];
+  const isLoading = overviewLoading || goalsLoading || articlesLoading || keywordsLoading;
+
+  // --- Mutations ---
+
+  const createGoalMutation = useMutation({
+    mutationFn: async (payload: { name: string; goal_type: string; goal_config?: Record<string, unknown> }) =>
+      api.analytics.createRevenueGoal(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["revenue", "goals"] });
+      setNewGoal({ name: "", goal_type: "page_visit", goal_config: "" });
+      setShowGoalForm(false);
+      toast.success("Conversion goal created");
+    },
+    onError: (err) => {
       toast.error(parseApiError(err).message);
-    }
-  }, [startDate, endDate]);
+    },
+  });
 
-  const loadAll = useCallback(async () => {
-    setIsLoading(true);
-    await Promise.all([loadOverview(), loadGoals(), loadArticles(), loadKeywords()]);
-    setIsLoading(false);
-  }, [loadOverview, loadGoals, loadArticles, loadKeywords]);
+  const deleteGoalMutation = useMutation({
+    mutationFn: (goalId: string) => api.analytics.deleteRevenueGoal(goalId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["revenue", "goals"] });
+      toast.success("Goal deleted");
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
 
-  useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+  const importMutation = useMutation({
+    mutationFn: (payload: Parameters<typeof api.analytics.importConversions>[0]) =>
+      api.analytics.importConversions(payload),
+    onSuccess: (result) => {
+      toast.success(result.message || `Imported ${result.imported_count} conversions`);
+      setImportData({ goal_id: "", csvText: "" });
+      queryClient.invalidateQueries({ queryKey: ["revenue"] });
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
 
-  const handleCreateGoal = async () => {
+  const generateReportMutation = useMutation({
+    mutationFn: () => api.analytics.generateRevenueReport("monthly"),
+    onSuccess: (report) => {
+      toast.success(
+        `Report generated: ${formatCurrency(report.total_revenue)} revenue over ${report.total_conversions} conversions`
+      );
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
+
+  // --- Handlers ---
+
+  const handleCreateGoal = () => {
     if (!newGoal.name.trim()) {
       toast.error("Goal name is required");
       return;
     }
-    try {
-      setIsCreatingGoal(true);
-      let parsedConfig: Record<string, unknown> | undefined;
-      if (newGoal.goal_config.trim()) {
-        try {
-          parsedConfig = JSON.parse(newGoal.goal_config);
-        } catch {
-          toast.error("Goal config must be valid JSON");
-          return;
-        }
+    let parsedConfig: Record<string, unknown> | undefined;
+    if (newGoal.goal_config.trim()) {
+      try {
+        parsedConfig = JSON.parse(newGoal.goal_config);
+      } catch {
+        toast.error("Goal config must be valid JSON");
+        return;
       }
-      const created = await api.analytics.createRevenueGoal({
-        name: newGoal.name,
-        goal_type: newGoal.goal_type,
-        ...(parsedConfig ? { goal_config: parsedConfig } : {}),
-      });
-      setGoals((prev) => [...prev, created]);
-      setNewGoal({ name: "", goal_type: "page_visit", goal_config: "" });
-      setShowGoalForm(false);
-      toast.success("Conversion goal created");
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setIsCreatingGoal(false);
     }
+    createGoalMutation.mutate({
+      name: newGoal.name,
+      goal_type: newGoal.goal_type,
+      ...(parsedConfig ? { goal_config: parsedConfig } : {}),
+    });
   };
 
-  const handleDeleteGoal = async (goalId: string) => {
-    try {
-      setDeletingGoalId(goalId);
-      await api.analytics.deleteRevenueGoal(goalId);
-      setGoals((prev) => prev.filter((g) => g.id !== goalId));
-      toast.success("Goal deleted");
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setDeletingGoalId(null);
-    }
+  const handleDeleteGoal = (goalId: string) => {
+    deleteGoalMutation.mutate(goalId);
   };
 
-  const handleImport = async () => {
+  const handleImport = () => {
     if (!importData.goal_id) {
       toast.error("Please select a conversion goal");
       return;
@@ -229,34 +240,20 @@ export default function RevenueAttributionPage() {
       return;
     }
 
-    try {
-      setIsImporting(true);
-      const result = await api.analytics.importConversions({
-        goal_id: importData.goal_id,
-        conversions,
-      });
-      toast.success(result.message || `Imported ${result.imported_count} conversions`);
-      setImportData({ goal_id: "", csvText: "" });
-      await loadAll();
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setIsImporting(false);
-    }
+    importMutation.mutate({
+      goal_id: importData.goal_id,
+      conversions,
+    });
   };
 
-  const handleGenerateReport = async () => {
-    try {
-      setIsGeneratingReport(true);
-      const report = await api.analytics.generateRevenueReport("monthly");
-      toast.success(
-        `Report generated: ${formatCurrency(report.total_revenue)} revenue over ${report.total_conversions} conversions`
-      );
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setIsGeneratingReport(false);
-    }
+  const handleGenerateReport = () => {
+    generateReportMutation.mutate();
+  };
+
+  const handleApplyDateRange = () => {
+    queryClient.invalidateQueries({ queryKey: ["revenue", "overview"] });
+    queryClient.invalidateQueries({ queryKey: ["revenue", "articles"] });
+    queryClient.invalidateQueries({ queryKey: ["revenue", "keywords"] });
   };
 
   return (
@@ -284,17 +281,17 @@ export default function RevenueAttributionPage() {
             onChange={(e) => setEndDate(e.target.value)}
             className="text-sm border border-surface-tertiary rounded-lg px-3 py-1.5 bg-surface text-text-primary"
           />
-          <Button onClick={loadAll} variant="outline" size="sm" disabled={isLoading}>
+          <Button onClick={handleApplyDateRange} variant="outline" size="sm" disabled={isLoading}>
             Apply
           </Button>
           <Button
             onClick={handleGenerateReport}
             variant="primary"
             size="sm"
-            disabled={isGeneratingReport}
+            disabled={generateReportMutation.isPending}
           >
-            <FileText className={`h-4 w-4 mr-1 ${isGeneratingReport ? "animate-pulse" : ""}`} />
-            {isGeneratingReport ? "Generating..." : "Generate Report"}
+            <FileText className={`h-4 w-4 mr-1 ${generateReportMutation.isPending ? "animate-pulse" : ""}`} />
+            {generateReportMutation.isPending ? "Generating..." : "Generate Report"}
           </Button>
         </div>
       </div>
@@ -467,9 +464,9 @@ export default function RevenueAttributionPage() {
                   onClick={handleCreateGoal}
                   variant="primary"
                   size="sm"
-                  disabled={isCreatingGoal}
+                  disabled={createGoalMutation.isPending}
                 >
-                  {isCreatingGoal ? "Creating..." : "Create Goal"}
+                  {createGoalMutation.isPending ? "Creating..." : "Create Goal"}
                 </Button>
                 <Button
                   onClick={() => {
@@ -531,7 +528,7 @@ export default function RevenueAttributionPage() {
                     onClick={() => handleDeleteGoal(goal.id)}
                     variant="ghost"
                     size="sm"
-                    disabled={deletingGoalId === goal.id}
+                    disabled={deleteGoalMutation.isPending && deleteGoalMutation.variables === goal.id}
                   >
                     <Trash2 className="h-4 w-4 text-red-500" />
                   </Button>
@@ -741,10 +738,10 @@ export default function RevenueAttributionPage() {
             onClick={handleImport}
             variant="primary"
             size="sm"
-            disabled={isImporting || !importData.goal_id || !importData.csvText.trim()}
+            disabled={importMutation.isPending || !importData.goal_id || !importData.csvText.trim()}
           >
-            <Upload className={`h-4 w-4 mr-1 ${isImporting ? "animate-pulse" : ""}`} />
-            {isImporting ? "Importing..." : "Import Data"}
+            <Upload className={`h-4 w-4 mr-1 ${importMutation.isPending ? "animate-pulse" : ""}`} />
+            {importMutation.isPending ? "Importing..." : "Import Data"}
           </Button>
         </CardContent>
       </Card>

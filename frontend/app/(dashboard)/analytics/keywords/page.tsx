@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   ArrowUpDown,
@@ -14,12 +14,12 @@ import {
   TrendingDown,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 
 import {
   api,
   parseApiError,
   KeywordRanking,
-  KeywordRankingListResponse,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,57 +32,39 @@ type SortField = "keyword" | "clicks" | "impressions" | "ctr" | "position";
 type SortOrder = "asc" | "desc";
 
 export default function KeywordsPage() {
-  const [isConnected, setIsConnected] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [keywords, setKeywords] = useState<KeywordRanking[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<SortField>("clicks");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const pageSize = 20;
 
-  useEffect(() => {
-    checkStatus();
-  }, []);
+  // --- React Query hooks ---
 
-  useEffect(() => {
-    if (isConnected) {
-      loadKeywords();
-    }
-  }, [isConnected, currentPage, sortField, sortOrder]);
+  const { data: gscStatus, isLoading: statusLoading } = useQuery({
+    queryKey: ["analytics", "gsc", "status"],
+    queryFn: () => api.analytics.status(),
+    staleTime: 30_000,
+  });
 
-  async function checkStatus() {
-    try {
-      setIsLoading(true);
-      const status = await api.analytics.status();
-      setIsConnected(status.connected);
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  const isConnected = gscStatus?.connected ?? false;
 
-  async function loadKeywords() {
-    try {
-      setIsLoading(true);
-      const response: KeywordRankingListResponse = await api.analytics.keywords({
+  const { data: keywordsData, isLoading: keywordsLoading } = useQuery({
+    queryKey: ["analytics", "keywords", { page: currentPage, page_size: pageSize }],
+    queryFn: () =>
+      api.analytics.keywords({
         page: currentPage,
         page_size: pageSize,
-      });
-      setKeywords(response.items);
-      setTotalPages(response.pages);
-      setTotal(response.total);
-    } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to load keywords");
-    } finally {
-      setIsLoading(false);
-    }
-  }
+      }),
+    staleTime: 30_000,
+    enabled: isConnected,
+  });
+
+  const keywords = keywordsData?.items ?? [];
+  const totalPages = keywordsData?.pages ?? 1;
+  const total = keywordsData?.total ?? 0;
+
+  const isLoading = statusLoading || (isConnected && keywordsLoading);
 
   async function handleConnect() {
     try {
@@ -92,8 +74,7 @@ export default function KeywordsPage() {
       localStorage.setItem("gsc_oauth_state_ts", Date.now().toString());
       window.location.href = response.auth_url;
     } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to initiate Google connection");
+      toast.error(parseApiError(error).message);
       setIsConnecting(false);
     }
   }
@@ -178,7 +159,7 @@ export default function KeywordsPage() {
     return new Intl.NumberFormat("en-US").format(Math.round(num));
   };
 
-  if (isLoading && !isConnected) {
+  if (statusLoading) {
     return (
       <div className="space-y-6">
         <div className="h-32 bg-surface-tertiary animate-pulse rounded-2xl" />
@@ -351,7 +332,7 @@ export default function KeywordsPage() {
                 </tr>
               </thead>
               <tbody>
-                {isLoading ? (
+                {keywordsLoading ? (
                   Array.from({ length: 10 }).map((_, i) => (
                     <tr key={i} className="border-b border-surface-tertiary">
                       <td className="p-4">

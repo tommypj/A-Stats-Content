@@ -4,8 +4,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Upload, Search, Filter, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { api, parseApiError, KnowledgeSource } from "@/lib/api";
+import { api, KnowledgeSource } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -24,98 +25,81 @@ const STATUS_OPTIONS = [
 
 export default function SourcesPage() {
   const router = useRouter();
-  const [sources, setSources] = useState<KnowledgeSource[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
   const [pageSize] = useState(12);
-  // Track previous statuses to detect transitions; also keep current filter
-  // values accessible inside the polling callback without re-creating it.
+
+  // Track previous statuses to detect transitions
   const prevStatusesRef = useRef<Record<string, string>>({});
-  const filtersRef = useRef({ page, pageSize, statusFilter, searchQuery });
-  useEffect(() => {
-    filtersRef.current = { page, pageSize, statusFilter, searchQuery };
-  });
-
-  const applyResponse = useCallback(
-    (items: KnowledgeSource[], total: number) => {
-      const prev = prevStatusesRef.current;
-      items.forEach((s) => {
-        if (prev[s.id] && prev[s.id] !== "completed" && s.status === "completed") {
-          toast.success(`"${s.title}" indexed and ready`);
-        }
-        if (prev[s.id] && prev[s.id] !== "failed" && s.status === "failed") {
-          toast.error(`"${s.title}" failed to index`);
-        }
-      });
-      prevStatusesRef.current = Object.fromEntries(items.map((s) => [s.id, s.status]));
-      setSources(items);
-      setTotal(total);
-    },
-    []
-  );
-
-  async function loadSources(silent = false) {
-    const { page, pageSize, statusFilter, searchQuery } = filtersRef.current;
-    try {
-      if (!silent) setIsLoading(true);
-      const response = await api.knowledge.sources({
-        page,
-        page_size: pageSize,
-        status: statusFilter === "all" ? undefined : statusFilter,
-        search: searchQuery || undefined,
-      });
-      applyResponse(response.items, response.total);
-    } catch (error) {
-      if (!silent) {
-        const apiError = parseApiError(error);
-        toast.error(apiError.message || "Failed to load sources");
-      }
-    } finally {
-      if (!silent) setIsLoading(false);
-    }
-  }
-
-  // Reload when page or status filter changes (immediate)
-  useEffect(() => {
-    loadSources();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, statusFilter]);
 
   // Debounce search — reset to page 1 when query changes
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (page === 1) {
-        loadSources();
-      } else {
-        setPage(1); // page change triggers the effect above
-      }
+      setDebouncedSearch(searchQuery);
+      setPage(1);
     }, 500);
     return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery]);
 
-  // Poll every 5 s while any source is pending/processing
-  useEffect(() => {
-    const hasActive = sources.some(
-      (s) => s.status === "pending" || s.status === "processing"
-    );
-    if (!hasActive) return;
+  const queryKey = [
+    "knowledge",
+    "sources",
+    { page, pageSize, status: statusFilter, search: debouncedSearch },
+  ];
 
-    const interval = setInterval(() => loadSources(true), 5000);
-    return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sources]);
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey,
+    queryFn: () =>
+      api.knowledge.sources({
+        page,
+        page_size: pageSize,
+        status: statusFilter === "all" ? undefined : statusFilter,
+        search: debouncedSearch || undefined,
+      }),
+    staleTime: 30_000,
+    refetchInterval: (query) => {
+      const items = query.state.data?.items;
+      if (!items) return false;
+      const hasActive = items.some(
+        (s) => s.status === "pending" || s.status === "processing"
+      );
+      return hasActive ? 5000 : false;
+    },
+  });
+
+  const sources = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.ceil(total / pageSize);
+
+  // Detect status transitions and show toasts
+  const notifyStatusChanges = useCallback((items: KnowledgeSource[]) => {
+    const prev = prevStatusesRef.current;
+    items.forEach((s) => {
+      if (prev[s.id] && prev[s.id] !== "completed" && s.status === "completed") {
+        toast.success(`"${s.title}" indexed and ready`);
+      }
+      if (prev[s.id] && prev[s.id] !== "failed" && s.status === "failed") {
+        toast.error(`"${s.title}" failed to index`);
+      }
+    });
+    prevStatusesRef.current = Object.fromEntries(items.map((s) => [s.id, s.status]));
+  }, []);
+
+  // Watch for status changes whenever data updates
+  useEffect(() => {
+    if (sources.length > 0) {
+      notifyStatusChanges(sources);
+    }
+  }, [sources, notifyStatusChanges]);
 
   const handleRefresh = () => {
-    loadSources();
+    queryClient.invalidateQueries({ queryKey: ["knowledge", "sources"] });
     toast.success("Sources refreshed");
   };
-
-  const totalPages = Math.ceil(total / pageSize);
 
   return (
     <TierGate minimum="professional" feature="Knowledge Vault">
@@ -135,7 +119,7 @@ export default function SourcesPage() {
             variant="outline"
             leftIcon={<RefreshCw className="h-4 w-4" />}
             onClick={handleRefresh}
-            disabled={isLoading}
+            disabled={isLoading || isFetching}
           >
             Refresh
           </Button>
@@ -285,7 +269,7 @@ export default function SourcesPage() {
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
         onSuccess={() => {
-          loadSources();
+          queryClient.invalidateQueries({ queryKey: ["knowledge", "sources"] });
           setPage(1);
         }}
       />

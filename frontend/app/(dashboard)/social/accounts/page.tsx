@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, SocialAccount, SocialPlatform } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -20,28 +21,40 @@ import { parseApiError } from "@/lib/api";
 import { TierGate } from "@/components/ui/tier-gate";
 
 export default function AccountsPage() {
-  const [accounts, setAccounts] = useState<SocialAccount[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string } | null>(null);
 
-  useEffect(() => {
-    loadAccounts();
-  }, []);
+  // --- React Query hooks ---
 
-  const loadAccounts = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await api.social.accounts();
-      setAccounts(res.accounts);
-    } catch (err) {
+  const { data: accountsData, isLoading: loading } = useQuery({
+    queryKey: ["social", "accounts"],
+    queryFn: () => api.social.accounts(),
+    staleTime: 30_000,
+  });
+
+  const accounts = accountsData?.accounts ?? [];
+
+  const disconnectMutation = useMutation({
+    mutationFn: (accountId: string) => api.social.disconnectAccount(accountId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["social", "accounts"] });
+    },
+    onError: (err) => {
       setError(parseApiError(err).message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+  });
+
+  const verifyMutation = useMutation({
+    mutationFn: (accountId: string) => api.social.verify(accountId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["social", "accounts"] });
+    },
+    onError: (err) => {
+      setError(parseApiError(err).message);
+    },
+  });
 
   const handleConnect = async (platform: SocialPlatform) => {
     // Prevent duplicate connections — warn if an active account already exists
@@ -72,28 +85,18 @@ export default function AccountsPage() {
 
   const handleDisconnect = (accountId: string, platform: string) => {
     setConfirmAction({
-      action: async () => {
-        try {
-          setError(null);
-          await api.social.disconnectAccount(accountId);
-          await loadAccounts();
-        } catch (err) {
-          setError(parseApiError(err).message);
-        }
+      action: () => {
+        setError(null);
+        disconnectMutation.mutate(accountId);
       },
       title: "Disconnect Account",
       message: `Are you sure you want to disconnect this ${platform} account?`,
     });
   };
 
-  const handleVerify = async (accountId: string) => {
-    try {
-      setError(null);
-      await api.social.verify(accountId);
-      await loadAccounts();
-    } catch (err) {
-      setError(parseApiError(err).message);
-    }
+  const handleVerify = (accountId: string) => {
+    setError(null);
+    verifyMutation.mutate(accountId);
   };
 
   const getPlatformIcon = (platform: SocialPlatform, className = "h-6 w-6") => {
@@ -247,6 +250,7 @@ export default function AccountsPage() {
                           variant="outline"
                           onClick={() => handleVerify(account.id)}
                           leftIcon={<RefreshCw className="h-3 w-3" />}
+                          isLoading={verifyMutation.isPending && verifyMutation.variables === account.id}
                         >
                           Reconnect
                         </Button>
@@ -258,6 +262,7 @@ export default function AccountsPage() {
                           handleDisconnect(account.id, getPlatformName(account.platform))
                         }
                         leftIcon={<Trash2 className="h-3 w-3" />}
+                        isLoading={disconnectMutation.isPending && disconnectMutation.variables === account.id}
                       >
                         Disconnect
                       </Button>

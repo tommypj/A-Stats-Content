@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Sparkles,
@@ -16,6 +15,7 @@ import {
   MessageSquare,
   Layout,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { api, parseApiError, AEOOverviewResponse, AEOArticleSummary } from "@/lib/api";
@@ -65,24 +65,23 @@ function ScoreBadge({ score }: { score: number }) {
 }
 
 export default function AEOPage() {
-  const [overview, setOverview] = useState<AEOOverviewResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const loadOverview = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const data = await api.analytics.aeoOverview();
-      setOverview(data);
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadOverview();
-  }, [loadOverview]);
+  const {
+    data: overview,
+    isLoading,
+    refetch,
+    isFetching,
+  } = useQuery({
+    queryKey: ["analytics", "aeo-overview"],
+    queryFn: async () => {
+      try {
+        return await api.analytics.aeoOverview();
+      } catch (err) {
+        toast.error(parseApiError(err).message);
+        throw err;
+      }
+    },
+    staleTime: 60_000,
+  });
 
   if (isLoading) {
     return (
@@ -109,8 +108,8 @@ export default function AEOPage() {
             Answer Engine Optimization — how AI-ready your content is
           </p>
         </div>
-        <Button onClick={loadOverview} variant="outline" size="sm">
-          <RefreshCw className="h-4 w-4 mr-1" />
+        <Button onClick={() => refetch()} variant="outline" size="sm" disabled={isFetching}>
+          <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? "animate-spin" : ""}`} />
           Refresh
         </Button>
       </div>

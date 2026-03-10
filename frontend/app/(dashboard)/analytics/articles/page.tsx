@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   ArrowUpDown,
@@ -17,6 +17,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 
 import {
   api,
@@ -36,60 +37,51 @@ type SortField = "total_clicks" | "total_impressions" | "avg_position" | "avg_ct
 type SortOrder = "asc" | "desc";
 
 export default function ArticlePerformancePage() {
-  const [isConnected, setIsConnected] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [data, setData] = useState<ArticlePerformanceListResponse | null>(null);
   const [dateRange, setDateRange] = useState(28);
   const [sortField, setSortField] = useState<SortField>("total_clicks");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 20;
 
-  useEffect(() => {
-    checkStatus();
-  }, []);
+  // --- React Query hooks ---
 
-  useEffect(() => {
-    if (isConnected) {
-      loadData();
-    }
-  }, [isConnected, dateRange, sortField, sortOrder, currentPage]);
-
-  async function checkStatus() {
-    try {
-      setIsLoading(true);
+  const {
+    data: statusData,
+    isLoading: statusLoading,
+  } = useQuery({
+    queryKey: ["analytics", "status"],
+    queryFn: async () => {
       const status = await api.analytics.status();
-      setIsConnected(status.connected && !!status.site_url);
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-    } finally {
-      setIsLoading(false);
-    }
-  }
+      return { connected: status.connected && !!status.site_url };
+    },
+    staleTime: 30_000,
+  });
 
-  async function loadData() {
-    try {
-      setIsLoading(true);
-      const endDate = new Date().toISOString().split("T")[0];
-      const startDate = new Date(Date.now() - dateRange * 86400000).toISOString().split("T")[0];
+  const isConnected = statusData?.connected ?? false;
 
-      const response = await api.analytics.articlePerformance({
+  const endDate = new Date().toISOString().split("T")[0];
+  const startDate = new Date(Date.now() - dateRange * 86400000).toISOString().split("T")[0];
+
+  const {
+    data,
+    isLoading: dataLoading,
+  } = useQuery({
+    queryKey: ["analytics", "articlePerformance", { page: currentPage, pageSize, startDate, endDate, sortField, sortOrder }],
+    queryFn: () =>
+      api.analytics.articlePerformance({
         page: currentPage,
         page_size: pageSize,
         start_date: startDate,
         end_date: endDate,
         sort_by: sortField,
         sort_order: sortOrder,
-      });
-      setData(response);
-    } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to load article performance");
-    } finally {
-      setIsLoading(false);
-    }
-  }
+      }),
+    enabled: isConnected,
+    staleTime: 30_000,
+  });
+
+  const isLoading = statusLoading || (isConnected && dataLoading);
 
   async function handleConnect() {
     try {
@@ -99,8 +91,7 @@ export default function ArticlePerformancePage() {
       localStorage.setItem("gsc_oauth_state_ts", Date.now().toString());
       window.location.href = response.auth_url;
     } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to initiate Google connection");
+      toast.error(parseApiError(error).message);
       setIsConnecting(false);
     }
   }
@@ -136,7 +127,7 @@ export default function ArticlePerformancePage() {
 
   const formatNumber = (num: number) => new Intl.NumberFormat("en-US").format(Math.round(num));
 
-  if (isLoading && !isConnected) {
+  if (statusLoading) {
     return (
       <div className="space-y-6">
         <div className="h-32 bg-surface-tertiary animate-pulse rounded-2xl" />
@@ -239,7 +230,7 @@ export default function ArticlePerformancePage() {
                 </tr>
               </thead>
               <tbody>
-                {isLoading ? (
+                {dataLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i} className="border-b border-surface-tertiary">
                       {Array.from({ length: 7 }).map((_, j) => (
