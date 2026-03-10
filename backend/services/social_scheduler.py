@@ -10,7 +10,6 @@ import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 
-import redis.asyncio as aioredis
 from sqlalchemy import and_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -60,9 +59,11 @@ class SocialSchedulerService:
             await asyncio.sleep(self.check_interval)
 
     async def _get_redis(self):
-        """Get or create a reusable Redis connection."""
-        if self._redis is None and settings.redis_url:
-            self._redis = aioredis.from_url(settings.redis_url, socket_timeout=2)
+        """Get the shared Redis connection pool."""
+        if self._redis is None:
+            from infrastructure.redis import get_redis
+
+            self._redis = await get_redis()
         return self._redis
 
     async def stop(self):
@@ -71,12 +72,8 @@ class SocialSchedulerService:
             return
 
         self.is_running = False
-        if self._redis is not None:
-            try:
-                await self._redis.aclose()
-            except Exception:
-                pass
-            self._redis = None
+        # Don't close Redis — it's a shared pool managed by infrastructure.redis
+        self._redis = None
         logger.info("Social scheduler stopped")
 
     async def process_due_posts(self):

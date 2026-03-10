@@ -648,12 +648,14 @@ async def handle_webhook(
     event_id = meta.get("event_id") or payload.get("id")
     if event_id:
         try:
-            import redis.asyncio as aioredis
+            from infrastructure.redis import get_redis
 
-            r = aioredis.from_url(settings.redis_url)
-            redis_key = f"webhook:processed:{event_id}"
-            is_new = await r.set(redis_key, "1", nx=True, ex=86400)
-            await r.aclose()
+            r = await get_redis()
+            if r is not None:
+                redis_key = f"webhook:processed:{event_id}"
+                is_new = await r.set(redis_key, "1", nx=True, ex=86400)
+            else:
+                is_new = True  # No Redis — proceed without idempotency check
             if not is_new:
                 logger.info("Duplicate webhook event %s — skipping", event_id)
                 return {"status": "ok", "message": "already processed"}

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -47,6 +47,8 @@ export default function RegisterPage() {
   const t = useTranslations("auth.register");
   const tErrors = useTranslations("auth.errors");
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -76,7 +78,7 @@ export default function RegisterPage() {
       });
 
       toast.success("Account created! Please check your email to verify.");
-      router.push("/login");
+      router.push(redirectTo ? `/login?redirect=${encodeURIComponent(redirectTo)}` : "/login");
     } catch (error) {
       const apiError = parseApiError(error);
       if (apiError.message.includes("already exists")) {

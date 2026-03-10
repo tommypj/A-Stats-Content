@@ -238,7 +238,6 @@ class ProjectInvitationAcceptResponse(BaseModel):
     success: bool
     project_id: str
     project_name: str
-    redirect_url: str | None = None  # For unauthenticated users needing to register/login
 
 
 # =============================================================================

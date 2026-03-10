@@ -355,7 +355,7 @@ class TestAcceptInvitation:
 
         assert response.status_code == 200
         data = response.json()
-        # ProjectInvitationAcceptResponse has: success, project_id, project_name, redirect_url
+        # ProjectInvitationAcceptResponse has: success, project_id, project_name
         assert data["project_id"] == project_invitation["project_id"]
         assert data["success"] is True
 

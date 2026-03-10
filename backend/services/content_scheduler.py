@@ -11,7 +11,6 @@ import logging
 from datetime import UTC, datetime
 from urllib.parse import urlparse
 
-import redis.asyncio as aioredis
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -51,12 +50,14 @@ class ContentSchedulerService:
     async def _process_due_articles(self):
         """Find articles due for auto-publish and push them to WordPress."""
         # Distributed lock via Redis to prevent duplicate publishes in multi-worker
-        redis_client = None
         lock_acquired = False
         lock_key = "scheduler:content_publish:lock"
+        redis_client = None
         try:
-            if settings.redis_url:
-                redis_client = aioredis.from_url(settings.redis_url, socket_timeout=2)
+            from infrastructure.redis import get_redis
+
+            redis_client = await get_redis()
+            if redis_client is not None:
                 lock_acquired = await redis_client.set(lock_key, "1", nx=True, ex=120)
                 if not lock_acquired:
                     return
@@ -87,13 +88,9 @@ class ContentSchedulerService:
                 for article in articles:
                     await self._publish_article(db, article)
         finally:
-            if redis_client and lock_acquired:
+            if redis_client is not None and lock_acquired:
                 try:
                     await redis_client.delete(lock_key)
-                except Exception:
-                    pass
-                try:
-                    await redis_client.aclose()
                 except Exception:
                     pass
 

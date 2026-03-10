@@ -14,7 +14,6 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import markdown
-import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -40,7 +39,7 @@ from api.schemas.content import (
     SocialPostsResponse,
     SocialPostUpdateRequest,
 )
-from api.utils import escape_like
+from api.utils import escape_like, scoped_query
 from core.plans import ARTICLE_IMPROVE_LIMIT
 from infrastructure.config.settings import settings
 from infrastructure.database.connection import async_session_maker, get_db
@@ -536,12 +535,14 @@ async def _run_article_generation(
 
             # Notify any waiting SSE stream of completion
             try:
-                _rc = aioredis.from_url(settings.redis_url, decode_responses=True)
-                await _rc.publish(
-                    f"article:{article_id}:status",
-                    json.dumps({"status": "completed", "article_id": article_id}),
-                )
-                await _rc.aclose()
+                from infrastructure.redis import get_redis_text
+
+                _rc = await get_redis_text()
+                if _rc is not None:
+                    await _rc.publish(
+                        f"article:{article_id}:status",
+                        json.dumps({"status": "completed", "article_id": article_id}),
+                    )
             except Exception as _pub_err:
                 logger.warning("Redis publish failed for article %s: %s", article_id, _pub_err)
 
@@ -565,12 +566,14 @@ async def _run_article_generation(
                         logger.info("Marked article %s as failed", article_id)
                         # Notify any waiting SSE stream of failure
                         try:
-                            _rc = aioredis.from_url(settings.redis_url, decode_responses=True)
-                            await _rc.publish(
-                                f"article:{article_id}:status",
-                                json.dumps({"status": "failed", "article_id": article_id, "error": str(e)[:200]}),
-                            )
-                            await _rc.aclose()
+                            from infrastructure.redis import get_redis_text
+
+                            _rc = await get_redis_text()
+                            if _rc is not None:
+                                await _rc.publish(
+                                    f"article:{article_id}:status",
+                                    json.dumps({"status": "failed", "article_id": article_id, "error": str(e)[:200]}),
+                                )
                         except Exception as _pub_err:
                             logger.warning("Redis publish failed for article %s: %s", article_id, _pub_err)
             except Exception:
@@ -738,18 +741,7 @@ async def stream_article_status(
     db: AsyncSession = Depends(get_db),
 ):
     """SSE stream — sends one event when generation completes/fails, then closes."""
-    if current_user.current_project_id:
-        article_query = select(Article).where(
-            Article.id == article_id,
-            Article.project_id == current_user.current_project_id,
-            Article.deleted_at.is_(None),
-        )
-    else:
-        article_query = select(Article).where(
-            Article.id == article_id,
-            Article.user_id == current_user.id,
-            Article.deleted_at.is_(None),
-        )
+    article_query = scoped_query(Article, article_id, current_user)
     result = await db.execute(article_query)
     article = result.scalar_one_or_none()
     if not article:
@@ -764,7 +756,12 @@ async def stream_article_status(
             yield f"event: failed\ndata: {json.dumps({'status': 'failed', 'article_id': article_id})}\n\n"
             return
 
-        _rc = aioredis.from_url(settings.redis_url, decode_responses=True)
+        from infrastructure.redis import get_redis_text
+
+        _rc = await get_redis_text()
+        if _rc is None:
+            yield f"event: error\ndata: {json.dumps({'status': 'error', 'article_id': article_id, 'error': 'Redis unavailable'})}\n\n"
+            return
         pubsub = _rc.pubsub()
         try:
             await pubsub.subscribe(f"article:{article_id}:status")
@@ -806,7 +803,6 @@ async def stream_article_status(
         finally:
             await pubsub.unsubscribe()
             await pubsub.aclose()
-            await _rc.aclose()
 
     return StreamingResponse(
         event_stream(),
@@ -977,19 +973,18 @@ async def get_keyword_suggestions(
     redis_key = f"kw_research:{current_user.id}:{normalized}"
 
     # 1. Redis fast-path
-    redis_client = None
+    from infrastructure.redis import get_redis_text
+
     try:
-        redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
-        cached_raw = await redis_client.get(redis_key)
-        if cached_raw:
-            result = json.loads(cached_raw)
-            result["cached"] = True
-            return result
+        redis_client = await get_redis_text()
+        if redis_client is not None:
+            cached_raw = await redis_client.get(redis_key)
+            if cached_raw:
+                result = json.loads(cached_raw)
+                result["cached"] = True
+                return result
     except Exception as redis_err:
         logger.warning("Redis keyword cache read failed: %s", redis_err)
-    finally:
-        if redis_client:
-            await redis_client.aclose()
 
     # 2. DB fallback
     now = datetime.now(UTC)
@@ -1006,17 +1001,14 @@ async def get_keyword_suggestions(
         result = json.loads(cached_row.result_json)
         result["cached"] = True
         # Backfill Redis
-        redis_client = None
         try:
-            redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
-            ttl = int((cached_row.expires_at - now).total_seconds())
-            if ttl > 0:
-                await redis_client.setex(redis_key, ttl, cached_row.result_json)
+            redis_client = await get_redis_text()
+            if redis_client is not None:
+                ttl = int((cached_row.expires_at - now).total_seconds())
+                if ttl > 0:
+                    await redis_client.setex(redis_key, ttl, cached_row.result_json)
         except Exception:
             pass
-        finally:
-            if redis_client:
-                await redis_client.aclose()
         return result
 
     # 3. Check monthly keyword research limit (only real AI calls count; cache hits above are free)
@@ -1030,22 +1022,19 @@ async def get_keyword_suggestions(
         "keyword_researches_per_month", 3
     )
     _count_key = f"kw_count:{current_user.id}:{_now.year}:{_now.month}"
-    redis_client = None
     try:
-        redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
-        _current_count = int(await redis_client.get(_count_key) or 0)
-        if _current_count >= _monthly_limit:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Monthly keyword research limit reached ({_monthly_limit}/month). Upgrade your plan for more.",
-            )
+        redis_client = await get_redis_text()
+        if redis_client is not None:
+            _current_count = int(await redis_client.get(_count_key) or 0)
+            if _current_count >= _monthly_limit:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=f"Monthly keyword research limit reached ({_monthly_limit}/month). Upgrade your plan for more.",
+                )
     except HTTPException:
         raise
     except Exception as _limit_err:
         logger.warning("Keyword research limit check failed (fail open): %s", _limit_err)
-    finally:
-        if redis_client:
-            await redis_client.aclose()
 
     # 4. Call AI (existing logic)
     prompt = f"""Given the seed keyword "{body.seed_keyword}", suggest {body.count} related keywords for SEO content creation.
@@ -1107,17 +1096,14 @@ Only return the JSON array, no other text."""
         expires_at = now + timedelta(days=KEYWORD_CACHE_TTL_DAYS)
 
         # Increment monthly usage counter (TTL = 35 days, safely covers any month)
-        redis_client = None
         try:
-            redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
-            _count_key = f"kw_count:{current_user.id}:{now.year}:{now.month}"
-            await redis_client.incr(_count_key)
-            await redis_client.expire(_count_key, 35 * 86400)
+            redis_client = await get_redis_text()
+            if redis_client is not None:
+                _count_key = f"kw_count:{current_user.id}:{now.year}:{now.month}"
+                await redis_client.incr(_count_key)
+                await redis_client.expire(_count_key, 35 * 86400)
         except Exception as _inc_err:
             logger.warning("Failed to increment keyword research counter: %s", _inc_err)
-        finally:
-            if redis_client:
-                await redis_client.aclose()
 
         # Store in DB
         try:
@@ -1141,15 +1127,12 @@ Only return the JSON array, no other text."""
             await db.rollback()
 
         # Store in Redis
-        redis_client = None
         try:
-            redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
-            await redis_client.setex(redis_key, REDIS_KW_TTL, result_str)
+            redis_client = await get_redis_text()
+            if redis_client is not None:
+                await redis_client.setex(redis_key, REDIS_KW_TTL, result_str)
         except Exception as redis_err:
             logger.warning("Failed to store keyword research in Redis: %s", redis_err)
-        finally:
-            if redis_client:
-                await redis_client.aclose()
 
         result["cached"] = False
         return result
@@ -1252,18 +1235,7 @@ async def export_article(
     """
     Export a single article in the requested format (markdown, html, or csv).
     """
-    if current_user.current_project_id:
-        query = select(Article).where(
-            Article.id == article_id,
-            Article.project_id == current_user.current_project_id,
-            Article.deleted_at.is_(None),
-        )
-    else:
-        query = select(Article).where(
-            Article.id == article_id,
-            Article.user_id == current_user.id,
-            Article.deleted_at.is_(None),
-        )
+    query = scoped_query(Article, article_id, current_user)
     result = await db.execute(query)
     article = result.scalar_one_or_none()
 
@@ -1355,18 +1327,7 @@ async def get_article(
     """
     Get a specific article by ID.
     """
-    if current_user.current_project_id:
-        query = select(Article).where(
-            Article.id == article_id,
-            Article.project_id == current_user.current_project_id,
-            Article.deleted_at.is_(None),
-        )
-    else:
-        query = select(Article).where(
-            Article.id == article_id,
-            Article.user_id == current_user.id,
-            Article.deleted_at.is_(None),
-        )
+    query = scoped_query(Article, article_id, current_user)
     result = await db.execute(query)
     article = result.scalar_one_or_none()
 
@@ -1389,18 +1350,7 @@ async def update_article(
     """
     Update an article.
     """
-    if current_user.current_project_id:
-        query = select(Article).where(
-            Article.id == article_id,
-            Article.project_id == current_user.current_project_id,
-            Article.deleted_at.is_(None),
-        )
-    else:
-        query = select(Article).where(
-            Article.id == article_id,
-            Article.user_id == current_user.id,
-            Article.deleted_at.is_(None),
-        )
+    query = scoped_query(Article, article_id, current_user)
     result = await db.execute(query)
     article = result.scalar_one_or_none()
 
@@ -1478,18 +1428,7 @@ async def delete_article(
     """
     Delete an article.
     """
-    if current_user.current_project_id:
-        query = select(Article).where(
-            Article.id == article_id,
-            Article.project_id == current_user.current_project_id,
-            Article.deleted_at.is_(None),
-        )
-    else:
-        query = select(Article).where(
-            Article.id == article_id,
-            Article.user_id == current_user.id,
-            Article.deleted_at.is_(None),
-        )
+    query = scoped_query(Article, article_id, current_user)
     result = await db.execute(query)
     article = result.scalar_one_or_none()
 
@@ -1515,18 +1454,7 @@ async def improve_article(
     """
     Improve article content using AI.
     """
-    if current_user.current_project_id:
-        query = select(Article).where(
-            Article.id == article_id,
-            Article.project_id == current_user.current_project_id,
-            Article.deleted_at.is_(None),
-        )
-    else:
-        query = select(Article).where(
-            Article.id == article_id,
-            Article.user_id == current_user.id,
-            Article.deleted_at.is_(None),
-        )
+    query = scoped_query(Article, article_id, current_user)
     result = await db.execute(query)
     article = result.scalar_one_or_none()
 
@@ -1612,18 +1540,7 @@ async def analyze_article_seo(
     """
     Re-run SEO analysis on an article.
     """
-    if current_user.current_project_id:
-        query = select(Article).where(
-            Article.id == article_id,
-            Article.project_id == current_user.current_project_id,
-            Article.deleted_at.is_(None),
-        )
-    else:
-        query = select(Article).where(
-            Article.id == article_id,
-            Article.user_id == current_user.id,
-            Article.deleted_at.is_(None),
-        )
+    query = scoped_query(Article, article_id, current_user)
     result = await db.execute(query)
     article = result.scalar_one_or_none()
 
@@ -1665,18 +1582,7 @@ async def generate_article_image_prompt(
     """
     Generate an image prompt for an existing article that doesn't have one yet.
     """
-    if current_user.current_project_id:
-        query = select(Article).where(
-            Article.id == article_id,
-            Article.project_id == current_user.current_project_id,
-            Article.deleted_at.is_(None),
-        )
-    else:
-        query = select(Article).where(
-            Article.id == article_id,
-            Article.user_id == current_user.id,
-            Article.deleted_at.is_(None),
-        )
+    query = scoped_query(Article, article_id, current_user)
     result = await db.execute(query)
     article = result.scalar_one_or_none()
 
@@ -1718,18 +1624,7 @@ async def get_social_posts(
     db: AsyncSession = Depends(get_db),
 ):
     """Get social media posts for an article."""
-    if current_user.current_project_id:
-        query = select(Article).where(
-            Article.id == article_id,
-            Article.project_id == current_user.current_project_id,
-            Article.deleted_at.is_(None),
-        )
-    else:
-        query = select(Article).where(
-            Article.id == article_id,
-            Article.user_id == current_user.id,
-            Article.deleted_at.is_(None),
-        )
+    query = scoped_query(Article, article_id, current_user)
     result = await db.execute(query)
     article = result.scalar_one_or_none()
 
@@ -1757,18 +1652,7 @@ async def generate_social_posts(
     db: AsyncSession = Depends(get_db),
 ):
     """Generate AI social media posts for an article."""
-    if current_user.current_project_id:
-        query = select(Article).where(
-            Article.id == article_id,
-            Article.project_id == current_user.current_project_id,
-            Article.deleted_at.is_(None),
-        )
-    else:
-        query = select(Article).where(
-            Article.id == article_id,
-            Article.user_id == current_user.id,
-            Article.deleted_at.is_(None),
-        )
+    query = scoped_query(Article, article_id, current_user)
     result = await db.execute(query)
     article = result.scalar_one_or_none()
 
@@ -1854,18 +1738,7 @@ async def update_social_post(
     db: AsyncSession = Depends(get_db),
 ):
     """Update a single platform's social post text."""
-    if current_user.current_project_id:
-        query = select(Article).where(
-            Article.id == article_id,
-            Article.project_id == current_user.current_project_id,
-            Article.deleted_at.is_(None),
-        )
-    else:
-        query = select(Article).where(
-            Article.id == article_id,
-            Article.user_id == current_user.id,
-            Article.deleted_at.is_(None),
-        )
+    query = scoped_query(Article, article_id, current_user)
     result = await db.execute(query)
     article = result.scalar_one_or_none()
 
@@ -1899,18 +1772,11 @@ async def update_social_post(
 
 
 def _article_ownership_query(article_id: str, current_user: User):
-    """Return a select() that fetches the article respecting project context."""
-    if current_user.current_project_id:
-        return select(Article).where(
-            Article.id == article_id,
-            Article.project_id == current_user.current_project_id,
-            Article.deleted_at.is_(None),
-        )
-    return select(Article).where(
-        Article.id == article_id,
-        Article.user_id == current_user.id,
-        Article.deleted_at.is_(None),
-    )
+    """Return a select() that fetches the article respecting project context.
+
+    .. deprecated:: Use ``scoped_query(Article, article_id, current_user)`` instead.
+    """
+    return scoped_query(Article, article_id, current_user)
 
 
 @router.get("/{article_id}/revisions", response_model=ArticleRevisionListResponse)
@@ -2208,18 +2074,7 @@ async def get_aeo_score(
     from services.aeo_scoring import score_and_save
 
     # Verify article belongs to current user
-    if current_user.current_project_id:
-        ownership_query = select(Article).where(
-            Article.id == article_id,
-            Article.project_id == current_user.current_project_id,
-            Article.deleted_at.is_(None),
-        )
-    else:
-        ownership_query = select(Article).where(
-            Article.id == article_id,
-            Article.user_id == current_user.id,
-            Article.deleted_at.is_(None),
-        )
+    ownership_query = scoped_query(Article, article_id, current_user)
     ownership_result = await db.execute(ownership_query)
     if not ownership_result.scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
@@ -2270,18 +2125,7 @@ async def refresh_aeo_score(
     from services.aeo_scoring import score_and_save
 
     # ANA-02: Verify article ownership before allowing re-scoring
-    if current_user.current_project_id:
-        ownership_query = select(Article).where(
-            Article.id == article_id,
-            Article.project_id == current_user.current_project_id,
-            Article.deleted_at.is_(None),
-        )
-    else:
-        ownership_query = select(Article).where(
-            Article.id == article_id,
-            Article.user_id == current_user.id,
-            Article.deleted_at.is_(None),
-        )
+    ownership_query = scoped_query(Article, article_id, current_user)
     if not (await db.execute(ownership_query)).scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
 

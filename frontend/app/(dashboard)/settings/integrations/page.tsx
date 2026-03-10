@@ -1,14 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { clsx } from "clsx";
 import { toast } from "sonner";
 import {
-  User,
-  CreditCard,
-  Plug,
-  Bell,
   CheckCircle,
   XCircle,
   Loader2,
@@ -20,28 +14,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, parseApiError } from "@/lib/api";
-
-const TABS = [
-  { id: "profile", label: "Profile", icon: User },
-  { id: "billing", label: "Billing", icon: CreditCard },
-  { id: "integrations", label: "Integrations", icon: Plug },
-  { id: "notifications", label: "Notifications", icon: Bell },
-] as const;
+import { SettingsTabs } from "@/components/settings/settings-tabs";
 
 export default function IntegrationsSettingsPage() {
-  const router = useRouter();
-
-  const handleTabChange = (tabId: string) => {
-    if (tabId === "integrations") return;
-    if (tabId === "billing") {
-      router.push("/settings/billing");
-    } else if (tabId === "notifications") {
-      router.push("/settings/notifications");
-    } else {
-      router.push(`/settings#${tabId}`);
-    }
-  };
-
   // WordPress connection state
   const [wpConnected, setWpConnected] = useState(false);
   const [wpSiteUrl, setWpSiteUrl] = useState("");
@@ -274,24 +249,7 @@ export default function IntegrationsSettingsPage() {
         <p className="mt-1 text-text-secondary">Manage your account settings and preferences.</p>
       </div>
 
-      {/* Tab bar */}
-      <div className="inline-flex gap-1 p-1 bg-surface-secondary rounded-xl">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => handleTabChange(tab.id)}
-            className={clsx(
-              "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors",
-              tab.id === "integrations"
-                ? "bg-surface text-text-primary shadow-sm"
-                : "text-text-secondary hover:text-text-primary"
-            )}
-          >
-            <tab.icon className="h-4 w-4" />
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <SettingsTabs activeTab="integrations" />
 
       {/* WordPress Integration Card */}
       <div className="card">

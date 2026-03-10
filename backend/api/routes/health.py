@@ -60,12 +60,15 @@ async def health_check_db(db: AsyncSession = Depends(get_db)):
 async def health_redis():
     """INFRA-M1: Check Redis connectivity."""
     try:
-        import redis.asyncio as aioredis
+        from infrastructure.redis import get_redis
 
-        r = aioredis.from_url(settings.redis_url)
+        r = await get_redis()
+        if r is None:
+            raise HTTPException(status_code=503, detail="Redis not configured")
         await asyncio.wait_for(r.ping(), timeout=3.0)
-        await r.aclose()
         return {"status": "healthy", "service": "redis"}
+    except HTTPException:
+        raise
     except TimeoutError:
         raise HTTPException(status_code=503, detail="Redis timeout")
     except Exception as e:
@@ -86,12 +89,12 @@ async def readiness_check(db: AsyncSession = Depends(get_db)):
     # INFRA-M1: Check Redis too — app degrades significantly without it (rate limiting breaks)
     redis_ok = False
     try:
-        import redis.asyncio as aioredis
+        from infrastructure.redis import get_redis
 
-        r = aioredis.from_url(settings.redis_url)
-        await asyncio.wait_for(r.ping(), timeout=2.0)
-        await r.aclose()
-        redis_ok = True
+        r = await get_redis()
+        if r is not None:
+            await asyncio.wait_for(r.ping(), timeout=2.0)
+            redis_ok = True
     except Exception:
         redis_ok = False
 

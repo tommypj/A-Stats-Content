@@ -1,14 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
 import { toast } from "sonner";
 import {
-  User,
-  CreditCard,
-  Plug,
-  Bell,
   Loader2,
   Sparkles,
   AlertTriangle,
@@ -19,13 +14,7 @@ import {
 } from "lucide-react";
 import { api, parseApiError, NotificationPreferences } from "@/lib/api";
 import { Card } from "@/components/ui/card";
-
-const TABS = [
-  { id: "profile", label: "Profile", icon: User },
-  { id: "billing", label: "Billing", icon: CreditCard },
-  { id: "integrations", label: "Integrations", icon: Plug },
-  { id: "notifications", label: "Notifications", icon: Bell },
-] as const;
+import { SettingsTabs } from "@/components/settings/settings-tabs";
 
 interface ToggleRowProps {
   label: string;
@@ -73,7 +62,6 @@ function ToggleRow({ label, description, icon: Icon, checked, onChange, disabled
 }
 
 export default function NotificationsSettingsPage() {
-  const router = useRouter();
   const [prefs, setPrefs] = useState<NotificationPreferences | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -113,17 +101,6 @@ export default function NotificationsSettingsPage() {
     }
   }
 
-  const handleTabChange = (tabId: string) => {
-    if (tabId === "notifications") return;
-    if (tabId === "billing") {
-      router.push("/settings/billing");
-    } else if (tabId === "integrations") {
-      router.push("/settings/integrations");
-    } else {
-      router.push(`/settings#${tabId}`);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -139,24 +116,7 @@ export default function NotificationsSettingsPage() {
         <p className="mt-1 text-text-secondary">Manage your account settings and preferences.</p>
       </div>
 
-      {/* Tab bar */}
-      <div className="inline-flex gap-1 p-1 bg-surface-secondary rounded-xl">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => handleTabChange(tab.id)}
-            className={clsx(
-              "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors",
-              tab.id === "notifications"
-                ? "bg-surface text-text-primary shadow-sm"
-                : "text-text-secondary hover:text-text-primary"
-            )}
-          >
-            <tab.icon className="h-4 w-4" />
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <SettingsTabs activeTab="notifications" />
 
       {prefs && (
         <div className="space-y-6">

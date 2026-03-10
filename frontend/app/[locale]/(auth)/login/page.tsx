@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,6 +28,10 @@ export default function LoginPage() {
   const t = useTranslations("auth.login");
   const tErrors = useTranslations("auth.errors");
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const rawRedirect = searchParams.get("redirect");
+  // Only allow relative paths to prevent open-redirect attacks
+  const redirectTo = rawRedirect?.startsWith("/") ? rawRedirect : null;
   const { login } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -73,7 +77,7 @@ export default function LoginPage() {
       });
 
       toast.success("Welcome back!");
-      router.push("/dashboard");
+      router.push(redirectTo || "/dashboard");
     } catch (error) {
       const apiError = parseApiError(error);
       toast.error(apiError.message || tErrors("invalidCredentials"));

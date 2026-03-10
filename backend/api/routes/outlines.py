@@ -27,7 +27,7 @@ from api.schemas.content import (
     OutlineResponse,
     OutlineUpdateRequest,
 )
-from api.utils import escape_like
+from api.utils import escape_like, scoped_query
 from infrastructure.config.settings import settings
 from infrastructure.database.connection import get_db
 from infrastructure.database.models import ContentStatus, Outline, User
@@ -366,18 +366,7 @@ async def export_outline(
     """
     Export a single outline in the requested format (markdown, html, or csv).
     """
-    if current_user.current_project_id:
-        query = select(Outline).where(
-            Outline.id == outline_id,
-            Outline.project_id == current_user.current_project_id,
-            Outline.deleted_at.is_(None),
-        )
-    else:
-        query = select(Outline).where(
-            Outline.id == outline_id,
-            Outline.user_id == current_user.id,
-            Outline.deleted_at.is_(None),
-        )
+    query = scoped_query(Outline, outline_id, current_user)
     result = await db.execute(query)
     outline = result.scalar_one_or_none()
 
@@ -483,18 +472,7 @@ async def get_outline(
     """
     Get a specific outline by ID.
     """
-    if current_user.current_project_id:
-        query = select(Outline).where(
-            Outline.id == outline_id,
-            Outline.project_id == current_user.current_project_id,
-            Outline.deleted_at.is_(None),
-        )
-    else:
-        query = select(Outline).where(
-            Outline.id == outline_id,
-            Outline.user_id == current_user.id,
-            Outline.deleted_at.is_(None),
-        )
+    query = scoped_query(Outline, outline_id, current_user)
     result = await db.execute(query)
     outline = result.scalar_one_or_none()
 
@@ -517,18 +495,7 @@ async def update_outline(
     """
     Update an outline.
     """
-    if current_user.current_project_id:
-        query = select(Outline).where(
-            Outline.id == outline_id,
-            Outline.project_id == current_user.current_project_id,
-            Outline.deleted_at.is_(None),
-        )
-    else:
-        query = select(Outline).where(
-            Outline.id == outline_id,
-            Outline.user_id == current_user.id,
-            Outline.deleted_at.is_(None),
-        )
+    query = scoped_query(Outline, outline_id, current_user)
     result = await db.execute(query)
     outline = result.scalar_one_or_none()
 
@@ -594,18 +561,7 @@ async def delete_outline(
     """
     Delete an outline.
     """
-    if current_user.current_project_id:
-        query = select(Outline).where(
-            Outline.id == outline_id,
-            Outline.project_id == current_user.current_project_id,
-            Outline.deleted_at.is_(None),
-        )
-    else:
-        query = select(Outline).where(
-            Outline.id == outline_id,
-            Outline.user_id == current_user.id,
-            Outline.deleted_at.is_(None),
-        )
+    query = scoped_query(Outline, outline_id, current_user)
     result = await db.execute(query)
     outline = result.scalar_one_or_none()
 
@@ -632,18 +588,7 @@ async def regenerate_outline(
 
     # GEN-43: Note — keyword can be changed on regeneration; this is intentional but may confuse users
     """
-    if current_user.current_project_id:
-        query = select(Outline).where(
-            Outline.id == outline_id,
-            Outline.project_id == current_user.current_project_id,
-            Outline.deleted_at.is_(None),
-        )
-    else:
-        query = select(Outline).where(
-            Outline.id == outline_id,
-            Outline.user_id == current_user.id,
-            Outline.deleted_at.is_(None),
-        )
+    query = scoped_query(Outline, outline_id, current_user)
     result = await db.execute(query)
     outline = result.scalar_one_or_none()
 

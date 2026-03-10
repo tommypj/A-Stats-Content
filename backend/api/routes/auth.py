@@ -67,12 +67,13 @@ async def _blacklist_token(token: str, ttl_seconds: int = 604800) -> None:
     try:
         import hashlib
 
-        import redis.asyncio as aioredis
+        from infrastructure.redis import get_redis
 
         token_hash = hashlib.sha256(token.encode()).hexdigest()[:16]
-        r = aioredis.from_url(settings.redis_url)
+        r = await get_redis()
+        if r is None:
+            return
         await r.setex(f"token_blacklist:{token_hash}", ttl_seconds, "1")
-        await r.aclose()
     except Exception as e:
         logger.warning("Could not blacklist token in Redis: %s", e)
 
@@ -86,12 +87,13 @@ async def _is_token_blacklisted(token: str) -> bool:
     try:
         import hashlib
 
-        import redis.asyncio as aioredis
+        from infrastructure.redis import get_redis
 
         token_hash = hashlib.sha256(token.encode()).hexdigest()[:16]
-        r = aioredis.from_url(settings.redis_url)
+        r = await get_redis()
+        if r is None:
+            return False
         result = await r.exists(f"token_blacklist:{token_hash}")
-        await r.aclose()
         return bool(result)
     except Exception:
         return False  # Fail open — don't block valid requests if Redis is down
@@ -119,9 +121,11 @@ async def _register_session(
         import hashlib
         import time
 
-        import redis.asyncio as aioredis
+        from infrastructure.redis import get_redis
 
-        r = aioredis.from_url(settings.redis_url)
+        r = await get_redis()
+        if r is None:
+            return
         key = f"user_sessions:{user_id}"
         token_hash = hashlib.sha256(session_token.encode()).hexdigest()[:16]
         now = time.time()
@@ -133,7 +137,6 @@ async def _register_session(
         if count > max_sessions:
             # zremrangebyrank(key, 0, N-1) removes the N oldest entries
             await r.zremrangebyrank(key, 0, count - max_sessions - 1)
-        await r.aclose()
     except Exception as e:
         logger.warning("Could not register session in Redis: %s", e)
 
@@ -143,12 +146,13 @@ async def _revoke_session(user_id: str, session_token: str) -> None:
     try:
         import hashlib
 
-        import redis.asyncio as aioredis
+        from infrastructure.redis import get_redis
 
-        r = aioredis.from_url(settings.redis_url)
+        r = await get_redis()
+        if r is None:
+            return
         token_hash = hashlib.sha256(session_token.encode()).hexdigest()[:16]
         await r.zrem(f"user_sessions:{user_id}", token_hash)
-        await r.aclose()
     except Exception as e:
         logger.warning("Could not revoke session in Redis: %s", e)
 
@@ -1466,15 +1470,21 @@ async def request_email_change(
     # verify endpoint will reject the token since it won't be found, which
     # is the safer behaviour.
     try:
-        import redis.asyncio as aioredis
+        from infrastructure.redis import get_redis
 
-        r = aioredis.from_url(settings.redis_url)
+        r = await get_redis()
+        if r is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Service temporarily unavailable. Please try again later.",
+            )
         await r.setex(
             f"email_change:{token}",
             3600,
             json.dumps({"user_id": str(current_user.id), "new_email": new_email}),
         )
-        await r.aclose()
+    except HTTPException:
+        raise
     except Exception as redis_err:
         logger.error("Could not store email change token in Redis: %s", redis_err)
         raise HTTPException(
@@ -1520,15 +1530,21 @@ async def verify_email_change(
     new_email: str | None = None
 
     try:
-        import redis.asyncio as aioredis
+        from infrastructure.redis import get_redis
 
-        r = aioredis.from_url(settings.redis_url)
+        r = await get_redis()
+        if r is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Service temporarily unavailable. Please try again later.",
+            )
         raw = await r.getdel(f"email_change:{body.token}")
-        await r.aclose()
         if raw:
             data = json.loads(raw)
             user_id = data.get("user_id")
             new_email = data.get("new_email")
+    except HTTPException:
+        raise
     except Exception as redis_err:
         logger.error("Redis error during email change verification: %s", redis_err)
         raise HTTPException(

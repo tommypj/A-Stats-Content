@@ -20,6 +20,7 @@ from api.middleware.rate_limit import limiter
 from api.routes import api_router
 from infrastructure.config import get_settings
 from infrastructure.database import close_db, init_db
+from infrastructure.redis import close_redis, get_redis
 from infrastructure.logging_config import setup_logging
 from services.error_logger import log_exception as log_system_exception
 from services.post_queue import post_queue
@@ -134,16 +135,16 @@ async def lifespan(app: FastAPI):
     # back to per-process in-memory storage which is ineffective in multi-instance.
     if settings.environment == "production":
         try:
-            import redis.asyncio as aioredis
-
-            # INFRA-02: Configure connection pool to cap max connections and prevent exhaustion
-            _redis_check = aioredis.from_url(
-                settings.redis_url,
-                max_connections=20,
-            )
-            await _redis_check.ping()
-            await _redis_check.aclose()
-            logger.info("Redis connectivity confirmed for rate limiter")
+            _redis_check = await get_redis()
+            if _redis_check is not None:
+                await _redis_check.ping()
+                logger.info("Redis connectivity confirmed for rate limiter")
+            else:
+                logger.critical(
+                    "INFRA-08: Redis URL is not configured in production. "
+                    "Rate limiting will use per-process in-memory storage — "
+                    "this is insecure in multi-instance deployments.",
+                )
         except Exception as _redis_err:
             logger.critical(
                 "INFRA-08: Redis is unreachable in production (%s). "
@@ -307,8 +308,11 @@ async def lifespan(app: FastAPI):
     except (TimeoutError, asyncio.CancelledError):
         pass
 
-    # Disconnect Redis
+    # Disconnect Redis post queue
     await post_queue.disconnect()
+
+    # Close shared Redis connection pools
+    await close_redis()
 
     await close_db()
     logger.info("Application stopped.")

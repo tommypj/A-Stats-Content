@@ -103,23 +103,12 @@ class PipelineResult:
 
 _SERP_CACHE_TTL = 86400  # 24 hours
 
-# Module-level Redis connection pool — avoids creating a new connection per cache op
-_redis_pool = None
+from infrastructure.redis import get_redis_text
 
 
-def _get_redis_pool():
-    """Return a shared Redis connection pool (lazy-initialized)."""
-    global _redis_pool
-    if _redis_pool is None:
-        try:
-            import redis.asyncio as aioredis  # type: ignore[import]
-
-            _redis_pool = aioredis.from_url(
-                settings.redis_url, decode_responses=True, max_connections=10
-            )
-        except Exception:
-            return None
-    return _redis_pool
+async def _get_redis_pool():
+    """Return the shared Redis text connection pool."""
+    return await get_redis_text()
 
 
 def _serp_cache_key(prefix: str, keyword: str, language: str) -> str:
@@ -129,7 +118,7 @@ def _serp_cache_key(prefix: str, keyword: str, language: str) -> str:
 
 async def _cache_get(key: str) -> dict | None:
     try:
-        r = _get_redis_pool()
+        r = await _get_redis_pool()
         if r is None:
             return None
         raw = await r.get(key)
@@ -140,7 +129,7 @@ async def _cache_get(key: str) -> dict | None:
 
 async def _cache_set(key: str, data: dict) -> None:
     try:
-        r = _get_redis_pool()
+        r = await _get_redis_pool()
         if r is None:
             return
         await r.setex(key, _SERP_CACHE_TTL, json.dumps(data))

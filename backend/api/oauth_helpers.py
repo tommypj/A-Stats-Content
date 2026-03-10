@@ -55,11 +55,12 @@ async def store_oauth_state(state: str, user_id: str, platform: str = "", **extr
     """
     data = json.dumps({"user_id": str(user_id), "platform": platform, **extra})
     try:
-        import redis.asyncio as aioredis
+        from infrastructure.redis import get_redis
 
-        r = aioredis.from_url(settings.redis_url)
+        r = await get_redis()
+        if r is None:
+            raise OSError("Redis not configured")
         await r.setex(f"oauth_state:{state}", _OAUTH_STATE_TTL, data)
-        await r.aclose()
     except (ImportError, OSError, ConnectionError, TypeError, ValueError):
         # Redis unavailable or misconfigured — prune expired entries and enforce size cap
         async with _oauth_states_lock:
@@ -83,11 +84,12 @@ async def verify_oauth_state(state: str) -> str | None:
     not reachable.
     """
     try:
-        import redis.asyncio as aioredis
+        from infrastructure.redis import get_redis
 
-        r = aioredis.from_url(settings.redis_url)
+        r = await get_redis()
+        if r is None:
+            raise OSError("Redis not configured")
         raw = await r.getdel(f"oauth_state:{state}")
-        await r.aclose()
         if raw is None:
             return None
         parsed = json.loads(raw)
@@ -117,11 +119,12 @@ async def verify_oauth_state_full(state: str) -> dict | None:
     Use this when you need ``platform`` in addition to ``user_id`` (SM-06).
     """
     try:
-        import redis.asyncio as aioredis
+        from infrastructure.redis import get_redis
 
-        r = aioredis.from_url(settings.redis_url)
+        r = await get_redis()
+        if r is None:
+            raise OSError("Redis not configured")
         raw = await r.getdel(f"oauth_state:{state}")
-        await r.aclose()
         if raw is None:
             return None
         return json.loads(raw)

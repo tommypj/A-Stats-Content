@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { clsx } from "clsx";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { api, getImageUrl, parseApiError } from "@/lib/api";
@@ -9,12 +8,10 @@ import { useAuthStore } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { SettingsTabs } from "@/components/settings/settings-tabs";
 import {
   User,
   Lock,
-  CreditCard,
-  Plug,
-  Bell,
   Save,
   Loader2,
   CheckCircle,
@@ -42,19 +39,6 @@ interface UserProfile {
   outlines_generated_this_month: number;
   images_generated_this_month: number;
 }
-
-// ---------------------------------------------------------------------------
-// Tab definitions
-// ---------------------------------------------------------------------------
-
-const TABS = [
-  { id: "profile", label: "Profile", icon: User },
-  { id: "billing", label: "Billing", icon: CreditCard },
-  { id: "integrations", label: "Integrations", icon: Plug },
-  { id: "notifications", label: "Notifications", icon: Bell },
-] as const;
-
-type TabId = (typeof TABS)[number]["id"];
 
 // ---------------------------------------------------------------------------
 // ProfileSection
@@ -561,30 +545,8 @@ function DangerZoneSection({ onDeleteAccount, onExportData, exporting }: DangerZ
 // Main page
 // ---------------------------------------------------------------------------
 
-function getInitialTab(): TabId {
-  if (typeof window === "undefined") return "profile";
-  const hash = window.location.hash.replace("#", "") as TabId;
-  return TABS.some((t) => t.id === hash) ? hash : "profile";
-}
-
 export default function SettingsPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabId>(getInitialTab);
-
-  // Sync hash → activeTab after mount and on hash changes.
-  // Fixes: navigating from /settings/integrations to /settings#billing
-  // would land on "profile" because the hash wasn't readable during useState init.
-  useEffect(() => {
-    function syncHash() {
-      const hash = window.location.hash.replace("#", "") as TabId;
-      if (hash && TABS.some((t) => t.id === hash && t.id !== "integrations")) {
-        setActiveTab(hash);
-      }
-    }
-    syncHash();
-    window.addEventListener("hashchange", syncHash);
-    return () => window.removeEventListener("hashchange", syncHash);
-  }, []);
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -640,24 +602,6 @@ export default function SettingsPage() {
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isDirty]);
-
-  // Sync hash when tab changes
-  const handleTabChange = (tab: TabId) => {
-    if (tab === "integrations") {
-      router.push("/settings/integrations");
-      return;
-    }
-    if (tab === "billing") {
-      router.push("/settings/billing");
-      return;
-    }
-    if (tab === "notifications") {
-      router.push("/settings/notifications");
-      return;
-    }
-    setActiveTab(tab);
-    window.location.hash = tab;
-  };
 
   useEffect(() => {
     loadProfile();
@@ -779,28 +723,9 @@ export default function SettingsPage() {
         <p className="mt-1 text-text-secondary">Manage your account settings and preferences.</p>
       </div>
 
-      {/* Tab bar */}
-      <div className="inline-flex gap-1 p-1 bg-surface-secondary rounded-xl">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => handleTabChange(tab.id)}
-            className={clsx(
-              "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors",
-              activeTab === tab.id
-                ? "bg-surface text-text-primary shadow-sm"
-                : "text-text-secondary hover:text-text-primary"
-            )}
-          >
-            <tab.icon className="h-4 w-4" />
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <SettingsTabs activeTab="profile" />
 
-      {/* Active section */}
-      {activeTab === "profile" && (
-        <div className="space-y-6">
+      <div className="space-y-6">
           <ProfileSection
             profile={profile}
             name={name}
@@ -836,9 +761,6 @@ export default function SettingsPage() {
             exporting={exporting}
           />
         </div>
-      )}
-
-      {/* Billing tab routes to /settings/billing */}
 
       {/* Account deletion confirmation dialog */}
       <DeleteAccountDialog

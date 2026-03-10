@@ -289,7 +289,7 @@ async def create_project_invitation(
     await db.refresh(new_invitation)
 
     # Send invitation email (graceful degradation — invitation is already saved)
-    invitation_url = f"{settings.frontend_url}/invitations/{token}"
+    invitation_url = f"{settings.frontend_url}/invite/{token}"
     try:
         await email_service.send_project_invitation_email(
             to_email=invitation.email,
@@ -414,7 +414,7 @@ async def resend_project_invitation(
     await db.refresh(invitation)
 
     # Resend invitation email (graceful degradation — expiry was already reset)
-    invitation_url = f"{settings.frontend_url}/invitations/{invitation.token}"
+    invitation_url = f"{settings.frontend_url}/invite/{invitation.token}"
     try:
         await email_service.send_project_invitation_email(
             to_email=invitation.email,
@@ -517,11 +517,13 @@ async def accept_invitation(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Accept a project invitation.
+    Accept a project invitation (requires authentication).
 
-    - If user is logged in: Add them to the project immediately
-    - If user is not logged in: Return redirect URL to register/login
+    - Adds the authenticated user to the project
     - Validates invitation is still pending and not expired
+    - Validates user email matches invitation email
+    - Unauthenticated users are rejected with 401; the frontend
+      handles the redirect to login/register before calling this endpoint
     """
     require_tier("starter")(current_user)
     # Get invitation
@@ -565,16 +567,6 @@ async def accept_invitation(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Cannot accept invitation with status: {invitation.status}",
             )
-
-    # If user is not logged in, return redirect URL
-    if not current_user:
-        redirect_url = f"{settings.frontend_url}/register?invitation={token}"
-        return ProjectInvitationAcceptResponse(
-            success=False,
-            project_id=invitation.project_id,
-            project_name=invitation.project.name,
-            redirect_url=redirect_url,
-        )
 
     # Check if user email matches invitation email
     if current_user.email.lower() != invitation.email.lower():
@@ -625,5 +617,4 @@ async def accept_invitation(
         success=True,
         project_id=invitation.project_id,
         project_name=invitation.project.name,
-        redirect_url=None,
     )

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import {
   FileText,
@@ -9,19 +9,17 @@ import {
   TrendingUp,
   ArrowRight,
   Plus,
-  Clock,
   CheckCircle2,
   Loader2,
-  BarChart2,
   XCircle,
   Rocket,
   X,
   Circle,
   Activity,
 } from "lucide-react";
-import { api, parseApiError, Article, Outline, PlanInfo, UserResponse, ContentHealthSummary } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { api, UserResponse } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
 
 const quickActions = [
   {
@@ -212,16 +210,6 @@ function OnboardingChecklist({
 }
 
 export default function DashboardPage() {
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<UserResponse | null>(null);
-  const [recentArticles, setRecentArticles] = useState<Article[]>([]);
-  const [recentOutlines, setRecentOutlines] = useState<Outline[]>([]);
-  const [totalArticles, setTotalArticles] = useState(0);
-  const [totalOutlines, setTotalOutlines] = useState(0);
-  const [totalImages, setTotalImages] = useState(0);
-  const [avgSeoScore, setAvgSeoScore] = useState<number | null>(null);
-  const [planLimits, setPlanLimits] = useState<PlanInfo | null>(null);
-  const [contentHealth, setContentHealth] = useState<ContentHealthSummary | null>(null);
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
 
   useEffect(() => {
@@ -239,58 +227,64 @@ export default function DashboardPage() {
     setOnboardingDismissed(true);
   }
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
+  // --- React Query hooks ---
 
-  async function loadDashboardData() {
-    try {
-      setLoading(true);
+  const { data: user, isLoading: userLoading } = useQuery({
+    queryKey: ["auth", "me"],
+    queryFn: () => api.auth.me(),
+  });
 
-      const [userRes, articlesRes, outlinesRes, imagesRes, pricingRes, healthRes] =
-        await Promise.all([
-          api.auth.me(),
-          api.articles.list({ page: 1, page_size: 5 }).catch(() => ({ items: [], total: 0 })),
-          api.outlines.list({ page: 1, page_size: 5 }).catch(() => ({ items: [], total: 0 })),
-          api.images.list({ page: 1, page_size: 1 }).catch(() => ({ items: [], total: 0 })),
-          api.billing.pricing().catch(() => null),
-          api.articles.healthSummary().catch(() => null),
-        ]);
+  const { data: articlesData, isLoading: articlesLoading } = useQuery({
+    queryKey: ["articles", "list", { page: 1, page_size: 5 }],
+    queryFn: () => api.articles.list({ page: 1, page_size: 5 }),
+  });
 
-      setUser(userRes);
-      setRecentArticles(articlesRes.items);
-      setTotalArticles(articlesRes.total);
-      setRecentOutlines(outlinesRes.items);
-      setTotalOutlines(outlinesRes.total);
-      setTotalImages(imagesRes.total);
-      setContentHealth(healthRes);
+  const { data: outlinesData, isLoading: outlinesLoading } = useQuery({
+    queryKey: ["outlines", "list", { page: 1, page_size: 5 }],
+    queryFn: () => api.outlines.list({ page: 1, page_size: 5 }),
+  });
 
-      // Calculate average SEO score from articles that have one
-      const articlesWithSeo = articlesRes.items.filter(
-        (a) => a.seo_score !== undefined && a.seo_score !== null
-      );
-      if (articlesWithSeo.length > 0) {
-        const avg =
-          articlesWithSeo.reduce((sum, a) => sum + (a.seo_score || 0), 0) /
-          articlesWithSeo.length;
-        setAvgSeoScore(Math.round(avg));
-      }
+  const { data: imagesData, isLoading: imagesLoading } = useQuery({
+    queryKey: ["images", "list", { page: 1, page_size: 1 }],
+    queryFn: () => api.images.list({ page: 1, page_size: 1 }),
+  });
 
-      // Find the user's current plan limits
-      if (pricingRes) {
-        const currentPlan = pricingRes.plans.find(
-          (p) => p.id === userRes.subscription_tier
-        );
-        if (currentPlan) {
-          setPlanLimits(currentPlan);
-        }
-      }
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const { data: pricingData } = useQuery({
+    queryKey: ["billing", "pricing"],
+    queryFn: () => api.billing.pricing(),
+    staleTime: 600_000, // 10 minutes — pricing rarely changes
+  });
+
+  const { data: contentHealth } = useQuery({
+    queryKey: ["articles", "health-summary"],
+    queryFn: () => api.articles.healthSummary(),
+  });
+
+  // --- Derived state ---
+
+  const loading = userLoading || articlesLoading || outlinesLoading || imagesLoading;
+
+  const recentArticles = articlesData?.items ?? [];
+  const totalArticles = articlesData?.total ?? 0;
+  const recentOutlines = outlinesData?.items ?? [];
+  const totalOutlines = outlinesData?.total ?? 0;
+  const totalImages = imagesData?.total ?? 0;
+
+  const avgSeoScore = useMemo(() => {
+    const articlesWithSeo = recentArticles.filter(
+      (a) => a.seo_score !== undefined && a.seo_score !== null
+    );
+    if (articlesWithSeo.length === 0) return null;
+    const avg =
+      articlesWithSeo.reduce((sum, a) => sum + (a.seo_score || 0), 0) /
+      articlesWithSeo.length;
+    return Math.round(avg);
+  }, [recentArticles]);
+
+  const planLimits = useMemo(() => {
+    if (!pricingData || !user) return null;
+    return pricingData.plans.find((p) => p.id === user.subscription_tier) ?? null;
+  }, [pricingData, user]);
 
   const articlesUsed = user?.articles_generated_this_month ?? 0;
   const outlinesUsed = user?.outlines_generated_this_month ?? 0;
@@ -382,7 +376,7 @@ export default function DashboardPage() {
       {/* Onboarding checklist — shown only to new users who haven't dismissed it */}
       {!onboardingDismissed && totalArticles === 0 && totalOutlines === 0 && (
         <OnboardingChecklist
-          user={user}
+          user={user ?? null}
           totalArticles={totalArticles}
           totalOutlines={totalOutlines}
           onDismiss={dismissOnboarding}
