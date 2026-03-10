@@ -6,7 +6,7 @@ export const metadata: Metadata = {
 };
 
 export default function CookiePolicyPage() {
-  const lastUpdated = "February 28, 2026";
+  const lastUpdated = "March 10, 2026";
 
   return (
     <article className="prose prose-neutral max-w-none">
@@ -52,11 +52,23 @@ export default function CookiePolicyPage() {
                 <td className="p-3">Remembers your language preference</td>
                 <td className="p-3">1 year</td>
               </tr>
-              <tr>
+              <tr className="border-b border-surface-tertiary">
                 <td className="p-3 font-mono text-xs">__ls_*</td>
                 <td className="p-3">Cookie</td>
                 <td className="p-3">Set by LemonSqueezy during checkout to manage your session</td>
                 <td className="p-3">Session</td>
+              </tr>
+              <tr className="border-b border-surface-tertiary">
+                <td className="p-3 font-mono text-xs">cookie_consent</td>
+                <td className="p-3">Local Storage</td>
+                <td className="p-3">Stores your cookie consent preference (&ldquo;all&rdquo; or &ldquo;necessary&rdquo;)</td>
+                <td className="p-3">Persistent</td>
+              </tr>
+              <tr>
+                <td className="p-3 font-mono text-xs">_ga, _ga_*</td>
+                <td className="p-3">Cookie</td>
+                <td className="p-3">Google Analytics — only set if you accept analytics cookies (IP anonymised)</td>
+                <td className="p-3">2 years</td>
               </tr>
             </tbody>
           </table>
@@ -64,19 +76,19 @@ export default function CookiePolicyPage() {
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xl font-semibold text-text-primary mb-3">3. Essential Cookies Only</h2>
+        <h2 className="text-xl font-semibold text-text-primary mb-3">3. Essential &amp; Optional Cookies</h2>
         <p className="text-text-secondary leading-relaxed">
-          We only use cookies that are strictly necessary to provide the Service. We do not use:
+          We categorise cookies into two groups:
         </p>
         <ul className="list-disc pl-5 space-y-2 text-text-secondary mt-3">
-          <li>Advertising or retargeting cookies</li>
-          <li>Third-party analytics cookies (e.g. Google Analytics)</li>
-          <li>Social media tracking pixels</li>
-          <li>Behavioural profiling cookies</li>
+          <li><strong>Essential cookies</strong> — required to keep the app running (authentication, locale preference, checkout). These cannot be refused without breaking core functionality.</li>
+          <li><strong>Analytics cookies</strong> — help us understand how the app is used (Google Analytics with anonymised IP). These are only loaded after you consent.</li>
         </ul>
         <p className="text-text-secondary leading-relaxed mt-4">
-          Because we only use essential cookies, we do not display a cookie consent banner — these
-          cookies cannot be refused without breaking core functionality of the Service.
+          We do <strong>not</strong> use advertising, retargeting, social media tracking, or behavioural profiling cookies.
+        </p>
+        <p className="text-text-secondary leading-relaxed mt-3">
+          When you first visit the site, a consent banner lets you choose between &ldquo;Accept All&rdquo; (enables analytics) or &ldquo;Necessary Only&rdquo;. You can change your preference at any time by clearing your browser&apos;s local storage for this site.
         </p>
       </section>
 

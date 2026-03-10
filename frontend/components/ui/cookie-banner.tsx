@@ -29,6 +29,8 @@ export function CookieBanner() {
 
   function accept(level: CookieConsent) {
     localStorage.setItem(CONSENT_KEY, level);
+    // Notify same-tab listeners (GA loader, etc.) — storage event only fires cross-tab
+    window.dispatchEvent(new Event("cookie-consent-change"));
     setVisible(false);
   }
 

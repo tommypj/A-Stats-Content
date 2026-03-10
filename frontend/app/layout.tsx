@@ -5,10 +5,9 @@ import { Toaster } from "sonner";
 import { Providers } from "@/components/providers";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { CookieBanner } from "@/components/ui/cookie-banner";
+import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 import { LemonSqueezyInit } from "@/components/LemonSqueezyInit";
 import "./globals.css";
-
-const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 
 const inter = Inter({
   subsets: ["latin"],
@@ -38,6 +37,8 @@ export const metadata: Metadata = {
     shortcut: "/icon.png",
     apple: "/icon.png",
   },
+  metadataBase: new URL("https://a-stats.app"),
+  manifest: "/manifest.json",
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -97,22 +98,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.variable}>
       <body className="min-h-screen bg-healing-cream">
-        {GA_MEASUREMENT_ID && (
-          <>
-            <Script
-              src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-              strategy="afterInteractive"
-            />
-            <Script id="google-analytics" strategy="afterInteractive">
-              {`
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                gtag('js', new Date());
-                gtag('config', '${GA_MEASUREMENT_ID}');
-              `}
-            </Script>
-          </>
-        )}
+        <GoogleAnalytics />
         <Script
           src="https://app.lemonsqueezy.com/js/lemon.js"
           strategy="afterInteractive"
