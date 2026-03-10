@@ -36,7 +36,7 @@ if settings.sentry_dsn:
 
     # LOW-12: Validate DSN format before initializing to surface misconfiguration early
     _dsn = settings.sentry_dsn
-    if not _dsn.startswith("https://") or "@sentry.io" not in _dsn:
+    if not _dsn.startswith("https://") or "sentry.io" not in _dsn:
         logger.warning(
             "LOW-12: SENTRY_DSN appears malformed: %s. Sentry will not be initialized.",
             _dsn[:30],
