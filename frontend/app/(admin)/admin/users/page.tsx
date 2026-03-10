@@ -9,7 +9,7 @@ import { SuspendUserModal } from "@/components/admin/suspend-user-modal";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Search, Filter, Ban, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Ban, ChevronLeft, ChevronRight } from "lucide-react";
 import { parseApiError } from "@/lib/api";
 
 export default function AdminUsersPage() {

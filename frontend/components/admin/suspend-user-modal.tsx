@@ -4,7 +4,7 @@ import { useState } from "react";
 import { api, AdminUserDetail, parseApiError } from "@/lib/api";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { X, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
 interface SuspendUserModalProps {
   user?: AdminUserDetail;

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Search, Plus, Trash2, Edit, Eye, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Plus, Trash2, Edit, Eye, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { api, parseApiError } from "@/lib/api";
 import type { AdminBlogPostListItem, BlogCategory } from "@/lib/api";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -175,7 +175,7 @@ export default function AdminBlogPostsPage() {
       {/* Table */}
       <div className="bg-surface border border-surface-tertiary rounded-xl overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center text-text-secondary">Loading...</div>
+          <div className="p-12 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-text-muted" /></div>
         ) : posts.length === 0 ? (
           <div className="p-12 text-center text-text-secondary">No posts found.</div>
         ) : (

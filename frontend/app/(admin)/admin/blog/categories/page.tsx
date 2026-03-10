@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Edit2, Trash2, Check, X } from "lucide-react";
+import { Plus, Edit2, Trash2, Check, X, Loader2 } from "lucide-react";
 import { api, parseApiError } from "@/lib/api";
 import type { BlogCategory } from "@/lib/api";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -152,7 +152,7 @@ export default function AdminBlogCategoriesPage() {
       {/* Table */}
       <div className="bg-surface border border-surface-tertiary rounded-xl overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-text-secondary">Loading...</div>
+          <div className="p-8 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-text-muted" /></div>
         ) : categories.length === 0 ? (
           <div className="p-8 text-center text-text-secondary">No categories yet. Create one above.</div>
         ) : (

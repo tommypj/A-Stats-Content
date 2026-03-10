@@ -794,7 +794,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
               </div>
               <div className="flex-1 min-w-0 text-left">
                 <p className="text-sm font-medium text-cream-100 truncate">
-                  {user?.name || "Loading..."}
+                  {user?.name || "\u00A0"}
                 </p>
                 <p className="text-xs text-primary-400 truncate">
                   {user?.email || ""}

@@ -39,6 +39,7 @@ import {
   Zap,
   Bot,
 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, parseApiError, Article, ArticleRevision, ArticleRevisionDetail, LinkSuggestion, AEOScore } from "@/lib/api";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -763,13 +764,41 @@ function formatRevisionType(revisionType: string): string {
 export default function ArticleEditorPage() {
   const params = useParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const rawArticleId = params.id;
   const articleId = Array.isArray(rawArticleId) ? rawArticleId[0] : (rawArticleId ?? "");
 
-  const [article, setArticle] = useState<Article | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [improving, setImproving] = useState(false);
+  // --- React Query: article detail ---
+  const {
+    data: article,
+    isLoading: loading,
+    error: articleError,
+  } = useQuery({
+    queryKey: ["articles", "detail", articleId],
+    queryFn: () => api.articles.get(articleId),
+    enabled: !!articleId,
+    staleTime: 60_000,
+  });
+
+  // --- React Query: WordPress status ---
+  const { data: wpStatus, isLoading: checkingWpConnection } = useQuery({
+    queryKey: ["wordpress", "status"],
+    queryFn: () => api.wordpress.status(),
+  });
+  const wpConnected = wpStatus?.is_connected ?? false;
+
+  // --- React Query: AEO score ---
+  const { data: aeoScore, isLoading: aeoQueryLoading } = useQuery({
+    queryKey: ["articles", "aeo", articleId],
+    queryFn: () => api.articles.getAeoScore(articleId),
+    enabled: !!article,
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  // --- Track whether editable fields have been seeded from article data ---
+  const seededRef = useRef(false);
+
   const [viewMode, setViewMode] = useState<"edit" | "preview">("edit");
 
   // Social posts modal state
@@ -778,8 +807,6 @@ export default function ArticleEditorPage() {
 
   // WordPress modal state
   const [showWpModal, setShowWpModal] = useState(false);
-  const [wpConnected, setWpConnected] = useState(false);
-  const [checkingWpConnection, setCheckingWpConnection] = useState(true);
 
   // Editable fields
   const [title, setTitle] = useState("");
@@ -817,10 +844,6 @@ export default function ArticleEditorPage() {
   // Export dropdown state
   const [showExportMenu, setShowExportMenu] = useState(false);
 
-  // AEO score state
-  const [aeoScore, setAeoScore] = useState<AEOScore | null>(null);
-  const [aeoLoading, setAeoLoading] = useState(false);
-
   // Sidebar tab state
   const [sidebarTab, setSidebarTab] = useState<"overview" | "seo" | "aeo" | "history">("overview");
 
@@ -830,6 +853,34 @@ export default function ArticleEditorPage() {
   // SEO score comes from backend seo_analysis (single source of truth)
   const seoAnalysis = article?.seo_analysis ?? null;
   const seoScoreValue = article?.seo_score ?? null;
+
+  // --- Seed editable fields from article data (once) ---
+  useEffect(() => {
+    if (article && !seededRef.current) {
+      seededRef.current = true;
+      setTitle(article.title);
+      setContent(article.content || "");
+      setMetaDescription(article.meta_description || "");
+      setKeyword(article.keyword);
+      lastSavedContentRef.current = article.content || "";
+
+      // Fetch featured image URL if article has one
+      if (article.featured_image_id) {
+        api.images.get(article.featured_image_id).then((image) => {
+          setFeaturedImageUrl(image.url);
+        }).catch(() => {
+          // Non-critical — featured image preview is optional
+        });
+      }
+    }
+  }, [article]);
+
+  // Show error toast if article fails to load
+  useEffect(() => {
+    if (articleError) {
+      toast.error(parseApiError(articleError).message);
+    }
+  }, [articleError]);
 
   // Escape key exits preview mode
   useEffect(() => {
@@ -841,72 +892,82 @@ export default function ArticleEditorPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [viewMode]);
 
-  const loadArticle = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await api.articles.get(articleId);
-      setArticle(data);
-      setTitle(data.title);
-      setContent(data.content || "");
-      setMetaDescription(data.meta_description || "");
-      setKeyword(data.keyword);
-      lastSavedContentRef.current = data.content || "";
+  // --- Mutations ---
 
-      // Fetch featured image URL if article has one
-      if (data.featured_image_id) {
-        try {
-          const image = await api.images.get(data.featured_image_id);
-          setFeaturedImageUrl(image.url);
-        } catch {
-          // Non-critical — featured image preview is optional
-        }
-      }
-    } catch (error) {
+  const saveMutation = useMutation({
+    mutationFn: (params: { articleId: string; title: string; content: string; meta_description: string; keyword: string }) =>
+      api.articles.update(params.articleId, {
+        title: params.title,
+        content: params.content,
+        meta_description: params.meta_description,
+        keyword: params.keyword,
+      }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["articles", "detail", articleId], updated);
+    },
+    onError: (error) => {
       toast.error(parseApiError(error).message);
-    } finally {
-      setLoading(false);
-    }
-  }, [articleId]);
+    },
+  });
 
-  const checkWordPressConnection = useCallback(async () => {
-    try {
-      setCheckingWpConnection(true);
-      const status = await api.wordpress.status();
-      setWpConnected(status.is_connected);
-    } catch (error) {
+  const improveMutation = useMutation({
+    mutationFn: (type: string) => api.articles.improve(article!.id, type),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["articles", "detail", articleId], updated);
+      setContent(updated.content || "");
+    },
+    onError: (error) => {
       toast.error(parseApiError(error).message);
-      setWpConnected(false);
-    } finally {
-      setCheckingWpConnection(false);
-    }
-  }, []);
+    },
+  });
 
-  useEffect(() => {
-    loadArticle();
-    checkWordPressConnection();
-  }, [loadArticle, checkWordPressConnection]);
+  const analyzeSeoMutation = useMutation({
+    mutationFn: () => api.articles.analyzeSeo(article!.id),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["articles", "detail", articleId], updated);
+    },
+    onError: (error) => {
+      toast.error(parseApiError(error).message);
+    },
+  });
 
-  useEffect(() => {
-    if (params.id) handleLoadAeo();
-  }, [params.id]);
+  const deleteMutation = useMutation({
+    mutationFn: () => api.articles.delete(article!.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["articles"] });
+      router.push("/articles");
+    },
+    onError: (error) => {
+      toast.error(parseApiError(error).message);
+    },
+  });
 
-  async function handleSave() {
+  const refreshAeoMutation = useMutation({
+    mutationFn: () => api.articles.refreshAeoScore(articleId),
+    onSuccess: (data) => {
+      queryClient.setQueryData(["articles", "aeo", articleId], data);
+      toast.success("AEO score updated");
+    },
+    onError: (error) => {
+      toast.error(parseApiError(error).message);
+    },
+  });
+
+  // Derived loading states from mutations
+  const saving = saveMutation.isPending;
+  const improving = improveMutation.isPending;
+  const analyzingSeo = analyzeSeoMutation.isPending;
+  const aeoLoading = aeoQueryLoading || refreshAeoMutation.isPending;
+
+  function handleSave() {
     if (!article) return;
-
-    setSaving(true);
-    try {
-      const updated = await api.articles.update(article.id, {
-        title,
-        content,
-        meta_description: metaDescription,
-        keyword,
-      });
-      setArticle(updated);
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-    } finally {
-      setSaving(false);
-    }
+    saveMutation.mutate({
+      articleId: article.id,
+      title,
+      content,
+      meta_description: metaDescription,
+      keyword,
+    });
   }
 
   // Keyboard shortcuts
@@ -935,46 +996,21 @@ export default function ArticleEditorPage() {
     { key: "\\", ctrl: true, handler: () => setViewMode((m) => m === "edit" ? "preview" : "edit") },
   ]);
 
-  async function handleImprove(type: string) {
+  function handleImprove(type: string) {
     if (!article) return;
-
-    setImproving(true);
-    try {
-      const updated = await api.articles.improve(article.id, type);
-      setArticle(updated);
-      setContent(updated.content || "");
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-    } finally {
-      setImproving(false);
-    }
+    improveMutation.mutate(type);
   }
 
-  const [analyzingSeo, setAnalyzingSeo] = useState(false);
-
-  async function handleAnalyzeSeo() {
+  function handleAnalyzeSeo() {
     if (!article) return;
-    setAnalyzingSeo(true);
-    try {
-      const updated = await api.articles.analyzeSeo(article.id);
-      setArticle(updated);
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-    } finally {
-      setAnalyzingSeo(false);
-    }
+    analyzeSeoMutation.mutate();
   }
 
   function handleDelete() {
     if (!article) return;
     setConfirmAction({
-      action: async () => {
-        try {
-          await api.articles.delete(article.id);
-          router.push("/articles");
-        } catch (error) {
-          toast.error(parseApiError(error).message);
-        }
+      action: () => {
+        deleteMutation.mutate();
       },
       title: "Delete Article",
       message: "Are you sure you want to delete this article? This cannot be undone.",
@@ -1113,7 +1149,7 @@ export default function ArticleEditorPage() {
 
   function handleWordPressPublishSuccess(postUrl: string) {
     // Reload article to get updated wordpress_post_id
-    loadArticle();
+    queryClient.invalidateQueries({ queryKey: ["articles", "detail", articleId] });
     setShowWpModal(false);
   }
 
@@ -1170,7 +1206,7 @@ export default function ArticleEditorPage() {
             toast.error("Failed to restore revision");
             return;
           }
-          setArticle(updated);
+          queryClient.setQueryData(["articles", "detail", articleId], updated);
           setTitle(updated.title);
           setContent(updated.content || "");
           setMetaDescription(updated.meta_description || "");
@@ -1239,31 +1275,9 @@ export default function ArticleEditorPage() {
     }
   }
 
-  const handleLoadAeo = async () => {
-    if (!params.id) return;
-    try {
-      setAeoLoading(true);
-      const data = await api.articles.getAeoScore(params.id as string);
-      setAeoScore(data);
-    } catch {
-      // Silent — AEO is optional
-    } finally {
-      setAeoLoading(false);
-    }
-  };
-
-  const handleRefreshAeo = async () => {
-    if (!params.id) return;
-    try {
-      setAeoLoading(true);
-      const data = await api.articles.refreshAeoScore(params.id as string);
-      setAeoScore(data);
-      toast.success("AEO score updated");
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-    } finally {
-      setAeoLoading(false);
-    }
+  const handleRefreshAeo = () => {
+    if (!articleId) return;
+    refreshAeoMutation.mutate();
   };
 
   if (loading) {

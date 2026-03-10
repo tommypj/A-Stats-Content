@@ -277,7 +277,7 @@ export default function AdminEditBlogPostPage() {
     }
   };
 
-  if (loading) return <div className="p-8 text-center text-text-secondary">Loading...</div>;
+  if (loading) return <div className="p-8 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-text-muted" /></div>;
   if (!post) return <div className="p-8 text-center text-text-secondary">Post not found.</div>;
 
   return (

@@ -5,7 +5,7 @@ import { api, AdminUserDetail, parseApiError } from "@/lib/api";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, AlertTriangle, Trash2 } from "lucide-react";
+import { AlertTriangle, Trash2 } from "lucide-react";
 
 interface DeleteUserModalProps {
   user: AdminUserDetail;
