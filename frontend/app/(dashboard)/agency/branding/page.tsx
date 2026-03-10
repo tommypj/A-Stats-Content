@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Palette, Save, Loader2, CheckCircle, Globe } from "lucide-react";
 import { toast } from "sonner";
-import axios from "axios";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, parseApiError, AgencyProfile } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -95,16 +95,30 @@ function PageSkeleton() {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function extractFormState(data: AgencyProfile) {
+  const colors = data.brand_colors ?? {};
+  return {
+    agencyName: data.agency_name ?? "",
+    logoUrl: data.logo_url ?? "",
+    contactEmail: data.contact_email ?? "",
+    footerText: data.footer_text ?? "",
+    primaryColor: colors.primary ?? DEFAULT_COLORS.primary,
+    secondaryColor: colors.secondary ?? DEFAULT_COLORS.secondary,
+    accentColor: colors.accent ?? DEFAULT_COLORS.accent,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
 export default function AgencyBrandingPage() {
-  const [profile, setProfile] = useState<AgencyProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const queryClient = useQueryClient();
 
-  // Form fields
+  // Form fields (local state — populated from query data)
   const [agencyName, setAgencyName] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [contactEmail, setContactEmail] = useState("");
@@ -115,49 +129,91 @@ export default function AgencyBrandingPage() {
   const [secondaryColor, setSecondaryColor] = useState(DEFAULT_COLORS.secondary);
   const [accentColor, setAccentColor] = useState(DEFAULT_COLORS.accent);
 
-  useEffect(() => {
-    loadProfile();
-  }, []);
+  const [saved, setSaved] = useState(false);
 
-  const loadProfile = async () => {
-    setLoading(true);
-    try {
-      const data = await api.agency.getProfile();
-      applyProfile(data);
-    } catch (err) {
-      // 404 means no agency profile has been created yet — blank form is fine
-      const is404 = axios.isAxiosError(err) && err.response?.status === 404;
-      if (!is404) {
-        toast.error(parseApiError(err).message);
+  // --- React Query: fetch profile ---
+
+  const { data: profile, isLoading: loading } = useQuery({
+    queryKey: ["agency", "profile"],
+    queryFn: async () => {
+      try {
+        return await api.agency.getProfile();
+      } catch (err: unknown) {
+        // 404 means no agency profile has been created yet — return null so blank form is shown
+        if (
+          err &&
+          typeof err === "object" &&
+          "response" in err &&
+          (err as { response?: { status?: number } }).response?.status === 404
+        ) {
+          return null;
+        }
+        throw err;
       }
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    staleTime: 30_000,
+    meta: { errorMessage: "Failed to load agency profile" },
+    select: (data) => data,
+  });
 
-  const applyProfile = (data: AgencyProfile) => {
-    setProfile(data);
-    setAgencyName(data.agency_name ?? "");
-    setLogoUrl(data.logo_url ?? "");
-    setContactEmail(data.contact_email ?? "");
-    setFooterText(data.footer_text ?? "");
+  // Sync fetched profile into local form state (only on first successful load)
+  const [formSynced, setFormSynced] = useState(false);
+  if (profile && !formSynced) {
+    const s = extractFormState(profile);
+    setAgencyName(s.agencyName);
+    setLogoUrl(s.logoUrl);
+    setContactEmail(s.contactEmail);
+    setFooterText(s.footerText);
+    setPrimaryColor(s.primaryColor);
+    setSecondaryColor(s.secondaryColor);
+    setAccentColor(s.accentColor);
+    setFormSynced(true);
+  }
 
-    const colors = data.brand_colors ?? {};
-    setPrimaryColor(colors.primary ?? DEFAULT_COLORS.primary);
-    setSecondaryColor(colors.secondary ?? DEFAULT_COLORS.secondary);
-    setAccentColor(colors.accent ?? DEFAULT_COLORS.accent);
-  };
+  // --- React Query: save mutation ---
 
-  const handleSave = async () => {
+  const saveMutation = useMutation({
+    mutationFn: async (payload: {
+      agency_name: string;
+      logo_url?: string;
+      contact_email?: string;
+      footer_text?: string;
+      brand_colors: Record<string, string>;
+    }) => {
+      if (profile) {
+        return api.agency.updateProfile(payload);
+      }
+      return api.agency.createProfile(payload as Parameters<typeof api.agency.createProfile>[0]);
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["agency", "profile"], updated);
+      // Re-sync form from returned data
+      const s = extractFormState(updated);
+      setAgencyName(s.agencyName);
+      setLogoUrl(s.logoUrl);
+      setContactEmail(s.contactEmail);
+      setFooterText(s.footerText);
+      setPrimaryColor(s.primaryColor);
+      setSecondaryColor(s.secondaryColor);
+      setAccentColor(s.accentColor);
+      setSaved(true);
+      toast.success("Branding saved successfully.");
+      setTimeout(() => setSaved(false), 3000);
+      // Also invalidate so any other components using this key get fresh data
+      queryClient.invalidateQueries({ queryKey: ["agency", "profile"] });
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
+
+  const handleSave = () => {
     if (!agencyName.trim()) {
       toast.error("Agency name is required.");
       return;
     }
 
-    setSaving(true);
-    setSaved(false);
-
-    const payload = {
+    saveMutation.mutate({
       agency_name: agencyName.trim(),
       logo_url: logoUrl.trim() || undefined,
       contact_email: contactEmail.trim() || undefined,
@@ -167,25 +223,10 @@ export default function AgencyBrandingPage() {
         secondary: secondaryColor,
         accent: accentColor,
       },
-    };
-
-    try {
-      let updated: AgencyProfile;
-      if (profile) {
-        updated = await api.agency.updateProfile(payload);
-      } else {
-        updated = await api.agency.createProfile(payload);
-      }
-      applyProfile(updated);
-      setSaved(true);
-      toast.success("Branding saved successfully.");
-      setTimeout(() => setSaved(false), 3000);
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setSaving(false);
-    }
+    });
   };
+
+  const saving = saveMutation.isPending;
 
   if (loading) {
     return (

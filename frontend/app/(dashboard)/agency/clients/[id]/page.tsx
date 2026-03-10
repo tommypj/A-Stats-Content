@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -20,11 +20,11 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   api,
   parseApiError,
   ClientWorkspace,
-  GeneratedReport,
   AgencyReportTemplate,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -67,19 +67,8 @@ function formatDateShort(dateString: string) {
 export default function ClientDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const clientId = params.id as string;
-
-  // Core state
-  const [workspace, setWorkspace] = useState<ClientWorkspace | null>(null);
-  const [reports, setReports] = useState<GeneratedReport[]>([]);
-  const [templates, setTemplates] = useState<AgencyReportTemplate[]>([]);
-
-  // Loading states
-  const [isLoading, setIsLoading] = useState(true);
-  const [isToggling, setIsToggling] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isSavingFeatures, setIsSavingFeatures] = useState(false);
 
   // UI state
   const [copied, setCopied] = useState(false);
@@ -93,48 +82,108 @@ export default function ClientDetailPage() {
     report_template_id: "",
   });
 
-  useEffect(() => {
-    loadAll();
-  }, [clientId]);
+  // --- React Query hooks ---
 
-  async function loadAll() {
-    setIsLoading(true);
-    try {
-      const [clientData, reportsData, templatesData] = await Promise.all([
-        api.agency.getClient(clientId),
-        api.agency.reports({ page_size: 50 }),
-        api.agency.reportTemplates(),
-      ]);
-      setWorkspace(clientData);
-      // Filter reports for this specific client
-      setReports(reportsData.items.filter((r) => r.client_workspace_id === clientId));
-      setTemplates(templatesData.items);
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-      router.push("/agency");
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  const { data: workspace, isLoading: clientLoading, error: clientError } = useQuery({
+    queryKey: ["agency", "client", clientId],
+    queryFn: () => api.agency.getClient(clientId),
+    staleTime: 60_000,
+  });
 
-  async function handleTogglePortal() {
-    if (!workspace) return;
-    setIsToggling(true);
-    try {
-      const updated = workspace.is_portal_enabled
-        ? await api.agency.disablePortal(clientId)
-        : await api.agency.enablePortal(clientId);
-      setWorkspace(updated);
+  const { data: reportsData, isLoading: reportsLoading } = useQuery({
+    queryKey: ["agency", "reports", clientId],
+    queryFn: async () => {
+      const data = await api.agency.reports({ page_size: 50 });
+      return data.items.filter((r) => r.client_workspace_id === clientId);
+    },
+    staleTime: 60_000,
+  });
+
+  const { data: templates = [] } = useQuery({
+    queryKey: ["agency", "reportTemplates"],
+    queryFn: async () => {
+      const data = await api.agency.reportTemplates();
+      return data.items;
+    },
+    staleTime: 60_000,
+  });
+
+  // --- Mutations ---
+
+  const togglePortalMutation = useMutation({
+    mutationFn: async () => {
+      if (!workspace) throw new Error("No workspace");
+      return workspace.is_portal_enabled
+        ? api.agency.disablePortal(clientId)
+        : api.agency.enablePortal(clientId);
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["agency", "client", clientId], updated);
       toast.success(
         updated.is_portal_enabled
           ? "Client portal enabled successfully"
           : "Client portal disabled"
       );
-    } catch (error) {
+    },
+    onError: (error) => {
       toast.error(parseApiError(error).message);
-    } finally {
-      setIsToggling(false);
-    }
+    },
+  });
+
+  const updateFeaturesMutation = useMutation({
+    mutationFn: ({ features }: { features: Record<string, boolean> }) =>
+      api.agency.updateClient(clientId, { allowed_features: features }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["agency", "client", clientId], updated);
+      toast.success("Feature access updated");
+    },
+    onError: (error) => {
+      toast.error(parseApiError(error).message);
+    },
+  });
+
+  const generateReportMutation = useMutation({
+    mutationFn: (form: ReportForm) =>
+      api.agency.generateReport({
+        client_workspace_id: clientId,
+        report_type: form.report_type || undefined,
+        period_start: form.period_start,
+        period_end: form.period_end,
+        report_template_id: form.report_template_id || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["agency", "reports", clientId] });
+      setReportForm({
+        report_type: "monthly",
+        period_start: "",
+        period_end: "",
+        report_template_id: "",
+      });
+      toast.success("Report generated successfully");
+    },
+    onError: (error) => {
+      toast.error(parseApiError(error).message);
+    },
+  });
+
+  const deleteClientMutation = useMutation({
+    mutationFn: () => api.agency.deleteClient(clientId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["agency"] });
+      toast.success("Client workspace deleted");
+      router.push("/agency");
+    },
+    onError: (error) => {
+      toast.error(parseApiError(error).message);
+      setShowDeleteDialog(false);
+    },
+  });
+
+  // --- Handlers ---
+
+  function handleTogglePortal() {
+    if (!workspace) return;
+    togglePortalMutation.mutate();
   }
 
   async function handleCopyPortalUrl() {
@@ -150,26 +199,14 @@ export default function ClientDetailPage() {
     }
   }
 
-  async function handleFeatureChange(key: FeatureKey, value: boolean) {
+  function handleFeatureChange(key: FeatureKey, value: boolean) {
     if (!workspace) return;
     const currentFeatures = workspace.allowed_features ?? {};
     const updatedFeatures = { ...currentFeatures, [key]: value };
-
-    setIsSavingFeatures(true);
-    try {
-      const updated = await api.agency.updateClient(clientId, {
-        allowed_features: updatedFeatures,
-      });
-      setWorkspace(updated);
-      toast.success("Feature access updated");
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-    } finally {
-      setIsSavingFeatures(false);
-    }
+    updateFeaturesMutation.mutate({ features: updatedFeatures });
   }
 
-  async function handleGenerateReport() {
+  function handleGenerateReport() {
     if (!reportForm.period_start || !reportForm.period_end) {
       toast.error("Please select a date range for the report");
       return;
@@ -178,42 +215,27 @@ export default function ClientDetailPage() {
       toast.error("Start date must be before end date");
       return;
     }
-
-    setIsGenerating(true);
-    try {
-      const newReport = await api.agency.generateReport({
-        client_workspace_id: clientId,
-        report_type: reportForm.report_type || undefined,
-        period_start: reportForm.period_start,
-        period_end: reportForm.period_end,
-        report_template_id: reportForm.report_template_id || undefined,
-      });
-      setReports((prev) => [newReport, ...prev]);
-      setReportForm({
-        report_type: "monthly",
-        period_start: "",
-        period_end: "",
-        report_template_id: "",
-      });
-      toast.success("Report generated successfully");
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-    } finally {
-      setIsGenerating(false);
-    }
+    generateReportMutation.mutate(reportForm);
   }
 
-  async function handleDeleteClient() {
-    setIsDeleting(true);
-    try {
-      await api.agency.deleteClient(clientId);
-      toast.success("Client workspace deleted");
-      router.push("/agency");
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-      setIsDeleting(false);
-      setShowDeleteDialog(false);
-    }
+  function handleDeleteClient() {
+    deleteClientMutation.mutate();
+  }
+
+  // --- Derived state ---
+
+  const reports = reportsData ?? [];
+  const isLoading = clientLoading || reportsLoading;
+  const isToggling = togglePortalMutation.isPending;
+  const isSavingFeatures = updateFeaturesMutation.isPending;
+  const isGenerating = generateReportMutation.isPending;
+  const isDeleting = deleteClientMutation.isPending;
+
+  // Redirect on client fetch error
+  if (clientError) {
+    toast.error(parseApiError(clientError).message);
+    router.push("/agency");
+    return null;
   }
 
   if (isLoading) {
@@ -535,7 +557,7 @@ export default function ClientDetailPage() {
                       className="w-full h-10 rounded-xl border border-surface-tertiary bg-surface px-3 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
                     >
                       <option value="">No template</option>
-                      {templates.map((t) => (
+                      {templates.map((t: AgencyReportTemplate) => (
                         <option key={t.id} value={t.id}>
                           {t.name}
                         </option>

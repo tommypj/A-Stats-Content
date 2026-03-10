@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -19,8 +19,9 @@ import {
   Tag,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { api, parseApiError, KnowledgeSource } from "@/lib/api";
+import { api, parseApiError } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -46,73 +47,46 @@ const STATUS_STYLES = {
 export default function SourceDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const sourceId = params.id as string;
 
-  const [source, setSource] = useState<KnowledgeSource | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isReprocessing, setIsReprocessing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  const statusRef = useRef(source?.status);
-  statusRef.current = source?.status;
+  const sourceQueryKey = ["knowledge", "sources", sourceId];
 
-  useEffect(() => {
-    loadSource();
-  }, [sourceId]);
+  const { data: source, isLoading } = useQuery({
+    queryKey: sourceQueryKey,
+    queryFn: () => api.knowledge.getSource(sourceId),
+    staleTime: 60_000,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "processing" || status === "pending" ? 3000 : false;
+    },
+  });
 
-  // Poll for status updates if processing
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (statusRef.current === "processing" || statusRef.current === "pending") {
-        loadSource(true);
-      }
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [sourceId]);
-
-  async function loadSource(silent = false) {
-    try {
-      if (!silent) setIsLoading(true);
-      const data = await api.knowledge.getSource(sourceId);
-      setSource(data);
-    } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to load source");
-      router.push("/knowledge/sources");
-    } finally {
-      if (!silent) setIsLoading(false);
-    }
-  }
-
-  async function handleDelete() {
-    try {
-      setIsDeleting(true);
-      await api.knowledge.deleteSource(sourceId);
+  const deleteMutation = useMutation({
+    mutationFn: () => api.knowledge.deleteSource(sourceId),
+    onSuccess: () => {
       toast.success("Source deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["knowledge", "sources"] });
       router.push("/knowledge/sources");
-    } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to delete source");
-      setIsDeleting(false);
+    },
+    onError: (error) => {
+      toast.error(parseApiError(error).message);
       setShowDeleteDialog(false);
-    }
-  }
+    },
+  });
 
-  async function handleReprocess() {
-    try {
-      setIsReprocessing(true);
-      await api.knowledge.reprocess(sourceId);
+  const reprocessMutation = useMutation({
+    mutationFn: () => api.knowledge.reprocess(sourceId),
+    onSuccess: () => {
       toast.success("Source reprocessing started");
-      loadSource();
-    } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to reprocess source");
-    } finally {
-      setIsReprocessing(false);
-    }
-  }
+      queryClient.invalidateQueries({ queryKey: sourceQueryKey });
+    },
+    onError: (error) => {
+      toast.error(parseApiError(error).message);
+    },
+  });
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -258,8 +232,8 @@ export default function SourceDetailPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleReprocess}
-                  isLoading={isReprocessing}
+                  onClick={() => reprocessMutation.mutate()}
+                  isLoading={reprocessMutation.isPending}
                   leftIcon={<RefreshCw className="h-4 w-4" />}
                 >
                   Retry Processing
@@ -340,8 +314,8 @@ export default function SourceDetailPage() {
                 <Button
                   variant="outline"
                   className="w-full"
-                  onClick={handleReprocess}
-                  isLoading={isReprocessing}
+                  onClick={() => reprocessMutation.mutate()}
+                  isLoading={reprocessMutation.isPending}
                   leftIcon={<RefreshCw className="h-4 w-4" />}
                 >
                   Reprocess Source
@@ -381,14 +355,14 @@ export default function SourceDetailPage() {
             <Button
               variant="outline"
               onClick={() => setShowDeleteDialog(false)}
-              disabled={isDeleting}
+              disabled={deleteMutation.isPending}
             >
               Cancel
             </Button>
             <Button
               variant="destructive"
-              onClick={handleDelete}
-              isLoading={isDeleting}
+              onClick={() => deleteMutation.mutate()}
+              isLoading={deleteMutation.isPending}
             >
               Delete Permanently
             </Button>

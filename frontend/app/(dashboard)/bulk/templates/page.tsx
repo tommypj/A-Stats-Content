@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { api, parseApiError, ContentTemplate, TemplateConfig } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -29,31 +30,23 @@ const DEFAULT_CONFIG: TemplateConfig = {
   language: "en",
 };
 
+const TEMPLATES_QUERY_KEY = ["bulk", "templates"];
+
 export default function TemplatesPage() {
-  const [templates, setTemplates] = useState<ContentTemplate[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [config, setConfig] = useState<TemplateConfig>(DEFAULT_CONFIG);
-  const [isSaving, setIsSaving] = useState(false);
 
-  const loadTemplates = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const data = await api.bulk.templates();
-      setTemplates(data.items);
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const { data, isLoading } = useQuery({
+    queryKey: TEMPLATES_QUERY_KEY,
+    queryFn: () => api.bulk.templates(),
+    staleTime: 30_000,
+  });
 
-  useEffect(() => {
-    loadTemplates();
-  }, [loadTemplates]);
+  const templates = data?.items ?? [];
 
   const resetForm = () => {
     setShowForm(false);
@@ -71,37 +64,45 @@ export default function TemplatesPage() {
     setShowForm(true);
   };
 
-  const handleSave = async () => {
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (editingId) {
+        return api.bulk.updateTemplate(editingId, { name, description, template_config: config });
+      } else {
+        return api.bulk.createTemplate({ name, description, template_config: config });
+      }
+    },
+    onSuccess: () => {
+      toast.success(editingId ? "Template updated" : "Template created");
+      resetForm();
+      queryClient.invalidateQueries({ queryKey: TEMPLATES_QUERY_KEY });
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.bulk.deleteTemplate(id),
+    onSuccess: () => {
+      toast.success("Template deleted");
+      queryClient.invalidateQueries({ queryKey: TEMPLATES_QUERY_KEY });
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
+
+  const handleSave = () => {
     if (!name.trim()) {
       toast.error("Template name is required");
       return;
     }
-    try {
-      setIsSaving(true);
-      if (editingId) {
-        await api.bulk.updateTemplate(editingId, { name, description, template_config: config });
-        toast.success("Template updated");
-      } else {
-        await api.bulk.createTemplate({ name, description, template_config: config });
-        toast.success("Template created");
-      }
-      resetForm();
-      loadTemplates();
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setIsSaving(false);
-    }
+    saveMutation.mutate();
   };
 
-  const handleDelete = async (id: string) => {
-    try {
-      await api.bulk.deleteTemplate(id);
-      toast.success("Template deleted");
-      setTemplates((prev) => prev.filter((t) => t.id !== id));
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    }
+  const handleDelete = (id: string) => {
+    deleteMutation.mutate(id);
   };
 
   return (
@@ -208,9 +209,9 @@ export default function TemplatesPage() {
               </label>
             </div>
             <div className="flex gap-2">
-              <Button onClick={handleSave} variant="primary" disabled={isSaving}>
+              <Button onClick={handleSave} variant="primary" disabled={saveMutation.isPending}>
                 <Save className="h-4 w-4 mr-1" />
-                {isSaving ? "Saving..." : "Save Template"}
+                {saveMutation.isPending ? "Saving..." : "Save Template"}
               </Button>
               <Button onClick={resetForm} variant="ghost">
                 <X className="h-4 w-4 mr-1" />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   Search,
@@ -10,11 +10,12 @@ import {
   Lightbulb,
   Clock,
 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   api,
+  parseApiError,
   KeywordSuggestion,
   KeywordSuggestionsResponse,
-  KeywordHistoryEntry,
 } from "@/lib/api";
 import { TierGate } from "@/components/ui/tier-gate";
 
@@ -56,52 +57,42 @@ function difficultyLabel(difficulty: KeywordSuggestion["difficulty"]): string {
 }
 
 export default function KeywordResearchPage() {
+  const queryClient = useQueryClient();
   const [seedKeyword, setSeedKeyword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<KeywordSuggestionsResponse | null>(null);
-  const [history, setHistory] = useState<KeywordHistoryEntry[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(true);
 
-  useEffect(() => {
-    api.articles.keywordHistory()
-      .then((data) => setHistory(data.history))
-      .catch(() => {}) // history is non-critical; silent fail
-      .finally(() => setHistoryLoading(false));
-  }, []);
+  // --- React Query hooks ---
 
-  async function handleSubmit(e?: React.FormEvent) {
+  const { data: historyData, isLoading: historyLoading } = useQuery({
+    queryKey: ["keyword-research", "history"],
+    queryFn: () => api.articles.keywordHistory(),
+    staleTime: 30_000,
+  });
+
+  const history = historyData?.history ?? [];
+
+  const suggestionsMutation = useMutation({
+    mutationFn: (keyword: string) => api.articles.keywordSuggestions(keyword, 10),
+    onSuccess: (data) => {
+      setResult(data);
+      // Invalidate history so it refetches with the new entry
+      if (!data.cached) {
+        queryClient.invalidateQueries({ queryKey: ["keyword-research", "history"] });
+      }
+    },
+  });
+
+  const isLoading = suggestionsMutation.isPending;
+  const error = suggestionsMutation.isError
+    ? parseApiError(suggestionsMutation.error).message
+    : null;
+
+  function handleSubmit(e?: React.FormEvent) {
     if (e) e.preventDefault();
     const trimmed = seedKeyword.trim();
     if (!trimmed) return;
-
-    setIsLoading(true);
-    setError(null);
     setResult(null);
-
-    try {
-      const data = await api.articles.keywordSuggestions(trimmed, 10);
-      setResult(data);
-
-      // Prepend to history if not already cached
-      if (!data.cached) {
-        setHistory((prev) => [
-          {
-            seed_keyword: data.seed_keyword,
-            searched_at: new Date().toISOString(),
-            expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-            result: data,
-          },
-          ...prev.filter((h) => h.seed_keyword.toLowerCase() !== data.seed_keyword.toLowerCase()),
-        ]);
-      }
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Failed to generate keyword suggestions";
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
+    suggestionsMutation.mutate(trimmed);
   }
 
   return (

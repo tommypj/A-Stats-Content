@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -16,6 +16,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { api, parseApiError, BulkJobDetail, BulkJobItem } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -34,57 +35,45 @@ const ITEMS_PER_PAGE = 50;
 
 export default function BulkJobDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const rawId = params.id;
   const jobId = Array.isArray(rawId) ? rawId[0] : (rawId ?? "");
-  const [job, setJob] = useState<BulkJobDetail | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   // FE-CONTENT-18: Client-side pagination to avoid rendering large item lists
   const [itemsPage, setItemsPage] = useState(1);
 
-  const loadJob = useCallback(async () => {
-    try {
-      const data = await api.bulk.getJob(jobId);
-      setJob(data);
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [jobId]);
+  const { data: job, isLoading } = useQuery({
+    queryKey: ["bulk", "job", jobId],
+    queryFn: () => api.bulk.getJob(jobId),
+    enabled: !!jobId,
+    staleTime: 60_000,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status === "processing" || status === "pending") return 5000;
+      return false;
+    },
+  });
 
-  useEffect(() => {
-    loadJob();
-  }, [loadJob]);
-
-  // Poll while processing
-  useEffect(() => {
-    if (!job || (job.status !== "processing" && job.status !== "pending")) return;
-    const interval = setInterval(loadJob, 5000);
-    return () => clearInterval(interval);
-  }, [job?.status, loadJob]);
-
-  const handleCancel = async () => {
-    if (!job) return;
-    try {
-      await api.bulk.cancelJob(job.id);
+  const cancelMutation = useMutation({
+    mutationFn: () => api.bulk.cancelJob(jobId),
+    onSuccess: () => {
       toast.success("Job cancelled");
-      loadJob();
-    } catch (err) {
+      queryClient.invalidateQueries({ queryKey: ["bulk", "job", jobId] });
+    },
+    onError: (err) => {
       toast.error(parseApiError(err).message);
-    }
-  };
+    },
+  });
 
-  const handleRetry = async () => {
-    if (!job) return;
-    try {
-      await api.bulk.retryFailed(job.id);
+  const retryMutation = useMutation({
+    mutationFn: () => api.bulk.retryFailed(jobId),
+    onSuccess: () => {
       toast.success("Retrying failed items");
-      loadJob();
-    } catch (err) {
+      queryClient.invalidateQueries({ queryKey: ["bulk", "job", jobId] });
+    },
+    onError: (err) => {
       toast.error(parseApiError(err).message);
-    }
-  };
+    },
+  });
 
   if (!jobId) {
     return <div>Not found</div>;
@@ -133,14 +122,32 @@ export default function BulkJobDetailPage() {
         </div>
         <div className="flex gap-2">
           {(job.status === "processing" || job.status === "pending") && (
-            <Button onClick={handleCancel} variant="outline" size="sm">
-              <Pause className="h-4 w-4 mr-1" />
+            <Button
+              onClick={() => cancelMutation.mutate()}
+              variant="outline"
+              size="sm"
+              disabled={cancelMutation.isPending}
+            >
+              {cancelMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Pause className="h-4 w-4 mr-1" />
+              )}
               Cancel
             </Button>
           )}
           {(job.status === "partially_failed" || job.status === "failed") && (
-            <Button onClick={handleRetry} variant="primary" size="sm">
-              <RefreshCw className="h-4 w-4 mr-1" />
+            <Button
+              onClick={() => retryMutation.mutate()}
+              variant="primary"
+              size="sm"
+              disabled={retryMutation.isPending}
+            >
+              {retryMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-1" />
+              )}
               Retry Failed
             </Button>
           )}

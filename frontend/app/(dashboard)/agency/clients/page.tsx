@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   Users,
@@ -12,7 +12,8 @@ import {
   Search,
 } from "lucide-react";
 import { toast } from "sonner";
-import { api, parseApiError, ClientWorkspace, Project } from "@/lib/api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api, parseApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,9 +44,7 @@ function PortalStatusBadge({ enabled }: { enabled: boolean }) {
 }
 
 export default function AgencyClientsPage() {
-  const [clients, setClients] = useState<ClientWorkspace[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
 
   // Add client modal
@@ -55,56 +54,61 @@ export default function AgencyClientsPage() {
     client_email: "",
     project_id: "",
   });
-  const [adding, setAdding] = useState(false);
 
-  const loadData = useCallback(async () => {
-    try {
-      const [clientsRes, projectsRes] = await Promise.all([
-        api.agency.clients(),
-        api.projects.list(),
-      ]);
-      setClients(clientsRes.items);
-      setProjects(projectsRes);
-    } catch (err) {
+  // --- React Query hooks ---
+
+  const { data: clientsData, isLoading: clientsLoading } = useQuery({
+    queryKey: ["agency", "clients"],
+    queryFn: () => api.agency.clients(),
+    staleTime: 30_000,
+  });
+
+  const { data: projects = [], isLoading: projectsLoading } = useQuery({
+    queryKey: ["projects", "list"],
+    queryFn: () => api.projects.list(),
+    staleTime: 30_000,
+  });
+
+  const addClientMutation = useMutation({
+    mutationFn: (data: { client_name: string; client_email: string; project_id: string }) =>
+      api.agency.createClient(data),
+    onSuccess: () => {
+      toast.success("Client workspace created");
+      setShowAdd(false);
+      setAddForm({ client_name: "", client_email: "", project_id: "" });
+      queryClient.invalidateQueries({ queryKey: ["agency", "clients"] });
+    },
+    onError: (err) => {
       toast.error(parseApiError(err).message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+  });
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  const deleteClientMutation = useMutation({
+    mutationFn: (id: string) => api.agency.deleteClient(id),
+    onSuccess: () => {
+      toast.success("Client workspace deleted");
+      queryClient.invalidateQueries({ queryKey: ["agency", "clients"] });
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
 
-  const handleAddClient = async () => {
+  const handleAddClient = () => {
     if (!addForm.client_name || !addForm.project_id) {
       toast.error("Client name and project are required");
       return;
     }
-    setAdding(true);
-    try {
-      await api.agency.createClient(addForm);
-      toast.success("Client workspace created");
-      setShowAdd(false);
-      setAddForm({ client_name: "", client_email: "", project_id: "" });
-      loadData();
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setAdding(false);
-    }
+    addClientMutation.mutate(addForm);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (!confirm("Delete this client workspace? This cannot be undone.")) return;
-    try {
-      await api.agency.deleteClient(id);
-      toast.success("Client workspace deleted");
-      setClients((prev) => prev.filter((c) => c.id !== id));
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    }
+    deleteClientMutation.mutate(id);
   };
+
+  const clients = clientsData?.items ?? [];
+  const loading = clientsLoading || projectsLoading;
 
   const filtered = clients.filter(
     (c) =>
@@ -272,9 +276,9 @@ export default function AgencyClientsPage() {
           <Button
             variant="primary"
             onClick={handleAddClient}
-            disabled={adding}
+            disabled={addClientMutation.isPending}
           >
-            {adding ? "Creating..." : "Create Workspace"}
+            {addClientMutation.isPending ? "Creating..." : "Create Workspace"}
           </Button>
         </div>
       </Dialog>

@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Sparkles, Clock, FileText, History, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
+import { useMutation } from "@tanstack/react-query";
 
 import { api, parseApiError, QueryResponse } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,32 +34,14 @@ function QueryPageContent() {
   const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
   const [response, setResponse] = useState<QueryResponse | null>(null);
-  const [isQuerying, setIsQuerying] = useState(false);
   const [queryHistory, setQueryHistory] = useState<QueryHistoryItem[]>([]);
+  const historyRef = useRef(queryHistory);
+  historyRef.current = queryHistory;
 
-  useEffect(() => {
-    // Load query from URL if present
-    const urlQuery = searchParams.get("q");
-    if (urlQuery) {
-      setQuery(urlQuery);
-      handleQuery(urlQuery);
-    }
-
-    // Load query history from localStorage
-    try {
-      const savedHistory = localStorage.getItem("knowledge_query_history");
-      if (savedHistory) {
-        setQueryHistory(JSON.parse(savedHistory));
-      }
-    } catch {
-      // Ignore corrupt localStorage data
-    }
-  }, []);
-
-  const saveToHistory = (query: string) => {
+  const saveToHistory = useCallback((queryText: string) => {
     const newHistory = [
-      { query, timestamp: new Date().toISOString() },
-      ...queryHistory.filter((item) => item.query !== query),
+      { query: queryText, timestamp: new Date().toISOString() },
+      ...historyRef.current.filter((item) => item.query !== queryText),
     ].slice(0, 50); // Keep only last 50 unique queries
 
     setQueryHistory(newHistory);
@@ -74,22 +57,46 @@ function QueryPageContent() {
         // Still failing — silently ignore, history just won't persist
       }
     }
-  };
+  }, []);
 
-  async function handleQuery(queryText: string) {
-    try {
-      setIsQuerying(true);
-      setQuery(queryText);
-      const result = await api.knowledge.query(queryText);
+  const queryMutation = useMutation({
+    mutationFn: (queryText: string) => api.knowledge.query(queryText),
+    onSuccess: (result, queryText) => {
       setResponse(result);
       saveToHistory(queryText);
-    } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to process query");
-    } finally {
-      setIsQuerying(false);
+    },
+    onError: (error) => {
+      toast.error(parseApiError(error).message || "Failed to process query");
+    },
+  });
+
+  const handleQuery = useCallback(
+    (queryText: string) => {
+      setQuery(queryText);
+      queryMutation.mutate(queryText);
+    },
+    [queryMutation],
+  );
+
+  useEffect(() => {
+    // Load query from URL if present
+    const urlQuery = searchParams.get("q");
+    if (urlQuery) {
+      setQuery(urlQuery);
+      queryMutation.mutate(urlQuery);
     }
-  }
+
+    // Load query history from localStorage
+    try {
+      const savedHistory = localStorage.getItem("knowledge_query_history");
+      if (savedHistory) {
+        setQueryHistory(JSON.parse(savedHistory));
+      }
+    } catch {
+      // Ignore corrupt localStorage data
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const formatQueryTime = (ms: number) => {
     if (ms < 1000) return `${ms}ms`;
@@ -128,14 +135,14 @@ function QueryPageContent() {
         <CardContent className="p-6">
           <QueryInput
             onSubmit={handleQuery}
-            isLoading={isQuerying}
+            isLoading={queryMutation.isPending}
             showExamples={!response}
           />
         </CardContent>
       </Card>
 
       {/* Query Response */}
-      {isQuerying && (
+      {queryMutation.isPending && (
         <Card>
           <CardContent className="p-6 space-y-4">
             <Skeleton className="h-8 w-3/4" />
@@ -150,7 +157,7 @@ function QueryPageContent() {
         </Card>
       )}
 
-      {response && !isQuerying && (
+      {response && !queryMutation.isPending && (
         <div className="space-y-6">
           {/* AI Answer */}
           <Card className="border-l-4 border-l-primary-500">
@@ -252,7 +259,7 @@ function QueryPageContent() {
       )}
 
       {/* Query History */}
-      {!response && !isQuerying && queryHistory.length > 0 && (
+      {!response && !queryMutation.isPending && queryHistory.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
