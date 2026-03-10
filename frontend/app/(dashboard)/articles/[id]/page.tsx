@@ -41,7 +41,6 @@ import {
 } from "lucide-react";
 import { api, parseApiError, Article, ArticleRevision, ArticleRevisionDetail, LinkSuggestion, AEOScore } from "@/lib/api";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
-import { calculateSEOScore, SEOScore } from "@/lib/seo-score";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -86,7 +85,7 @@ function getProgressTextColor(pct: number): string {
 }
 
 function WordCountWidget({ content, target, onTargetChange }: WordCountWidgetProps) {
-  // FE-CONTENT-19: Word count also computed in lib/seo-score.ts — keep in sync
+  // Word count
   const wordCount = getWordCount(content);
   const readingTime = Math.max(1, Math.round(wordCount / 200));
   const hasTarget = target !== "" && target > 0;
@@ -540,16 +539,64 @@ function getLiveScoreLabel(score: number): string {
   return "Poor";
 }
 
+interface SEOCheck {
+  label: string;
+  passed: boolean;
+  tip: string;
+  points: number;
+}
+
+/** Convert backend seo_analysis JSON into the checklist format for the panel. */
+function seoAnalysisToChecks(seo: Record<string, any>, keyword: string): SEOCheck[] {
+  const kw = keyword || "keyword";
+  const metaLen = seo.meta_description_length ?? 0;
+  return [
+    { label: "Keyword in first 100 words", passed: !!seo.keyword_in_first_100, tip: `Mention "${kw}" within the first 100 words.`, points: 10 },
+    { label: "Keyword in at least one H2", passed: !!seo.keyword_in_h2, tip: `Include "${kw}" in at least one H2 heading.`, points: 5 },
+    { label: "Keyword in title", passed: !!seo.title_has_keyword, tip: `Include "${kw}" in your article title.`, points: 15 },
+    { label: `Meta description (120–160 chars, ${metaLen} found)`, passed: metaLen >= 120 && metaLen <= 160, tip: metaLen < 120 ? `Expand to at least 120 characters (currently ${metaLen}).` : `Shorten to under 160 characters (currently ${metaLen}).`, points: 10 },
+    { label: `Section structure (3+ H2 headings, ${seo.h2_count ?? 0} found)`, passed: seo.headings_structure === "good", tip: "Add more ## headings — aim for at least 3 modular sections.", points: 15 },
+    { label: "FAQ section present", passed: !!seo.has_faq, tip: "Add a '## Frequently Asked Questions' section.", points: 15 },
+    { label: "External citation link", passed: (seo.external_links ?? 0) >= 1, tip: "Add at least one external link to an authoritative source.", points: 10 },
+    { label: "Structured lists (bullets or numbered)", passed: !!seo.has_lists, tip: "Add bullet points or a numbered list.", points: 10 },
+    { label: "Quick Answer / TL;DR block", passed: !!seo.has_quick_answer, tip: "Add a blockquote: > **Quick Answer:** [40–70 word answer].", points: 5 },
+    { label: "Images have alt text", passed: !!seo.image_alt_texts, tip: "Ensure all images have descriptive alt text.", points: 5 },
+  ];
+}
+
 interface LiveSeoPanelProps {
-  seoScore: SEOScore;
+  seoAnalysis: Record<string, any> | null;
+  score: number | null;
+  keyword: string;
   onRefresh?: () => void;
   refreshing?: boolean;
 }
 
-function LiveSeoPanel({ seoScore, onRefresh, refreshing }: LiveSeoPanelProps) {
+function LiveSeoPanel({ seoAnalysis, score, keyword, onRefresh, refreshing }: LiveSeoPanelProps) {
   const [expanded, setExpanded] = useState(true);
 
-  const { overall, checks } = seoScore;
+  if (!seoAnalysis || score == null) {
+    return (
+      <Card className="p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-text-secondary" />
+            <span className="font-medium text-text-primary text-sm">SEO Score</span>
+            <span className="text-xs text-text-muted">Not analyzed yet</span>
+          </div>
+          {onRefresh && (
+            <Button variant="ghost" size="sm" onClick={onRefresh} disabled={refreshing}>
+              {refreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              <span className="ml-1">Analyze</span>
+            </Button>
+          )}
+        </div>
+      </Card>
+    );
+  }
+
+  const overall = score;
+  const checks = seoAnalysisToChecks(seoAnalysis, keyword);
   const passedCount = checks.filter((c) => c.passed).length;
   const total = checks.length;
 
@@ -780,30 +827,9 @@ export default function ArticleEditorPage() {
   // Confirmation dialog state
   const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string; confirmLabel?: string; variant?: "danger" | "warning" | "default" } | null>(null);
 
-  // Live SEO score — debounced 500 ms to avoid recalculating on every keystroke
-  const [debouncedSeoInput, setDebouncedSeoInput] = useState({ title: "", content: "", keyword: "", metaDescription: "" });
-  const seoDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (seoDebounceRef.current) clearTimeout(seoDebounceRef.current);
-    seoDebounceRef.current = setTimeout(() => {
-      setDebouncedSeoInput({ title, content, keyword, metaDescription });
-    }, 500);
-    return () => {
-      if (seoDebounceRef.current) clearTimeout(seoDebounceRef.current);
-    };
-  }, [title, content, keyword, metaDescription]);
-
-  const liveSeoScore = useMemo(
-    () =>
-      calculateSEOScore({
-        title: debouncedSeoInput.title,
-        content: debouncedSeoInput.content,
-        keyword: debouncedSeoInput.keyword,
-        meta_description: debouncedSeoInput.metaDescription,
-      }),
-    [debouncedSeoInput]
-  );
+  // SEO score comes from backend seo_analysis (single source of truth)
+  const seoAnalysis = article?.seo_analysis ?? null;
+  const seoScoreValue = article?.seo_score ?? null;
 
   // Escape key exits preview mode
   useEffect(() => {
@@ -1742,7 +1768,9 @@ export default function ArticleEditorPage() {
               {sidebarTab === "seo" && (
                 <>
                   <LiveSeoPanel
-                    seoScore={liveSeoScore}
+                    seoAnalysis={seoAnalysis}
+                    score={seoScoreValue}
+                    keyword={keyword}
                     onRefresh={handleAnalyzeSeo}
                     refreshing={analyzingSeo}
                   />
