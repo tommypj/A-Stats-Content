@@ -57,11 +57,35 @@ router = APIRouter(prefix="/admin/blog", tags=["Admin - Blog"])
 # ---------------------------------------------------------------------------
 
 
-def _get_permanent_image_url(image: GeneratedImage) -> str | None:
-    """Get a permanent URL for a GeneratedImage, preferring local storage over Replicate."""
+async def _get_permanent_image_url(image: GeneratedImage, db: AsyncSession | None = None) -> str | None:
+    """Get a permanent URL for a GeneratedImage, preferring local storage over Replicate.
+
+    If the image only has an external URL (e.g. Replicate), attempt to download
+    and persist it to local storage so the URL never expires.
+    """
+    api_base = settings.api_base_url.rstrip("/")
+
     if image.local_path:
-        return f"{settings.api_base_url.rstrip('/')}/uploads/{image.local_path}"
-    return image.url  # fallback to external URL (may expire)
+        return f"{api_base}/uploads/{image.local_path}"
+
+    # Auto-persist: download and store locally so the URL doesn't expire
+    if image.url:
+        try:
+            storage = get_storage_adapter()
+            image_data = await download_image(image.url)
+            filename = f"gen_{image.id}.png"
+            local_path = await storage.save_image(image_data, filename)
+            # Update the GeneratedImage record so future lookups skip the download
+            if db is not None:
+                image.local_path = local_path
+                await db.flush()
+            return f"{api_base}/uploads/{local_path}"
+        except Exception as e:
+            logger.warning("Auto-persist failed for image %s: %s", image.id, str(e)[:200])
+            # Return the external URL as last resort (may already be expired)
+            return image.url
+
+    return None
 
 
 def _slugify(text: str) -> str:
@@ -683,7 +707,7 @@ async def admin_post_from_article(
         )
         img = img_result.scalar_one_or_none()
         if img:
-            featured_img_url = _get_permanent_image_url(img)
+            featured_img_url = await _get_permanent_image_url(img, db)
             featured_img_alt = img.alt_text or article.title
 
     # Generate unique slug
