@@ -43,6 +43,7 @@ const config: Config = {
           primary: "#2e352e",
           secondary: "#533f38",
           muted: "#6c5b45",
+          tertiary: "#9b8e7b",
         },
         // Extended palettes
         cream: {

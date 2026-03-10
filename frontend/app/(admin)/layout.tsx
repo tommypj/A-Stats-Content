@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Toaster, toast } from "sonner";
+import { toast } from "sonner";
 import {
   LayoutDashboard,
   FileText,
@@ -406,7 +406,6 @@ export default function AdminLayout({
           <ErrorBoundary>{children}</ErrorBoundary>
         </main>
       </div>
-      <Toaster richColors position="top-right" />
     </div>
   );
 }
