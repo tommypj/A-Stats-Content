@@ -117,10 +117,11 @@ export function ProjectSettingsGeneral({ project, onUpdate, onUploadLogo }: Proj
           />
 
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
+            <label htmlFor="project-slug" className="block text-sm font-medium text-text-secondary mb-1">
               Project Slug
             </label>
             <Input
+              id="project-slug"
               value={project.slug}
               disabled
               helperText="Slug cannot be changed after project creation"

@@ -65,10 +65,11 @@ export function DeleteProjectModal({
 
         {/* Confirmation Input */}
         <div>
-          <label className="block text-sm font-medium text-text-secondary mb-2">
+          <label htmlFor="confirm-project-name" className="block text-sm font-medium text-text-secondary mb-2">
             Type <span className="font-bold text-text-primary">{projectName}</span> to confirm
           </label>
           <Input
+            id="confirm-project-name"
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}
             placeholder="Enter project name"

@@ -135,8 +135,8 @@ export default function TemplatesPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">Name</label>
-              <input
+              <label htmlFor="name" className="block text-sm font-medium text-text-primary mb-1">Name</label>
+              <input id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="E.g. Blog Post Standard"
@@ -144,8 +144,8 @@ export default function TemplatesPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">Description</label>
-              <input
+              <label htmlFor="description" className="block text-sm font-medium text-text-primary mb-1">Description</label>
+              <input id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Optional description"
@@ -154,8 +154,8 @@ export default function TemplatesPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-text-primary mb-1">Tone</label>
-                <select value={config.tone} onChange={(e) => setConfig({ ...config, tone: e.target.value })} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm bg-surface text-text-primary">
+                <label htmlFor="tone" className="block text-sm font-medium text-text-primary mb-1">Tone</label>
+                <select id="tone" value={config.tone} onChange={(e) => setConfig({ ...config, tone: e.target.value })} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm bg-surface text-text-primary">
                   <option value="professional">Professional</option>
                   <option value="friendly">Friendly</option>
                   <option value="conversational">Conversational</option>
@@ -164,8 +164,8 @@ export default function TemplatesPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-text-primary mb-1">Writing Style</label>
-                <select value={config.writing_style} onChange={(e) => setConfig({ ...config, writing_style: e.target.value })} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm bg-surface text-text-primary">
+                <label htmlFor="writing-style" className="block text-sm font-medium text-text-primary mb-1">Writing Style</label>
+                <select id="writing-style" value={config.writing_style} onChange={(e) => setConfig({ ...config, writing_style: e.target.value })} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm bg-surface text-text-primary">
                   <option value="editorial">Editorial</option>
                   <option value="narrative">Narrative</option>
                   <option value="listicle">Listicle</option>
@@ -173,10 +173,11 @@ export default function TemplatesPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-text-primary mb-1">Word Count Target</label>
-                <input type="number" value={config.word_count_target} onChange={(e) => setConfig({ ...config, word_count_target: parseInt(e.target.value) || 1500 })} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm bg-surface text-text-primary" />
+                <label htmlFor="word-count-target" className="block text-sm font-medium text-text-primary mb-1">Word Count Target</label>
+                <input id="word-count-target" type="number" value={config.word_count_target} onChange={(e) => setConfig({ ...config, word_count_target: parseInt(e.target.value) || 1500 })} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm bg-surface text-text-primary" />
               </div>
               <div>
+                id="language"
                 <label className="block text-sm font-medium text-text-primary mb-1">Language</label>
                 <select value={config.language} onChange={(e) => setConfig({ ...config, language: e.target.value })} className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm bg-surface text-text-primary">
                   <option value="en">English</option>
@@ -187,8 +188,9 @@ export default function TemplatesPage() {
                 </select>
               </div>
             </div>
+              id="target-audience"
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">Target Audience</label>
+              <label htmlFor="custom-instructions" className="block text-sm font-medium text-text-primary mb-1">Target Audience</label>
               <input value={config.target_audience} onChange={(e) => setConfig({ ...config, target_audience: e.target.value })} placeholder="E.g. Small business owners" className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm bg-surface text-text-primary" />
             </div>
             <div>

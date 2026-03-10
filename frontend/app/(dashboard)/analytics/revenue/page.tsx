@@ -423,8 +423,9 @@ export default function RevenueAttributionPage() {
               <p className="text-sm font-medium text-text-primary">New Conversion Goal</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-text-secondary mb-1">Goal Name</label>
+                  <label htmlFor="goal-name" className="block text-xs text-text-secondary mb-1">Goal Name</label>
                   <input
+                    id="goal-name"
                     type="text"
                     value={newGoal.name}
                     onChange={(e) => setNewGoal((p) => ({ ...p, name: e.target.value }))}
@@ -433,8 +434,9 @@ export default function RevenueAttributionPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-text-secondary mb-1">Goal Type</label>
+                  <label htmlFor="goal-type" className="block text-xs text-text-secondary mb-1">Goal Type</label>
                   <select
+                    id="goal-type"
                     value={newGoal.goal_type}
                     onChange={(e) => setNewGoal((p) => ({ ...p, goal_type: e.target.value }))}
                     className="w-full text-sm border border-surface-tertiary rounded-lg px-3 py-2 bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -448,10 +450,11 @@ export default function RevenueAttributionPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-text-secondary mb-1">
+                <label htmlFor="goal-config" className="block text-xs text-text-secondary mb-1">
                   Config (optional JSON, e.g. {"{"}"url": "/thank-you"{"}"})
                 </label>
                 <input
+                  id="goal-config"
                   type="text"
                   value={newGoal.goal_config}
                   onChange={(e) => setNewGoal((p) => ({ ...p, goal_config: e.target.value }))}
@@ -706,8 +709,9 @@ export default function RevenueAttributionPage() {
           </p>
 
           <div>
-            <label className="block text-xs text-text-secondary mb-1">Conversion Goal</label>
+            <label htmlFor="import-conversion-goal" className="block text-xs text-text-secondary mb-1">Conversion Goal</label>
             <select
+              id="import-conversion-goal"
               value={importData.goal_id}
               onChange={(e) => setImportData((p) => ({ ...p, goal_id: e.target.value }))}
               className="w-full sm:w-64 text-sm border border-surface-tertiary rounded-lg px-3 py-2 bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -722,8 +726,9 @@ export default function RevenueAttributionPage() {
           </div>
 
           <div>
-            <label className="block text-xs text-text-secondary mb-1">CSV Data</label>
+            <label htmlFor="import-csv-data" className="block text-xs text-text-secondary mb-1">CSV Data</label>
             <textarea
+              id="import-csv-data"
               value={importData.csvText}
               onChange={(e) => setImportData((p) => ({ ...p, csvText: e.target.value }))}
               rows={6}

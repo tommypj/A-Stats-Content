@@ -347,10 +347,11 @@ export default function TemplatesPage() {
         <div className="space-y-4">
           {/* Name */}
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
+            <label htmlFor="name" className="block text-sm font-medium text-text-secondary mb-1">
               Name *
             </label>
             <input
+              id="name"
               type="text"
               value={form.name}
               onChange={(e) =>
@@ -363,10 +364,11 @@ export default function TemplatesPage() {
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
+            <label htmlFor="description" className="block text-sm font-medium text-text-secondary mb-1">
               Description
             </label>
             <input
+              id="description"
               type="text"
               value={form.description || ""}
               onChange={(e) =>
@@ -380,10 +382,11 @@ export default function TemplatesPage() {
           {/* Two-column row */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1">
+              <label htmlFor="tone" className="block text-sm font-medium text-text-secondary mb-1">
                 Tone
               </label>
               <select
+                id="tone"
                 value={form.tone || "professional"}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, tone: e.target.value }))
@@ -398,10 +401,11 @@ export default function TemplatesPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1">
+              <label htmlFor="word-count-target" className="block text-sm font-medium text-text-secondary mb-1">
                 Word Count Target
               </label>
               <input
+                id="word-count-target"
                 type="number"
                 min={100}
                 max={20000}
@@ -419,10 +423,11 @@ export default function TemplatesPage() {
 
           {/* Target Audience */}
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
+            <label htmlFor="target-audience" className="block text-sm font-medium text-text-secondary mb-1">
               Target Audience
             </label>
             <input
+              id="target-audience"
               type="text"
               value={form.target_audience || ""}
               onChange={(e) =>
@@ -439,10 +444,11 @@ export default function TemplatesPage() {
           {/* Writing style & Voice */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1">
+              <label htmlFor="writing-style" className="block text-sm font-medium text-text-secondary mb-1">
                 Writing Style
               </label>
               <input
+                id="writing-style"
                 type="text"
                 value={form.writing_style || ""}
                 onChange={(e) =>
@@ -456,10 +462,11 @@ export default function TemplatesPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1">
+              <label htmlFor="voice" className="block text-sm font-medium text-text-secondary mb-1">
                 Voice
               </label>
               <input
+                id="voice"
                 type="text"
                 value={form.voice || ""}
                 onChange={(e) =>
@@ -473,10 +480,11 @@ export default function TemplatesPage() {
 
           {/* Custom Instructions */}
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
+            <label htmlFor="custom-instructions" className="block text-sm font-medium text-text-secondary mb-1">
               Custom Instructions
             </label>
             <textarea
+              id="custom-instructions"
               rows={3}
               value={form.custom_instructions || ""}
               onChange={(e) =>

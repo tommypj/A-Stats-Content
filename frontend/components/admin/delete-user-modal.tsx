@@ -101,10 +101,11 @@ export function DeleteUserModal({
           )}
 
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+            <label htmlFor="confirm-delete-email" className="block text-sm font-medium text-text-secondary mb-1.5">
               Type the user's email to confirm deletion
             </label>
             <Input
+              id="confirm-delete-email"
               value={confirmEmail}
               onChange={(e) => setConfirmEmail(e.target.value)}
               placeholder={user.email}

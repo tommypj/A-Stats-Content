@@ -35,7 +35,7 @@ interface ColorSwatchProps {
 function ColorSwatch({ label, value, onChange, disabled }: ColorSwatchProps) {
   return (
     <div className="flex flex-col gap-2">
-      <label className="block text-sm font-medium text-text-secondary">{label}</label>
+      <label htmlFor={`color-${label.toLowerCase()}`} className="block text-sm font-medium text-text-secondary">{label}</label>
       <div className="flex items-center gap-3">
         {/* Native color picker */}
         <div className="relative">
@@ -231,10 +231,11 @@ export default function AgencyBrandingPage() {
         <CardContent className="space-y-4">
           {/* Agency name */}
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
+            <label htmlFor="agency-name" className="block text-sm font-medium text-text-secondary mb-1">
               Agency Name <span className="text-red-500">*</span>
             </label>
             <Input
+              id="agency-name"
               value={agencyName}
               onChange={(e) => setAgencyName(e.target.value)}
               placeholder="Acme Marketing Agency"
@@ -244,10 +245,11 @@ export default function AgencyBrandingPage() {
 
           {/* Logo URL */}
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
+            <label htmlFor="logo-url" className="block text-sm font-medium text-text-secondary mb-1">
               Logo URL
             </label>
             <Input
+              id="logo-url"
               value={logoUrl}
               onChange={(e) => setLogoUrl(e.target.value)}
               placeholder="https://example.com/logo.png"
@@ -270,10 +272,11 @@ export default function AgencyBrandingPage() {
 
           {/* Contact email */}
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
+            <label htmlFor="contact-email" className="block text-sm font-medium text-text-secondary mb-1">
               Contact Email
             </label>
             <Input
+              id="contact-email"
               type="email"
               value={contactEmail}
               onChange={(e) => setContactEmail(e.target.value)}
@@ -287,10 +290,11 @@ export default function AgencyBrandingPage() {
 
           {/* Footer text */}
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
+            <label htmlFor="footer-text" className="block text-sm font-medium text-text-secondary mb-1">
               Footer Text
             </label>
             <Input
+              id="footer-text"
               value={footerText}
               onChange={(e) => setFooterText(e.target.value)}
               placeholder="Powered by Acme Marketing Agency"
@@ -371,10 +375,11 @@ export default function AgencyBrandingPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
+            <label htmlFor="custom-domain" className="block text-sm font-medium text-text-secondary mb-1">
               Custom Domain
             </label>
             <Input
+              id="custom-domain"
               value={profile?.custom_domain ?? ""}
               readOnly
               disabled

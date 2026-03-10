@@ -98,11 +98,12 @@ export function SchedulePicker({
           {/* Date and Time Inputs */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">
+              <label htmlFor="schedule-date" className="block text-sm font-medium text-text-primary mb-2">
                 <Calendar className="h-4 w-4 inline mr-1" />
                 Date
               </label>
               <input
+                id="schedule-date"
                 type="date"
                 value={dateStr}
                 onChange={(e) => handleDateTimeChange(e.target.value, timeStr)}
@@ -111,11 +112,12 @@ export function SchedulePicker({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">
+              <label htmlFor="schedule-time" className="block text-sm font-medium text-text-primary mb-2">
                 <Clock className="h-4 w-4 inline mr-1" />
                 Time
               </label>
               <input
+                id="schedule-time"
                 type="time"
                 value={timeStr}
                 onChange={(e) => handleDateTimeChange(dateStr, e.target.value)}
@@ -127,10 +129,11 @@ export function SchedulePicker({
           {/* Timezone Selector */}
           {onTimezoneChange && (
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">
+              <label htmlFor="schedule-timezone" className="block text-sm font-medium text-text-primary mb-2">
                 Timezone
               </label>
               <select
+                id="schedule-timezone"
                 value={timezone}
                 onChange={(e) => onTimezoneChange(e.target.value)}
                 className="w-full px-3 py-2 border border-surface-tertiary rounded-xl bg-surface-primary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"

@@ -883,10 +883,11 @@ export default function ImagesPage() {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                <label htmlFor="prompt" className="block text-sm font-medium text-text-secondary mb-1.5">
                   Prompt
                 </label>
                 <textarea
+                  id="prompt"
                   value={regenPrompt}
                   onChange={(e) => setRegenPrompt(e.target.value)}
                   rows={3}
@@ -901,10 +902,11 @@ export default function ImagesPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                  <label htmlFor="style" className="block text-sm font-medium text-text-secondary mb-1.5">
                     Style
                   </label>
                   <select
+                    id="style"
                     value={regenStyle}
                     onChange={(e) => setRegenStyle(e.target.value)}
                     disabled={regenLoading}
@@ -916,10 +918,11 @@ export default function ImagesPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                  <label htmlFor="size" className="block text-sm font-medium text-text-secondary mb-1.5">
                     Size
                   </label>
                   <select
+                    id="size"
                     value={regenSize}
                     onChange={(e) => setRegenSize(e.target.value)}
                     disabled={regenLoading}

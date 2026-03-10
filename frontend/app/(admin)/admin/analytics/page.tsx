@@ -74,15 +74,17 @@ export default function AdminAnalyticsPage() {
         <div className="flex items-center gap-4">
           <Calendar className="h-5 w-5 text-text-secondary" />
           <div className="flex items-center gap-3">
-            <label className="text-sm font-medium text-text-secondary">From:</label>
+            <label htmlFor="analytics-date-from" className="text-sm font-medium text-text-secondary">From:</label>
             <input
+              id="analytics-date-from"
               type="date"
               value={dateRange.start_date}
               onChange={(e) => setDateRange({ ...dateRange, start_date: e.target.value })}
               className="px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
-            <label className="text-sm font-medium text-text-secondary">To:</label>
+            <label htmlFor="analytics-date-to" className="text-sm font-medium text-text-secondary">To:</label>
             <input
+              id="analytics-date-to"
               type="date"
               value={dateRange.end_date}
               onChange={(e) => setDateRange({ ...dateRange, end_date: e.target.value })}

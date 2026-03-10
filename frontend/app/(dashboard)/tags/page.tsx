@@ -184,10 +184,11 @@ export default function TagsPage() {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
+            <label htmlFor="name" className="block text-sm font-medium text-text-secondary mb-1">
               Name *
             </label>
             <input
+              id="name"
               type="text"
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}

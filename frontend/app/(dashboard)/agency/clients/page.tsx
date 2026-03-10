@@ -215,10 +215,11 @@ export default function AgencyClientsPage() {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
+            <label htmlFor="client-name" className="block text-sm font-medium text-text-secondary mb-1">
               Client Name *
             </label>
             <input
+              id="client-name"
               type="text"
               value={addForm.client_name}
               onChange={(e) =>
@@ -229,10 +230,11 @@ export default function AgencyClientsPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
+            <label htmlFor="client-email" className="block text-sm font-medium text-text-secondary mb-1">
               Client Email
             </label>
             <input
+              id="client-email"
               type="email"
               value={addForm.client_email}
               onChange={(e) =>
@@ -243,10 +245,11 @@ export default function AgencyClientsPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
+            <label htmlFor="project" className="block text-sm font-medium text-text-secondary mb-1">
               Project *
             </label>
             <select
+              id="project"
               value={addForm.project_id}
               onChange={(e) =>
                 setAddForm({ ...addForm, project_id: e.target.value })

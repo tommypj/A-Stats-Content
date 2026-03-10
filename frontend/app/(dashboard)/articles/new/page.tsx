@@ -235,10 +235,11 @@ function NewArticleContent() {
                   <h4 className="text-sm font-medium text-text-primary mb-3">Writing Style</h4>
                   <div className="grid gap-3 md:grid-cols-3">
                     <div>
-                      <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                      <label htmlFor="gen-style" className="block text-xs font-medium text-text-secondary mb-1.5">
                         Style
                       </label>
                       <select
+                        id="gen-style"
                         value={writingStyle}
                         onChange={(e) => setWritingStyle(e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all text-sm"
@@ -251,10 +252,11 @@ function NewArticleContent() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                      <label htmlFor="gen-voice" className="block text-xs font-medium text-text-secondary mb-1.5">
                         Voice
                       </label>
                       <select
+                        id="gen-voice"
                         value={voice}
                         onChange={(e) => setVoice(e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all text-sm"
@@ -266,10 +268,11 @@ function NewArticleContent() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                      <label htmlFor="gen-list-usage" className="block text-xs font-medium text-text-secondary mb-1.5">
                         List Usage
                       </label>
                       <select
+                        id="gen-list-usage"
                         value={listUsage}
                         onChange={(e) => setListUsage(e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all text-sm"
@@ -284,10 +287,11 @@ function NewArticleContent() {
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                    <label htmlFor="gen-tone" className="block text-xs font-medium text-text-secondary mb-1.5">
                       Tone (optional override)
                     </label>
                     <select
+                      id="gen-tone"
                       value={tone}
                       onChange={(e) => setTone(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all text-sm"
@@ -302,10 +306,11 @@ function NewArticleContent() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                    <label htmlFor="gen-audience" className="block text-xs font-medium text-text-secondary mb-1.5">
                       Target Audience (optional override)
                     </label>
                     <input
+                      id="gen-audience"
                       type="text"
                       value={targetAudience}
                       onChange={(e) => setTargetAudience(e.target.value)}
@@ -316,10 +321,11 @@ function NewArticleContent() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                  <label htmlFor="gen-custom-instructions" className="block text-xs font-medium text-text-secondary mb-1.5">
                     Custom Instructions (optional)
                   </label>
                   <textarea
+                    id="gen-custom-instructions"
                     value={customInstructions}
                     onChange={(e) => setCustomInstructions(e.target.value)}
                     placeholder="e.g., Include a personal anecdote in the introduction. Reference recent 2025 studies. Avoid medical disclaimers."
@@ -334,10 +340,11 @@ function NewArticleContent() {
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                    <label htmlFor="gen-secondary-keywords" className="block text-xs font-medium text-text-secondary mb-1.5">
                       Secondary Keywords (optional)
                     </label>
                     <input
+                      id="gen-secondary-keywords"
                       type="text"
                       value={secondaryKeywords}
                       onChange={(e) => setSecondaryKeywords(e.target.value)}
@@ -347,10 +354,11 @@ function NewArticleContent() {
                     <p className="text-xs text-text-muted mt-1">Comma-separated, max 10</p>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                    <label htmlFor="gen-entities" className="block text-xs font-medium text-text-secondary mb-1.5">
                       Entities (optional)
                     </label>
                     <input
+                      id="gen-entities"
                       type="text"
                       value={entities}
                       onChange={(e) => setEntities(e.target.value)}
@@ -380,10 +388,11 @@ function NewArticleContent() {
         // Manual Creation
         <Card className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+            <label htmlFor="manual-title" className="block text-sm font-medium text-text-secondary mb-1.5">
               Article Title *
             </label>
             <input
+              id="manual-title"
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -393,10 +402,11 @@ function NewArticleContent() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+            <label htmlFor="manual-keyword" className="block text-sm font-medium text-text-secondary mb-1.5">
               Target Keyword *
             </label>
             <input
+              id="manual-keyword"
               type="text"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
@@ -406,10 +416,11 @@ function NewArticleContent() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+            <label htmlFor="manual-meta-desc" className="block text-sm font-medium text-text-secondary mb-1.5">
               Meta Description
             </label>
             <textarea
+              id="manual-meta-desc"
               value={metaDescription}
               onChange={(e) => setMetaDescription(e.target.value)}
               placeholder="SEO meta description (150-160 characters)"
@@ -423,10 +434,11 @@ function NewArticleContent() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+            <label htmlFor="manual-content" className="block text-sm font-medium text-text-secondary mb-1.5">
               Content (optional)
             </label>
             <textarea
+              id="manual-content"
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="Write your article content in Markdown format..."

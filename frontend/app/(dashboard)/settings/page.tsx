@@ -140,10 +140,10 @@ function ProfileSection({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-text-secondary mb-1">Email</label>
+          <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-1">Email</label>
           <div className="flex items-center gap-2">
             {/* FE-AUTH-10: readOnly prevents DevTools bypass; save payload never includes email */}
-            <Input value={profile?.email || ""} disabled readOnly className="bg-surface-secondary" />
+            <Input id="email" value={profile?.email || ""} disabled readOnly className="bg-surface-secondary" />
             {profile?.email_verified ? (
               <span className="flex items-center gap-1 text-xs text-green-600">
                 <CheckCircle className="h-3.5 w-3.5" /> Verified
@@ -157,8 +157,8 @@ function ProfileSection({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-text-secondary mb-1">Name</label>
-          <Input
+          <label htmlFor="profile-name" className="block text-sm font-medium text-text-secondary mb-1">Name</label>
+          <Input id="profile-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Your name"
@@ -167,10 +167,10 @@ function ProfileSection({
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
+            <label htmlFor="profile-language" className="block text-sm font-medium text-text-secondary mb-1">
               Language
             </label>
-            <select
+            <select id="profile-language"
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
               className="w-full rounded-xl border border-surface-tertiary bg-surface px-3 py-2 text-sm"
@@ -183,10 +183,10 @@ function ProfileSection({
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
+            <label htmlFor="profile-timezone" className="block text-sm font-medium text-text-secondary mb-1">
               Timezone
             </label>
-            <select
+            <select id="profile-timezone"
               value={timezone}
               onChange={(e) => setTimezone(e.target.value)}
               className="w-full rounded-xl border border-surface-tertiary bg-surface px-3 py-2 text-sm"
@@ -264,10 +264,10 @@ function PasswordSection({
 
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-text-secondary mb-1">
+          <label htmlFor="current-password" className="block text-sm font-medium text-text-secondary mb-1">
             Current Password
           </label>
-          <Input
+          <Input id="current-password"
             type="password"
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
@@ -275,10 +275,10 @@ function PasswordSection({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-text-secondary mb-1">
+          <label htmlFor="new-password" className="block text-sm font-medium text-text-secondary mb-1">
             New Password
           </label>
-          <Input
+          <Input id="new-password"
             type="password"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
@@ -286,10 +286,10 @@ function PasswordSection({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-text-secondary mb-1">
+          <label htmlFor="confirm-new-password" className="block text-sm font-medium text-text-secondary mb-1">
             Confirm New Password
           </label>
-          <Input
+          <Input id="confirm-new-password"
             type="password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
@@ -437,12 +437,12 @@ function DeleteAccountDialog({
 
           {/* Confirmation input */}
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
+            <label htmlFor="confirm-delete-account" className="block text-sm font-medium text-text-secondary mb-1">
               Type{" "}
               <span className="font-mono font-semibold text-red-600">{DELETE_PHRASE}</span> to
               confirm
             </label>
-            <Input
+            <Input id="confirm-delete-account"
               ref={inputRef}
               value={typed}
               onChange={(e) => setTyped(e.target.value)}

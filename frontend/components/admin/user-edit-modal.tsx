@@ -62,10 +62,11 @@ export function UserEditModal({ user, onClose, onSuccess }: UserEditModalProps) 
           )}
 
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+            <label htmlFor="user-role" className="block text-sm font-medium text-text-secondary mb-1.5">
               Role
             </label>
             <select
+              id="user-role"
               value={role}
               onChange={(e) => setRole(e.target.value)}
               className="w-full rounded-xl border border-surface-tertiary bg-surface px-4 py-2.5 text-sm text-text-primary focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
@@ -77,10 +78,11 @@ export function UserEditModal({ user, onClose, onSuccess }: UserEditModalProps) 
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+            <label htmlFor="user-subscription-tier" className="block text-sm font-medium text-text-secondary mb-1.5">
               Subscription Tier
             </label>
             <select
+              id="user-subscription-tier"
               value={subscriptionTier}
               onChange={(e) => setSubscriptionTier(e.target.value)}
               className="w-full rounded-xl border border-surface-tertiary bg-surface px-4 py-2.5 text-sm text-text-primary focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
@@ -106,10 +108,11 @@ export function UserEditModal({ user, onClose, onSuccess }: UserEditModalProps) 
 
           {isSuspended && (
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              <label htmlFor="user-suspension-reason" className="block text-sm font-medium text-text-secondary mb-1.5">
                 Suspension Reason
               </label>
               <textarea
+                id="user-suspension-reason"
                 value={suspensionReason}
                 onChange={(e) => setSuspensionReason(e.target.value)}
                 placeholder="Enter reason for suspension..."

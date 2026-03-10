@@ -198,13 +198,14 @@ export default function BrandVoicePage() {
       <Card className="p-6 space-y-6">
         {/* Tone */}
         <div className="space-y-1.5">
-          <label className="block text-sm font-medium text-text-primary">
+          <label htmlFor="tone" className="block text-sm font-medium text-text-primary">
             Tone
           </label>
           <p className="text-xs text-text-secondary">
             The overall tone used when generating outlines and articles.
           </p>
           <select
+            id="tone"
             value={tone}
             onChange={(e) => setTone(e.target.value)}
             className="w-full px-3 py-2 text-sm rounded-lg border border-surface-tertiary bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -219,13 +220,14 @@ export default function BrandVoicePage() {
 
         {/* Writing style */}
         <div className="space-y-1.5">
-          <label className="block text-sm font-medium text-text-primary">
+          <label htmlFor="writing-style" className="block text-sm font-medium text-text-primary">
             Writing Style
           </label>
           <p className="text-xs text-text-secondary">
             The structural approach and rhetorical style of generated content.
           </p>
           <select
+            id="writing-style"
             value={writingStyle}
             onChange={(e) => setWritingStyle(e.target.value)}
             className="w-full px-3 py-2 text-sm rounded-lg border border-surface-tertiary bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -240,13 +242,14 @@ export default function BrandVoicePage() {
 
         {/* Target audience */}
         <div className="space-y-1.5">
-          <label className="block text-sm font-medium text-text-primary">
+          <label htmlFor="target-audience" className="block text-sm font-medium text-text-primary">
             Target Audience
           </label>
           <p className="text-xs text-text-secondary">
             Describe who the content is written for (e.g., "marketing professionals", "first-time home buyers").
           </p>
           <Input
+            id="target-audience"
             type="text"
             value={targetAudience}
             onChange={(e) => setTargetAudience(e.target.value)}
@@ -257,13 +260,14 @@ export default function BrandVoicePage() {
 
         {/* Language */}
         <div className="space-y-1.5">
-          <label className="block text-sm font-medium text-text-primary">
+          <label htmlFor="default-language" className="block text-sm font-medium text-text-primary">
             Default Language
           </label>
           <p className="text-xs text-text-secondary">
             When set, this overrides the per-article language selection.
           </p>
           <select
+            id="default-language"
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
             className="w-full px-3 py-2 text-sm rounded-lg border border-surface-tertiary bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -279,7 +283,7 @@ export default function BrandVoicePage() {
         {/* Custom instructions */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <label className="block text-sm font-medium text-text-primary">
+            <label htmlFor="brand-custom-instructions" className="block text-sm font-medium text-text-primary">
               Custom Instructions
             </label>
             <span
@@ -296,6 +300,7 @@ export default function BrandVoicePage() {
             Any additional instructions to pass to the AI when generating content for this project.
           </p>
           <textarea
+            id="brand-custom-instructions"
             value={customInstructions}
             onChange={(e) => setCustomInstructions(e.target.value)}
             placeholder="e.g., Always cite at least two statistics. Avoid jargon. Use the Oxford comma."

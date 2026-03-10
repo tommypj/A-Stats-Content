@@ -501,10 +501,11 @@ export default function ClientDetailPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-text-muted mb-1">
+                    <label htmlFor="report-type" className="block text-xs font-medium text-text-muted mb-1">
                       Report Type
                     </label>
                     <select
+                      id="report-type"
                       value={reportForm.report_type}
                       onChange={(e) =>
                         setReportForm((prev) => ({ ...prev, report_type: e.target.value }))
@@ -519,10 +520,11 @@ export default function ClientDetailPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-text-muted mb-1">
+                    <label htmlFor="client-template" className="block text-xs font-medium text-text-muted mb-1">
                       Template (optional)
                     </label>
                     <select
+                      id="client-template"
                       value={reportForm.report_template_id}
                       onChange={(e) =>
                         setReportForm((prev) => ({
@@ -542,10 +544,11 @@ export default function ClientDetailPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-text-muted mb-1">
+                    <label htmlFor="period-start" className="block text-xs font-medium text-text-muted mb-1">
                       Period Start
                     </label>
                     <input
+                      id="period-start"
                       type="date"
                       value={reportForm.period_start}
                       onChange={(e) =>
@@ -559,10 +562,11 @@ export default function ClientDetailPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-text-muted mb-1">
+                    <label htmlFor="period-end" className="block text-xs font-medium text-text-muted mb-1">
                       Period End
                     </label>
                     <input
+                      id="period-end"
                       type="date"
                       value={reportForm.period_end}
                       onChange={(e) =>

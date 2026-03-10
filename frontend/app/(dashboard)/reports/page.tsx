@@ -302,10 +302,11 @@ export default function ReportsPage() {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
+            <label htmlFor="report-name" className="block text-sm font-medium text-text-secondary mb-1">
               Report Name *
             </label>
             <input
+              id="report-name"
               type="text"
               value={form.name}
               onChange={(e) =>
@@ -317,10 +318,11 @@ export default function ReportsPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
+            <label htmlFor="report-type" className="block text-sm font-medium text-text-secondary mb-1">
               Report Type
             </label>
             <select
+              id="report-type"
               value={form.report_type}
               onChange={(e) =>
                 setForm((f) => ({ ...f, report_type: e.target.value }))
@@ -337,10 +339,11 @@ export default function ReportsPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1">
+              <label htmlFor="from" className="block text-sm font-medium text-text-secondary mb-1">
                 From
               </label>
               <input
+                id="from"
                 type="date"
                 value={form.date_from || ""}
                 onChange={(e) =>
@@ -353,10 +356,11 @@ export default function ReportsPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1">
+              <label htmlFor="to" className="block text-sm font-medium text-text-secondary mb-1">
                 To
               </label>
               <input
+                id="to"
                 type="date"
                 value={form.date_to || ""}
                 onChange={(e) =>
@@ -371,10 +375,11 @@ export default function ReportsPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
+            <label htmlFor="description" className="block text-sm font-medium text-text-secondary mb-1">
               Description
             </label>
             <input
+              id="description"
               type="text"
               value={form.description || ""}
               onChange={(e) =>

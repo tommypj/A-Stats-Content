@@ -84,10 +84,11 @@ export function SuspendUserModal({
           )}
 
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+            <label htmlFor="suspension-reason" className="block text-sm font-medium text-text-secondary mb-1.5">
               Reason for Suspension *
             </label>
             <textarea
+              id="suspension-reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Enter a detailed reason for suspending this account..."

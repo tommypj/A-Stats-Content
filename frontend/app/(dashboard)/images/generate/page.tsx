@@ -253,10 +253,11 @@ function GenerateImageContent() {
         <Card className="p-6">
           <form onSubmit={handleGenerate} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
+              <label htmlFor="image-prompt" className="block text-sm font-medium text-text-secondary mb-2">
                 Image Prompt *
               </label>
               <textarea
+                id="image-prompt"
                 value={prompt}
                 onChange={(e) => {
                   setPrompt(e.target.value);
@@ -279,10 +280,11 @@ function GenerateImageContent() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">
+                <label htmlFor="style" className="block text-sm font-medium text-text-secondary mb-2">
                   Style
                 </label>
                 <select
+                  id="style"
                   value={style}
                   onChange={(e) => setStyle(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all"
@@ -296,10 +298,11 @@ function GenerateImageContent() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">
+                <label htmlFor="size" className="block text-sm font-medium text-text-secondary mb-2">
                   Size
                 </label>
                 <select
+                  id="size"
                   value={size}
                   onChange={(e) => setSize(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all"
@@ -314,10 +317,11 @@ function GenerateImageContent() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
+              <label htmlFor="link-article" className="block text-sm font-medium text-text-secondary mb-2">
                 Link to Article (Optional)
               </label>
               <select
+                id="link-article"
                 value={articleId}
                 onChange={(e) => setArticleId(e.target.value)}
                 disabled={loadingArticles}

@@ -257,10 +257,11 @@ export default function ConversionGoalsPage() {
           <CardContent className="space-y-4">
             {/* Name */}
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-text-primary">
+              <label htmlFor="goal-name" className="block text-sm font-medium text-text-primary">
                 Goal Name <span className="text-red-500">*</span>
               </label>
               <input
+                id="goal-name"
                 type="text"
                 value={formData.name}
                 onChange={(e) =>
@@ -273,10 +274,11 @@ export default function ConversionGoalsPage() {
 
             {/* Goal Type */}
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-text-primary">
+              <label htmlFor="goal-type" className="block text-sm font-medium text-text-primary">
                 Goal Type
               </label>
               <select
+                id="goal-type"
                 value={formData.goal_type}
                 onChange={(e) => handleGoalTypeChange(e.target.value)}
                 className="w-full px-3 py-2 border border-surface-tertiary rounded-xl text-sm text-text-primary bg-surface focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -291,11 +293,12 @@ export default function ConversionGoalsPage() {
 
             {/* Goal Config */}
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-text-primary">
+              <label htmlFor="goal-config-json" className="block text-sm font-medium text-text-primary">
                 Goal Config{" "}
                 <span className="text-text-muted font-normal">(JSON)</span>
               </label>
               <textarea
+                id="goal-config-json"
                 value={formData.goal_config}
                 onChange={(e) => handleConfigChange(e.target.value)}
                 rows={6}

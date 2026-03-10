@@ -504,10 +504,11 @@ export default function IntegrationsSettingsPage() {
                     </div>
                   ) : gscAvailableSites.length > 0 ? (
                     <div className="space-y-3">
-                      <label className="block text-sm font-medium text-text-primary">
+                      <label htmlFor="gsc-site-select" className="block text-sm font-medium text-text-primary">
                         Select a site to track
                       </label>
                       <select
+                        id="gsc-site-select"
                         value={gscSelectedSite}
                         onChange={(e) => setGscSelectedSite(e.target.value)}
                         className="w-full rounded-lg border border-surface-tertiary bg-surface px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"

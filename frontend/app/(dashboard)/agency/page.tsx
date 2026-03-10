@@ -239,10 +239,11 @@ export default function AgencyPage() {
         <Card>
           <CardContent className="p-6 space-y-4">
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1">
+              <label htmlFor="agency-name" className="block text-xs font-medium text-text-secondary mb-1">
                 Agency Name <span className="text-red-500">*</span>
               </label>
               <input
+                id="agency-name"
                 type="text"
                 value={setupForm.agency_name}
                 onChange={(e) =>
@@ -254,10 +255,11 @@ export default function AgencyPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1">
+              <label htmlFor="contact-email" className="block text-xs font-medium text-text-secondary mb-1">
                 Contact Email
               </label>
               <input
+                id="contact-email"
                 type="email"
                 value={setupForm.contact_email}
                 onChange={(e) =>
@@ -269,10 +271,11 @@ export default function AgencyPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1">
+              <label htmlFor="logo-url" className="block text-xs font-medium text-text-secondary mb-1">
                 Logo URL
               </label>
               <input
+                id="logo-url"
                 type="url"
                 value={setupForm.logo_url}
                 onChange={(e) =>
@@ -478,10 +481,11 @@ export default function AgencyPage() {
         <div className="space-y-4">
           {/* Project selector */}
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">
+            <label htmlFor="project" className="block text-xs font-medium text-text-secondary mb-1">
               Project <span className="text-red-500">*</span>
             </label>
             <select
+              id="project"
               value={clientForm.project_id}
               onChange={(e) =>
                 setClientForm((p) => ({ ...p, project_id: e.target.value }))
@@ -498,10 +502,11 @@ export default function AgencyPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">
+            <label htmlFor="client-name" className="block text-xs font-medium text-text-secondary mb-1">
               Client Name <span className="text-red-500">*</span>
             </label>
             <input
+              id="client-name"
               type="text"
               value={clientForm.client_name}
               onChange={(e) =>
@@ -513,10 +518,11 @@ export default function AgencyPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">
+            <label htmlFor="client-email" className="block text-xs font-medium text-text-secondary mb-1">
               Client Email
             </label>
             <input
+              id="client-email"
               type="email"
               value={clientForm.client_email}
               onChange={(e) =>

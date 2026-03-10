@@ -409,8 +409,9 @@ export default function AdminArticlesPage() {
             </p>
 
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">Category (optional)</label>
+              <label htmlFor="admin-article-category" className="block text-sm font-medium text-text-primary mb-1">Category (optional)</label>
               <select
+                id="admin-article-category"
                 value={pushCategoryId}
                 onChange={e => setPushCategoryId(e.target.value)}
                 className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"

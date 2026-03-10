@@ -541,30 +541,33 @@ export default function ProjectSettingsPage() {
                   ) : (
                     <div className="space-y-3 p-4 bg-surface-secondary rounded-xl">
                       <div>
-                        <label className="block text-sm font-medium text-text-secondary mb-1">
+                        <label htmlFor="site-url" className="block text-sm font-medium text-text-secondary mb-1">
                           Site URL
                         </label>
                         <Input
+                          id="site-url"
                           value={wpFormSiteUrl}
                           onChange={(e) => setWpFormSiteUrl(e.target.value)}
                           placeholder="https://yoursite.com"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-text-secondary mb-1">
+                        <label htmlFor="username" className="block text-sm font-medium text-text-secondary mb-1">
                           Username
                         </label>
                         <Input
+                          id="username"
                           value={wpFormUsername}
                           onChange={(e) => setWpFormUsername(e.target.value)}
                           placeholder="WordPress username"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-text-secondary mb-1">
+                        <label htmlFor="application-password" className="block text-sm font-medium text-text-secondary mb-1">
                           Application Password
                         </label>
                         <Input
+                          id="application-password"
                           type="password"
                           value={wpFormAppPassword}
                           onChange={(e) => setWpFormAppPassword(e.target.value)}
