@@ -327,10 +327,11 @@ export default function OutlineDetailPage() {
             {expandedSections.has(index) && (
               <div className="p-4 border-t border-surface-tertiary space-y-4 bg-surface-secondary/30">
                 <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                  <label htmlFor="section-heading-h2" className="block text-sm font-medium text-text-secondary mb-1.5">
                     Section Heading (H2)
                   </label>
                   <input
+                    id="section-heading-h2"
                     type="text"
                     value={section.heading}
                     onChange={(e) => updateSection(index, { heading: e.target.value })}
@@ -339,10 +340,11 @@ export default function OutlineDetailPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                  <label htmlFor="subheadings-h3-one-per-line" className="block text-sm font-medium text-text-secondary mb-1.5">
                     Subheadings (H3) - one per line
                   </label>
                   <textarea
+                    id="subheadings-h3-one-per-line"
                     value={section.subheadings?.join("\n") || ""}
                     onChange={(e) =>
                       updateSection(index, {
@@ -356,10 +358,11 @@ export default function OutlineDetailPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                  <label htmlFor="content-notes" className="block text-sm font-medium text-text-secondary mb-1.5">
                     Content Notes
                   </label>
                   <textarea
+                    id="content-notes"
                     value={section.notes || ""}
                     onChange={(e) => updateSection(index, { notes: e.target.value })}
                     rows={2}
@@ -369,10 +372,11 @@ export default function OutlineDetailPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                  <label htmlFor="target-word-count" className="block text-sm font-medium text-text-secondary mb-1.5">
                     Target Word Count
                   </label>
                   <input
+                    id="target-word-count"
                     type="number"
                     value={section.word_count_target}
                     onChange={(e) =>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -13,8 +13,9 @@ import {
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { api, parseApiError, KnowledgeStats, KnowledgeSource } from "@/lib/api";
+import { api, parseApiError, KnowledgeSource } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,57 +26,66 @@ import { TierGate } from "@/components/ui/tier-gate";
 
 export default function KnowledgePage() {
   const router = useRouter();
-  const [stats, setStats] = useState<KnowledgeStats | null>(null);
-  const [recentSources, setRecentSources] = useState<KnowledgeSource[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   // Track previous source statuses so we can detect completed transitions
   const prevStatusesRef = useRef<Record<string, string>>({});
 
-  const loadData = useCallback(async (silent = false) => {
-    try {
-      if (!silent) setIsLoading(true);
-      const [statsData, sourcesResponse] = await Promise.all([
-        api.knowledge.stats(),
-        api.knowledge.sources({ page: 1, page_size: 5 }),
-      ]);
-      setStats(statsData);
+  const {
+    data: stats,
+    isLoading: statsLoading,
+  } = useQuery({
+    queryKey: ["knowledge", "stats"],
+    queryFn: () => api.knowledge.stats(),
+    staleTime: 30_000,
+  });
 
-      // Detect processing → completed transitions and toast
-      const incoming = sourcesResponse.items;
-      const prev = prevStatusesRef.current;
-      incoming.forEach((s) => {
-        if (prev[s.id] && prev[s.id] !== "completed" && s.status === "completed") {
-          toast.success(`"${s.title}" indexed and ready`);
-        }
-      });
-      prevStatusesRef.current = Object.fromEntries(incoming.map((s) => [s.id, s.status]));
+  const {
+    data: sourcesData,
+    isLoading: sourcesLoading,
+    error: sourcesError,
+  } = useQuery({
+    queryKey: ["knowledge", "sources", { page: 1, page_size: 5 }],
+    queryFn: () => api.knowledge.sources({ page: 1, page_size: 5 }),
+    staleTime: 30_000,
+    refetchInterval: (query) => {
+      const items = query.state.data?.items;
+      if (!items) return false;
+      const hasActive = items.some(
+        (s: KnowledgeSource) => s.status === "pending" || s.status === "processing"
+      );
+      return hasActive ? 5000 : false;
+    },
+  });
 
-      setRecentSources(incoming);
-    } catch (error) {
-      if (!silent) {
-        const apiError = parseApiError(error);
-        toast.error(apiError.message || "Failed to load knowledge vault data");
+  const recentSources = sourcesData?.items ?? [];
+  const isLoading = statsLoading || sourcesLoading;
+
+  // Detect processing → completed transitions and toast
+  useEffect(() => {
+    if (!sourcesData?.items) return;
+    const incoming = sourcesData.items;
+    const prev = prevStatusesRef.current;
+    incoming.forEach((s: KnowledgeSource) => {
+      if (prev[s.id] && prev[s.id] !== "completed" && s.status === "completed") {
+        toast.success(`"${s.title}" indexed and ready`);
       }
-    } finally {
-      if (!silent) setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  // Poll every 5 s while any source is pending/processing
-  useEffect(() => {
-    const hasActive = recentSources.some(
-      (s) => s.status === "pending" || s.status === "processing"
+    });
+    prevStatusesRef.current = Object.fromEntries(
+      incoming.map((s: KnowledgeSource) => [s.id, s.status])
     );
-    if (!hasActive) return;
+  }, [sourcesData]);
 
-    const interval = setInterval(() => loadData(true), 5000);
-    return () => clearInterval(interval);
-  }, [recentSources, loadData]);
+  // Show error toast on initial load failure
+  useEffect(() => {
+    if (sourcesError) {
+      toast.error(parseApiError(sourcesError).message || "Failed to load knowledge vault data");
+    }
+  }, [sourcesError]);
+
+  const handleUploadSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ["knowledge"] });
+  };
 
   const handleQuickQuery = (query: string) => {
     router.push(`/knowledge/query?q=${encodeURIComponent(query)}`);
@@ -291,7 +301,7 @@ export default function KnowledgePage() {
       <UploadModal
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
-        onSuccess={loadData}
+        onSuccess={handleUploadSuccess}
       />
     </div>
     </TierGate>

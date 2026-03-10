@@ -621,10 +621,11 @@ function CreateOutlineModal({
         /* Normal form view */
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+            <label htmlFor="target-keyword" className="block text-sm font-medium text-text-secondary mb-1.5">
               Target Keyword *
             </label>
             <input
+              id="target-keyword"
               type="text"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
@@ -634,10 +635,11 @@ function CreateOutlineModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+            <label htmlFor="target-audience" className="block text-sm font-medium text-text-secondary mb-1.5">
               Target Audience
             </label>
             <input
+              id="target-audience"
               type="text"
               value={targetAudience}
               onChange={(e) => setTargetAudience(e.target.value)}
@@ -648,10 +650,11 @@ function CreateOutlineModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              <label htmlFor="tone" className="block text-sm font-medium text-text-secondary mb-1.5">
                 Tone
               </label>
               <select
+                id="tone"
                 value={tone}
                 onChange={(e) => setTone(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all"
@@ -665,10 +668,11 @@ function CreateOutlineModal({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              <label htmlFor="word-count" className="block text-sm font-medium text-text-secondary mb-1.5">
                 Word Count
               </label>
               <select
+                id="word-count"
                 value={wordCount}
                 onChange={(e) => setWordCount(Number(e.target.value))}
                 className="w-full px-4 py-2.5 rounded-xl border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all"

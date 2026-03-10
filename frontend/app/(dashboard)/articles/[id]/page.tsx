@@ -134,10 +134,11 @@ function WordCountWidget({ content, target, onTargetChange }: WordCountWidgetPro
 
       {/* Target input */}
       <div>
-        <label className="block text-xs font-medium text-text-secondary mb-1">
+        <label htmlFor="target-word-count" className="block text-xs font-medium text-text-secondary mb-1">
           Target word count
         </label>
         <input
+          id="target-word-count"
           type="number"
           min={0}
           placeholder="e.g. 1500"
@@ -1447,10 +1448,11 @@ export default function ArticleEditorPage() {
         <div className="lg:col-span-2 space-y-4 min-w-0">
           <Card className="p-4 space-y-4 overflow-hidden">
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              <label htmlFor="article-title" className="block text-sm font-medium text-text-secondary mb-1.5">
                 Title
               </label>
               <input
+                id="article-title"
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -1460,10 +1462,11 @@ export default function ArticleEditorPage() {
 
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                <label htmlFor="article-keyword" className="block text-sm font-medium text-text-secondary mb-1.5">
                   Target Keyword
                 </label>
                 <input
+                  id="article-keyword"
                   type="text"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
@@ -1471,13 +1474,14 @@ export default function ArticleEditorPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                <label htmlFor="article-meta-description" className="block text-sm font-medium text-text-secondary mb-1.5">
                   Meta Description
                   <span className="text-text-muted ml-2">
                     ({metaDescription.length}/160)
                   </span>
                 </label>
                 <input
+                  id="article-meta-description"
                   type="text"
                   value={metaDescription}
                   onChange={(e) => setMetaDescription(e.target.value)}

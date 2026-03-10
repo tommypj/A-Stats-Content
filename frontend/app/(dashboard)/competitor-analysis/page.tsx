@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   Search,
@@ -16,8 +16,9 @@ import {
   Target,
   Plus,
 } from "lucide-react";
-import { api, CompetitorAnalysis, CompetitorAnalysisDetail, KeywordAggregation, KeywordGapItem } from "@/lib/api";
+import { api, parseApiError, CompetitorAnalysis, CompetitorAnalysisDetail, KeywordAggregation, KeywordGapItem } from "@/lib/api";
 import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { clsx } from "clsx";
@@ -26,21 +27,6 @@ import { TierGate } from "@/components/ui/tier-gate";
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function parseApiError(err: unknown): { message: string } {
-  if (err && typeof err === "object") {
-    const e = err as Record<string, unknown>;
-    if (typeof e.message === "string") return { message: e.message };
-    if (e.response && typeof e.response === "object") {
-      const r = e.response as Record<string, unknown>;
-      if (r.data && typeof r.data === "object") {
-        const d = r.data as Record<string, unknown>;
-        if (typeof d.detail === "string") return { message: d.detail };
-      }
-    }
-  }
-  return { message: "An unexpected error occurred." };
-}
 
 function statusBadge(status: string) {
   const classes = clsx(
@@ -87,18 +73,17 @@ function formatDate(iso: string) {
 type Tab = "keywords" | "gaps" | "articles";
 
 function KeywordsTab({ analysisId }: { analysisId: string }) {
-  const [keywords, setKeywords] = useState<KeywordAggregation[]>([]);
-  const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    setLoading(true);
-    api.competitors
-      .keywords(analysisId)
-      .then((data) => setKeywords(data.keywords))
-      .catch((err) => toast.error(parseApiError(err).message))
-      .finally(() => setLoading(false));
-  }, [analysisId]);
+  const { data: keywords = [], isLoading: loading } = useQuery({
+    queryKey: ["competitors", "keywords", analysisId],
+    queryFn: async () => {
+      const data = await api.competitors.keywords(analysisId);
+      return data.keywords;
+    },
+    staleTime: 30_000,
+    meta: { errorToast: true },
+  });
 
   function toggle(keyword: string) {
     setExpanded((prev) => {
@@ -173,17 +158,15 @@ function KeywordsTab({ analysisId }: { analysisId: string }) {
 }
 
 function GapsTab({ analysisId }: { analysisId: string }) {
-  const [gaps, setGaps] = useState<KeywordGapItem[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    api.competitors
-      .gaps(analysisId)
-      .then((data) => setGaps(data.gaps))
-      .catch((err) => toast.error(parseApiError(err).message))
-      .finally(() => setLoading(false));
-  }, [analysisId]);
+  const { data: gaps = [], isLoading: loading } = useQuery({
+    queryKey: ["competitors", "gaps", analysisId],
+    queryFn: async () => {
+      const data = await api.competitors.gaps(analysisId);
+      return data.gaps;
+    },
+    staleTime: 30_000,
+    meta: { errorToast: true },
+  });
 
   if (loading) {
     return (
@@ -322,17 +305,13 @@ function ArticlesTab({ detail }: { detail: CompetitorAnalysisDetail }) {
 // ---------------------------------------------------------------------------
 
 export default function CompetitorAnalysisPage() {
-  // History list
-  const [analyses, setAnalyses] = useState<CompetitorAnalysis[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   // Input state
   const [domain, setDomain] = useState("");
-  const [submitting, setSubmitting] = useState(false);
 
   // Selected analysis
-  const [selected, setSelected] = useState<CompetitorAnalysisDetail | null>(null);
-  const [selectedLoading, setSelectedLoading] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // Active tab in results view
   const [activeTab, setActiveTab] = useState<Tab>("keywords");
@@ -344,34 +323,21 @@ export default function CompetitorAnalysisPage() {
   // Data fetching
   // ---------------------------------------------------------------------------
 
-  const loadHistory = useCallback(async () => {
-    try {
+  const { data: analyses = [], isLoading: historyLoading } = useQuery({
+    queryKey: ["competitors", "list"],
+    queryFn: async () => {
       const data = await api.competitors.list(1, 20);
-      setAnalyses(data.items);
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setHistoryLoading(false);
-    }
-  }, []);
+      return data.items;
+    },
+    staleTime: 30_000,
+  });
 
-  useEffect(() => {
-    loadHistory();
-  }, [loadHistory]);
-
-  const loadDetail = useCallback(async (id: string) => {
-    setSelectedLoading(true);
-    try {
-      const data = await api.competitors.get(id);
-      setSelected(data);
-      return data;
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-      return null;
-    } finally {
-      setSelectedLoading(false);
-    }
-  }, []);
+  const { data: selected = null, isLoading: selectedLoading } = useQuery({
+    queryKey: ["competitors", "detail", selectedId],
+    queryFn: () => api.competitors.get(selectedId!),
+    enabled: !!selectedId,
+    staleTime: 30_000,
+  });
 
   // ---------------------------------------------------------------------------
   // Polling for in-progress analyses
@@ -390,15 +356,19 @@ export default function CompetitorAnalysisPage() {
       pollRef.current = setInterval(async () => {
         try {
           const data = await api.competitors.get(id);
-          setSelected(data);
-          // Update status in history list too
-          setAnalyses((prev) =>
-            prev.map((a) => (a.id === id ? { ...a, status: data.status, scraped_urls: data.scraped_urls } : a))
+          // Update the detail cache
+          queryClient.setQueryData(["competitors", "detail", id], data);
+          // Update status in history list cache too
+          queryClient.setQueryData<CompetitorAnalysis[]>(["competitors", "list"], (prev) =>
+            prev?.map((a) => (a.id === id ? { ...a, status: data.status, scraped_urls: data.scraped_urls } : a))
           );
           if (!isInProgress(data.status)) {
             stopPolling();
             if (data.status === "completed") {
               setActiveTab("keywords");
+              // Invalidate sub-queries so keywords/gaps load fresh
+              queryClient.invalidateQueries({ queryKey: ["competitors", "keywords", id] });
+              queryClient.invalidateQueries({ queryKey: ["competitors", "gaps", id] });
             }
           }
         } catch {
@@ -406,67 +376,87 @@ export default function CompetitorAnalysisPage() {
         }
       }, 3000);
     },
-    [stopPolling]
+    [stopPolling, queryClient]
   );
 
-  useEffect(() => {
-    if (selected && isInProgress(selected.status)) {
-      startPolling(selected.id);
-    } else {
-      stopPolling();
-    }
-    return () => stopPolling();
-  }, [selected?.id, selected?.status, startPolling, stopPolling]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Start/stop polling based on selected analysis status
+  // Using a ref to track what we're currently polling to avoid duplicate intervals
+  const currentPollingId = useRef<string | null>(null);
+  if (selected && isInProgress(selected.status) && currentPollingId.current !== selected.id) {
+    currentPollingId.current = selected.id;
+    startPolling(selected.id);
+  } else if (selected && !isInProgress(selected.status) && currentPollingId.current === selected.id) {
+    currentPollingId.current = null;
+    stopPolling();
+  } else if (!selected && currentPollingId.current) {
+    currentPollingId.current = null;
+    stopPolling();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Mutations
+  // ---------------------------------------------------------------------------
+
+  const analyzeMutation = useMutation({
+    mutationFn: (trimmedDomain: string) => api.competitors.analyze(trimmedDomain),
+    onSuccess: async (analysis, trimmedDomain) => {
+      toast.success(`Analysis started for ${trimmedDomain}`);
+      setDomain("");
+      // Add new analysis to cache at the front
+      queryClient.setQueryData<CompetitorAnalysis[]>(["competitors", "list"], (prev) =>
+        prev ? [analysis, ...prev] : [analysis]
+      );
+      // Select the new analysis
+      setSelectedId(analysis.id);
+      setActiveTab("keywords");
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.competitors.delete(id),
+    onSuccess: (_, id) => {
+      queryClient.setQueryData<CompetitorAnalysis[]>(["competitors", "list"], (prev) =>
+        prev?.filter((a) => a.id !== id)
+      );
+      if (selectedId === id) {
+        setSelectedId(null);
+        stopPolling();
+      }
+      toast.success("Analysis deleted.");
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
 
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
 
-  async function handleAnalyze(e: React.FormEvent) {
+  function handleAnalyze(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = domain.trim();
     if (!trimmed) return;
-    setSubmitting(true);
-    try {
-      const analysis = await api.competitors.analyze(trimmed);
-      toast.success(`Analysis started for ${trimmed}`);
-      setDomain("");
-      setAnalyses((prev) => [analysis, ...prev]);
-      const detail = await loadDetail(analysis.id);
-      if (detail) {
-        setActiveTab("keywords");
-      }
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setSubmitting(false);
-    }
+    analyzeMutation.mutate(trimmed);
   }
 
-  async function handleDelete(id: string, e: React.MouseEvent) {
+  function handleDelete(id: string, e: React.MouseEvent) {
     e.stopPropagation();
-    try {
-      await api.competitors.delete(id);
-      setAnalyses((prev) => prev.filter((a) => a.id !== id));
-      if (selected?.id === id) {
-        setSelected(null);
-        stopPolling();
-      }
-      toast.success("Analysis deleted.");
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    }
+    deleteMutation.mutate(id);
   }
 
-  async function handleSelectAnalysis(analysis: CompetitorAnalysis) {
+  function handleSelectAnalysis(analysis: CompetitorAnalysis) {
     setActiveTab("keywords");
-    await loadDetail(analysis.id);
+    setSelectedId(analysis.id);
   }
 
   function handleBack() {
-    setSelected(null);
+    setSelectedId(null);
     stopPolling();
-    loadHistory();
+    queryClient.invalidateQueries({ queryKey: ["competitors", "list"] });
   }
 
   // ---------------------------------------------------------------------------
@@ -661,7 +651,7 @@ export default function CompetitorAnalysisPage() {
             )}
           </div>
           <button
-            onClick={() => setSelected(null)}
+            onClick={() => setSelectedId(null)}
             className="text-xs text-red-600 hover:text-red-800"
           >
             Dismiss
@@ -681,11 +671,11 @@ export default function CompetitorAnalysisPage() {
               onChange={(e) => setDomain(e.target.value)}
               placeholder="e.g. competitor.com"
               className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-surface-tertiary bg-surface text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-400 transition-colors"
-              disabled={submitting}
+              disabled={analyzeMutation.isPending}
             />
           </div>
-          <Button type="submit" disabled={submitting || !domain.trim()}>
-            {submitting ? (
+          <Button type="submit" disabled={analyzeMutation.isPending || !domain.trim()}>
+            {analyzeMutation.isPending ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 Analyzing...
@@ -768,14 +758,14 @@ export default function CompetitorAnalysisPage() {
 // ---------------------------------------------------------------------------
 
 function GapCountCard({ analysisId }: { analysisId: string }) {
-  const [count, setCount] = useState<number | null>(null);
-
-  useEffect(() => {
-    api.competitors
-      .gaps(analysisId)
-      .then((data) => setCount(data.total_gaps))
-      .catch(() => setCount(null));
-  }, [analysisId]);
+  const { data: count = null } = useQuery({
+    queryKey: ["competitors", "gaps", analysisId, "count"],
+    queryFn: async () => {
+      const data = await api.competitors.gaps(analysisId);
+      return data.total_gaps;
+    },
+    staleTime: 30_000,
+  });
 
   return (
     <Card className="p-4 flex items-center gap-4">

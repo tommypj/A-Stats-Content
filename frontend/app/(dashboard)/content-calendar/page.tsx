@@ -190,12 +190,13 @@ function ScheduleModal({
 
             {/* Time picker */}
             <div>
-              <label className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2 flex items-center gap-1.5">
+              <label htmlFor="publish-time" className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2 flex items-center gap-1.5">
                 <Clock className="h-3.5 w-3.5" />
                 Publish time
               </label>
               <div className="flex items-center gap-2 mt-1">
                 <select
+                  id="publish-time"
                   value={hour}
                   onChange={(e) => setHour(Number(e.target.value))}
                   className="px-3 py-2 rounded-lg border border-surface-tertiary text-sm bg-surface"

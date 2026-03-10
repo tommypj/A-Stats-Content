@@ -177,10 +177,11 @@ export default function BulkContentPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-text-primary mb-1">
+            <label htmlFor="bulk-keywords" className="block text-sm font-medium text-text-primary mb-1">
               Keywords (one per line)
             </label>
             <textarea
+              id="bulk-keywords"
               value={keywords}
               onChange={(e) => setKeywords(e.target.value)}
               placeholder={"best project management tools\nhow to improve team productivity\nremote work best practices"}
@@ -194,10 +195,11 @@ export default function BulkContentPage() {
 
           {templates.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">
+              <label htmlFor="bulk-template" className="block text-sm font-medium text-text-primary mb-1">
                 Template (optional)
               </label>
               <select
+                id="bulk-template"
                 value={templateId}
                 onChange={(e) => setTemplateId(e.target.value)}
                 className="w-full px-3 py-2 border border-surface-tertiary rounded-lg text-sm bg-surface text-text-primary"
