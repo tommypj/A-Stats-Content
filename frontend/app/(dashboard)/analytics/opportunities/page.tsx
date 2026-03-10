@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -14,12 +14,12 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery, useMutation } from "@tanstack/react-query";
 
 import {
   api,
   parseApiError,
   KeywordOpportunity,
-  ContentOpportunitiesResponse,
   ContentSuggestion,
 } from "@/lib/api";
 import { StatCard } from "@/components/analytics/stat-card";
@@ -34,60 +34,50 @@ type Tab = "quick_wins" | "content_gaps" | "rising";
 
 export default function ContentOpportunitiesPage() {
   const router = useRouter();
-  const [isConnected, setIsConnected] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [data, setData] = useState<ContentOpportunitiesResponse | null>(null);
   const [dateRange, setDateRange] = useState(28);
   const [activeTab, setActiveTab] = useState<Tab>("quick_wins");
 
   // Selection & AI suggestions
   const [selectedKeywords, setSelectedKeywords] = useState<Set<string>>(new Set());
   const [suggestions, setSuggestions] = useState<ContentSuggestion[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
 
-  useEffect(() => {
-    checkStatus();
-  }, []);
+  // --- React Query hooks ---
 
-  useEffect(() => {
-    if (isConnected) {
-      loadData();
-    }
-  }, [isConnected, dateRange]);
+  const { data: statusData, isLoading: statusLoading } = useQuery({
+    queryKey: ["analytics", "status"],
+    queryFn: () => api.analytics.status(),
+    staleTime: 60_000,
+  });
 
-  async function checkStatus() {
-    try {
-      setIsLoading(true);
-      const status = await api.analytics.status();
-      setIsConnected(status.connected && !!status.site_url);
-    } catch (error) {
+  const isConnected = statusData?.connected && !!statusData?.site_url;
+
+  const endDate = new Date().toISOString().split("T")[0];
+  const startDate = new Date(Date.now() - dateRange * 86400000).toISOString().split("T")[0];
+
+  const { data, isLoading: dataLoading } = useQuery({
+    queryKey: ["analytics", "opportunities", { start_date: startDate, end_date: endDate }],
+    queryFn: () => api.analytics.opportunities({
+      start_date: startDate,
+      end_date: endDate,
+    }),
+    enabled: !!isConnected,
+    staleTime: 30_000,
+  });
+
+  const isLoading = statusLoading || (isConnected && dataLoading);
+
+  const generateSuggestionsMutation = useMutation({
+    mutationFn: (keywords: string[]) =>
+      api.analytics.suggestContent(keywords, Math.min(keywords.length * 2, 10)),
+    onSuccess: (response) => {
+      setSuggestions(response.suggestions);
+      toast.success(`Generated ${response.suggestions.length} content suggestions`);
+    },
+    onError: (error) => {
       toast.error(parseApiError(error).message);
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function loadData() {
-    try {
-      setIsLoading(true);
-      const endDate = new Date().toISOString().split("T")[0];
-      const startDate = new Date(Date.now() - dateRange * 86400000).toISOString().split("T")[0];
-
-      const response = await api.analytics.opportunities({
-        start_date: startDate,
-        end_date: endDate,
-      });
-      setData(response);
-      setSelectedKeywords(new Set());
-      setSuggestions([]);
-    } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to load opportunities");
-    } finally {
-      setIsLoading(false);
-    }
-  }
+    },
+  });
 
   async function handleConnect() {
     try {
@@ -97,32 +87,17 @@ export default function ContentOpportunitiesPage() {
       localStorage.setItem("gsc_oauth_state_ts", Date.now().toString());
       window.location.href = response.auth_url;
     } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to initiate Google connection");
+      toast.error(parseApiError(error).message);
       setIsConnecting(false);
     }
   }
 
-  async function handleGenerateSuggestions() {
+  function handleGenerateSuggestions() {
     if (selectedKeywords.size === 0) {
       toast.error("Select at least one keyword");
       return;
     }
-
-    try {
-      setIsGenerating(true);
-      const response = await api.analytics.suggestContent(
-        Array.from(selectedKeywords),
-        Math.min(selectedKeywords.size * 2, 10),
-      );
-      setSuggestions(response.suggestions);
-      toast.success(`Generated ${response.suggestions.length} content suggestions`);
-    } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to generate suggestions");
-    } finally {
-      setIsGenerating(false);
-    }
+    generateSuggestionsMutation.mutate(Array.from(selectedKeywords));
   }
 
   function toggleKeyword(keyword: string) {
@@ -167,7 +142,7 @@ export default function ContentOpportunitiesPage() {
       <div className="space-y-6">
         <div>
           <Link href="/analytics" className="text-sm text-primary-600 hover:text-primary-700 mb-4 inline-block">
-            ← Back to Analytics
+            &larr; Back to Analytics
           </Link>
           <h1 className="font-display text-3xl font-bold text-text-primary">Content Opportunities</h1>
           <p className="mt-2 text-text-secondary">
@@ -199,7 +174,7 @@ export default function ContentOpportunitiesPage() {
       {/* Header */}
       <div>
         <Link href="/analytics" className="text-sm text-primary-600 hover:text-primary-700 mb-4 inline-block">
-          ← Back to Analytics
+          &larr; Back to Analytics
         </Link>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
@@ -275,7 +250,7 @@ export default function ContentOpportunitiesPage() {
           </span>
           <Button
             onClick={handleGenerateSuggestions}
-            isLoading={isGenerating}
+            isLoading={generateSuggestionsMutation.isPending}
             leftIcon={<Sparkles className="h-4 w-4" />}
           >
             Get AI Suggestions
@@ -367,7 +342,7 @@ export default function ContentOpportunitiesPage() {
                         {item.has_existing_article ? (
                           <CheckCircle2 className="h-4 w-4 text-green-500 mx-auto" />
                         ) : (
-                          <span className="text-xs text-text-muted">—</span>
+                          <span className="text-xs text-text-muted">&mdash;</span>
                         )}
                       </td>
                       <td className="p-4 text-right">

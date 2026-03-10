@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import {
   Plus,
   Loader2,
@@ -17,6 +17,7 @@ import {
   ArticleTemplate,
   CreateTemplateInput,
 } from "@/lib/api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import {
@@ -53,42 +54,81 @@ const EMPTY_FORM: CreateTemplateInput = {
 export default function TemplatesPage() {
   const { isLoading: authLoading } = useRequireAuth();
   const { currentProject } = useProject();
+  const queryClient = useQueryClient();
 
-  const [templates, setTemplates] = useState<ArticleTemplate[]>([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
-  const [total, setTotal] = useState(0);
   const pageSize = 20;
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<ArticleTemplate | null>(null);
   const [form, setForm] = useState<CreateTemplateInput>(EMPTY_FORM);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
 
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await api.templates.list({
+  // --- React Query hooks ---
+
+  const { data: templatesData, isLoading: loading } = useQuery({
+    queryKey: ["templates", "list", { page, page_size: pageSize, project_id: currentProject?.id }],
+    queryFn: () =>
+      api.templates.list({
         page,
         page_size: pageSize,
         project_id: currentProject?.id,
-      });
-      setTemplates(res.items);
-      setTotalPages(res.pages);
-      setTotal(res.total);
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, currentProject?.id]);
+      }),
+    staleTime: 30_000,
+  });
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  const templates = templatesData?.items ?? [];
+  const totalPages = templatesData?.pages ?? 0;
+  const total = templatesData?.total ?? 0;
+
+  const createMutation = useMutation({
+    mutationFn: (data: CreateTemplateInput) => api.templates.create(data),
+    onSuccess: () => {
+      toast.success("Template created");
+      setShowModal(false);
+      queryClient.invalidateQueries({ queryKey: ["templates"] });
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: CreateTemplateInput }) =>
+      api.templates.update(id, data),
+    onSuccess: () => {
+      toast.success("Template updated");
+      setShowModal(false);
+      queryClient.invalidateQueries({ queryKey: ["templates"] });
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.templates.delete(id),
+    onSuccess: () => {
+      toast.success("Template deleted");
+      queryClient.invalidateQueries({ queryKey: ["templates"] });
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: (data: CreateTemplateInput) => api.templates.create(data),
+    onSuccess: () => {
+      toast.success("Template duplicated");
+      queryClient.invalidateQueries({ queryKey: ["templates"] });
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
+
+  const saving = createMutation.isPending || updateMutation.isPending;
 
   const openCreate = () => {
     setEditing(null);
@@ -113,60 +153,34 @@ export default function TemplatesPage() {
     setShowModal(true);
   };
 
-  const handleDuplicate = async (t: ArticleTemplate) => {
-    try {
-      await api.templates.create({
-        name: `${t.name} (copy)`,
-        description: t.description,
-        project_id: t.project_id,
-        target_audience: t.target_audience,
-        tone: t.tone,
-        word_count_target: t.word_count_target,
-        writing_style: t.writing_style,
-        voice: t.voice,
-        custom_instructions: t.custom_instructions,
-        sections: t.sections,
-      });
-      toast.success("Template duplicated");
-      loadData();
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    }
+  const handleDuplicate = (t: ArticleTemplate) => {
+    duplicateMutation.mutate({
+      name: `${t.name} (copy)`,
+      description: t.description,
+      project_id: t.project_id,
+      target_audience: t.target_audience,
+      tone: t.tone,
+      word_count_target: t.word_count_target,
+      writing_style: t.writing_style,
+      voice: t.voice,
+      custom_instructions: t.custom_instructions,
+      sections: t.sections,
+    });
   };
 
-  const handleDelete = async (id: string) => {
-    setDeleting(id);
-    try {
-      await api.templates.delete(id);
-      toast.success("Template deleted");
-      loadData();
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setDeleting(null);
-    }
+  const handleDelete = (id: string) => {
+    deleteMutation.mutate(id);
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!form.name.trim()) {
       toast.error("Template name is required");
       return;
     }
-    setSaving(true);
-    try {
-      if (editing) {
-        await api.templates.update(editing.id, form);
-        toast.success("Template updated");
-      } else {
-        await api.templates.create(form);
-        toast.success("Template created");
-      }
-      setShowModal(false);
-      loadData();
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setSaving(false);
+    if (editing) {
+      updateMutation.mutate({ id: editing.id, data: form });
+    } else {
+      createMutation.mutate(form);
     }
   };
 
@@ -294,11 +308,11 @@ export default function TemplatesPage() {
                     variant="ghost"
                     size="sm"
                     onClick={() => handleDelete(t.id)}
-                    disabled={deleting === t.id}
+                    disabled={deleteMutation.isPending && deleteMutation.variables === t.id}
                     aria-label="Delete template"
                     className="text-red-500 hover:text-red-600"
                   >
-                    {deleting === t.id ? (
+                    {deleteMutation.isPending && deleteMutation.variables === t.id ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
                       <Trash2 className="h-3.5 w-3.5" />

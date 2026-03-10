@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Plus,
   Loader2,
@@ -12,6 +12,7 @@ import {
   Clock,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   api,
   parseApiError,
@@ -50,52 +51,46 @@ const STATUS_CONFIG: Record<
 export default function ReportsPage() {
   const { isLoading: authLoading } = useRequireAuth();
   const { currentProject } = useProject();
+  const queryClient = useQueryClient();
 
-  const [reports, setReports] = useState<SEOReport[]>([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
-  const [total, setTotal] = useState(0);
   const pageSize = 20;
 
   // Modal
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<CreateReportInput>({ name: "", report_type: "overview" });
-  const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  // Polling for in-progress reports
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // --- React Query hooks ---
 
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await api.reports.list({
+  const reportsQueryKey = ["reports", "list", { page, page_size: pageSize, project_id: currentProject?.id }];
+
+  const { data: reportsData, isLoading: loading } = useQuery({
+    queryKey: reportsQueryKey,
+    queryFn: () =>
+      api.reports.list({
         page,
         page_size: pageSize,
         project_id: currentProject?.id,
-      });
-      setReports(res.items);
-      setTotalPages(res.pages);
-      setTotal(res.total);
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, currentProject?.id]);
+      }),
+    staleTime: 30_000,
+  });
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  const reports = reportsData?.items ?? [];
+  const totalPages = reportsData?.pages ?? 0;
+  const total = reportsData?.total ?? 0;
 
   // Poll while any report is pending/generating
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => {
     const hasInProgress = reports.some(
       (r) => r.status === "pending" || r.status === "generating"
     );
     if (hasInProgress && !pollRef.current) {
-      pollRef.current = setInterval(loadData, 3000);
+      pollRef.current = setInterval(() => {
+        queryClient.invalidateQueries({ queryKey: reportsQueryKey });
+      }, 3000);
     } else if (!hasInProgress && pollRef.current) {
       clearInterval(pollRef.current);
       pollRef.current = null;
@@ -103,41 +98,50 @@ export default function ReportsPage() {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [reports, loadData]);
+  }, [reports, queryClient, reportsQueryKey]);
 
-  const handleCreate = async () => {
+  // --- Mutations ---
+
+  const createMutation = useMutation({
+    mutationFn: (data: CreateReportInput) => api.reports.create(data),
+    onSuccess: () => {
+      toast.success("Report generation started");
+      setShowModal(false);
+      setForm({ name: "", report_type: "overview" });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.reports.delete(id),
+    onSuccess: () => {
+      toast.success("Report deleted");
+      setDeleting(null);
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
+    },
+    onError: (err) => {
+      setDeleting(null);
+      toast.error(parseApiError(err).message);
+    },
+  });
+
+  const handleCreate = () => {
     if (!form.name.trim()) {
       toast.error("Report name is required");
       return;
     }
-    setSaving(true);
-    try {
-      await api.reports.create({
-        ...form,
-        project_id: currentProject?.id,
-      });
-      toast.success("Report generation started");
-      setShowModal(false);
-      setForm({ name: "", report_type: "overview" });
-      loadData();
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setSaving(false);
-    }
+    createMutation.mutate({
+      ...form,
+      project_id: currentProject?.id,
+    });
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     setDeleting(id);
-    try {
-      await api.reports.delete(id);
-      toast.success("Report deleted");
-      loadData();
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setDeleting(null);
-    }
+    deleteMutation.mutate(id);
   };
 
   const handleDownload = (report: SEOReport) => {
@@ -395,8 +399,8 @@ export default function ReportsPage() {
           <Button variant="outline" onClick={() => setShowModal(false)}>
             Cancel
           </Button>
-          <Button onClick={handleCreate} disabled={saving}>
-            {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          <Button onClick={handleCreate} disabled={createMutation.isPending}>
+            {createMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Generate Report
           </Button>
         </div>

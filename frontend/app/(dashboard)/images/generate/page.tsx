@@ -15,7 +15,8 @@ import {
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
-import { api, getImageUrl, parseApiError, GeneratedImage, Article } from "@/lib/api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api, getImageUrl, parseApiError, GeneratedImage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AIGenerationProgress } from "@/components/ui/ai-generation-progress";
@@ -51,19 +52,16 @@ export default function GenerateImagePage() {
 function GenerateImageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const articleIdParam = searchParams.get("article");
 
   const [prompt, setPrompt] = useState("");
   const [style, setStyle] = useState("realistic");
   const [size, setSize] = useState("1024x1024");
   const [articleId, setArticleId] = useState<string>(articleIdParam || "");
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loadingArticles, setLoadingArticles] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<GeneratedImage | null>(null);
   const [error, setError] = useState("");
   const [promptSource, setPromptSource] = useState<"manual" | "article">("manual");
-  const [wpConnected, setWpConnected] = useState(false);
   const [wpUploading, setWpUploading] = useState(false);
   const [wpUploaded, setWpUploaded] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -77,36 +75,49 @@ function GenerateImageContent() {
     };
   }, []);
 
-  useEffect(() => {
-    loadArticles();
-    checkWpConnection();
-  }, []);
+  // --- React Query hooks ---
 
-  async function checkWpConnection() {
-    try {
-      const status = await api.wordpress.status();
-      setWpConnected(status.is_connected);
-    } catch {
-      setWpConnected(false);
-    }
-  }
+  const { data: articlesData, isLoading: loadingArticles } = useQuery({
+    queryKey: ["articles", "list", { page_size: 100 }],
+    queryFn: () => api.articles.list({ page_size: 100 }),
+    staleTime: 30_000,
+  });
 
-  async function handleSendToWordPress() {
-    if (!generatedImage || wpUploading) return;
-    setWpUploading(true);
-    try {
-      await api.wordpress.uploadMedia({
-        image_id: generatedImage.id,
-        alt_text: generatedImage.alt_text || undefined,
-      });
+  const articles = (articlesData?.items ?? []).filter(
+    (a) => a.status === "completed" || a.status === "published"
+  );
+
+  const { data: wpStatus } = useQuery({
+    queryKey: ["wordpress", "status"],
+    queryFn: () => api.wordpress.status(),
+    staleTime: 30_000,
+  });
+
+  const wpConnected = wpStatus?.is_connected ?? false;
+
+  const generateMutation = useMutation({
+    mutationFn: (data: { prompt: string; style: string; width?: number; height?: number; article_id?: string }) =>
+      api.images.generate(data),
+    onSuccess: (image) => {
+      setGeneratedImage(image);
+      pollImageStatus(image.id);
+    },
+    onError: () => {
+      setError("Failed to generate image. Please try again.");
+    },
+  });
+
+  const wpUploadMutation = useMutation({
+    mutationFn: (data: { image_id: string; alt_text?: string }) =>
+      api.wordpress.uploadMedia(data),
+    onSuccess: () => {
       setWpUploaded(true);
       toast.success("Image sent to WordPress!");
-    } catch (err) {
+    },
+    onError: (err) => {
       toast.error(parseApiError(err).message || "Failed to upload to WordPress");
-    } finally {
-      setWpUploading(false);
-    }
-  }
+    },
+  });
 
   // Auto-fill prompt when article selection changes
   useEffect(() => {
@@ -124,53 +135,36 @@ function GenerateImageContent() {
     }
   }, [articleId, articles]);
 
-  async function loadArticles() {
-    try {
-      setLoadingArticles(true);
-      const response = await api.articles.list({ page_size: 100 });
-      setArticles(response.items.filter(a => a.status === "completed" || a.status === "published"));
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setLoadingArticles(false);
-    }
+  function handleSendToWordPress() {
+    if (!generatedImage || wpUploadMutation.isPending) return;
+    wpUploadMutation.mutate({
+      image_id: generatedImage.id,
+      alt_text: generatedImage.alt_text || undefined,
+    });
   }
 
-  async function handleGenerate(e: React.FormEvent) {
+  function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
 
-    if (loading) return;
+    if (generateMutation.isPending) return;
 
     if (!prompt.trim()) {
       setError("Please enter a prompt");
       return;
     }
 
-    setLoading(true);
     setError("");
     setGeneratedImage(null);
     setWpUploaded(false);
 
-    try {
-      const selectedSize = IMAGE_SIZES.find(s => s.value === size);
-      // Endpoint returns 202 immediately with status="generating"
-      const image = await api.images.generate({
-        prompt: prompt.trim(),
-        style,
-        width: selectedSize?.width,
-        height: selectedSize?.height,
-        article_id: articleId || undefined,
-      });
-
-      setGeneratedImage(image);
-
-      // The image is always enqueued as a background task; start polling
-      pollImageStatus(image.id);
-    } catch (err) {
-      setError("Failed to generate image. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+    const selectedSize = IMAGE_SIZES.find(s => s.value === size);
+    generateMutation.mutate({
+      prompt: prompt.trim(),
+      style,
+      width: selectedSize?.width,
+      height: selectedSize?.height,
+      article_id: articleId || undefined,
+    });
   }
 
   function pollImageStatus(imageId: string) {
@@ -191,6 +185,7 @@ function GenerateImageContent() {
 
         if (image.status === "completed") {
           setGeneratedImage(image);
+          queryClient.invalidateQueries({ queryKey: ["images"] });
           if (pollRef.current) clearInterval(pollRef.current);
           pollRef.current = null;
         } else if (image.status === "failed") {
@@ -228,6 +223,8 @@ function GenerateImageContent() {
   function handleSaveAndReturn() {
     router.push("/images");
   }
+
+  const loading = generateMutation.isPending;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -457,10 +454,10 @@ function GenerateImageContent() {
                   <Button
                     variant="outline"
                     onClick={handleSendToWordPress}
-                    disabled={wpUploading || wpUploaded}
+                    disabled={wpUploadMutation.isPending || wpUploaded}
                     className="col-span-2"
                   >
-                    {wpUploading ? (
+                    {wpUploadMutation.isPending ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         Uploading...

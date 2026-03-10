@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { FileText, ArrowLeft, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api, parseApiError, GeneratedReport, ClientWorkspace } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -79,43 +80,40 @@ function EmptyState() {
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
 export default function AgencyReportsPage() {
-  const [reports, setReports] = useState<GeneratedReport[]>([]);
-  const [clients, setClients] = useState<Map<string, ClientWorkspace>>(new Map());
-  const [loading, setLoading] = useState(true);
-
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [totalPages, setTotalPages] = useState(0);
-  const [total, setTotal] = useState(0);
 
   // Load clients once so we can display client names
-  useEffect(() => {
-    api.agency.clients().then((res) => {
-      const map = new Map<string, ClientWorkspace>();
-      res.items.forEach((c) => map.set(c.id, c));
-      setClients(map);
-    }).catch(() => {
-      // Non-fatal — client names will just show the raw ID as fallback
-    });
-  }, []);
+  const { data: clientsData } = useQuery({
+    queryKey: ["agency", "clients"],
+    queryFn: () => api.agency.clients(),
+    staleTime: 30_000,
+  });
 
-  const loadReports = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await api.agency.reports({ page, page_size: pageSize });
-      setReports(res.items);
-      setTotal(res.total);
-      setTotalPages(res.pages);
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, pageSize]);
+  const clientsMap = useMemo(() => {
+    const map = new Map<string, ClientWorkspace>();
+    clientsData?.items.forEach((c) => map.set(c.id, c));
+    return map;
+  }, [clientsData]);
 
-  useEffect(() => {
-    loadReports();
-  }, [loadReports]);
+  // Load reports with pagination
+  const {
+    data: reportsData,
+    isLoading: loading,
+  } = useQuery({
+    queryKey: ["agency", "reports", { page, page_size: pageSize }],
+    queryFn: () => api.agency.reports({ page, page_size: pageSize }),
+    staleTime: 30_000,
+    meta: {
+      onError: (err: unknown) => {
+        toast.error(parseApiError(err).message);
+      },
+    },
+  });
+
+  const reports = reportsData?.items ?? [];
+  const total = reportsData?.total ?? 0;
+  const totalPages = reportsData?.pages ?? 0;
 
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);
@@ -123,7 +121,7 @@ export default function AgencyReportsPage() {
   };
 
   const clientName = (workspaceId: string): string => {
-    return clients.get(workspaceId)?.client_name ?? workspaceId;
+    return clientsMap.get(workspaceId)?.client_name ?? workspaceId;
   };
 
   return (

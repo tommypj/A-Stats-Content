@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, SocialAccount, parseApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -22,7 +23,7 @@ const DRAFT_KEY = "social_compose_draft";
 
 export default function ComposePage() {
   const router = useRouter();
-  const [accounts, setAccounts] = useState<SocialAccount[]>([]);
+  const queryClient = useQueryClient();
   const [content, setContent] = useState("");
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
@@ -36,10 +37,9 @@ export default function ComposePage() {
       return "America/New_York";
     }
   });
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [accountsInitialised, setAccountsInitialised] = useState(false);
   const blobUrlsRef = useRef<string[]>([]);
 
   // Revoke all blob URLs on unmount to prevent memory leaks
@@ -82,46 +82,65 @@ export default function ComposePage() {
     return () => clearTimeout(timer);
   }, [content, selectedAccountIds, scheduledAt, timezone]);
 
+  // --- React Query: fetch accounts ---
+
+  const { data: accountsData, isLoading: loading } = useQuery({
+    queryKey: ["social", "accounts"],
+    queryFn: () => api.social.accounts(),
+    staleTime: 30_000,
+    select: (res) => res.accounts.filter((a) => a.is_active),
+  });
+
+  const accounts: SocialAccount[] = accountsData ?? [];
+
+  // Initialise selectedAccountIds once accounts arrive
   useEffect(() => {
-    loadAccounts();
-  }, []);
+    if (accountsInitialised || accounts.length === 0) return;
+    setAccountsInitialised(true);
 
-  const loadAccounts = async () => {
+    const connectedIds = accounts.map((a) => a.id);
     try {
-      setLoading(true);
-      const res = await api.social.accounts();
-      const connected = res.accounts.filter((a) => a.is_active);
-      setAccounts(connected);
-
-      // Restore draft account selection, or auto-select all connected
-      const connectedIds = connected.map((a) => a.id);
-      try {
-        const raw = localStorage.getItem(DRAFT_KEY);
-        if (raw) {
-          const draft = JSON.parse(raw);
-          if (Array.isArray(draft.selectedAccountIds)) {
-            const valid = draft.selectedAccountIds.filter((id: string) => connectedIds.includes(id));
-            if (valid.length > 0) {
-              setSelectedAccountIds(valid);
-              if (valid.length < draft.selectedAccountIds.length) {
-                toast.warning("Some accounts from your draft are no longer connected and were removed.");
-              }
-              return;
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const draft = JSON.parse(raw);
+        if (Array.isArray(draft.selectedAccountIds)) {
+          const valid = draft.selectedAccountIds.filter((id: string) => connectedIds.includes(id));
+          if (valid.length > 0) {
+            setSelectedAccountIds(valid);
+            if (valid.length < draft.selectedAccountIds.length) {
+              toast.warning("Some accounts from your draft are no longer connected and were removed.");
             }
+            return;
           }
         }
-      } catch {
-        // ignore
       }
-      setSelectedAccountIds(connectedIds);
-    } catch (err) {
-      setError(parseApiError(err).message);
-    } finally {
-      setLoading(false);
+    } catch {
+      // ignore
     }
-  };
+    setSelectedAccountIds(connectedIds);
+  }, [accounts, accountsInitialised]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // --- React Query: create post mutation ---
+
+  const createPostMutation = useMutation({
+    mutationFn: (data: Parameters<typeof api.social.createPost>[0]) =>
+      api.social.createPost(data),
+    onSuccess: () => {
+      localStorage.removeItem(DRAFT_KEY);
+      setSuccess(true);
+      queryClient.invalidateQueries({ queryKey: ["social", "posts"] });
+      setTimeout(() => {
+        router.push("/social");
+      }, 2000);
+    },
+    onError: (err) => {
+      setError(parseApiError(err).message);
+    },
+  });
+
+  const submitting = createPostMutation.isPending;
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(false);
@@ -137,36 +156,22 @@ export default function ComposePage() {
       return;
     }
 
-    try {
-      setSubmitting(true);
-
-      // Filter out blob: URLs — only send actual remote URLs to the backend
-      const remoteMediaUrls = mediaUrls.filter((url) => !url.startsWith("blob:"));
-      const blobCount = mediaUrls.length - remoteMediaUrls.length;
-      if (blobCount > 0) {
-        toast.error("Image upload failed — post will be sent without images");
-      }
-
-      await api.social.createPost({
-        content,
-        media_urls: remoteMediaUrls.length > 0 ? remoteMediaUrls : undefined,
-        scheduled_at: scheduledAt,
-        platforms: accounts
-          .filter((a) => selectedAccountIds.includes(a.id))
-          .map((a) => a.platform),
-        account_ids: selectedAccountIds,
-      });
-
-      localStorage.removeItem(DRAFT_KEY);
-      setSuccess(true);
-      setTimeout(() => {
-        router.push("/social");
-      }, 2000);
-    } catch (err) {
-      setError(parseApiError(err).message);
-    } finally {
-      setSubmitting(false);
+    // Filter out blob: URLs — only send actual remote URLs to the backend
+    const remoteMediaUrls = mediaUrls.filter((url) => !url.startsWith("blob:"));
+    const blobCount = mediaUrls.length - remoteMediaUrls.length;
+    if (blobCount > 0) {
+      toast.error("Image upload failed — post will be sent without images");
     }
+
+    createPostMutation.mutate({
+      content,
+      media_urls: remoteMediaUrls.length > 0 ? remoteMediaUrls : undefined,
+      scheduled_at: scheduledAt,
+      platforms: accounts
+        .filter((a) => selectedAccountIds.includes(a.id))
+        .map((a) => a.platform),
+      account_ids: selectedAccountIds,
+    });
   };
 
   const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

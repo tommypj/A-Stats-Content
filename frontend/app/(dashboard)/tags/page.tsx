@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { Plus, Loader2, Pencil, Trash2, Tag as TagIcon } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, parseApiError, Tag, CreateTagInput } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -20,35 +21,55 @@ const PRESET_COLORS = [
 export default function TagsPage() {
   const { isLoading: authLoading } = useRequireAuth();
   const { currentProject } = useProject();
-
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Tag | null>(null);
   const [form, setForm] = useState<CreateTagInput>({ name: "", color: "#6366f1" });
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
 
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await api.tags.list({
+  const tagsQueryKey = ["tags", "list", { project_id: currentProject?.id }];
+
+  const { data: tagsData, isLoading: loading } = useQuery({
+    queryKey: tagsQueryKey,
+    queryFn: () =>
+      api.tags.list({
         page_size: 100,
         project_id: currentProject?.id,
-      });
-      setTags(res.items);
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setLoading(false);
-    }
-  }, [currentProject?.id]);
+      }),
+    staleTime: 30_000,
+  });
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  const tags = tagsData?.items ?? [];
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (editing) {
+        return api.tags.update(editing.id, { name: form.name, color: form.color });
+      } else {
+        return api.tags.create(form);
+      }
+    },
+    onSuccess: () => {
+      toast.success(editing ? "Tag updated" : "Tag created");
+      setShowModal(false);
+      queryClient.invalidateQueries({ queryKey: ["tags"] });
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.tags.delete(id),
+    onSuccess: () => {
+      toast.success("Tag deleted");
+      queryClient.invalidateQueries({ queryKey: ["tags"] });
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
 
   const openCreate = () => {
     setEditing(null);
@@ -62,40 +83,16 @@ export default function TagsPage() {
     setShowModal(true);
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!form.name.trim()) {
       toast.error("Tag name is required");
       return;
     }
-    setSaving(true);
-    try {
-      if (editing) {
-        await api.tags.update(editing.id, { name: form.name, color: form.color });
-        toast.success("Tag updated");
-      } else {
-        await api.tags.create(form);
-        toast.success("Tag created");
-      }
-      setShowModal(false);
-      loadData();
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setSaving(false);
-    }
+    saveMutation.mutate();
   };
 
-  const handleDelete = async (id: string) => {
-    setDeleting(id);
-    try {
-      await api.tags.delete(id);
-      toast.success("Tag deleted");
-      loadData();
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setDeleting(null);
-    }
+  const handleDelete = (id: string) => {
+    deleteMutation.mutate(id);
   };
 
   if (authLoading) return null;
@@ -159,11 +156,11 @@ export default function TagsPage() {
                 </button>
                 <button
                   onClick={() => handleDelete(t.id)}
-                  disabled={deleting === t.id}
+                  disabled={deleteMutation.isPending && deleteMutation.variables === t.id}
                   className="p-1 text-text-muted hover:text-red-500 rounded"
                   aria-label="Delete tag"
                 >
-                  {deleting === t.id ? (
+                  {deleteMutation.isPending && deleteMutation.variables === t.id ? (
                     <Loader2 className="h-3 w-3 animate-spin" />
                   ) : (
                     <Trash2 className="h-3 w-3" />
@@ -240,8 +237,8 @@ export default function TagsPage() {
           <Button variant="outline" onClick={() => setShowModal(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          <Button onClick={handleSave} disabled={saveMutation.isPending}>
+            {saveMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             {editing ? "Save Changes" : "Create Tag"}
           </Button>
         </div>

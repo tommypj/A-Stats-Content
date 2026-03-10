@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -23,6 +23,7 @@ import {
   X,
   RefreshCw,
 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, getImageUrl, parseApiError, GeneratedImage } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -59,12 +60,11 @@ const IMAGE_SIZES = [
 const PAGE_SIZE = 20;
 
 export default function ImagesPage() {
-  const [images, setImages] = useState<GeneratedImage[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<GeneratedImage | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [wpConnected, setWpConnected] = useState(false);
   const [wpUploading, setWpUploading] = useState<string | null>(null);
   const [wpUploaded, setWpUploaded] = useState<Set<string>>(new Set());
   const [wpError, setWpError] = useState("");
@@ -83,8 +83,6 @@ export default function ImagesPage() {
   // Pagination state
   const [page, setPage] = useState(1);
   const [pageSize] = useState(PAGE_SIZE);
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalCount, setTotalCount] = useState(0);
 
   // Search / filter state
   // FE-IMAGES-03: Client-side filtering only applies to loaded page — full-text search requires server-side filtering
@@ -105,7 +103,6 @@ export default function ImagesPage() {
 
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string } | null>(null);
 
   // Debounce search input; reset to page 1 when search changes
@@ -127,28 +124,34 @@ export default function ImagesPage() {
     setSelectedIds(new Set());
   }, [page]);
 
-  const loadImages = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await api.images.list({
+  // --- React Query: images list ---
+  const { data: imagesData, isLoading: loading } = useQuery({
+    queryKey: [
+      "images",
+      "list",
+      { page, page_size: pageSize, prompt: debouncedSearch || undefined, style: styleFilter || undefined },
+    ],
+    queryFn: () =>
+      api.images.list({
         page,
         page_size: pageSize,
         ...(debouncedSearch ? { prompt: debouncedSearch } : {}),
         ...(styleFilter ? { style: styleFilter } : {}),
-      });
-      setImages(response.items);
-      setTotalCount(response.total);
-      setTotalPages(Math.ceil(response.total / pageSize));
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, pageSize, debouncedSearch, styleFilter]);
+      }),
+    staleTime: 30_000,
+  });
 
-  useEffect(() => {
-    loadImages();
-  }, [loadImages]);
+  const images = imagesData?.items ?? [];
+  const totalCount = imagesData?.total ?? 0;
+  const totalPages = totalCount > 0 ? Math.ceil(totalCount / pageSize) : 0;
+
+  // --- React Query: WordPress connection status ---
+  const { data: wpStatus } = useQuery({
+    queryKey: ["wordpress", "status"],
+    queryFn: () => api.wordpress.status(),
+    staleTime: 30_000,
+  });
+  const wpConnected = wpStatus?.is_connected ?? false;
 
   // Close image modal on Escape key
   useEffect(() => {
@@ -159,10 +162,6 @@ export default function ImagesPage() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedImage]);
-
-  useEffect(() => {
-    checkWpConnection();
-  }, []);
 
   // Server-side filtering — images already filtered by API
   const filteredImages = images;
@@ -177,17 +176,34 @@ export default function ImagesPage() {
   const pageStart = (page - 1) * pageSize + 1;
   const pageEnd = Math.min(page * pageSize, totalCount);
 
+  // --- Mutations ---
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.images.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["images"] });
+    },
+    onError: (error) => {
+      toast.error(parseApiError(error).message);
+    },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) => api.images.bulkDelete(ids),
+    onSuccess: () => {
+      setSelectedIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["images"] });
+    },
+    onError: (error) => {
+      toast.error(parseApiError(error).message);
+    },
+  });
+
   function handleDelete(id: string) {
     setActiveMenu(null);
     setConfirmAction({
-      action: async () => {
-        try {
-          await api.images.delete(id);
-          setImages((prev) => prev.filter((img) => img.id !== id));
-          setTotalCount((prev) => prev - 1);
-        } catch (error) {
-          toast.error(parseApiError(error).message);
-        }
+      action: () => {
+        deleteMutation.mutate(id);
       },
       title: "Delete Image",
       message: "Are you sure you want to delete this image? This action cannot be undone.",
@@ -217,15 +233,6 @@ export default function ImagesPage() {
     link.click();
     document.body.removeChild(link);
     setActiveMenu(null);
-  }
-
-  async function checkWpConnection() {
-    try {
-      const status = await api.wordpress.status();
-      setWpConnected(status.is_connected);
-    } catch {
-      setWpConnected(false);
-    }
   }
 
   async function handleSendToWordPress(image: GeneratedImage) {
@@ -284,17 +291,8 @@ export default function ImagesPage() {
   function handleBulkDelete() {
     const count = selectedIds.size;
     setConfirmAction({
-      action: async () => {
-        setIsBulkDeleting(true);
-        try {
-          await api.images.bulkDelete(Array.from(selectedIds));
-          setSelectedIds(new Set());
-          await loadImages();
-        } catch (error) {
-          toast.error(parseApiError(error).message);
-        } finally {
-          setIsBulkDeleting(false);
-        }
+      action: () => {
+        bulkDeleteMutation.mutate(Array.from(selectedIds));
       },
       title: `Delete ${count} Image${count !== 1 ? "s" : ""}`,
       message: `Delete ${count} image${count !== 1 ? "s" : ""}? This cannot be undone.`,
@@ -366,7 +364,7 @@ export default function ImagesPage() {
             setRegenLoading(false);
             setRegenImage(null);
             toast.success("New image generated!");
-            loadImages();
+            queryClient.invalidateQueries({ queryKey: ["images"] });
           } else if (updated.status === "failed" || attempts >= 90) {
             if (regenPollRef.current) clearInterval(regenPollRef.current);
             regenPollRef.current = null;
@@ -460,10 +458,10 @@ export default function ImagesPage() {
             </button>
             <button
               onClick={handleBulkDelete}
-              disabled={isBulkDeleting}
+              disabled={bulkDeleteMutation.isPending}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {isBulkDeleting ? (
+              {bulkDeleteMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Trash2 className="h-4 w-4" />

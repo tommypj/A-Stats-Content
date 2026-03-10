@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   ArrowUpDown,
@@ -15,12 +15,12 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 
 import {
   api,
   parseApiError,
   PagePerformance,
-  PagePerformanceListResponse,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,57 +33,37 @@ type SortField = "page_url" | "clicks" | "impressions" | "ctr" | "position";
 type SortOrder = "asc" | "desc";
 
 export default function PagesPage() {
-  const [isConnected, setIsConnected] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [pages, setPages] = useState<PagePerformance[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<SortField>("clicks");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const pageSize = 20;
 
-  useEffect(() => {
-    checkStatus();
-  }, []);
+  // --- React Query hooks ---
 
-  useEffect(() => {
-    if (isConnected) {
-      loadPages();
-    }
-  }, [isConnected, currentPage]);
+  const { data: statusData, isLoading: statusLoading } = useQuery({
+    queryKey: ["analytics", "status"],
+    queryFn: () => api.analytics.status(),
+    staleTime: 60_000,
+  });
 
-  async function checkStatus() {
-    try {
-      setIsLoading(true);
-      const status = await api.analytics.status();
-      setIsConnected(status.connected);
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  const isConnected = !!statusData?.connected;
 
-  async function loadPages() {
-    try {
-      setIsLoading(true);
-      const response: PagePerformanceListResponse = await api.analytics.pages({
-        page: currentPage,
-        page_size: pageSize,
-      });
-      setPages(response.items);
-      setTotalPages(response.pages);
-      setTotal(response.total);
-    } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to load pages");
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  const { data: pagesData, isLoading: pagesLoading } = useQuery({
+    queryKey: ["analytics", "pages", { page: currentPage, page_size: pageSize }],
+    queryFn: () => api.analytics.pages({
+      page: currentPage,
+      page_size: pageSize,
+    }),
+    enabled: isConnected,
+    staleTime: 30_000,
+  });
+
+  const pages = pagesData?.items ?? [];
+  const totalPages = pagesData?.pages ?? 1;
+  const total = pagesData?.total ?? 0;
+  const isLoading = statusLoading || (isConnected && pagesLoading);
 
   async function handleConnect() {
     try {
@@ -93,8 +73,7 @@ export default function PagesPage() {
       localStorage.setItem("gsc_oauth_state_ts", Date.now().toString());
       window.location.href = response.auth_url;
     } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to initiate Google connection");
+      toast.error(parseApiError(error).message);
       setIsConnecting(false);
     }
   }
@@ -189,7 +168,7 @@ export default function PagesPage() {
             href="/analytics"
             className="text-sm text-primary-600 hover:text-primary-700 mb-4 inline-block"
           >
-            ← Back to Analytics
+            &larr; Back to Analytics
           </Link>
           <h1 className="font-display text-3xl font-bold text-text-primary">
             Page Performance
@@ -214,7 +193,7 @@ export default function PagesPage() {
           href="/analytics"
           className="text-sm text-primary-600 hover:text-primary-700 mb-4 inline-block"
         >
-          ← Back to Analytics
+          &larr; Back to Analytics
         </Link>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>

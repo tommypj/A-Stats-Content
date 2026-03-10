@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -19,12 +19,11 @@ import {
   Clock,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
   api,
   parseApiError,
-  ArticlePerformanceDetailResponse,
-  URLInspectionResponse,
 } from "@/lib/api";
 import { StatCard } from "@/components/analytics/stat-card";
 import { PerformanceChart } from "@/components/analytics/performance-chart";
@@ -37,55 +36,42 @@ import { TierGate } from "@/components/ui/tier-gate";
 export default function ArticlePerformanceDetailPage() {
   const params = useParams();
   const articleId = params.id as string;
+  const queryClient = useQueryClient();
 
-  const [isConnected, setIsConnected] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [data, setData] = useState<ArticlePerformanceDetailResponse | null>(null);
   const [dateRange, setDateRange] = useState(28);
-  const [indexStatus, setIndexStatus] = useState<URLInspectionResponse | null>(null);
-  const [isCheckingIndex, setIsCheckingIndex] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
 
-  useEffect(() => {
-    checkStatus();
-  }, []);
+  // --- React Query hooks ---
 
-  useEffect(() => {
-    if (isConnected && articleId) {
-      loadData();
-    }
-  }, [isConnected, articleId, dateRange]);
+  const { data: statusData, isLoading: statusLoading } = useQuery({
+    queryKey: ["analytics", "status"],
+    queryFn: () => api.analytics.status(),
+    staleTime: 60_000,
+  });
 
-  async function checkStatus() {
-    try {
-      setIsLoading(true);
-      const status = await api.analytics.status();
-      setIsConnected(status.connected && !!status.site_url);
-    } catch (error) {
+  const isConnected = statusData?.connected && !!statusData?.site_url;
+
+  const endDate = new Date().toISOString().split("T")[0];
+  const startDate = new Date(Date.now() - dateRange * 86400000).toISOString().split("T")[0];
+
+  const { data, isLoading: dataLoading } = useQuery({
+    queryKey: ["analytics", "articlePerformanceDetail", articleId, { start_date: startDate, end_date: endDate }],
+    queryFn: () => api.analytics.articlePerformanceDetail(articleId, {
+      start_date: startDate,
+      end_date: endDate,
+    }),
+    enabled: !!isConnected && !!articleId,
+    staleTime: 30_000,
+  });
+
+  const { data: indexStatus, isPending: isCheckingIndex, mutate: checkIndexStatus } = useMutation({
+    mutationFn: () => api.analytics.articleIndexStatus(articleId),
+    onError: (error) => {
       toast.error(parseApiError(error).message);
-    } finally {
-      setIsLoading(false);
-    }
-  }
+    },
+  });
 
-  async function loadData() {
-    try {
-      setIsLoading(true);
-      const endDate = new Date().toISOString().split("T")[0];
-      const startDate = new Date(Date.now() - dateRange * 86400000).toISOString().split("T")[0];
-
-      const response = await api.analytics.articlePerformanceDetail(articleId, {
-        start_date: startDate,
-        end_date: endDate,
-      });
-      setData(response);
-    } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to load article performance");
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  const isLoading = statusLoading || (isConnected && dataLoading);
 
   async function handleConnect() {
     try {
@@ -95,22 +81,8 @@ export default function ArticlePerformanceDetailPage() {
       localStorage.setItem("gsc_oauth_state_ts", Date.now().toString());
       window.location.href = response.auth_url;
     } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to initiate Google connection");
+      toast.error(parseApiError(error).message);
       setIsConnecting(false);
-    }
-  }
-
-  async function checkIndexStatus() {
-    try {
-      setIsCheckingIndex(true);
-      const result = await api.analytics.articleIndexStatus(articleId);
-      setIndexStatus(result);
-    } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to check index status");
-    } finally {
-      setIsCheckingIndex(false);
     }
   }
 
@@ -137,7 +109,7 @@ export default function ArticlePerformanceDetailPage() {
       <div className="space-y-6">
         <div>
           <Link href="/analytics/articles" className="text-sm text-primary-600 hover:text-primary-700 mb-4 inline-block">
-            ← Back to Article Performance
+            &larr; Back to Article Performance
           </Link>
           <h1 className="font-display text-2xl font-bold text-text-primary">Article Detail</h1>
         </div>
@@ -150,7 +122,7 @@ export default function ArticlePerformanceDetailPage() {
     return (
       <div className="space-y-6">
         <Link href="/analytics/articles" className="text-sm text-primary-600 hover:text-primary-700 mb-4 inline-block">
-          ← Back to Article Performance
+          &larr; Back to Article Performance
         </Link>
         <div className="text-center py-12 text-text-muted">Article not found or has no published URL.</div>
       </div>
@@ -174,7 +146,7 @@ export default function ArticlePerformanceDetailPage() {
       {/* Header */}
       <div>
         <Link href="/analytics/articles" className="text-sm text-primary-600 hover:text-primary-700 mb-4 inline-block">
-          ← Back to Article Performance
+          &larr; Back to Article Performance
         </Link>
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div className="flex-1 min-w-0">
@@ -223,7 +195,7 @@ export default function ArticlePerformanceDetailPage() {
                   <p className="text-xs text-text-muted">Check if this page is indexed by Google</p>
                 </div>
               </div>
-              <Button variant="outline" size="sm" onClick={checkIndexStatus}>
+              <Button variant="outline" size="sm" onClick={() => checkIndexStatus()}>
                 Check Status
               </Button>
             </div>
@@ -256,7 +228,7 @@ export default function ArticlePerformanceDetailPage() {
                     )}
                   </div>
                 </div>
-                <Button variant="ghost" size="sm" onClick={checkIndexStatus}>
+                <Button variant="ghost" size="sm" onClick={() => checkIndexStatus()}>
                   Refresh
                 </Button>
               </div>
@@ -282,7 +254,7 @@ export default function ArticlePerformanceDetailPage() {
                   <div>
                     <p className="text-xs text-text-muted">Crawled As</p>
                     <p className="text-sm font-medium text-text-primary">
-                      {indexStatus.crawled_as ? indexStatus.crawled_as.replace("_", " ") : "—"}
+                      {indexStatus.crawled_as ? indexStatus.crawled_as.replace("_", " ") : "\u2014"}
                     </p>
                   </div>
                 </div>
@@ -299,7 +271,7 @@ export default function ArticlePerformanceDetailPage() {
                       ? "Passed"
                       : indexStatus.mobile_usability_verdict === "FAIL"
                       ? "Issues Found"
-                      : "—"}
+                      : "\u2014"}
                   </p>
                 </div>
                 <div>
@@ -315,7 +287,7 @@ export default function ArticlePerformanceDetailPage() {
                       ? "Eligible"
                       : indexStatus.rich_results_verdict === "FAIL"
                       ? "Not Eligible"
-                      : "—"}
+                      : "\u2014"}
                   </p>
                 </div>
               </div>
