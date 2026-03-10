@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, BrandVoiceSettings, parseApiError } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,18 +63,9 @@ const LANGUAGE_OPTIONS = [
 const MAX_CUSTOM_INSTRUCTIONS = 500;
 
 export default function BrandVoicePage() {
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const queryClient = useQueryClient();
   const [saved, setSaved] = useState(false);
-  const [error, setError] = useState("");
-  const [noProject, setNoProject] = useState(false);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
-    };
-  }, []);
 
   // Form state
   const [tone, setTone] = useState("");
@@ -82,60 +74,62 @@ export default function BrandVoicePage() {
   const [customInstructions, setCustomInstructions] = useState("");
   const [language, setLanguage] = useState("");
 
+  // --- React Query hooks ---
+
+  const { data: brandVoiceData, isLoading: loading, error: queryError } = useQuery({
+    queryKey: ["projects", "brand-voice"],
+    queryFn: () => api.projects.getBrandVoice(),
+    staleTime: 30_000,
+  });
+
+  // Sync fetched data into form state
+  const [formInitialized, setFormInitialized] = useState(false);
   useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
-    try {
-      setLoading(true);
-      setError("");
-      setNoProject(false);
-      const data = await api.projects.getBrandVoice();
-      setTone(data.tone || "");
-      setWritingStyle(data.writing_style || "");
-      setTargetAudience(data.target_audience || "");
-      setCustomInstructions(data.custom_instructions || "");
-      setLanguage(data.language || "");
-    } catch (err) {
-      const parsed = parseApiError(err);
-      // 400 means no project is selected
-      if (parsed.message?.includes("No project selected")) {
-        setNoProject(true);
-      } else {
-        setError(parsed.message || "Failed to load brand voice settings.");
-      }
-    } finally {
-      setLoading(false);
+    if (brandVoiceData && !formInitialized) {
+      setTone(brandVoiceData.tone || "");
+      setWritingStyle(brandVoiceData.writing_style || "");
+      setTargetAudience(brandVoiceData.target_audience || "");
+      setCustomInstructions(brandVoiceData.custom_instructions || "");
+      setLanguage(brandVoiceData.language || "");
+      setFormInitialized(true);
     }
-  };
+  }, [brandVoiceData, formInitialized]);
 
-  const handleSave = async () => {
-    try {
-      setSaving(true);
-      setSaved(false);
-      setError("");
-
-      const payload: BrandVoiceSettings = {};
-      if (tone) payload.tone = tone;
-      if (writingStyle) payload.writing_style = writingStyle;
-      if (targetAudience.trim()) payload.target_audience = targetAudience.trim();
-      if (customInstructions.trim()) payload.custom_instructions = customInstructions.trim();
-      if (language) payload.language = language;
-
-      await api.projects.updateBrandVoice(payload);
+  const saveMutation = useMutation({
+    mutationFn: (payload: BrandVoiceSettings) =>
+      api.projects.updateBrandVoice(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects", "brand-voice"] });
       setSaved(true);
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
       savedTimerRef.current = setTimeout(() => setSaved(false), 3000);
-    } catch (err) {
-      const parsed = parseApiError(err);
-      if (parsed.message?.includes("No project selected")) {
-        setNoProject(true);
-      } else {
-        setError(parsed.message || "Failed to save brand voice settings.");
-      }
-    } finally {
-      setSaving(false);
-    }
+    },
+  });
+
+  const noProject =
+    (queryError && parseApiError(queryError).message?.includes("No project selected")) ||
+    (saveMutation.error && parseApiError(saveMutation.error).message?.includes("No project selected"));
+
+  const error = (() => {
+    if (noProject) return "";
+    if (saveMutation.error) return parseApiError(saveMutation.error).message;
+    if (queryError) return parseApiError(queryError).message;
+    return "";
+  })();
+
+  const saving = saveMutation.isPending;
+
+  const handleSave = () => {
+    setSaved(false);
+
+    const payload: BrandVoiceSettings = {};
+    if (tone) payload.tone = tone;
+    if (writingStyle) payload.writing_style = writingStyle;
+    if (targetAudience.trim()) payload.target_audience = targetAudience.trim();
+    if (customInstructions.trim()) payload.custom_instructions = customInstructions.trim();
+    if (language) payload.language = language;
+
+    saveMutation.mutate(payload);
   };
 
   if (loading) {

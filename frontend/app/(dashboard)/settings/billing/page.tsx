@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, parseApiError, PlanInfo, SubscriptionStatus } from "@/lib/api";
 import { openCheckoutOverlay } from "@/lib/lemonsqueezy";
 import { toast } from "sonner";
@@ -91,87 +92,93 @@ function UsageBar({ label, icon: Icon, used, limit, color }: UsageBarProps) {
 }
 
 export default function BillingPage() {
-  const [plans, setPlans] = useState<PlanInfo[]>([]);
-  const [currentTier, setCurrentTier] = useState("free");
+  const queryClient = useQueryClient();
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">("monthly");
-  const [loading, setLoading] = useState(true);
-  const [cancelling, setCancelling] = useState(false);
-  const [refunding, setRefunding] = useState(false);
   const [showRefundConfirm, setShowRefundConfirm] = useState(false);
-  const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
 
-  useEffect(() => {
-    loadBillingData();
-  }, []);
+  // --- React Query hooks ---
 
-  async function loadBillingData() {
-    try {
-      setLoading(true);
-      const [pricingRes, profileRes, subRes] = await Promise.all([
-        api.billing.pricing().catch(() => null),
-        api.auth.me().catch(() => null),
-        api.billing.subscription().catch(() => null),
-      ]);
+  const { data: pricingRes, isLoading: pricingLoading } = useQuery({
+    queryKey: ["billing", "pricing"],
+    queryFn: () => api.billing.pricing().catch(() => null),
+    staleTime: 30_000,
+  });
 
-      if (pricingRes?.plans) {
-        setPlans(pricingRes.plans);
-      }
-      if (subRes) {
-        setSubscription(subRes);
-        // Prefer subscription tier (most up-to-date after refund/cancel)
-        setCurrentTier(subRes.subscription_tier || "free");
-      } else if (profileRes) {
-        setCurrentTier(profileRes.subscription_tier || "free");
-      }
-    } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to load billing data");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const { data: profileRes } = useQuery({
+    queryKey: ["auth", "me"],
+    queryFn: () => api.auth.me().catch(() => null),
+    staleTime: 30_000,
+  });
 
-  const handleUpgrade = async (tier: string) => {
-    try {
+  const { data: subRes, isLoading: subLoading } = useQuery({
+    queryKey: ["billing", "subscription"],
+    queryFn: () => api.billing.subscription().catch(() => null),
+    staleTime: 30_000,
+  });
+
+  const loading = pricingLoading || subLoading;
+
+  // Derived state
+  const plans: PlanInfo[] = pricingRes?.plans ?? [];
+  const subscription: SubscriptionStatus | null = subRes ?? null;
+  const currentTier = subRes?.subscription_tier || profileRes?.subscription_tier || "free";
+
+  const invalidateBilling = () => {
+    queryClient.invalidateQueries({ queryKey: ["billing"] });
+    queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+  };
+
+  // --- Mutations ---
+
+  const upgradeMutation = useMutation({
+    mutationFn: async (tier: string) => {
       const { checkout_url } = await api.billing.checkout(tier, billingPeriod);
       if (checkout_url) {
         await openCheckoutOverlay(checkout_url, () => {
           toast.success("Subscription activated! Refreshing...");
-          loadBillingData();
+          invalidateBilling();
         });
       }
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-    }
-  };
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
 
-  const handleCancel = async () => {
-    try {
-      setCancelling(true);
-      const result = await api.billing.cancel();
+  const cancelMutation = useMutation({
+    mutationFn: () => api.billing.cancel(),
+    onSuccess: (result) => {
       toast.success(result.message || "Subscription cancelled");
-      await loadBillingData();
-    } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to cancel subscription");
-    } finally {
-      setCancelling(false);
-    }
-  };
+      invalidateBilling();
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message || "Failed to cancel subscription");
+    },
+  });
 
-  const handleRefund = async () => {
-    try {
-      setRefunding(true);
-      const result = await api.billing.refund();
+  const refundMutation = useMutation({
+    mutationFn: () => api.billing.refund(),
+    onSuccess: (result) => {
       toast.success(result.message || "Refund processed successfully");
       setShowRefundConfirm(false);
       // Force full reload to clear all cached state
       window.location.reload();
-    } catch (error) {
-      setRefunding(false);
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to process refund");
-    }
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message || "Failed to process refund");
+    },
+  });
+
+  const handleUpgrade = (tier: string) => {
+    upgradeMutation.mutate(tier);
+  };
+
+  const handleCancel = () => {
+    cancelMutation.mutate();
+  };
+
+  const handleRefund = () => {
+    refundMutation.mutate();
   };
 
   // Derive current plan limits
@@ -259,8 +266,8 @@ export default function BillingPage() {
                   variant="destructive"
                   size="sm"
                   onClick={() => setShowRefundConfirm(true)}
-                  disabled={refunding}
-                  isLoading={refunding}
+                  disabled={refundMutation.isPending}
+                  isLoading={refundMutation.isPending}
                 >
                   Request Refund
                 </Button>
@@ -269,8 +276,8 @@ export default function BillingPage() {
                 variant="outline"
                 size="sm"
                 onClick={handleCancel}
-                disabled={cancelling}
-                isLoading={cancelling}
+                disabled={cancelMutation.isPending}
+                isLoading={cancelMutation.isPending}
                 leftIcon={<AlertTriangle className="h-4 w-4" />}
               >
                 Cancel
@@ -302,8 +309,8 @@ export default function BillingPage() {
                 variant="destructive"
                 size="sm"
                 onClick={handleRefund}
-                disabled={refunding}
-                isLoading={refunding}
+                disabled={refundMutation.isPending}
+                isLoading={refundMutation.isPending}
               >
                 Yes, Refund &amp; Cancel
               </Button>
@@ -311,7 +318,7 @@ export default function BillingPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowRefundConfirm(false)}
-                disabled={refunding}
+                disabled={refundMutation.isPending}
               >
                 Keep Subscription
               </Button>

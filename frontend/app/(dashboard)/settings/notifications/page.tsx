@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { clsx } from "clsx";
 import { toast } from "sonner";
 import {
@@ -12,6 +11,7 @@ import {
   CreditCard as BillingIcon,
   Megaphone,
 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, parseApiError, NotificationPreferences } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
@@ -62,43 +62,42 @@ function ToggleRow({ label, description, icon: Icon, checked, onChange, disabled
 }
 
 export default function NotificationsSettingsPage() {
-  const [prefs, setPrefs] = useState<NotificationPreferences | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    loadPreferences();
-  }, []);
+  const { data: prefs, isLoading: loading } = useQuery({
+    queryKey: ["notifications", "preferences"],
+    queryFn: () => api.notifications.getPreferences(),
+    staleTime: 30_000,
+  });
 
-  async function loadPreferences() {
-    try {
-      setLoading(true);
-      const data = await api.notifications.getPreferences();
-      setPrefs(data);
-    } catch (err) {
-      toast.error(parseApiError(err).message || "Failed to load notification preferences");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleToggle(field: keyof NotificationPreferences, value: boolean) {
-    if (!prefs) return;
-
-    // Optimistic update
-    const prev = { ...prefs };
-    setPrefs({ ...prefs, [field]: value });
-
-    setSaving(true);
-    try {
-      const updated = await api.notifications.updatePreferences({ [field]: value });
-      setPrefs(updated);
-    } catch (err) {
-      setPrefs(prev); // Rollback
+  const { mutate: togglePref, isPending: saving } = useMutation({
+    mutationFn: (update: Partial<NotificationPreferences>) =>
+      api.notifications.updatePreferences(update),
+    onMutate: async (update) => {
+      await queryClient.cancelQueries({ queryKey: ["notifications", "preferences"] });
+      const previous = queryClient.getQueryData<NotificationPreferences>(["notifications", "preferences"]);
+      if (previous) {
+        queryClient.setQueryData<NotificationPreferences>(
+          ["notifications", "preferences"],
+          { ...previous, ...update }
+        );
+      }
+      return { previous };
+    },
+    onError: (err, _update, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["notifications", "preferences"], context.previous);
+      }
       toast.error(parseApiError(err).message || "Failed to update preference");
-    } finally {
-      setSaving(false);
-    }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications", "preferences"] });
+    },
+  });
+
+  function handleToggle(field: keyof NotificationPreferences, value: boolean) {
+    if (!prefs) return;
+    togglePref({ [field]: value });
   }
 
   if (loading) {

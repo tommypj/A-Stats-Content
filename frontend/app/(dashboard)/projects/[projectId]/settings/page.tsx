@@ -1,13 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   api,
-  Project,
-  ProjectMember,
-  ProjectInvitation,
   ProjectUpdateRequest,
   ProjectInvitationCreateRequest,
   ProjectRole,
@@ -59,91 +57,102 @@ export default function ProjectSettingsPage() {
   const router = useRouter();
   const projectId = params.projectId as string;
 
-  const [activeTab, setActiveTab] = useState<Tab>("general");
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
+  const queryClient = useQueryClient();
 
-  // Data state
-  const [project, setProject] = useState<Project | null>(null);
-  const [members, setMembers] = useState<ProjectMember[]>([]);
-  const [invitations, setInvitations] = useState<ProjectInvitation[]>([]);
+  const [activeTab, setActiveTab] = useState<Tab>("general");
 
   // Modal state
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string; confirmLabel?: string; variant?: "danger" | "warning" | "default" } | null>(null);
 
-  // WordPress integration state
-  const [wpConnected, setWpConnected] = useState(false);
-  const [wpSiteUrl, setWpSiteUrl] = useState("");
-  const [wpUsername, setWpUsername] = useState("");
-  const [wpSiteName, setWpSiteName] = useState("");
-  const [wpLoadingStatus, setWpLoadingStatus] = useState(false);
+  // WordPress form state (local only — not fetched data)
   const [showWpForm, setShowWpForm] = useState(false);
   const [wpFormSiteUrl, setWpFormSiteUrl] = useState("");
   const [wpFormUsername, setWpFormUsername] = useState("");
   const [wpFormAppPassword, setWpFormAppPassword] = useState("");
-  const [wpConnecting, setWpConnecting] = useState(false);
-  const [wpDisconnecting, setWpDisconnecting] = useState(false);
   const [wpError, setWpError] = useState("");
 
-  // GSC integration state
-  const [gscConnected, setGscConnected] = useState(false);
-  const [gscSiteUrl, setGscSiteUrl] = useState("");
-  const [gscLastSync, setGscLastSync] = useState("");
-  const [gscLoadingStatus, setGscLoadingStatus] = useState(false);
-  const [gscConnecting, setGscConnecting] = useState(false);
-  const [gscDisconnecting, setGscDisconnecting] = useState(false);
+  // GSC local state
   const [gscError, setGscError] = useState("");
 
-  useEffect(() => {
-    loadProjectData();
-  }, [projectId]);
+  // --- React Query: project data ---
 
-  // Load integrations when the integrations tab becomes active
-  useEffect(() => {
-    if (activeTab === "integrations") {
-      loadWordPressStatus();
-      loadGscStatus();
-    }
-  }, [activeTab]);
+  const projectQueryKey = ["projects", projectId];
+  const membersQueryKey = ["projects", projectId, "members"];
+  const invitationsQueryKey = ["projects", projectId, "invitations"];
 
-  // Re-check GSC status when window regains focus (after OAuth redirect)
-  useEffect(() => {
-    const onFocus = () => {
-      if (activeTab === "integrations" && !gscConnected) {
-        loadGscStatus();
+  const { data: project, isLoading: projectLoading, error: projectError } = useQuery({
+    queryKey: projectQueryKey,
+    queryFn: () => api.projects.get(projectId),
+    staleTime: 30_000,
+  });
+
+  const { data: members = [], isLoading: membersLoading } = useQuery({
+    queryKey: membersQueryKey,
+    queryFn: () => api.projects.members.list(projectId),
+    staleTime: 30_000,
+  });
+
+  const { data: invitations = [], isLoading: invitationsLoading } = useQuery({
+    queryKey: invitationsQueryKey,
+    queryFn: () => api.projects.invitations.list(projectId),
+    staleTime: 30_000,
+  });
+
+  const isLoading = projectLoading || membersLoading || invitationsLoading;
+  const error = projectError ? parseApiError(projectError).message : "";
+
+  // --- React Query: integrations (only when tab is active) ---
+
+  const { data: wpStatus, isLoading: wpLoadingStatus } = useQuery({
+    queryKey: ["wordpress", "status"],
+    queryFn: async () => {
+      try {
+        return await api.wordpress.status();
+      } catch {
+        return { is_connected: false, site_url: "", username: "", site_name: "" };
       }
-    };
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, [activeTab, gscConnected]);
+    },
+    enabled: activeTab === "integrations",
+    staleTime: 30_000,
+  });
 
-  const loadProjectData = async () => {
-    try {
-      setError("");
-      setIsLoading(true);
+  const wpConnected = wpStatus?.is_connected ?? false;
+  const wpSiteUrl = wpStatus?.site_url || "";
+  const wpUsername = wpStatus?.username || "";
+  const wpSiteName = wpStatus?.site_name || "";
 
-      const [projectData, membersData, invitationsData] = await Promise.all([
-        api.projects.get(projectId),
-        api.projects.members.list(projectId),
-        api.projects.invitations.list(projectId),
-      ]);
+  const { data: gscStatus, isLoading: gscLoadingStatus } = useQuery({
+    queryKey: ["gsc", "status"],
+    queryFn: async () => {
+      try {
+        return await api.analytics.status();
+      } catch {
+        return { connected: false, site_url: "", last_sync: "" };
+      }
+    },
+    enabled: activeTab === "integrations",
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+  });
 
-      setProject(projectData);
-      setMembers(membersData);
-      setInvitations(invitationsData);
-    } catch (err) {
-      setError(parseApiError(err).message);
-    } finally {
-      setIsLoading(false);
-    }
+  const gscConnected = gscStatus?.connected ?? false;
+  const gscSiteUrl = gscStatus?.site_url || "";
+  const gscLastSync = gscStatus?.last_sync || "";
+
+  // --- Mutations ---
+
+  const invalidateProjectData = () => {
+    queryClient.invalidateQueries({ queryKey: projectQueryKey });
+    queryClient.invalidateQueries({ queryKey: membersQueryKey });
+    queryClient.invalidateQueries({ queryKey: invitationsQueryKey });
   };
 
   const handleUpdateProject = async (data: ProjectUpdateRequest) => {
     try {
       const updated = await api.projects.update(projectId, data);
-      setProject(updated);
+      queryClient.setQueryData(projectQueryKey, updated);
       toast.success("Project updated successfully!");
     } catch (err) {
       throw new Error(parseApiError(err).message);
@@ -153,92 +162,141 @@ export default function ProjectSettingsPage() {
   const handleUploadLogo = async (file: File) => {
     try {
       const updated = await api.projects.uploadLogo(projectId, file);
-      setProject(updated);
+      queryClient.setQueryData(projectQueryKey, updated);
       toast.success("Logo uploaded successfully!");
     } catch (err) {
       throw new Error(parseApiError(err).message);
     }
   };
 
-  const handleUpdateRole = async (userId: string, role: ProjectRole) => {
-    try {
-      await api.projects.members.update(projectId, userId, { role });
-      await loadProjectData();
+  const updateRoleMutation = useMutation({
+    mutationFn: ({ userId, role }: { userId: string; role: ProjectRole }) =>
+      api.projects.members.update(projectId, userId, { role }),
+    onSuccess: () => {
       toast.success("Member role updated successfully!");
-    } catch (err) {
+      invalidateProjectData();
+    },
+    onError: (err) => {
       toast.error(parseApiError(err).message);
-    }
+    },
+  });
+
+  const handleUpdateRole = async (userId: string, role: ProjectRole) => {
+    updateRoleMutation.mutate({ userId, role });
   };
+
+  const removeMemberMutation = useMutation({
+    mutationFn: ({ userId }: { userId: string; memberName: string }) =>
+      api.projects.members.remove(projectId, userId),
+    onSuccess: (_data, { memberName }) => {
+      toast.success(`${memberName} has been removed from the project`);
+      invalidateProjectData();
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
 
   const handleRemoveMember = async (userId: string, memberName: string) => {
-    try {
-      await api.projects.members.remove(projectId, userId);
-      await loadProjectData();
-      toast.success(`${memberName} has been removed from the project`);
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    }
+    removeMemberMutation.mutate({ userId, memberName });
   };
+
+  const inviteMemberMutation = useMutation({
+    mutationFn: (data: ProjectInvitationCreateRequest) =>
+      api.projects.invitations.create(projectId, data),
+    onSuccess: (_data, variables) => {
+      toast.success(`Invitation sent to ${variables.email}`);
+      invalidateProjectData();
+    },
+    onError: (err) => {
+      throw new Error(parseApiError(err).message);
+    },
+  });
 
   const handleInviteMember = async (data: ProjectInvitationCreateRequest) => {
-    try {
-      await api.projects.invitations.create(projectId, data);
-      await loadProjectData();
-      toast.success(`Invitation sent to ${data.email}`);
-    } catch (err) {
-      throw new Error(parseApiError(err).message);
-    }
+    // The child component expects a thrown error for inline display
+    await inviteMemberMutation.mutateAsync(data);
   };
+
+  const revokeInvitationMutation = useMutation({
+    mutationFn: (invitationId: string) =>
+      api.projects.invitations.revoke(projectId, invitationId),
+    onSuccess: () => {
+      toast.success("Invitation revoked");
+      invalidateProjectData();
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
 
   const handleRevokeInvitation = async (invitationId: string) => {
-    try {
-      await api.projects.invitations.revoke(projectId, invitationId);
-      await loadProjectData();
-      toast.success("Invitation revoked");
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    }
+    revokeInvitationMutation.mutate(invitationId);
   };
+
+  const resendInvitationMutation = useMutation({
+    mutationFn: (invitationId: string) =>
+      api.projects.invitations.resend(projectId, invitationId),
+    onSuccess: () => {
+      toast.success("Invitation resent");
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
 
   const handleResendInvitation = async (invitationId: string) => {
-    try {
-      await api.projects.invitations.resend(projectId, invitationId);
-      toast.success("Invitation resent");
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    }
+    resendInvitationMutation.mutate(invitationId);
   };
 
-  const handleTransferOwnership = async (newOwnerId: string) => {
-    try {
-      await api.projects.transferOwnership(projectId, newOwnerId);
+  const transferOwnershipMutation = useMutation({
+    mutationFn: (newOwnerId: string) =>
+      api.projects.transferOwnership(projectId, newOwnerId),
+    onSuccess: () => {
       router.push("/projects");
       toast.success("Ownership transferred successfully. You are now an Admin.");
-    } catch (err) {
+    },
+    onError: (err) => {
       toast.error(parseApiError(err).message);
-    }
+    },
+  });
+
+  const handleTransferOwnership = async (newOwnerId: string) => {
+    transferOwnershipMutation.mutate(newOwnerId);
   };
 
-  const handleDeleteProject = async () => {
-    try {
-      await api.projects.delete(projectId);
+  const deleteProjectMutation = useMutation({
+    mutationFn: () => api.projects.delete(projectId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
       router.push("/projects");
       toast.success("Project deleted successfully");
-    } catch (err) {
+    },
+    onError: (err) => {
       toast.error(parseApiError(err).message);
-    }
+    },
+  });
+
+  const handleDeleteProject = async () => {
+    deleteProjectMutation.mutate();
   };
+
+  const leaveProjectMutation = useMutation({
+    mutationFn: () => api.projects.leave(projectId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      router.push("/projects");
+      toast.success("You have left the project");
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
 
   const handleLeaveProject = () => {
     setConfirmAction({
-      action: async () => {
-        try {
-          await api.projects.leave(projectId);
-          router.push("/projects");
-          toast.success("You have left the project");
-        } catch (err) {
-          toast.error(parseApiError(err).message);
-        }
+      action: () => {
+        leaveProjectMutation.mutate();
       },
       title: "Leave Project",
       message: "Are you sure you want to leave this project? You will lose access immediately.",
@@ -248,104 +306,85 @@ export default function ProjectSettingsPage() {
   };
 
   // ---------------------------------------------------------------------------
-  // Integrations handlers
+  // Integrations mutations
   // ---------------------------------------------------------------------------
 
-  const loadWordPressStatus = async () => {
-    setWpLoadingStatus(true);
-    try {
-      const status = await api.wordpress.status();
-      setWpConnected(status.is_connected);
-      setWpSiteUrl(status.site_url || "");
-      setWpUsername(status.username || "");
-      setWpSiteName(status.site_name || "");
-    } catch {
-      setWpConnected(false);
-    } finally {
-      setWpLoadingStatus(false);
-    }
-  };
+  const wpConnectMutation = useMutation({
+    mutationFn: () =>
+      api.wordpress.connect({
+        site_url: wpFormSiteUrl,
+        username: wpFormUsername,
+        app_password: wpFormAppPassword,
+      }),
+    onSuccess: () => {
+      setShowWpForm(false);
+      setWpFormSiteUrl("");
+      setWpFormUsername("");
+      setWpFormAppPassword("");
+      setWpError("");
+      queryClient.invalidateQueries({ queryKey: ["wordpress", "status"] });
+    },
+    onError: (err) => {
+      setWpError(parseApiError(err).message);
+    },
+  });
 
-  const handleWpConnect = async () => {
+  const handleWpConnect = () => {
     setWpError("");
     if (!wpFormSiteUrl || !wpFormUsername || !wpFormAppPassword) {
       setWpError("All fields are required");
       return;
     }
-    setWpConnecting(true);
-    try {
-      await api.wordpress.connect({
-        site_url: wpFormSiteUrl,
-        username: wpFormUsername,
-        app_password: wpFormAppPassword,
-      });
-      setShowWpForm(false);
-      setWpFormSiteUrl("");
-      setWpFormUsername("");
-      setWpFormAppPassword("");
-      await loadWordPressStatus();
-    } catch (err) {
+    wpConnectMutation.mutate();
+  };
+
+  const wpDisconnectMutation = useMutation({
+    mutationFn: () => api.wordpress.disconnect(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wordpress", "status"] });
+    },
+    onError: (err) => {
       setWpError(parseApiError(err).message);
-    } finally {
-      setWpConnecting(false);
-    }
+    },
+  });
+
+  const handleWpDisconnect = () => {
+    wpDisconnectMutation.mutate();
   };
 
-  const handleWpDisconnect = async () => {
-    setWpDisconnecting(true);
-    try {
-      await api.wordpress.disconnect();
-      setWpConnected(false);
-      setWpSiteUrl("");
-      setWpUsername("");
-      setWpSiteName("");
-    } catch (err) {
-      setWpError(parseApiError(err).message);
-    } finally {
-      setWpDisconnecting(false);
-    }
-  };
-
-  const loadGscStatus = async () => {
-    setGscLoadingStatus(true);
-    try {
-      const status = await api.analytics.status();
-      setGscConnected(status.connected);
-      setGscSiteUrl(status.site_url || "");
-      setGscLastSync(status.last_sync || "");
-    } catch {
-      setGscConnected(false);
-    } finally {
-      setGscLoadingStatus(false);
-    }
-  };
-
-  const handleGscConnect = async () => {
-    setGscError("");
-    setGscConnecting(true);
-    try {
-      const { auth_url } = await api.analytics.getAuthUrl();
+  const gscConnectMutation = useMutation({
+    mutationFn: () => api.analytics.getAuthUrl(),
+    onSuccess: ({ auth_url }) => {
       window.open(auth_url, "_blank", "noopener,noreferrer");
-    } catch (err) {
+    },
+    onError: (err) => {
       setGscError(parseApiError(err).message);
-    } finally {
-      setGscConnecting(false);
-    }
+    },
+  });
+
+  const handleGscConnect = () => {
+    setGscError("");
+    gscConnectMutation.mutate();
   };
 
-  const handleGscDisconnect = async () => {
-    setGscDisconnecting(true);
-    try {
-      await api.analytics.disconnect();
-      setGscConnected(false);
-      setGscSiteUrl("");
-      setGscLastSync("");
-    } catch (err) {
+  const gscDisconnectMutation = useMutation({
+    mutationFn: () => api.analytics.disconnect(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["gsc", "status"] });
+    },
+    onError: (err) => {
       setGscError(parseApiError(err).message);
-    } finally {
-      setGscDisconnecting(false);
-    }
+    },
+  });
+
+  const handleGscDisconnect = () => {
+    gscDisconnectMutation.mutate();
   };
+
+  const wpConnecting = wpConnectMutation.isPending;
+  const wpDisconnecting = wpDisconnectMutation.isPending;
+  const gscConnecting = gscConnectMutation.isPending;
+  const gscDisconnecting = gscDisconnectMutation.isPending;
 
   // ---------------------------------------------------------------------------
 
@@ -374,7 +413,7 @@ export default function ProjectSettingsPage() {
         <Card className="p-6">
           <div className="text-center py-8">
             <p className="text-red-600 mb-4">{error || "Project not found"}</p>
-            <Button onClick={loadProjectData}>Retry</Button>
+            <Button onClick={() => invalidateProjectData()}>Retry</Button>
           </div>
         </Card>
       </div>

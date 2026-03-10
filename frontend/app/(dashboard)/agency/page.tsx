@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   Building2,
@@ -15,6 +15,7 @@ import {
   Check,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, parseApiError, AgencyProfile, ClientWorkspace, Project } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -52,18 +53,12 @@ function PortalStatusBadge({ enabled }: { enabled: boolean }) {
 }
 
 export default function AgencyPage() {
-  const [profile, setProfile] = useState<AgencyProfile | null>(null);
-  const [clients, setClients] = useState<ClientWorkspace[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-
-  const [isLoading, setIsLoading] = useState(true);
-  const [isCreating, setIsCreating] = useState(false);
-  const [isAddingClient, setIsAddingClient] = useState(false);
-  const [deletingClientId, setDeletingClientId] = useState<string | null>(null);
-  const [togglingPortalId, setTogglingPortalId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const [showSetup, setShowSetup] = useState(false);
   const [showAddClient, setShowAddClient] = useState(false);
+  const [deletingClientId, setDeletingClientId] = useState<string | null>(null);
+  const [togglingPortalId, setTogglingPortalId] = useState<string | null>(null);
 
   const [setupForm, setSetupForm] = useState({
     agency_name: "",
@@ -85,83 +80,62 @@ export default function AgencyPage() {
     },
   });
 
-  const loadProfile = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await api.agency.getProfile();
-      setProfile(data);
-      setShowSetup(false);
-      // Load clients alongside profile
-      const clientData = await api.agency.clients();
-      setClients(clientData.items);
-    } catch (err: unknown) {
-      const apiErr = err as { response?: { status?: number } };
-      if (apiErr?.response?.status === 404) {
-        setShowSetup(true);
-      } else {
-        toast.error(parseApiError(err).message);
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  // --- React Query hooks ---
 
-  useEffect(() => {
-    loadProfile();
-  }, [loadProfile]);
+  const { data: profile, isLoading: profileLoading, error: profileError } = useQuery({
+    queryKey: ["agency", "profile"],
+    queryFn: () => api.agency.getProfile(),
+    staleTime: 30_000,
+    retry: (failureCount, error) => {
+      const apiErr = error as { response?: { status?: number } };
+      if (apiErr?.response?.status === 404) return false;
+      return failureCount < 3;
+    },
+  });
 
-  // Load user projects for Add Client form
-  useEffect(() => {
-    api.projects.list().then(setProjects).catch(() => {});
-  }, []);
+  const is404 = (() => {
+    const apiErr = profileError as { response?: { status?: number } } | null;
+    return apiErr?.response?.status === 404;
+  })();
 
-  const handleCreateProfile = async () => {
-    if (!setupForm.agency_name.trim()) {
-      toast.error("Agency name is required");
-      return;
-    }
-    try {
-      setIsCreating(true);
-      const brand_colors: Record<string, string> = {
-        primary: setupForm.brand_color_primary,
-        secondary: setupForm.brand_color_secondary,
-        accent: setupForm.brand_color_accent,
-      };
-      const created = await api.agency.createProfile({
-        agency_name: setupForm.agency_name.trim(),
-        contact_email: setupForm.contact_email.trim() || undefined,
-        logo_url: setupForm.logo_url.trim() || undefined,
-        brand_colors,
-      });
-      setProfile(created);
-      setClients([]);
+  const { data: clientsData, isLoading: clientsLoading } = useQuery({
+    queryKey: ["agency", "clients"],
+    queryFn: () => api.agency.clients(),
+    staleTime: 30_000,
+    enabled: !!profile && !is404,
+  });
+
+  const { data: projectsData } = useQuery({
+    queryKey: ["projects", "list"],
+    queryFn: () => api.projects.list(),
+    staleTime: 30_000,
+  });
+
+  const clients = clientsData?.items ?? [];
+  const projects = projectsData ?? [];
+
+  const isLoading = profileLoading || (!!profile && clientsLoading);
+
+  // --- Mutations ---
+
+  const createProfileMutation = useMutation({
+    mutationFn: (data: Parameters<typeof api.agency.createProfile>[0]) =>
+      api.agency.createProfile(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["agency"] });
       setShowSetup(false);
       toast.success("Agency profile created");
-    } catch (err) {
+    },
+    onError: (err) => {
       toast.error(parseApiError(err).message);
-    } finally {
-      setIsCreating(false);
-    }
-  };
+    },
+  });
 
-  const handleAddClient = async () => {
-    if (!clientForm.project_id) {
-      toast.error("Please select a project");
-      return;
-    }
-    if (!clientForm.client_name.trim()) {
-      toast.error("Client name is required");
-      return;
-    }
-    try {
-      setIsAddingClient(true);
-      const created = await api.agency.createClient({
-        project_id: clientForm.project_id,
-        client_name: clientForm.client_name.trim(),
-        client_email: clientForm.client_email.trim() || undefined,
-        allowed_features: clientForm.allowed_features,
-      });
-      setClients((prev) => [...prev, created]);
+  const addClientMutation = useMutation({
+    mutationFn: (data: Parameters<typeof api.agency.createClient>[0]) =>
+      api.agency.createClient(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["agency", "clients"] });
       setShowAddClient(false);
       setClientForm({
         project_id: "",
@@ -170,41 +144,94 @@ export default function AgencyPage() {
         allowed_features: { analytics: true, content: true, social: false },
       });
       toast.success("Client workspace created");
-    } catch (err) {
+    },
+    onError: (err) => {
       toast.error(parseApiError(err).message);
-    } finally {
-      setIsAddingClient(false);
-    }
-  };
+    },
+  });
 
-  const handleDeleteClient = async (id: string) => {
-    try {
+  const deleteClientMutation = useMutation({
+    mutationFn: (id: string) => api.agency.deleteClient(id),
+    onMutate: (id) => {
       setDeletingClientId(id);
-      await api.agency.deleteClient(id);
-      setClients((prev) => prev.filter((c) => c.id !== id));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["agency", "clients"] });
       toast.success("Client workspace removed");
-    } catch (err) {
+    },
+    onError: (err) => {
       toast.error(parseApiError(err).message);
-    } finally {
+    },
+    onSettled: () => {
       setDeletingClientId(null);
-    }
-  };
+    },
+  });
 
-  const handleTogglePortal = async (client: ClientWorkspace) => {
-    try {
+  const togglePortalMutation = useMutation({
+    mutationFn: (client: ClientWorkspace) =>
+      client.is_portal_enabled
+        ? api.agency.disablePortal(client.id)
+        : api.agency.enablePortal(client.id),
+    onMutate: (client) => {
       setTogglingPortalId(client.id);
-      const updated = client.is_portal_enabled
-        ? await api.agency.disablePortal(client.id)
-        : await api.agency.enablePortal(client.id);
-      setClients((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    },
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["agency", "clients"] });
       toast.success(
         updated.is_portal_enabled ? "Portal enabled" : "Portal disabled"
       );
-    } catch (err) {
+    },
+    onError: (err) => {
       toast.error(parseApiError(err).message);
-    } finally {
+    },
+    onSettled: () => {
       setTogglingPortalId(null);
+    },
+  });
+
+  // --- Handlers ---
+
+  const handleCreateProfile = () => {
+    if (!setupForm.agency_name.trim()) {
+      toast.error("Agency name is required");
+      return;
     }
+    const brand_colors: Record<string, string> = {
+      primary: setupForm.brand_color_primary,
+      secondary: setupForm.brand_color_secondary,
+      accent: setupForm.brand_color_accent,
+    };
+    createProfileMutation.mutate({
+      agency_name: setupForm.agency_name.trim(),
+      contact_email: setupForm.contact_email.trim() || undefined,
+      logo_url: setupForm.logo_url.trim() || undefined,
+      brand_colors,
+    });
+  };
+
+  const handleAddClient = () => {
+    if (!clientForm.project_id) {
+      toast.error("Please select a project");
+      return;
+    }
+    if (!clientForm.client_name.trim()) {
+      toast.error("Client name is required");
+      return;
+    }
+    addClientMutation.mutate({
+      project_id: clientForm.project_id,
+      client_name: clientForm.client_name.trim(),
+      client_email: clientForm.client_email.trim() || undefined,
+      allowed_features: clientForm.allowed_features,
+    });
+  };
+
+  const handleDeleteClient = (id: string) => {
+    deleteClientMutation.mutate(id);
+  };
+
+  const handleTogglePortal = (client: ClientWorkspace) => {
+    togglePortalMutation.mutate(client);
   };
 
   // --- Loading skeleton ---
@@ -223,7 +250,7 @@ export default function AgencyPage() {
   }
 
   // --- Setup state ---
-  if (showSetup) {
+  if (is404 || showSetup) {
     return (
       <div className="max-w-lg mx-auto space-y-6 py-12">
         <div className="text-center">
@@ -326,9 +353,9 @@ export default function AgencyPage() {
               onClick={handleCreateProfile}
               variant="primary"
               className="w-full"
-              disabled={isCreating || !setupForm.agency_name.trim()}
+              disabled={createProfileMutation.isPending || !setupForm.agency_name.trim()}
             >
-              {isCreating ? "Creating..." : "Create Agency Profile"}
+              {createProfileMutation.isPending ? "Creating..." : "Create Agency Profile"}
             </Button>
           </CardContent>
         </Card>
@@ -395,7 +422,7 @@ export default function AgencyPage() {
                 )}
                 <span className="flex items-center gap-1 text-xs text-text-secondary">
                   <Users className="h-3.5 w-3.5" />
-                  {clients.length} / {profile?.max_clients ?? "—"} clients
+                  {clients.length} / {profile?.max_clients ?? "\u2014"} clients
                 </span>
               </div>
             </div>
@@ -428,7 +455,7 @@ export default function AgencyPage() {
             </div>
             <p className="text-2xl font-bold text-text-primary">{clients.length}</p>
             <p className="text-xs text-text-muted mt-1">
-              of {profile?.max_clients ?? "—"} max
+              of {profile?.max_clients ?? "\u2014"} max
             </p>
           </CardContent>
         </Card>
@@ -454,7 +481,7 @@ export default function AgencyPage() {
                 <FileText className="h-5 w-5 text-purple-600" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-text-primary">—</p>
+            <p className="text-2xl font-bold text-text-primary">{"\u2014"}</p>
             <p className="text-xs text-text-muted mt-1">all time</p>
           </CardContent>
         </Card>
@@ -576,12 +603,12 @@ export default function AgencyPage() {
               variant="primary"
               size="sm"
               disabled={
-                isAddingClient ||
+                addClientMutation.isPending ||
                 !clientForm.project_id ||
                 !clientForm.client_name.trim()
               }
             >
-              {isAddingClient ? "Adding..." : "Add Client"}
+              {addClientMutation.isPending ? "Adding..." : "Add Client"}
             </Button>
             <Button
               onClick={() => {

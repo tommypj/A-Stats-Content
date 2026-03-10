@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, getImageUrl, parseApiError } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
@@ -547,12 +548,8 @@ function DangerZoneSection({ onDeleteAccount, onExportData, exporting }: DangerZ
 
 export default function SettingsPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState("");
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const passwordSavedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -562,6 +559,13 @@ export default function SettingsPage() {
       if (passwordSavedTimerRef.current) clearTimeout(passwordSavedTimerRef.current);
     };
   }, []);
+
+  // --- React Query: load profile ---
+  const { data: profile, isLoading: loading } = useQuery({
+    queryKey: ["auth", "me"],
+    queryFn: () => api.auth.me(),
+    staleTime: 30_000,
+  });
 
   // Profile fields
   const [name, setName] = useState("");
@@ -573,6 +577,20 @@ export default function SettingsPage() {
   const [originalLanguage, setOriginalLanguage] = useState("en");
   const [originalTimezone, setOriginalTimezone] = useState("UTC");
 
+  // Sync form fields when profile data loads
+  const [profileSynced, setProfileSynced] = useState(false);
+  useEffect(() => {
+    if (profile && !profileSynced) {
+      setName(profile.name);
+      setLanguage(profile.language || "en");
+      setTimezone(profile.timezone || "UTC");
+      setOriginalName(profile.name);
+      setOriginalLanguage(profile.language || "en");
+      setOriginalTimezone(profile.timezone || "UTC");
+      setProfileSynced(true);
+    }
+  }, [profile, profileSynced]);
+
   const isDirty =
     name !== originalName || language !== originalLanguage || timezone !== originalTimezone;
 
@@ -583,15 +601,12 @@ export default function SettingsPage() {
   const [passwordError, setPasswordError] = useState("");
   const [passwordSaved, setPasswordSaved] = useState(false);
 
-  // Avatar upload
-  const [avatarUploading, setAvatarUploading] = useState(false);
-
-  // Data export
-  const [exporting, setExporting] = useState(false);
+  // UI state
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
 
   // Account deletion
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   // Warn before leaving with unsaved changes
   useEffect(() => {
@@ -603,46 +618,81 @@ export default function SettingsPage() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isDirty]);
 
-  useEffect(() => {
-    loadProfile();
-  }, []);
+  // --- Mutations ---
 
-  const loadProfile = async () => {
-    try {
-      const data = await api.auth.me();
-      setProfile(data);
-      setName(data.name);
-      setLanguage(data.language || "en");
-      setTimezone(data.timezone || "UTC");
-      setOriginalName(data.name);
-      setOriginalLanguage(data.language || "en");
-      setOriginalTimezone(data.timezone || "UTC");
-    } catch {
-      setError("Failed to load profile");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSaveProfile = async () => {
-    setSaving(true);
-    setSaved(false);
-    setError("");
-    try {
-      await api.auth.updateProfile({ name, language, timezone });
+  const saveProfileMutation = useMutation({
+    mutationFn: (data: { name: string; language: string; timezone: string }) =>
+      api.auth.updateProfile(data),
+    onSuccess: () => {
       setOriginalName(name);
       setOriginalLanguage(language);
       setOriginalTimezone(timezone);
       setSaved(true);
+      setError("");
+      queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
       savedTimerRef.current = setTimeout(() => setSaved(false), 3000);
-    } catch {
-      setError("Failed to save profile");
-    } finally {
-      setSaving(false);
-    }
+    },
+    onError: (err) => {
+      setError(parseApiError(err).message || "Failed to save profile");
+    },
+  });
+
+  const changePasswordMutation = useMutation({
+    mutationFn: ({ current, next }: { current: string; next: string }) =>
+      api.auth.changePassword(current, next),
+    onSuccess: () => {
+      setPasswordSaved(true);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordError("");
+      passwordSavedTimerRef.current = setTimeout(() => setPasswordSaved(false), 3000);
+    },
+    onError: (err) => {
+      setPasswordError(parseApiError(err).message || "Current password is incorrect");
+    },
+  });
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: () => api.auth.deleteAccount(),
+    onSuccess: () => {
+      useAuthStore.getState().logout();
+      toast.success("Your account has been deleted.");
+      router.push("/login");
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
+
+  const avatarMutation = useMutation({
+    mutationFn: (file: File) => api.auth.uploadAvatar(file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+      toast.success("Avatar updated successfully.");
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
+
+  const exportMutation = useMutation({
+    mutationFn: () => api.auth.exportData(),
+    onSuccess: () => {
+      toast.success("Data export downloaded.");
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
+
+  const handleSaveProfile = () => {
+    setSaved(false);
+    setError("");
+    saveProfileMutation.mutate({ name, language, timezone });
   };
 
-  const handleChangePassword = async () => {
+  const handleChangePassword = () => {
     setPasswordError("");
     setPasswordSaved(false);
 
@@ -655,57 +705,19 @@ export default function SettingsPage() {
       return;
     }
 
-    try {
-      await api.auth.changePassword(currentPassword, newPassword);
-      setPasswordSaved(true);
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      passwordSavedTimerRef.current = setTimeout(() => setPasswordSaved(false), 3000);
-    } catch (err) {
-      const apiError = parseApiError(err);
-      setPasswordError(apiError.message || "Current password is incorrect");
-    }
+    changePasswordMutation.mutate({ current: currentPassword, next: newPassword });
   };
 
-  const handleDeleteAccount = async () => {
-    setIsDeleting(true);
-    try {
-      await api.auth.deleteAccount();
-      // Cookies are cleared server-side on account deletion.
-      // Clear Zustand state and redirect to login.
-      useAuthStore.getState().logout();
-      toast.success("Your account has been deleted.");
-      router.push("/login");
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-      setIsDeleting(false);
-    }
+  const handleDeleteAccount = () => {
+    deleteAccountMutation.mutate();
   };
 
-  const handleAvatarChange = async (file: File) => {
-    setAvatarUploading(true);
-    try {
-      const updated = await api.auth.uploadAvatar(file);
-      setProfile((prev) => (prev ? { ...prev, avatar_url: updated.avatar_url } : prev));
-      toast.success("Avatar updated successfully.");
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-    } finally {
-      setAvatarUploading(false);
-    }
+  const handleAvatarChange = (file: File) => {
+    avatarMutation.mutate(file);
   };
 
-  const handleExportData = async () => {
-    setExporting(true);
-    try {
-      await api.auth.exportData();
-      toast.success("Data export downloaded.");
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-    } finally {
-      setExporting(false);
-    }
+  const handleExportData = () => {
+    exportMutation.mutate();
   };
 
   if (loading) {
@@ -727,19 +739,19 @@ export default function SettingsPage() {
 
       <div className="space-y-6">
           <ProfileSection
-            profile={profile}
+            profile={profile as UserProfile | null}
             name={name}
             setName={setName}
             language={language}
             setLanguage={setLanguage}
             timezone={timezone}
             setTimezone={setTimezone}
-            saving={saving}
+            saving={saveProfileMutation.isPending}
             saved={saved}
             error={error}
             onSave={handleSaveProfile}
             onAvatarChange={handleAvatarChange}
-            avatarUploading={avatarUploading}
+            avatarUploading={avatarMutation.isPending}
             isDirty={isDirty}
           />
 
@@ -758,14 +770,14 @@ export default function SettingsPage() {
           <DangerZoneSection
             onDeleteAccount={() => setShowDeleteDialog(true)}
             onExportData={handleExportData}
-            exporting={exporting}
+            exporting={exportMutation.isPending}
           />
         </div>
 
       {/* Account deletion confirmation dialog */}
       <DeleteAccountDialog
         isOpen={showDeleteDialog}
-        isDeleting={isDeleting}
+        isDeleting={deleteAccountMutation.isPending}
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={handleDeleteAccount}
       />

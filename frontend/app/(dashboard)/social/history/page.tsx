@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { PostListItem } from "@/components/social/post-list-item";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, parseApiError, SocialPost, SocialPostStatus, SocialPlatform, getPostPlatforms } from "@/lib/api";
 import { History, Search, Filter, Download, Trash2, List, Grid } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -14,13 +15,10 @@ import { TierGate } from "@/components/ui/tier-gate";
 
 export default function SocialHistoryPage() {
   const router = useRouter();
-  const [posts, setPosts] = useState<SocialPost[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
+  const queryClient = useQueryClient();
 
   // Filters
+  const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<SocialPostStatus | "all">("all");
   const [platformFilter, setPlatformFilter] = useState<SocialPlatform | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -28,30 +26,55 @@ export default function SocialHistoryPage() {
   const [selectedPosts, setSelectedPosts] = useState<Set<string>>(new Set());
   const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string } | null>(null);
 
-  useEffect(() => {
-    loadPosts();
-  }, [page, statusFilter, platformFilter, searchQuery]);
-
-  const loadPosts = async () => {
-    setLoading(true);
-    try {
-      const response = await api.social.posts({
-        page,
-        page_size: 20,
-        status: statusFilter === "all" ? undefined : statusFilter,
-        platform: platformFilter === "all" ? undefined : platformFilter,
-        search: searchQuery || undefined,
-      });
-
-      setPosts(response.items);
-      setTotal(response.total);
-      setTotalPages(response.pages);
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-    } finally {
-      setLoading(false);
-    }
+  const queryParams = {
+    page,
+    page_size: 20,
+    status: statusFilter === "all" ? undefined : statusFilter,
+    platform: platformFilter === "all" ? undefined : platformFilter,
+    search: searchQuery || undefined,
   };
+
+  const { data, isLoading: loading } = useQuery({
+    queryKey: ["social", "posts", queryParams],
+    queryFn: () => api.social.posts(queryParams),
+    staleTime: 30_000,
+  });
+
+  const posts = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.pages ?? 1;
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.social.deletePost(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["social", "posts"] });
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) =>
+      Promise.all(ids.map((id) => api.social.deletePost(id))),
+    onSuccess: () => {
+      setSelectedPosts(new Set());
+      queryClient.invalidateQueries({ queryKey: ["social", "posts"] });
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
+
+  const retryMutation = useMutation({
+    mutationFn: (id: string) => api.social.retryFailed(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["social", "posts"] });
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
 
   const handleView = (id: string) => {
     router.push(`/social/posts/${id}`);
@@ -63,43 +86,22 @@ export default function SocialHistoryPage() {
 
   const handleDelete = (id: string) => {
     setConfirmAction({
-      action: async () => {
-        try {
-          await api.social.deletePost(id);
-          loadPosts();
-        } catch (error) {
-          toast.error(parseApiError(error).message);
-        }
-      },
+      action: () => deleteMutation.mutate(id),
       title: "Delete Post",
       message: "Are you sure you want to delete this post? This action cannot be undone.",
     });
   };
 
-  const handleRetry = async (id: string) => {
-    try {
-      await api.social.retryFailed(id);
-      loadPosts();
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-    }
+  const handleRetry = (id: string) => {
+    retryMutation.mutate(id);
   };
 
   const handleBulkDelete = () => {
     if (selectedPosts.size === 0) return;
     const count = selectedPosts.size;
+    const ids = Array.from(selectedPosts);
     setConfirmAction({
-      action: async () => {
-        try {
-          await Promise.all(
-            Array.from(selectedPosts).map((id) => api.social.deletePost(id))
-          );
-          setSelectedPosts(new Set());
-          loadPosts();
-        } catch (error) {
-          toast.error(parseApiError(error).message);
-        }
-      },
+      action: () => bulkDeleteMutation.mutate(ids),
       title: `Delete ${count} Post${count !== 1 ? "s" : ""}`,
       message: `Are you sure you want to delete ${count} post${count !== 1 ? "s" : ""}? This action cannot be undone.`,
     });

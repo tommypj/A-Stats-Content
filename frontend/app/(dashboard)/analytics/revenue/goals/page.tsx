@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Plus, Pencil, Trash2, Check, X, Target } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, parseApiError, ConversionGoal } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,31 +63,67 @@ function formatDate(dateStr: string): string {
   });
 }
 
+const GOALS_QUERY_KEY = ["analytics", "revenue", "goals"] as const;
+
 export default function ConversionGoalsPage() {
-  const [goals, setGoals] = useState<ConversionGoal[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
+
   const [editingGoal, setEditingGoal] = useState<ConversionGoal | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState<FormData>(EMPTY_FORM);
-  const [isSaving, setIsSaving] = useState(false);
   const [configError, setConfigError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadGoals();
-  }, []);
+  // --- React Query hooks ---
 
-  async function loadGoals() {
-    try {
-      setIsLoading(true);
-      const response = await api.analytics.revenueGoals();
-      setGoals(response.items);
-    } catch (err) {
+  const { data: goalsData, isLoading } = useQuery({
+    queryKey: GOALS_QUERY_KEY,
+    queryFn: () => api.analytics.revenueGoals(),
+    staleTime: 30_000,
+  });
+
+  const goals = goalsData?.items ?? [];
+
+  const createMutation = useMutation({
+    mutationFn: (data: { name: string; goal_type: string; goal_config?: Record<string, unknown> }) =>
+      api.analytics.createRevenueGoal(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: GOALS_QUERY_KEY });
+      toast.success("Goal created successfully.");
+      closeForm();
+    },
+    onError: (err) => {
       toast.error(parseApiError(err).message);
-    } finally {
-      setIsLoading(false);
-    }
-  }
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ goalId, data }: { goalId: string; data: { name?: string; goal_type?: string; goal_config?: Record<string, unknown>; is_active?: boolean } }) =>
+      api.analytics.updateRevenueGoal(goalId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: GOALS_QUERY_KEY });
+      toast.success("Goal updated successfully.");
+      closeForm();
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (goalId: string) => api.analytics.deleteRevenueGoal(goalId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: GOALS_QUERY_KEY });
+      toast.success("Goal deleted.");
+      setDeletingId(null);
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+      setDeletingId(null);
+    },
+  });
+
+  const isSaving = createMutation.isPending || updateMutation.isPending;
 
   function openAddForm() {
     setEditingGoal(null);
@@ -134,7 +171,7 @@ export default function ConversionGoalsPage() {
     }
   }
 
-  async function handleSave() {
+  function handleSave() {
     if (!formData.name.trim()) {
       toast.error("Goal name is required.");
       return;
@@ -149,50 +186,31 @@ export default function ConversionGoalsPage() {
       parsedConfig = JSON.parse(formData.goal_config) as Record<string, unknown>;
     }
 
-    setIsSaving(true);
-    try {
-      if (editingGoal) {
-        const updated = await api.analytics.updateRevenueGoal(editingGoal.id, {
+    if (editingGoal) {
+      updateMutation.mutate({
+        goalId: editingGoal.id,
+        data: {
           name: formData.name.trim(),
           goal_type: formData.goal_type,
           goal_config: parsedConfig,
           is_active: formData.is_active,
-        });
-        setGoals((prev) =>
-          prev.map((g) => (g.id === updated.id ? updated : g))
-        );
-        toast.success("Goal updated successfully.");
-      } else {
-        const created = await api.analytics.createRevenueGoal({
-          name: formData.name.trim(),
-          goal_type: formData.goal_type,
-          goal_config: parsedConfig,
-        });
-        setGoals((prev) => [...prev, created]);
-        toast.success("Goal created successfully.");
-      }
-      closeForm();
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setIsSaving(false);
+        },
+      });
+    } else {
+      createMutation.mutate({
+        name: formData.name.trim(),
+        goal_type: formData.goal_type,
+        goal_config: parsedConfig,
+      });
     }
   }
 
-  async function handleDelete(goal: ConversionGoal) {
+  function handleDelete(goal: ConversionGoal) {
     if (!confirm(`Delete goal "${goal.name}"? This action cannot be undone.`)) {
       return;
     }
     setDeletingId(goal.id);
-    try {
-      await api.analytics.deleteRevenueGoal(goal.id);
-      setGoals((prev) => prev.filter((g) => g.id !== goal.id));
-      toast.success("Goal deleted.");
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setDeletingId(null);
-    }
+    deleteMutation.mutate(goal.id);
   }
 
   // Loading skeleton

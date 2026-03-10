@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle,
   XCircle,
@@ -17,12 +18,7 @@ import { api, parseApiError } from "@/lib/api";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 
 export default function IntegrationsSettingsPage() {
-  // WordPress connection state
-  const [wpConnected, setWpConnected] = useState(false);
-  const [wpSiteUrl, setWpSiteUrl] = useState("");
-  const [wpUsername, setWpUsername] = useState("");
-  const [wpSiteName, setWpSiteName] = useState("");
-  const [loadingStatus, setLoadingStatus] = useState(true);
+  const queryClient = useQueryClient();
 
   // WordPress form state
   const [showWpForm, setShowWpForm] = useState(false);
@@ -31,18 +27,6 @@ export default function IntegrationsSettingsPage() {
     username: "",
     app_password: "",
   });
-  const [wpConnecting, setWpConnecting] = useState(false);
-  const [wpDisconnecting, setWpDisconnecting] = useState(false);
-  const [wpTesting, setWpTesting] = useState(false);
-
-  // GSC connection state
-  const [gscConnected, setGscConnected] = useState(false);
-  const [gscSiteUrl, setGscSiteUrl] = useState<string | undefined>(undefined);
-  const [gscLastSync, setGscLastSync] = useState<string | undefined>(undefined);
-  const [gscLoadingStatus, setGscLoadingStatus] = useState(true);
-  const [gscConnecting, setGscConnecting] = useState(false);
-  const [gscDisconnecting, setGscDisconnecting] = useState(false);
-  const [gscSyncing, setGscSyncing] = useState(false);
 
   // GSC site selection state
   const [gscAvailableSites, setGscAvailableSites] = useState<
@@ -50,59 +34,47 @@ export default function IntegrationsSettingsPage() {
   >([]);
   const [gscLoadingSites, setGscLoadingSites] = useState(false);
   const [gscSelectedSite, setGscSelectedSite] = useState("");
-  const [gscSelectingSite, setGscSelectingSite] = useState(false);
 
-  useEffect(() => {
-    checkWordPressStatus();
-    checkGscStatus();
-  }, []);
+  // --- React Query: WordPress status ---
+  const { data: wpStatus, isLoading: loadingStatus } = useQuery({
+    queryKey: ["integrations", "wordpress"],
+    queryFn: () => api.wordpress.status().catch(() => ({ is_connected: false, site_url: "", username: "", site_name: "" })),
+    staleTime: 30_000,
+  });
+
+  const wpConnected = wpStatus?.is_connected ?? false;
+  const wpSiteUrl = wpStatus?.site_url || "";
+  const wpUsername = wpStatus?.username || "";
+  const wpSiteName = wpStatus?.site_name || "";
+
+  // --- React Query: GSC status ---
+  const { data: gscStatus, isLoading: gscLoadingStatus } = useQuery({
+    queryKey: ["integrations", "gsc"],
+    queryFn: () => api.analytics.status().catch(() => ({ connected: false, site_url: undefined, last_sync: undefined })),
+    staleTime: 30_000,
+  });
+
+  const gscConnected = gscStatus?.connected ?? false;
+  const gscSiteUrl = gscStatus?.site_url;
+  const gscLastSync = gscStatus?.last_sync;
 
   // Re-check GSC status when the window regains focus (user returns from OAuth flow)
   useEffect(() => {
     function handleFocus() {
       if (!gscConnected) {
-        checkGscStatus();
+        queryClient.invalidateQueries({ queryKey: ["integrations", "gsc"] });
       }
     }
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
-  }, [gscConnected]);
+  }, [gscConnected, queryClient]);
 
-  async function checkWordPressStatus() {
-    try {
-      setLoadingStatus(true);
-      const status = await api.wordpress.status();
-      setWpConnected(status.is_connected);
-      if (status.is_connected) {
-        setWpSiteUrl(status.site_url || "");
-        setWpUsername(status.username || "");
-        setWpSiteName(status.site_name || "");
-      }
-    } catch {
-      // WordPress status check is non-critical
-    } finally {
-      setLoadingStatus(false);
+  // If connected but no site selected, fetch available sites
+  useEffect(() => {
+    if (gscConnected && !gscSiteUrl && gscAvailableSites.length === 0) {
+      fetchGscSites();
     }
-  }
-
-  const checkGscStatus = useCallback(async () => {
-    try {
-      setGscLoadingStatus(true);
-      const status = await api.analytics.status();
-      setGscConnected(status.connected);
-      setGscSiteUrl(status.site_url);
-      setGscLastSync(status.last_sync);
-
-      // If connected but no site selected, fetch available sites
-      if (status.connected && !status.site_url) {
-        fetchGscSites();
-      }
-    } catch {
-      // GSC status check is non-critical
-    } finally {
-      setGscLoadingStatus(false);
-    }
-  }, []);
+  }, [gscConnected, gscSiteUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchGscSites() {
     try {
@@ -119,127 +91,131 @@ export default function IntegrationsSettingsPage() {
     }
   }
 
-  async function handleGscConnect() {
-    setGscConnecting(true);
-    try {
-      const { auth_url, state } = await api.analytics.getAuthUrl();
+  // --- Mutations ---
+
+  const wpConnectMutation = useMutation({
+    mutationFn: (data: { site_url: string; username: string; app_password: string }) =>
+      api.wordpress.connect(data),
+    onSuccess: () => {
+      setShowWpForm(false);
+      setWpFormData({ site_url: "", username: "", app_password: "" });
+      queryClient.invalidateQueries({ queryKey: ["integrations", "wordpress"] });
+      toast.success("Successfully connected to WordPress!");
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message || "Failed to connect to WordPress");
+    },
+  });
+
+  const wpDisconnectMutation = useMutation({
+    mutationFn: () => api.wordpress.disconnect(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["integrations", "wordpress"] });
+      toast.success("Disconnected from WordPress");
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message || "Failed to disconnect from WordPress");
+    },
+  });
+
+  const wpTestMutation = useMutation({
+    mutationFn: (data: { site_url: string; username: string; app_password: string }) =>
+      api.wordpress.connect(data),
+    onSuccess: () => {
+      toast.success("Connection test successful!");
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message || "Connection test failed");
+    },
+  });
+
+  const gscConnectMutation = useMutation({
+    mutationFn: () => api.analytics.getAuthUrl(),
+    onSuccess: ({ auth_url, state }) => {
       localStorage.setItem("gsc_oauth_state", state);
       localStorage.setItem("gsc_oauth_state_ts", Date.now().toString());
       window.open(auth_url, "_blank", "noopener");
       toast.info("Complete the Google sign-in in the new tab, then return here.");
-    } catch (err) {
+    },
+    onError: (err) => {
       toast.error(parseApiError(err).message);
-    } finally {
-      setGscConnecting(false);
+    },
+  });
+
+  const gscSelectSiteMutation = useMutation({
+    mutationFn: (siteUrl: string) => api.analytics.selectSite(siteUrl),
+    onSuccess: () => {
+      setGscAvailableSites([]);
+      queryClient.invalidateQueries({ queryKey: ["integrations", "gsc"] });
+      toast.success("Site selected successfully");
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
+
+  const gscSyncMutation = useMutation({
+    mutationFn: () => api.analytics.sync(),
+    onSuccess: (result) => {
+      toast.success(result.message || "Sync started successfully");
+      queryClient.invalidateQueries({ queryKey: ["integrations", "gsc"] });
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
+
+  const gscDisconnectMutation = useMutation({
+    mutationFn: () => api.analytics.disconnect(),
+    onSuccess: () => {
+      setGscAvailableSites([]);
+      setGscSelectedSite("");
+      queryClient.invalidateQueries({ queryKey: ["integrations", "gsc"] });
+      toast.success("Disconnected from Google Search Console");
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
+
+  function handleWordPressConnect() {
+    if (!wpFormData.site_url || !wpFormData.username || !wpFormData.app_password) {
+      toast.error("Please fill in all fields");
+      return;
     }
+    wpConnectMutation.mutate(wpFormData);
   }
 
-  async function handleGscSelectSite() {
+  function handleWordPressDisconnect() {
+    wpDisconnectMutation.mutate();
+  }
+
+  function handleTestConnection() {
+    if (!wpFormData.site_url || !wpFormData.username || !wpFormData.app_password) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+    wpTestMutation.mutate(wpFormData);
+  }
+
+  function handleGscConnect() {
+    gscConnectMutation.mutate();
+  }
+
+  function handleGscSelectSite() {
     if (!gscSelectedSite) {
       toast.error("Please select a site");
       return;
     }
-    setGscSelectingSite(true);
-    try {
-      const updated = await api.analytics.selectSite(gscSelectedSite);
-      setGscSiteUrl(updated.site_url);
-      setGscAvailableSites([]);
-      toast.success("Site selected successfully");
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setGscSelectingSite(false);
-    }
+    gscSelectSiteMutation.mutate(gscSelectedSite);
   }
 
-  async function handleGscSync() {
-    setGscSyncing(true);
-    try {
-      const result = await api.analytics.sync();
-      toast.success(result.message || "Sync started successfully");
-      // Refresh status to get updated last_sync time
-      await checkGscStatus();
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setGscSyncing(false);
-    }
+  function handleGscSync() {
+    gscSyncMutation.mutate();
   }
 
-  async function handleGscDisconnect() {
-    setGscDisconnecting(true);
-    try {
-      await api.analytics.disconnect();
-      setGscConnected(false);
-      setGscSiteUrl(undefined);
-      setGscLastSync(undefined);
-      setGscAvailableSites([]);
-      setGscSelectedSite("");
-      toast.success("Disconnected from Google Search Console");
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setGscDisconnecting(false);
-    }
-  }
-
-  async function handleWordPressConnect() {
-    if (!wpFormData.site_url || !wpFormData.username || !wpFormData.app_password) {
-      toast.error("Please fill in all fields");
-      return;
-    }
-
-    setWpConnecting(true);
-    try {
-      const result = await api.wordpress.connect(wpFormData);
-      setWpConnected(true);
-      setWpSiteUrl(result.site_url);
-      setWpUsername(result.username);
-      setWpSiteName(result.site_name || "");
-      setShowWpForm(false);
-      setWpFormData({ site_url: "", username: "", app_password: "" });
-      toast.success("Successfully connected to WordPress!");
-    } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to connect to WordPress");
-    } finally {
-      setWpConnecting(false);
-    }
-  }
-
-  async function handleWordPressDisconnect() {
-    setWpDisconnecting(true);
-    try {
-      await api.wordpress.disconnect();
-      setWpConnected(false);
-      setWpSiteUrl("");
-      setWpUsername("");
-      setWpSiteName("");
-      toast.success("Disconnected from WordPress");
-    } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to disconnect from WordPress");
-    } finally {
-      setWpDisconnecting(false);
-    }
-  }
-
-  async function handleTestConnection() {
-    if (!wpFormData.site_url || !wpFormData.username || !wpFormData.app_password) {
-      toast.error("Please fill in all fields");
-      return;
-    }
-
-    setWpTesting(true);
-    try {
-      await api.wordpress.connect(wpFormData);
-      toast.success("Connection test successful!");
-    } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Connection test failed");
-    } finally {
-      setWpTesting(false);
-    }
+  function handleGscDisconnect() {
+    gscDisconnectMutation.mutate();
   }
 
   return (
@@ -317,7 +293,7 @@ export default function IntegrationsSettingsPage() {
               <Button
                 variant="outline"
                 onClick={handleWordPressDisconnect}
-                isLoading={wpDisconnecting}
+                isLoading={wpDisconnectMutation.isPending}
                 className="w-full sm:w-auto"
               >
                 Disconnect WordPress
@@ -399,14 +375,14 @@ export default function IntegrationsSettingsPage() {
                     <Button
                       variant="secondary"
                       onClick={handleTestConnection}
-                      isLoading={wpTesting}
+                      isLoading={wpTestMutation.isPending}
                       className="flex-1"
                     >
                       Test Connection
                     </Button>
                     <Button
                       onClick={handleWordPressConnect}
-                      isLoading={wpConnecting}
+                      isLoading={wpConnectMutation.isPending}
                       className="flex-1"
                     >
                       Connect
@@ -521,7 +497,7 @@ export default function IntegrationsSettingsPage() {
                       </select>
                       <Button
                         onClick={handleGscSelectSite}
-                        isLoading={gscSelectingSite}
+                        isLoading={gscSelectSiteMutation.isPending}
                         className="w-full sm:w-auto"
                       >
                         Confirm Site Selection
@@ -549,7 +525,7 @@ export default function IntegrationsSettingsPage() {
                   <Button
                     variant="secondary"
                     onClick={handleGscSync}
-                    isLoading={gscSyncing}
+                    isLoading={gscSyncMutation.isPending}
                     className="flex items-center gap-2"
                   >
                     <RefreshCw className="h-4 w-4" />
@@ -559,7 +535,7 @@ export default function IntegrationsSettingsPage() {
                 <Button
                   variant="outline"
                   onClick={handleGscDisconnect}
-                  isLoading={gscDisconnecting}
+                  isLoading={gscDisconnectMutation.isPending}
                 >
                   Disconnect GSC
                 </Button>
@@ -576,7 +552,7 @@ export default function IntegrationsSettingsPage() {
               </p>
               <Button
                 onClick={handleGscConnect}
-                isLoading={gscConnecting}
+                isLoading={gscConnectMutation.isPending}
               >
                 Connect Google Search Console
               </Button>

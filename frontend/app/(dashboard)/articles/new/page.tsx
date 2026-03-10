@@ -8,6 +8,7 @@ import {
   Loader2,
   Sparkles,
 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, Outline, parseApiError } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -26,10 +27,8 @@ function NewArticleContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const outlineId = searchParams.get("outline");
+  const queryClient = useQueryClient();
 
-  const [outline, setOutline] = useState<Outline | null>(null);
-  const [loading, setLoading] = useState(!!outlineId);
-  const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
 
   // Manual creation fields
@@ -59,34 +58,29 @@ function NewArticleContent() {
     };
   }, []);
 
-  useEffect(() => {
-    if (outlineId) {
-      loadOutline(outlineId);
-    }
-  }, [outlineId]);
+  // --- React Query: load outline ---
 
-  async function loadOutline(id: string) {
-    try {
-      setLoading(true);
-      const data = await api.outlines.get(id);
-      setOutline(data);
+  const { data: outlineData, isLoading: loading } = useQuery({
+    queryKey: ["outlines", outlineId],
+    queryFn: async () => {
+      const data = await api.outlines.get(outlineId!);
+      // Seed form defaults from fetched outline
       setTone(data.tone);
       setTargetAudience(data.target_audience || "");
-    } catch (error) {
-      setError("Failed to load outline");
-    } finally {
-      setLoading(false);
-    }
-  }
+      return data;
+    },
+    enabled: !!outlineId,
+    staleTime: 60_000,
+  });
 
-  async function handleGenerate() {
-    if (!outline) return;
+  const outline = outlineData ?? null;
 
-    setGenerating(true);
-    setError("");
+  // --- Mutations ---
 
-    try {
-      // Returns immediately with status "generating"
+  const generateMutation = useMutation({
+    mutationFn: async () => {
+      if (!outline) throw new Error("No outline loaded");
+
       const article = await api.articles.generate({
         outline_id: outline.id,
         tone: tone || undefined,
@@ -117,55 +111,53 @@ function NewArticleContent() {
         try {
           const updated = await api.articles.get(article.id);
           if (updated.status === "completed" || updated.status === "published") {
-            router.push(`/articles/${article.id}`);
-            return;
+            return article.id;
           }
           if (updated.status === "failed") {
-            if (mountedRef.current) {
-              setError("Article generation failed. Please try again.");
-              setGenerating(false);
-            }
-            return;
+            throw new Error("Article generation failed. Please try again.");
           }
           // still "generating" — keep polling
-        } catch {
-          // Transient network error — keep polling
+        } catch (pollErr) {
+          // Re-throw our own errors, swallow transient network errors
+          if (pollErr instanceof Error && pollErr.message.includes("generation failed")) {
+            throw pollErr;
+          }
         }
       }
 
-      if (mountedRef.current && polls >= MAX_POLLS) {
-        setError("Generation is taking longer than expected. Check your articles list for the result.");
-        setGenerating(false);
+      if (polls >= MAX_POLLS) {
+        throw new Error("Generation is taking longer than expected. Check your articles list for the result.");
       }
-    } catch (err) {
+
+      return article.id;
+    },
+    onSuccess: (articleId) => {
+      queryClient.invalidateQueries({ queryKey: ["articles"] });
+      router.push(`/articles/${articleId}`);
+    },
+    onError: (err) => {
       if (mountedRef.current) {
-        setError("Failed to start article generation. Please try again.");
-        setGenerating(false);
+        setError(err instanceof Error ? err.message : "Failed to start article generation. Please try again.");
       }
-    } finally {
+    },
+    onSettled: () => {
       pollingRef.current = false;
-    }
-  }
+    },
+  });
 
-  async function handleCreate() {
-    if (!title.trim() || !keyword.trim()) {
-      setError("Title and keyword are required");
-      return;
-    }
-
-    setGenerating(true);
-    setError("");
-
-    try {
-      const article = await api.articles.create({
+  const createMutation = useMutation({
+    mutationFn: () =>
+      api.articles.create({
         title: title.trim(),
         keyword: keyword.trim(),
         content: content.trim() || undefined,
         meta_description: metaDescription.trim() || undefined,
-      });
-
+      }),
+    onSuccess: (article) => {
+      queryClient.invalidateQueries({ queryKey: ["articles"] });
       router.push(`/articles/${article.id}`);
-    } catch (err) {
+    },
+    onError: (err) => {
       // FE-CONTENT-27: Show field-specific error if API returns one
       const apiError = parseApiError(err);
       if (apiError.field) {
@@ -173,9 +165,24 @@ function NewArticleContent() {
       } else {
         toast.error(apiError.message || "Failed to create article");
       }
-    } finally {
-      setGenerating(false);
+    },
+  });
+
+  const generating = generateMutation.isPending || createMutation.isPending;
+
+  function handleGenerate() {
+    if (!outline) return;
+    setError("");
+    generateMutation.mutate();
+  }
+
+  function handleCreate() {
+    if (!title.trim() || !keyword.trim()) {
+      setError("Title and keyword are required");
+      return;
     }
+    setError("");
+    createMutation.mutate();
   }
 
   if (loading) {
