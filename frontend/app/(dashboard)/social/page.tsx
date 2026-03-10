@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api, parseApiError, SocialAccount, SocialPost, getPostPlatforms } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -21,52 +22,75 @@ import { TierGate } from "@/components/ui/tier-gate";
 
 export default function SocialDashboard() {
   const router = useRouter();
-  const [accounts, setAccounts] = useState<SocialAccount[]>([]);
-  const [upcomingPosts, setUpcomingPosts] = useState<SocialPost[]>([]);
-  const [stats, setStats] = useState({
-    scheduled: 0,
-    postedThisWeek: 0,
-    totalPosted: 0,
+
+  // --- React Query hooks ---
+
+  const {
+    data: accountsData,
+    isLoading: accountsLoading,
+  } = useQuery({
+    queryKey: ["social", "accounts"],
+    queryFn: () => api.social.accounts(),
+    staleTime: 30_000,
+    meta: { errorMessage: "Failed to load social accounts" },
   });
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
+  const {
+    data: upcomingData,
+    isLoading: upcomingLoading,
+  } = useQuery({
+    queryKey: ["social", "posts", { page: 1, page_size: 5 }],
+    queryFn: async () => {
+      try {
+        return await api.social.posts({ page: 1, page_size: 5 });
+      } catch (err) {
+        toast.error(parseApiError(err).message);
+        throw err;
+      }
+    },
+    staleTime: 30_000,
+  });
 
-  const loadDashboardData = async () => {
-    try {
-      setLoading(true);
-      const [accountsRes, upcomingRes, recentRes] = await Promise.all([
-        api.social.accounts(),
-        api.social.posts({ page: 1, page_size: 5 }),
-        api.social.posts({ page: 1, page_size: 20, status: "posted" }),
-      ]);
+  const {
+    data: recentPostedData,
+    isLoading: recentPostedLoading,
+  } = useQuery({
+    queryKey: ["social", "posts", { page: 1, page_size: 20, status: "posted" }],
+    queryFn: async () => {
+      try {
+        return await api.social.posts({ page: 1, page_size: 20, status: "posted" });
+      } catch (err) {
+        toast.error(parseApiError(err).message);
+        throw err;
+      }
+    },
+    staleTime: 30_000,
+  });
 
-      setAccounts(accountsRes.accounts);
-      // Show upcoming (non-posted) posts
-      const upcoming = upcomingRes.items.filter(
-        (p) => p.status !== "posted" && p.status !== "failed" && p.status !== "cancelled"
-      );
-      setUpcomingPosts(upcoming);
+  // --- Derived state ---
 
-      // Calculate stats from separate queries
-      const scheduled = upcoming.length;
-      const postedThisWeek = recentRes.items.filter(
-        (p) => isThisWeek(p.published_at || p.updated_at || "")
-      ).length;
+  const loading = accountsLoading || upcomingLoading || recentPostedLoading;
 
-      setStats({
-        scheduled,
-        postedThisWeek,
-        totalPosted: recentRes.total,
-      });
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const accounts = accountsData?.accounts ?? [];
+
+  const upcomingPosts = useMemo(() => {
+    if (!upcomingData) return [];
+    return upcomingData.items.filter(
+      (p) => p.status !== "posted" && p.status !== "failed" && p.status !== "cancelled"
+    );
+  }, [upcomingData]);
+
+  const stats = useMemo(() => {
+    const scheduled = upcomingPosts.length;
+    const postedThisWeek = (recentPostedData?.items ?? []).filter(
+      (p) => isThisWeek(p.published_at || p.updated_at || "")
+    ).length;
+    return {
+      scheduled,
+      postedThisWeek,
+      totalPosted: recentPostedData?.total ?? 0,
+    };
+  }, [upcomingPosts, recentPostedData]);
 
   const isThisWeek = (date: string) => {
     const postDate = new Date(date);

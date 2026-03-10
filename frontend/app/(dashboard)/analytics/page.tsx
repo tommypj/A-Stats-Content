@@ -15,15 +15,11 @@ import {
   Globe,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
   api,
   parseApiError,
-  AnalyticsSummary,
-  DailyAnalyticsData,
-  GSCSite,
-  DeviceBreakdownItem,
-  CountryBreakdownItem,
 } from "@/lib/api";
 import { StatCard } from "@/components/analytics/stat-card";
 import { PerformanceChart } from "@/components/analytics/performance-chart";
@@ -34,160 +30,140 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TierGate } from "@/components/ui/tier-gate";
 
 export default function AnalyticsPage() {
-  const [isConnected, setIsConnected] = useState(false);
-  const [siteUrl, setSiteUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
+  const queryClient = useQueryClient();
+
   const [dateRange, setDateRange] = useState(28);
   const [debouncedDateRange, setDebouncedDateRange] = useState(dateRange);
-  const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
-  const [dailyData, setDailyData] = useState<DailyAnalyticsData[]>([]);
-  const [lastSync, setLastSync] = useState<string | null>(null);
-
-  // Device / Country breakdown state
-  const [deviceData, setDeviceData] = useState<DeviceBreakdownItem[]>([]);
-  const [countryData, setCountryData] = useState<CountryBreakdownItem[]>([]);
-  const [isLoadingBreakdown, setIsLoadingBreakdown] = useState(false);
-
-  // Site selection state
-  const [sites, setSites] = useState<GSCSite[]>([]);
-  const [isLoadingSites, setIsLoadingSites] = useState(false);
-  const [isSelectingSite, setIsSelectingSite] = useState(false);
-  const [sitesLoadError, setSitesLoadError] = useState<string | null>(null);
-
-  useEffect(() => {
-    checkStatus();
-  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedDateRange(dateRange), 300);
     return () => clearTimeout(timer);
   }, [dateRange]);
 
-  useEffect(() => {
-    if (isConnected && siteUrl) {
-      loadAnalytics();
-      loadBreakdowns();
-    }
-  }, [isConnected, siteUrl, debouncedDateRange]);
+  // --- React Query hooks ---
 
-  useEffect(() => {
-    if (isConnected && !siteUrl) {
-      loadSites();
-    }
-  }, [isConnected, siteUrl]);
+  const {
+    data: statusData,
+    isLoading: isLoadingStatus,
+  } = useQuery({
+    queryKey: ["analytics", "status"],
+    queryFn: () => api.analytics.status(),
+    staleTime: 60_000,
+  });
 
-  async function checkStatus() {
-    try {
-      setIsLoading(true);
-      const status = await api.analytics.status();
-      setIsConnected(status.connected);
-      setSiteUrl(status.site_url || null);
-      setLastSync(status.last_sync || null);
-    } catch (error) {
-      console.error("Failed to check analytics status:", error);
-      toast.error(parseApiError(error).message);
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  const isConnected = statusData?.connected ?? false;
+  const siteUrl = statusData?.site_url || null;
+  const lastSync = statusData?.last_sync || null;
 
-  async function loadSites() {
-    try {
-      setIsLoadingSites(true);
-      setSitesLoadError(null);
-      const response = await api.analytics.sites();
-      setSites(response.sites);
-    } catch (error) {
-      const apiError = parseApiError(error);
-      const message = apiError.message || "Failed to load GSC sites";
-      setSitesLoadError(message);
-      toast.error(message);
-    } finally {
-      setIsLoadingSites(false);
-    }
-  }
+  const {
+    data: sitesData,
+    isLoading: isLoadingSites,
+    error: sitesError,
+    refetch: refetchSites,
+  } = useQuery({
+    queryKey: ["analytics", "sites"],
+    queryFn: () => api.analytics.sites(),
+    enabled: isConnected && !siteUrl,
+    staleTime: 60_000,
+  });
 
-  async function handleSelectSite(selectedSiteUrl: string) {
-    try {
-      setIsSelectingSite(true);
-      await api.analytics.selectSite(selectedSiteUrl);
-      setSiteUrl(selectedSiteUrl);
-      toast.success("Site selected! Syncing data...");
-      // Auto-sync after selecting site
-      await handleSync();
-    } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to select site");
-    } finally {
-      setIsSelectingSite(false);
-    }
-  }
+  const sites = sitesData?.sites ?? [];
+  const sitesLoadError = sitesError ? parseApiError(sitesError).message : null;
 
-  async function loadAnalytics() {
-    try {
-      setIsLoading(true);
-      const [summaryData, dailyResponse] = await Promise.all([
-        api.analytics.summary(),
-        api.analytics.daily({ page: 1, page_size: debouncedDateRange }),
-      ]);
-      setSummary(summaryData);
-      setDailyData(dailyResponse.items);
-    } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to load analytics data");
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  const {
+    data: summaryData,
+    isLoading: isLoadingSummary,
+  } = useQuery({
+    queryKey: ["analytics", "summary", { siteUrl }],
+    queryFn: () => api.analytics.summary(),
+    enabled: isConnected && !!siteUrl,
+    staleTime: 60_000,
+  });
 
-  async function loadBreakdowns() {
-    try {
-      setIsLoadingBreakdown(true);
-      const [deviceRes, countryRes] = await Promise.all([
-        api.analytics.deviceBreakdown(debouncedDateRange),
-        api.analytics.countryBreakdown(debouncedDateRange, 10),
-      ]);
-      setDeviceData(deviceRes.items);
-      setCountryData(countryRes.items);
-    } catch (error) {
-      // Breakdowns are supplementary — soft toast instead of blocking
-      toast.error(parseApiError(error).message);
-    } finally {
-      setIsLoadingBreakdown(false);
-    }
-  }
+  const summary = summaryData ?? null;
 
-  async function handleConnect() {
-    try {
-      setIsConnecting(true);
-      const response = await api.analytics.getAuthUrl();
-      // Store CSRF state in sessionStorage so the callback page can validate it
+  const {
+    data: dailyResponse,
+    isLoading: isLoadingDaily,
+  } = useQuery({
+    queryKey: ["analytics", "daily", { dateRange: debouncedDateRange, siteUrl }],
+    queryFn: () => api.analytics.daily({ page: 1, page_size: debouncedDateRange }),
+    enabled: isConnected && !!siteUrl,
+    staleTime: 60_000,
+  });
+
+  const dailyData = dailyResponse?.items ?? [];
+
+  const {
+    data: deviceResponse,
+    isLoading: isLoadingDevices,
+  } = useQuery({
+    queryKey: ["analytics", "deviceBreakdown", { dateRange: debouncedDateRange, siteUrl }],
+    queryFn: () => api.analytics.deviceBreakdown(debouncedDateRange),
+    enabled: isConnected && !!siteUrl,
+    staleTime: 60_000,
+  });
+
+  const deviceData = deviceResponse?.items ?? [];
+
+  const {
+    data: countryResponse,
+    isLoading: isLoadingCountry,
+  } = useQuery({
+    queryKey: ["analytics", "countryBreakdown", { dateRange: debouncedDateRange, siteUrl }],
+    queryFn: () => api.analytics.countryBreakdown(debouncedDateRange, 10),
+    enabled: isConnected && !!siteUrl,
+    staleTime: 60_000,
+  });
+
+  const countryData = countryResponse?.items ?? [];
+
+  const isLoadingBreakdown = isLoadingDevices || isLoadingCountry;
+
+  // --- Mutations ---
+
+  const connectMutation = useMutation({
+    mutationFn: () => api.analytics.getAuthUrl(),
+    onSuccess: (response) => {
       localStorage.setItem("gsc_oauth_state", response.state);
       localStorage.setItem("gsc_oauth_state_ts", Date.now().toString());
       window.location.href = response.auth_url;
-    } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to initiate Google connection");
-      setIsConnecting(false);
-    }
-  }
+    },
+    onError: (error) => {
+      toast.error(parseApiError(error).message);
+    },
+  });
 
-  async function handleSync() {
-    try {
-      setIsSyncing(true);
-      await api.analytics.sync();
+  const selectSiteMutation = useMutation({
+    mutationFn: (selectedSiteUrl: string) => api.analytics.selectSite(selectedSiteUrl),
+    onSuccess: async () => {
+      toast.success("Site selected! Syncing data...");
+      // Invalidate status so siteUrl updates, then trigger sync
+      await queryClient.invalidateQueries({ queryKey: ["analytics", "status"] });
+      syncMutation.mutate();
+    },
+    onError: (error) => {
+      toast.error(parseApiError(error).message);
+    },
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: () => api.analytics.sync(),
+    onSuccess: async () => {
       toast.success("Analytics data synced successfully!");
-      await loadAnalytics();
-      await checkStatus();
-    } catch (error) {
-      const apiError = parseApiError(error);
-      toast.error(apiError.message || "Failed to sync analytics data");
-    } finally {
-      setIsSyncing(false);
-    }
-  }
+      // Invalidate all analytics queries to refetch fresh data
+      await queryClient.invalidateQueries({ queryKey: ["analytics"] });
+    },
+    onError: (error) => {
+      toast.error(parseApiError(error).message);
+    },
+  });
+
+  // --- Derived loading state ---
+
+  const isLoading = isLoadingStatus || (isConnected && !!siteUrl && (isLoadingSummary || isLoadingDaily));
+
+  // --- Formatters ---
 
   const formatNumber = (num: number) => {
     return new Intl.NumberFormat("en-US").format(Math.round(num));
@@ -223,7 +199,7 @@ export default function AnalyticsPage() {
             Track your website performance with Google Search Console
           </p>
         </div>
-        <GscConnectBanner onConnect={handleConnect} isLoading={isConnecting} />
+        <GscConnectBanner onConnect={() => connectMutation.mutate()} isLoading={connectMutation.isPending} />
       </div>
     );
   }
@@ -260,7 +236,7 @@ export default function AnalyticsPage() {
                 <Button
                   variant="outline"
                   className="mt-4"
-                  onClick={loadSites}
+                  onClick={() => refetchSites()}
                 >
                   Retry
                 </Button>
@@ -276,7 +252,7 @@ export default function AnalyticsPage() {
                 <Button
                   variant="outline"
                   className="mt-4"
-                  onClick={loadSites}
+                  onClick={() => refetchSites()}
                 >
                   Retry
                 </Button>
@@ -286,8 +262,8 @@ export default function AnalyticsPage() {
                 {sites.map((site) => (
                   <button
                     key={site.site_url}
-                    onClick={() => handleSelectSite(site.site_url)}
-                    disabled={isSelectingSite}
+                    onClick={() => selectSiteMutation.mutate(site.site_url)}
+                    disabled={selectSiteMutation.isPending}
                     className="w-full flex items-center justify-between p-4 rounded-xl border border-surface-tertiary hover:border-primary-500 hover:bg-primary-50 transition-colors text-left disabled:opacity-50"
                   >
                     <div>
@@ -328,8 +304,8 @@ export default function AnalyticsPage() {
           <DateRangePicker value={dateRange} onChange={setDateRange} />
           <Button
             variant="outline"
-            onClick={handleSync}
-            isLoading={isSyncing}
+            onClick={() => syncMutation.mutate()}
+            isLoading={syncMutation.isPending}
             leftIcon={<RefreshCw className="h-4 w-4" />}
           >
             Sync Data

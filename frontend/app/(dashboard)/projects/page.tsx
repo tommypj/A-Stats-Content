@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, Project, parseApiError } from "@/lib/api";
@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { TierGate } from "@/components/ui/tier-gate";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 
 const roleIcons: Record<string, typeof Crown> = {
@@ -43,38 +44,38 @@ const roleColors: Record<string, string> = {
 
 export default function ProjectsPage() {
   const router = useRouter();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
+  const queryClient = useQueryClient();
   const [switchingProject, setSwitchingProject] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadProjects();
-  }, []);
+  const {
+    data: projects = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery<Project[]>({
+    queryKey: ["projects"],
+    queryFn: () => api.projects.list(),
+    staleTime: 30_000,
+  });
 
-  const loadProjects = async () => {
-    try {
-      setError("");
-      const data = await api.projects.list();
-      setProjects(data);
-    } catch (err) {
-      setError(parseApiError(err).message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSwitchProject = async (projectId: string | null) => {
-    setSwitchingProject(projectId || "personal");
-    try {
-      await api.projects.switch(projectId);
-      // Redirect to dashboard after switching
+  const switchMutation = useMutation({
+    mutationFn: (projectId: string | null) => api.projects.switch(projectId),
+    onMutate: (projectId) => {
+      setSwitchingProject(projectId || "personal");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
       router.push("/dashboard");
       router.refresh();
-    } catch (err) {
+    },
+    onError: (err) => {
       toast.error(parseApiError(err).message);
       setSwitchingProject(null);
-    }
+    },
+  });
+
+  const handleSwitchProject = (projectId: string | null) => {
+    switchMutation.mutate(projectId);
   };
 
   if (isLoading) {
@@ -112,8 +113,8 @@ export default function ProjectsPage() {
 
         <Card className="p-6">
           <div className="text-center py-8">
-            <p className="text-red-600 mb-4">{error}</p>
-            <Button onClick={loadProjects}>Retry</Button>
+            <p className="text-red-600 mb-4">{parseApiError(error).message}</p>
+            <Button onClick={() => refetch()}>Retry</Button>
           </div>
         </Card>
       </div>
@@ -179,7 +180,7 @@ export default function ProjectsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map((project) => {
               const RoleIcon = roleIcons[project.my_role];
-              const isLoading = switchingProject === project.id;
+              const isSwitching = switchingProject === project.id;
 
               return (
                 <Card
@@ -244,10 +245,10 @@ export default function ProjectsPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleSwitchProject(project.id)}
-                          isLoading={isLoading}
+                          isLoading={isSwitching}
                           disabled={switchingProject !== null}
                         >
-                          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Switch"}
+                          {isSwitching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Switch"}
                         </Button>
                       </div>
                     </div>

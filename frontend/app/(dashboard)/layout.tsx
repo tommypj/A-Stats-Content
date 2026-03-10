@@ -56,6 +56,8 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { KeyboardShortcutsDialog } from "@/components/ui/keyboard-shortcuts-dialog";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { PostHogProvider, PostHogPageview } from "@/components/PostHogProvider";
+import { Suspense } from "react";
 
 // Tier hierarchy: higher number = higher plan
 const TIER_ORDER: Record<string, number> = {
@@ -921,8 +923,13 @@ export default function DashboardLayout({
   }
 
   return (
-    <ProjectProvider>
-      <DashboardContent>{children}</DashboardContent>
-    </ProjectProvider>
+    <PostHogProvider>
+      <Suspense fallback={null}>
+        <PostHogPageview />
+      </Suspense>
+      <ProjectProvider>
+        <DashboardContent>{children}</DashboardContent>
+      </ProjectProvider>
+    </PostHogProvider>
   );
 }

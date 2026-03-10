@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   ScanSearch,
@@ -27,6 +27,7 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useRequireAuth } from "@/lib/auth";
 import { useAuthStore } from "@/stores/auth";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -133,17 +134,13 @@ function ScoreCircle({ score, size = "large" }: { score: number; size?: "large" 
 type ResultTab = "overview" | "issues" | "pages" | "performance";
 
 function OverviewTab({ audit }: { audit: SiteAudit }) {
-  const [issues, setIssues] = useState<AuditIssue[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: issuesData, isLoading: loading } = useQuery({
+    queryKey: ["site-audit", "issues", { auditId: audit.id, overview: true }],
+    queryFn: () => api.siteAudit.issues(audit.id, { page: 1, page_size: 100 }),
+    staleTime: 30_000,
+  });
 
-  useEffect(() => {
-    setLoading(true);
-    api.siteAudit
-      .issues(audit.id, { page: 1, page_size: 100 })
-      .then((data) => setIssues(data.items))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [audit.id]);
+  const issues = issuesData?.items ?? [];
 
   // Aggregate issues by type
   const issuesByType = issues.reduce<Record<string, { count: number; severity: string }>>((acc, issue) => {
@@ -217,51 +214,37 @@ function OverviewTab({ audit }: { audit: SiteAudit }) {
 }
 
 function IssuesTab({ auditId }: { auditId: string }) {
-  const [issues, setIssues] = useState<AuditIssue[]>([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const [severity, setSeverity] = useState("");
   const [issueType, setIssueType] = useState("");
-  const [issueTypes, setIssueTypes] = useState<string[]>([]);
 
-  const issueTypesLoaded = useRef(false);
+  // Main issues query with filters
+  const { data: issuesData, isLoading: loading } = useQuery({
+    queryKey: ["site-audit", "issues", { auditId, page, severity, issueType }],
+    queryFn: () =>
+      api.siteAudit.issues(auditId, {
+        page,
+        page_size: 20,
+        severity: severity || undefined,
+        issue_type: issueType || undefined,
+      }),
+    staleTime: 30_000,
+  });
 
-  const loadIssues = useCallback(
-    async (pg: number, sev: string, type: string) => {
-      setLoading(true);
-      try {
-        const data = await api.siteAudit.issues(auditId, {
-          page: pg,
-          page_size: 20,
-          severity: sev || undefined,
-          issue_type: type || undefined,
-        });
-        setIssues(data.items);
-        setTotalPages(data.pages);
-        setTotal(data.total);
-
-        // Extract unique issue types from unfiltered first load (no extra API call)
-        if (!issueTypesLoaded.current && !sev && !type && pg === 1) {
-          // Fetch a larger page just for type extraction
-          const allData = await api.siteAudit.issues(auditId, { page: 1, page_size: 100 });
-          const types = [...new Set(allData.items.map((i) => i.issue_type))].sort();
-          setIssueTypes(types);
-          issueTypesLoaded.current = true;
-        }
-      } catch (err) {
-        toast.error(parseApiError(err).message);
-      } finally {
-        setLoading(false);
-      }
+  // Separate query for issue types (fetched once for the filter dropdown)
+  const { data: issueTypesData } = useQuery({
+    queryKey: ["site-audit", "issue-types", { auditId }],
+    queryFn: async () => {
+      const allData = await api.siteAudit.issues(auditId, { page: 1, page_size: 100 });
+      return [...new Set(allData.items.map((i) => i.issue_type))].sort();
     },
-    [auditId]
-  );
+    staleTime: 60_000,
+  });
 
-  useEffect(() => {
-    loadIssues(page, severity, issueType);
-  }, [page, severity, issueType, loadIssues]);
+  const issues = issuesData?.items ?? [];
+  const totalPages = issuesData?.pages ?? 1;
+  const total = issuesData?.total ?? 0;
+  const issueTypes = issueTypesData ?? [];
 
   return (
     <div>
@@ -392,38 +375,24 @@ function IssuesTab({ auditId }: { auditId: string }) {
 }
 
 function PagesTab({ auditId }: { auditId: string }) {
-  const [pages, setPages] = useState<AuditPage[]>([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const [onlyWithIssues, setOnlyWithIssues] = useState(false);
   const [expandedPage, setExpandedPage] = useState<string | null>(null);
 
-  const loadPages = useCallback(
-    async (pg: number, hasIssues: boolean) => {
-      setLoading(true);
-      try {
-        const data = await api.siteAudit.pages(auditId, {
-          page: pg,
-          page_size: 20,
-          has_issues: hasIssues || undefined,
-        });
-        setPages(data.items);
-        setTotalPages(data.pages);
-        setTotal(data.total);
-      } catch (err) {
-        toast.error(parseApiError(err).message);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [auditId]
-  );
+  const { data: pagesData, isLoading: loading } = useQuery({
+    queryKey: ["site-audit", "pages", { auditId, page, onlyWithIssues }],
+    queryFn: () =>
+      api.siteAudit.pages(auditId, {
+        page,
+        page_size: 20,
+        has_issues: onlyWithIssues || undefined,
+      }),
+    staleTime: 30_000,
+  });
 
-  useEffect(() => {
-    loadPages(page, onlyWithIssues);
-  }, [page, onlyWithIssues, loadPages]);
+  const pages = pagesData?.items ?? [];
+  const totalPages = pagesData?.pages ?? 1;
+  const total = pagesData?.total ?? 0;
 
   function toggleExpand(pageId: string) {
     setExpandedPage((prev) => (prev === pageId ? null : pageId));
@@ -633,19 +602,16 @@ function perfScoreRing(score: number): string {
 }
 
 function PerformanceTab({ auditId }: { auditId: string }) {
-  const [pages, setPages] = useState<AuditPage[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: pagesWithPerf, isLoading: loading } = useQuery({
+    queryKey: ["site-audit", "performance", { auditId }],
+    queryFn: async () => {
+      const data = await api.siteAudit.pages(auditId, { page: 1, page_size: 20 });
+      return data.items.filter((p) => p.performance_score != null);
+    },
+    staleTime: 30_000,
+  });
 
-  useEffect(() => {
-    setLoading(true);
-    api.siteAudit
-      .pages(auditId, { page: 1, page_size: 20 })
-      .then((data) => {
-        setPages(data.items.filter((p) => p.performance_score != null));
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [auditId]);
+  const pages = pagesWithPerf ?? [];
 
   if (loading) {
     return (
@@ -798,155 +764,119 @@ export default function SiteAuditPage() {
   const user = useAuthStore((s) => s.user);
   const isFree = !user?.subscription_tier || user.subscription_tier === "free";
 
-  // History list
-  const [audits, setAudits] = useState<SiteAudit[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   // Input state
   const [domain, setDomain] = useState("");
-  const [submitting, setSubmitting] = useState(false);
 
   // Selected audit
-  const [selected, setSelected] = useState<SiteAudit | null>(null);
-  const [selectedLoading, setSelectedLoading] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // Active tab in results view
   const [activeTab, setActiveTab] = useState<ResultTab>("overview");
 
-  // Poll ref
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   // ---------------------------------------------------------------------------
-  // Data fetching
+  // Data fetching with React Query
   // ---------------------------------------------------------------------------
 
-  const loadHistory = useCallback(async () => {
-    try {
-      const data = await api.siteAudit.list({ page: 1, page_size: 20 });
-      setAudits(data.items);
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setHistoryLoading(false);
-    }
-  }, []);
+  const {
+    data: historyData,
+    isLoading: historyLoading,
+  } = useQuery({
+    queryKey: ["site-audit", "list"],
+    queryFn: () => api.siteAudit.list({ page: 1, page_size: 20 }),
+    staleTime: 30_000,
+  });
 
-  useEffect(() => {
-    loadHistory();
-  }, [loadHistory]);
+  const audits = historyData?.items ?? [];
 
-  const loadDetail = useCallback(async (id: string) => {
-    setSelectedLoading(true);
-    try {
-      const data = await api.siteAudit.get(id);
-      setSelected(data);
-      return data;
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-      return null;
-    } finally {
-      setSelectedLoading(false);
-    }
-  }, []);
-
-  // ---------------------------------------------------------------------------
-  // Polling for in-progress audits
-  // ---------------------------------------------------------------------------
-
-  const stopPolling = useCallback(() => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-  }, []);
-
-  const startPolling = useCallback(
-    (id: string) => {
-      stopPolling();
-      pollRef.current = setInterval(async () => {
-        try {
-          const data = await api.siteAudit.get(id);
-          setSelected(data);
-          // Update status in history list too
-          setAudits((prev) =>
-            prev.map((a) =>
-              a.id === id
-                ? { ...a, status: data.status, pages_crawled: data.pages_crawled, pages_discovered: data.pages_discovered }
-                : a
-            )
-          );
-          if (!isInProgress(data.status)) {
-            stopPolling();
-            if (data.status === "completed") {
-              setActiveTab("overview");
-            }
-          }
-        } catch {
-          // silent poll failure
-        }
-      }, 5000);
+  // Detail query — only runs when we have a selectedId
+  const {
+    data: selected,
+    isLoading: selectedLoading,
+  } = useQuery({
+    queryKey: ["site-audit", "detail", { id: selectedId }],
+    queryFn: () => api.siteAudit.get(selectedId!),
+    enabled: !!selectedId,
+    staleTime: 30_000,
+    // Poll every 5s while audit is in progress
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (data && isInProgress(data.status)) return 5_000;
+      return false;
     },
-    [stopPolling]
-  );
+  });
 
-  useEffect(() => {
-    if (selected && isInProgress(selected.status)) {
-      startPolling(selected.id);
-    } else {
-      stopPolling();
+  // When polling detects completion, invalidate history so counts update
+  const prevStatusRef = useRef<string | undefined>();
+  if (selected && prevStatusRef.current !== selected.status) {
+    const wasInProgress = prevStatusRef.current && isInProgress(prevStatusRef.current);
+    prevStatusRef.current = selected.status;
+    if (wasInProgress && !isInProgress(selected.status)) {
+      // Audit just finished — refresh history list
+      queryClient.invalidateQueries({ queryKey: ["site-audit", "list"] });
+      if (selected.status === "completed") {
+        setActiveTab("overview");
+      }
     }
-    return () => stopPolling();
-  }, [selected?.id, selected?.status, startPolling, stopPolling]); // eslint-disable-line react-hooks/exhaustive-deps
+  }
+
+  // ---------------------------------------------------------------------------
+  // Mutations
+  // ---------------------------------------------------------------------------
+
+  const startMutation = useMutation({
+    mutationFn: (trimmedDomain: string) => api.siteAudit.start(trimmedDomain),
+    onSuccess: (audit) => {
+      toast.success(`Audit started for ${audit.domain}`);
+      setDomain("");
+      queryClient.invalidateQueries({ queryKey: ["site-audit", "list"] });
+      setSelectedId(audit.id);
+      setActiveTab("overview");
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.siteAudit.delete(id),
+    onSuccess: (_data, id) => {
+      queryClient.invalidateQueries({ queryKey: ["site-audit", "list"] });
+      if (selectedId === id) {
+        setSelectedId(null);
+      }
+      toast.success("Audit deleted.");
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
 
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
 
-  async function handleStart(e: React.FormEvent) {
+  function handleStart(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = domain.trim();
     if (!trimmed) return;
-    setSubmitting(true);
-    try {
-      const audit = await api.siteAudit.start(trimmed);
-      toast.success(`Audit started for ${trimmed}`);
-      setDomain("");
-      setAudits((prev) => [audit, ...prev]);
-      const detail = await loadDetail(audit.id);
-      if (detail) {
-        setActiveTab("overview");
-      }
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    } finally {
-      setSubmitting(false);
-    }
+    startMutation.mutate(trimmed);
   }
 
-  async function handleDelete(id: string, e: React.MouseEvent) {
+  function handleDelete(id: string, e: React.MouseEvent) {
     e.stopPropagation();
-    try {
-      await api.siteAudit.delete(id);
-      setAudits((prev) => prev.filter((a) => a.id !== id));
-      if (selected?.id === id) {
-        setSelected(null);
-        stopPolling();
-      }
-      toast.success("Audit deleted.");
-    } catch (err) {
-      toast.error(parseApiError(err).message);
-    }
+    deleteMutation.mutate(id);
   }
 
-  async function handleSelectAudit(audit: SiteAudit) {
+  function handleSelectAudit(audit: SiteAudit) {
     setActiveTab("overview");
-    await loadDetail(audit.id);
+    setSelectedId(audit.id);
   }
 
   function handleBack() {
-    setSelected(null);
-    stopPolling();
-    loadHistory();
+    setSelectedId(null);
+    queryClient.invalidateQueries({ queryKey: ["site-audit", "list"] });
   }
 
   async function handleExportCsv() {
@@ -1202,7 +1132,7 @@ export default function SiteAuditPage() {
             )}
           </div>
           <button
-            onClick={() => setSelected(null)}
+            onClick={() => setSelectedId(null)}
             className="text-xs text-red-600 hover:text-red-800"
           >
             Dismiss
@@ -1223,11 +1153,11 @@ export default function SiteAuditPage() {
                 onChange={(e) => setDomain(e.target.value)}
                 placeholder="e.g. example.com"
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-surface-tertiary bg-surface text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-400 transition-colors"
-                disabled={submitting}
+                disabled={startMutation.isPending}
               />
             </div>
-            <Button type="submit" disabled={submitting || !domain.trim()}>
-              {submitting ? (
+            <Button type="submit" disabled={startMutation.isPending || !domain.trim()}>
+              {startMutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   Starting...

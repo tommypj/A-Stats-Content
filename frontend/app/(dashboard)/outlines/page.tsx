@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { api, parseApiError, Outline } from "@/lib/api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -48,8 +49,7 @@ const STATUS_OPTIONS = [
 
 export default function OutlinesPage() {
   const searchParams = useSearchParams();
-  const [outlines, setOutlines] = useState<Outline[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [initialKeyword, setInitialKeyword] = useState("");
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -57,15 +57,12 @@ export default function OutlinesPage() {
   // Pagination & filter state
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalItems, setTotalItems] = useState(0);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [debouncedKeyword, setDebouncedKeyword] = useState("");
 
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string } | null>(null);
 
   // Open create modal with pre-filled keyword when ?keyword= is in the URL
@@ -105,54 +102,74 @@ export default function OutlinesPage() {
     setSelectedIds(new Set());
   }, [page, debouncedKeyword, statusFilter]);
 
-  const loadOutlines = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await api.outlines.list({
+  // --- React Query: fetch outlines ---
+  const queryKey = ["outlines", { page, page_size: pageSize, keyword: debouncedKeyword || undefined, status: statusFilter || undefined }];
+
+  const {
+    data: outlinesData,
+    isLoading: loading,
+  } = useQuery({
+    queryKey,
+    queryFn: () =>
+      api.outlines.list({
         page,
         page_size: pageSize,
         keyword: debouncedKeyword || undefined,
         status: statusFilter || undefined,
-      });
-      setOutlines(response.items);
-      setTotalItems(response.total);
-      setTotalPages(response.pages);
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, pageSize, debouncedKeyword, statusFilter]);
+      }),
+    staleTime: 30_000,
+  });
 
-  // Load outlines whenever page, debouncedKeyword, or statusFilter changes
-  useEffect(() => {
-    loadOutlines();
-  }, [loadOutlines]);
+  const outlines = outlinesData?.items ?? [];
+  const totalItems = outlinesData?.total ?? 0;
+  const totalPages = outlinesData?.pages ?? 0;
+
+  // --- Mutations ---
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.outlines.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["outlines"] });
+    },
+    onError: (error) => {
+      toast.error(parseApiError(error).message);
+    },
+  });
+
+  const regenerateMutation = useMutation({
+    mutationFn: (id: string) => api.outlines.regenerate(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["outlines"] });
+    },
+    onError: (error) => {
+      toast.error(parseApiError(error).message);
+    },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) => api.outlines.bulkDelete(ids),
+    onSuccess: () => {
+      setSelectedIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["outlines"] });
+    },
+    onError: (error) => {
+      toast.error(parseApiError(error).message);
+    },
+  });
 
   function handleDelete(id: string) {
     setActiveMenu(null);
     setConfirmAction({
-      action: async () => {
-        try {
-          await api.outlines.delete(id);
-          setOutlines((prev) => prev.filter((o) => o.id !== id));
-          setTotalItems((prev) => Math.max(0, prev - 1));
-        } catch (error) {
-          toast.error(parseApiError(error).message);
-        }
+      action: () => {
+        deleteMutation.mutate(id);
       },
       title: "Delete Outline",
       message: "Are you sure you want to delete this outline? This action cannot be undone.",
     });
   }
 
-  async function handleRegenerate(id: string) {
-    try {
-      const updated = await api.outlines.regenerate(id);
-      setOutlines(outlines.map((o) => (o.id === id ? updated : o)));
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-    }
+  function handleRegenerate(id: string) {
+    regenerateMutation.mutate(id);
     setActiveMenu(null);
   }
 
@@ -190,17 +207,8 @@ export default function OutlinesPage() {
   function handleBulkDelete() {
     const count = selectedIds.size;
     setConfirmAction({
-      action: async () => {
-        setIsBulkDeleting(true);
-        try {
-          await api.outlines.bulkDelete(Array.from(selectedIds));
-          setSelectedIds(new Set());
-          await loadOutlines();
-        } catch (error) {
-          toast.error(parseApiError(error).message);
-        } finally {
-          setIsBulkDeleting(false);
-        }
+      action: () => {
+        bulkDeleteMutation.mutate(Array.from(selectedIds));
       },
       title: `Delete ${count} Outline${count !== 1 ? "s" : ""}`,
       message: `Delete ${count} outline${count !== 1 ? "s" : ""}? This cannot be undone.`,
@@ -331,10 +339,10 @@ export default function OutlinesPage() {
             </button>
             <button
               onClick={handleBulkDelete}
-              disabled={isBulkDeleting}
+              disabled={bulkDeleteMutation.isPending}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {isBulkDeleting ? (
+              {bulkDeleteMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Trash2 className="h-4 w-4" />
@@ -532,9 +540,8 @@ export default function OutlinesPage() {
         <CreateOutlineModal
           initialKeyword={initialKeyword}
           onClose={() => { setShowCreateModal(false); setInitialKeyword(""); }}
-          onCreate={(outline) => {
-            setOutlines([outline, ...outlines]);
-            setTotalItems((prev) => prev + 1);
+          onCreate={() => {
+            queryClient.invalidateQueries({ queryKey: ["outlines"] });
             setShowCreateModal(false);
           }}
         />
@@ -550,40 +557,41 @@ function CreateOutlineModal({
 }: {
   initialKeyword?: string;
   onClose: () => void;
-  onCreate: (outline: Outline) => void;
+  onCreate: () => void;
 }) {
   const [keyword, setKeyword] = useState(initialKeyword);
   const [targetAudience, setTargetAudience] = useState("");
   const [tone, setTone] = useState("professional");
   const [wordCount, setWordCount] = useState(1500);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  async function handleSubmit(e: React.FormEvent) {
+  const createMutation = useMutation({
+    mutationFn: (data: { keyword: string; target_audience?: string; tone: string; word_count_target: number; auto_generate: boolean }) =>
+      api.outlines.create(data),
+    onSuccess: () => {
+      onCreate();
+    },
+    onError: (error) => {
+      toast.error(parseApiError(error).message);
+    },
+  });
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!keyword.trim()) {
-      setError("Keyword is required");
+      toast.error("Keyword is required");
       return;
     }
 
-    setLoading(true);
-    setError("");
-
-    try {
-      const outline = await api.outlines.create({
-        keyword: keyword.trim(),
-        target_audience: targetAudience.trim() || undefined,
-        tone,
-        word_count_target: wordCount,
-        auto_generate: true,
-      });
-      onCreate(outline);
-    } catch (err) {
-      setError("Failed to create outline. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+    createMutation.mutate({
+      keyword: keyword.trim(),
+      target_audience: targetAudience.trim() || undefined,
+      tone,
+      word_count_target: wordCount,
+      auto_generate: true,
+    });
   }
+
+  const loading = createMutation.isPending;
 
   return (
     <Dialog
@@ -673,8 +681,8 @@ function CreateOutlineModal({
             </div>
           </div>
 
-          {error && (
-            <p className="text-sm text-red-600">{error}</p>
+          {createMutation.isError && (
+            <p className="text-sm text-red-600">{parseApiError(createMutation.error).message}</p>
           )}
 
           <div className="flex gap-3 pt-4">

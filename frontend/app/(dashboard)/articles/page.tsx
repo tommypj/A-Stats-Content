@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -24,6 +24,7 @@ import {
   Download,
   X,
 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, parseApiError, Article } from "@/lib/api";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { toast } from "sonner";
@@ -65,16 +66,13 @@ function getSeoScoreColor(score: number | undefined) {
 
 export default function ArticlesPage() {
   const router = useRouter();
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [contentFilter, setContentFilter] = useState<ContentFilter>("all");
 
   // Pagination state
   const [page, setPage] = useState(1);
   const pageSize = 20;
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalArticles, setTotalArticles] = useState(0);
 
   // Search/filter state
   const [searchKeyword, setSearchKeyword] = useState("");
@@ -83,7 +81,6 @@ export default function ArticlesPage() {
 
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ action: () => void; title: string; message: string } | null>(null);
 
   const {
@@ -164,60 +161,83 @@ export default function ArticlesPage() {
     setSelectedIds(new Set());
   }, [page, debouncedKeyword, statusFilter, contentFilter]);
 
-  const loadArticles = useCallback(async () => {
-    try {
-      setLoading(true);
-      const params: { page: number; page_size: number; status?: string; keyword?: string; project_id?: string } = {
-        page,
-        page_size: pageSize,
-      };
+  // --- Build query params for the articles list ---
+  const listParams = (() => {
+    const params: { page: number; page_size: number; status?: string; keyword?: string; project_id?: string } = {
+      page,
+      page_size: pageSize,
+    };
 
-      if (debouncedKeyword) {
-        params.keyword = debouncedKeyword;
-      }
-
-      if (statusFilter) {
-        params.status = statusFilter;
-      }
-
-      // Apply project context
-      if (!isPersonalWorkspace && currentProject) {
-        params.project_id = currentProject.id;
-      }
-
-      // Apply content filter
-      if (contentFilter === "personal") {
-        delete params.project_id;
-      } else if (contentFilter === "project" && currentProject) {
-        params.project_id = currentProject.id;
-      }
-
-      const response = await api.articles.list(params);
-      setArticles(response.items);
-      setTotalArticles(response.total);
-      setTotalPages(response.pages ?? Math.ceil(response.total / pageSize));
-    } catch (error) {
-      toast.error(parseApiError(error).message);
-    } finally {
-      setLoading(false);
+    if (debouncedKeyword) {
+      params.keyword = debouncedKeyword;
     }
-  }, [currentProject, isPersonalWorkspace, contentFilter, page, pageSize, debouncedKeyword, statusFilter]);
 
-  useEffect(() => {
-    loadArticles();
-  }, [loadArticles]);
+    if (statusFilter) {
+      params.status = statusFilter;
+    }
+
+    // Apply project context
+    if (!isPersonalWorkspace && currentProject) {
+      params.project_id = currentProject.id;
+    }
+
+    // Apply content filter
+    if (contentFilter === "personal") {
+      delete params.project_id;
+    } else if (contentFilter === "project" && currentProject) {
+      params.project_id = currentProject.id;
+    }
+
+    return params;
+  })();
+
+  // --- React Query: fetch articles list ---
+  const {
+    data: articlesData,
+    isLoading: loading,
+  } = useQuery({
+    queryKey: ["articles", "list", listParams],
+    queryFn: () => api.articles.list(listParams),
+    staleTime: 30_000,
+    meta: {
+      onError: (error: unknown) => {
+        toast.error(parseApiError(error).message);
+      },
+    },
+  });
+
+  const articles = articlesData?.items ?? [];
+  const totalArticles = articlesData?.total ?? 0;
+  const totalPages = articlesData?.pages ?? (totalArticles > 0 ? Math.ceil(totalArticles / pageSize) : 0);
+
+  // --- Mutations ---
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.articles.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["articles"] });
+    },
+    onError: (error) => {
+      toast.error(parseApiError(error).message);
+    },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) => api.articles.bulkDelete(ids),
+    onSuccess: () => {
+      setSelectedIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["articles"] });
+    },
+    onError: (error) => {
+      toast.error(parseApiError(error).message);
+    },
+  });
 
   function handleDelete(id: string) {
     setActiveMenu(null);
     setConfirmAction({
       action: async () => {
-        try {
-          await api.articles.delete(id);
-          setArticles((prev) => prev.filter((a) => a.id !== id));
-          setTotalArticles((prev) => Math.max(0, prev - 1));
-        } catch (error) {
-          toast.error(parseApiError(error).message);
-        }
+        deleteMutation.mutate(id);
       },
       title: "Delete Article",
       message: "Are you sure you want to delete this article? This action cannot be undone.",
@@ -259,16 +279,7 @@ export default function ArticlesPage() {
     const count = selectedIds.size;
     setConfirmAction({
       action: async () => {
-        setIsBulkDeleting(true);
-        try {
-          await api.articles.bulkDelete(Array.from(selectedIds));
-          setSelectedIds(new Set());
-          await loadArticles();
-        } catch (error) {
-          toast.error(parseApiError(error).message);
-        } finally {
-          setIsBulkDeleting(false);
-        }
+        bulkDeleteMutation.mutate(Array.from(selectedIds));
       },
       title: `Delete ${count} Article${count !== 1 ? "s" : ""}`,
       message: `Delete ${count} article${count !== 1 ? "s" : ""}? This cannot be undone.`,
@@ -328,6 +339,8 @@ export default function ArticlesPage() {
   // Calculate displayed range for "Showing X-Y of Z"
   const rangeStart = totalArticles === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeEnd = Math.min(page * pageSize, totalArticles);
+
+  const isBulkDeleting = bulkDeleteMutation.isPending;
 
   return (
     <div className="space-y-6">
