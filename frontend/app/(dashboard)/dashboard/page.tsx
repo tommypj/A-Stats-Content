@@ -16,6 +16,7 @@ import {
   X,
   Circle,
   Activity,
+  ExternalLink,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api, UserResponse } from "@/lib/api";
@@ -81,6 +82,8 @@ function OnboardingChecklist({
       description: "Add your name so we can personalise your experience.",
       done: Boolean(user?.name && user.name.trim().length > 0),
       href: "/settings",
+      docHref: "/en/docs/getting-started/quick-start",
+      docLabel: "Learn more in the Quick Start guide",
     },
     {
       id: "wordpress",
@@ -89,6 +92,8 @@ function OnboardingChecklist({
       done: false, // not available from user object — link-only step
       href: "/settings",
       linkOnly: true,
+      docHref: "/en/docs/getting-started/quick-start",
+      docLabel: "Learn more in the Quick Start guide",
     },
     {
       id: "gsc",
@@ -97,6 +102,8 @@ function OnboardingChecklist({
       done: false, // not available from user object — link-only step
       href: "/analytics",
       linkOnly: true,
+      docHref: "/en/docs/getting-started/quick-start",
+      docLabel: "Learn more in the Quick Start guide",
     },
     {
       id: "outline",
@@ -104,6 +111,8 @@ function OnboardingChecklist({
       description: "Generate an AI-structured content plan for any keyword.",
       done: totalOutlines > 0,
       href: "/outlines",
+      docHref: "/en/docs/getting-started/your-first-article",
+      docLabel: "Learn more about creating outlines",
     },
     {
       id: "article",
@@ -111,6 +120,8 @@ function OnboardingChecklist({
       description: "Turn an outline into a full SEO-optimised article.",
       done: totalArticles > 0,
       href: "/articles/new",
+      docHref: "/en/docs/getting-started/your-first-article",
+      docLabel: "Learn more about article generation",
     },
   ];
 
@@ -190,6 +201,15 @@ function OnboardingChecklist({
               >
                 {step.description}
               </p>
+              {!step.done && step.docHref && (
+                <Link
+                  href={step.docHref}
+                  className="inline-flex items-center gap-1 text-xs mt-1 text-primary-600 hover:text-primary-700 transition-colors"
+                >
+                  {step.docLabel}
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+              )}
             </div>
 
             {/* Arrow link */}

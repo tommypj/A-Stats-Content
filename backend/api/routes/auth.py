@@ -885,7 +885,9 @@ async def logout(
 
 
 @router.delete("/account", status_code=status.HTTP_200_OK)
+@limiter.limit("3/hour")
 async def delete_account(
+    request: Request,
     body: DeleteAccountRequest,
     current_user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db),

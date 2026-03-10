@@ -15,6 +15,9 @@ Rate Limits:
 - Registration: 3 attempts per minute
 - Password Reset: 3 attempts per hour
 - Email Verification: 5 attempts per hour
+- Delete Account: 3 attempts per hour
+- Change Email: 3 attempts per minute
+- Avatar Upload: 10 attempts per minute
 - Default: 100 requests per minute
 """
 
@@ -92,6 +95,9 @@ RATE_LIMITS = {
     "password_reset": "3/hour",
     "email_verification": "5/hour",
     "resend_verification": "5/hour",
+    "delete_account": "3/hour",
+    "change_email": "3/minute",
+    "avatar_upload": "10/minute",
     "default": "100/minute",
 }
 
