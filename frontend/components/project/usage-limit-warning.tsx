@@ -3,6 +3,7 @@ import { AlertTriangle, AlertCircle, TrendingUp, ExternalLink } from "lucide-rea
 import { clsx } from "clsx";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { useAuthStore } from "@/stores/auth";
 import Link from "next/link";
 
 interface UsageLimitWarningProps {
@@ -24,6 +25,7 @@ export function UsageLimitWarning({
   showUpgrade = true,
   className,
 }: UsageLimitWarningProps) {
+  const tier = useAuthStore((s) => s.user?.subscription_tier) || "free";
   const percentage = limit > 0 ? (used / limit) * 100 : (used > 0 ? 100 : 0);
   const isWarning = percentage >= 80 && percentage < 100;
   const isAtLimit = percentage >= 100;
@@ -94,8 +96,7 @@ export function UsageLimitWarning({
           >
             {isAtLimit ? (
               <>
-                You've reached your {resourceLabel.toLowerCase()} limit for{" "}
-                {isProject ? "this project" : "your account"}.{" "}
+                You've reached your {tier === "free" ? "lifetime" : "monthly"} {resourceLabel.toLowerCase()} limit.{" "}
                 {showUpgrade && (
                   <>
                     Upgrade to continue creating {resourceLabel.toLowerCase()}.
@@ -164,6 +165,8 @@ export function UsageLimitBanner({
   isProject = false,
   projectName,
 }: UsageLimitBannerProps) {
+  const tier = useAuthStore((s) => s.user?.subscription_tier) || "free";
+  const periodLabel = tier === "free" ? "(lifetime)" : "this month";
   const percentage = limit > 0 ? (used / limit) * 100 : (used > 0 ? 100 : 0);
 
   // Don't show anything if usage is below 90% for banner
@@ -212,7 +215,7 @@ export function UsageLimitBanner({
                 isAtLimit ? "text-red-700" : "text-yellow-700"
               )}
             >
-              {used} / {limit} {resourceLabel} this month
+              {used} / {limit} {resourceLabel} {periodLabel}
               {isProject && projectName && ` for ${projectName}`}
             </p>
           </div>

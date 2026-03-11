@@ -230,7 +230,7 @@ export default function PricingPage() {
                           {plan.limits.articles_per_month === -1
                             ? "Unlimited"
                             : plan.limits.articles_per_month}{" "}
-                          articles/month
+                          {plan.id === "free" ? "articles (lifetime)" : "articles/month"}
                         </span>
                       </li>
                       <li className="flex items-start gap-2 text-sm text-text-secondary">
@@ -239,7 +239,7 @@ export default function PricingPage() {
                           {plan.limits.outlines_per_month === -1
                             ? "Unlimited"
                             : plan.limits.outlines_per_month}{" "}
-                          outlines/month
+                          {plan.id === "free" ? "outlines (lifetime)" : "outlines/month"}
                         </span>
                       </li>
                       <li className="flex items-start gap-2 text-sm text-text-secondary">
@@ -248,7 +248,7 @@ export default function PricingPage() {
                           {plan.limits.images_per_month === -1
                             ? "Unlimited"
                             : plan.limits.images_per_month}{" "}
-                          images/month
+                          {plan.id === "free" ? "images (lifetime)" : "images/month"}
                         </span>
                       </li>
                       {plan.features.map((feature) => (

@@ -351,8 +351,10 @@ export default function BillingPage() {
         {/* Usage bars */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-text-primary">Usage This Month</h3>
-            {resetDate && (
+            <h3 className="text-sm font-semibold text-text-primary">
+              {currentTier === "free" ? "Lifetime Usage" : "Usage This Month"}
+            </h3>
+            {currentTier !== "free" && resetDate && (
               <span className="flex items-center gap-1 text-xs text-text-muted">
                 <RefreshCw className="h-3 w-3" />
                 Resets {resetDate}
@@ -391,7 +393,7 @@ export default function BillingPage() {
           </div>
           {limits && (
             <p className="text-xs text-text-muted mt-3">
-              Keyword research: <span className="font-medium text-text-secondary">{limits.keyword_researches_per_month} searches/month</span>
+              Keyword research: <span className="font-medium text-text-secondary">{limits.keyword_researches_per_month} searches{currentTier === "free" ? "" : "/month"}</span>
             </p>
           )}
         </div>

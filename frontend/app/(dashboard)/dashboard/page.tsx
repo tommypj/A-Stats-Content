@@ -331,9 +331,9 @@ export default function DashboardPage() {
   }
 
   const stats = [
-    { name: "Total Articles", value: totalArticles.toString(), icon: FileText, change: `${articlesUsed} this month` },
-    { name: "Outlines Created", value: totalOutlines.toString(), icon: Sparkles, change: `${outlinesUsed} this month` },
-    { name: "Images Generated", value: totalImages.toString(), icon: ImageIcon, change: `${imagesUsed} this month` },
+    { name: "Total Articles", value: totalArticles.toString(), icon: FileText, change: `${articlesUsed} ${user?.subscription_tier === "free" ? "total" : "this month"}` },
+    { name: "Outlines Created", value: totalOutlines.toString(), icon: Sparkles, change: `${outlinesUsed} ${user?.subscription_tier === "free" ? "total" : "this month"}` },
+    { name: "Images Generated", value: totalImages.toString(), icon: ImageIcon, change: `${imagesUsed} ${user?.subscription_tier === "free" ? "total" : "this month"}` },
     {
       name: "SEO Score Avg",
       value: avgSeoScore !== null ? avgSeoScore.toString() : "N/A",

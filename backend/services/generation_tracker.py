@@ -213,9 +213,6 @@ class GenerationTracker:
                 logger.warning("User %s not found during limit check — denying", user_id)
                 return False
 
-            # Reset monthly counters if we've crossed into a new month
-            await self._reset_user_usage_if_needed(user)
-
             # Get plan limits — treat expired subscriptions as free tier
             from core.plans import PLANS
 
@@ -223,6 +220,10 @@ class GenerationTracker:
             tier = user.subscription_tier or "free"
             if user.subscription_expires and user.subscription_expires < now:
                 tier = "free"
+
+            # Free tier limits are lifetime — skip monthly reset
+            if tier != "free":
+                await self._reset_user_usage_if_needed(user)
             plan = PLANS.get(tier, PLANS["free"])
             limits = plan.get("limits", {})
 
