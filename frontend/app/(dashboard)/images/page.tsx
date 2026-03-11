@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { clsx } from "clsx";
+import { useGenerationTracker } from "@/stores/generation-tracker";
 
 const statusConfig = {
   generating: { label: "Generating", color: "bg-yellow-100 text-yellow-700", icon: Loader2 },
@@ -80,6 +81,13 @@ export default function ImagesPage() {
     };
   }, []);
 
+  // Unsuppress tracker on unmount
+  useEffect(() => {
+    return () => {
+      if (activeRegenId.current) unsuppress(activeRegenId.current);
+    };
+  }, []);
+
   // Pagination state
   const [page, setPage] = useState(1);
   const [pageSize] = useState(PAGE_SIZE);
@@ -100,6 +108,8 @@ export default function ImagesPage() {
   const [regenSize, setRegenSize] = useState("1024x1024");
   const [regenLoading, setRegenLoading] = useState(false);
   const regenPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { track, suppress, unsuppress, remove } = useGenerationTracker();
+  const activeRegenId = useRef<string | null>(null);
 
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -351,6 +361,10 @@ export default function ImagesPage() {
         article_id: regenImage?.article_id || undefined,
       });
 
+      track({ id: image.id, type: "image", status: "generating", title: regenPrompt.trim().slice(0, 60), startedAt: Date.now() });
+      suppress(image.id);
+      activeRegenId.current = image.id;
+
       // Poll for completion
       let attempts = 0;
       if (regenPollRef.current) clearInterval(regenPollRef.current);
@@ -359,6 +373,8 @@ export default function ImagesPage() {
           attempts++;
           const updated = await api.images.get(image.id);
           if (updated.status === "completed") {
+            remove(image.id);
+            activeRegenId.current = null;
             if (regenPollRef.current) clearInterval(regenPollRef.current);
             regenPollRef.current = null;
             setRegenLoading(false);
@@ -366,12 +382,16 @@ export default function ImagesPage() {
             toast.success("New image generated!");
             queryClient.invalidateQueries({ queryKey: ["images"] });
           } else if (updated.status === "failed" || attempts >= 90) {
+            remove(image.id);
+            activeRegenId.current = null;
             if (regenPollRef.current) clearInterval(regenPollRef.current);
             regenPollRef.current = null;
             setRegenLoading(false);
             toast.error(updated.status === "failed" ? "Image generation failed" : "Generation timed out");
           }
         } catch (error) {
+          remove(image.id);
+          activeRegenId.current = null;
           if (regenPollRef.current) clearInterval(regenPollRef.current);
           regenPollRef.current = null;
           setRegenLoading(false);
