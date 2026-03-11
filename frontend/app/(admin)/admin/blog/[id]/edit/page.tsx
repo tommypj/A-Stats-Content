@@ -156,7 +156,7 @@ export default function AdminEditBlogPostPage() {
       });
       setContentHtml(result.content_html);
       if (result.meta_description && !metaDescription) setMetaDescription(result.meta_description);
-      if (result.image_prompt) setImagePrompt(result.image_prompt);
+      if (result.image_prompts?.[0]) setImagePrompt(result.image_prompts[0]);
       setFlaggedStats(result.flagged_stats || []);
       toast.success("Content generated!");
     } catch (err) {

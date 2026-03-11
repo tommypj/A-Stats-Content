@@ -123,7 +123,7 @@ export default function AdminNewBlogPostPage() {
       });
       setContentHtml(result.content_html);
       if (result.meta_description && !metaDescription) setMetaDescription(result.meta_description);
-      if (result.image_prompt) setImagePrompt(result.image_prompt);
+      if (result.image_prompts?.[0]) setImagePrompt(result.image_prompts[0]);
       setFlaggedStats(result.flagged_stats || []);
       if (result.url_slug) setGeneratedSlug(result.url_slug);
       toast.success("Content generated!");
