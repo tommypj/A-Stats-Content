@@ -21,6 +21,7 @@ from .report import SEOReport
 from .tag import ArticleTag, OutlineTag, Tag
 from .template import ArticleTemplate
 from .content import Article, ArticleRevision, ContentStatus, ContentTone, GeneratedImage, Outline
+from .email_journey_event import EmailJourneyEvent
 from .error_log import SystemErrorLog
 from .notification_preferences import NotificationPreferences
 from .refund_blocked_email import RefundBlockedEmail
@@ -106,4 +107,5 @@ __all__ = [
     "SystemErrorLog",
     "NotificationPreferences",
     "RefundBlockedEmail",
+    "EmailJourneyEvent",
 ]

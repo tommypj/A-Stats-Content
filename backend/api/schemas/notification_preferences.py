@@ -14,6 +14,9 @@ class NotificationPreferencesResponse(BaseModel):
     email_weekly_digest: bool
     email_billing_alerts: bool
     email_product_updates: bool
+    email_onboarding: bool
+    email_conversion_tips: bool
+    email_reengagement: bool
 
     model_config = {"from_attributes": True}
 
@@ -29,3 +32,6 @@ class NotificationPreferencesUpdate(BaseModel):
     email_weekly_digest: bool | None = None
     email_billing_alerts: bool | None = None
     email_product_updates: bool | None = None
+    email_onboarding: bool | None = None
+    email_conversion_tips: bool | None = None
+    email_reengagement: bool | None = None
