@@ -219,7 +219,7 @@ class ArticleResponse(BaseModel):
     seo_score: float | None
     seo_analysis: dict[str, Any] | None
     ai_model: str | None
-    image_prompt: str | None = None
+    image_prompts: list[str] | None = None
     quality_tier: str | None = None
     schemas: dict[str, Any] | None = None
     run_metadata: dict[str, Any] | None = None
@@ -252,7 +252,7 @@ class ArticleListItemResponse(BaseModel):
     seo_score: float | None
     seo_analysis: dict[str, Any] | None
     ai_model: str | None
-    image_prompt: str | None = None
+    image_prompts: list[str] | None = None
     quality_tier: str | None = None
     published_at: datetime | None
     published_url: str | None

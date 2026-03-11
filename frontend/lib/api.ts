@@ -515,10 +515,10 @@ export const api = {
         method: "POST",
         url: `/articles/${id}/analyze-seo`,
       }),
-    generateImagePrompt: (id: string) =>
+    generateImagePrompts: (id: string) =>
       apiRequest<Article>({
         method: "POST",
-        url: `/articles/${id}/generate-image-prompt`,
+        url: `/articles/${id}/generate-image-prompts`,
         timeout: AI_TIMEOUT,
       }),
     getSocialPosts: (id: string) =>
@@ -1317,7 +1317,7 @@ export const api = {
         secondary_keywords?: string[];
         entities?: string[];
       }) =>
-        apiRequest<{ content_html: string; meta_description?: string; suggested_title?: string; image_prompt?: string; flagged_stats?: string[]; url_slug?: string }>({
+        apiRequest<{ content_html: string; meta_description?: string; suggested_title?: string; image_prompts?: string[] | null; flagged_stats?: string[]; url_slug?: string }>({
           method: "POST",
           url: "/admin/blog/generate-content",
           data,
@@ -1855,7 +1855,7 @@ export interface Article {
   published_at?: string;
   published_url?: string;
   featured_image_id?: string;
-  image_prompt?: string;
+  image_prompts?: string[] | null;
   quality_tier?: string;
   schemas?: Record<string, unknown>;
   run_metadata?: Record<string, unknown>;

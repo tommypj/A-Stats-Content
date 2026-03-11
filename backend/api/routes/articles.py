@@ -507,8 +507,8 @@ async def _run_article_generation(
                 }
 
             # Apply pipeline image prompt and flagged stats (already computed in parallel)
-            if pipeline_result.image_prompt:
-                article.image_prompt = pipeline_result.image_prompt
+            if pipeline_result.image_prompts:
+                article.image_prompts = pipeline_result.image_prompts
             if pipeline_result.flagged_stats:
                 article.seo_analysis = {
                     **(article.seo_analysis or {}),
@@ -1571,16 +1571,16 @@ async def analyze_article_seo(
     return article
 
 
-@router.post("/{article_id}/generate-image-prompt", response_model=ArticleResponse)
+@router.post("/{article_id}/generate-image-prompts", response_model=ArticleResponse)
 @limiter.limit("10/minute")
-async def generate_article_image_prompt(
+async def generate_article_image_prompts(
     request: Request,
     article_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Generate an image prompt for an existing article that doesn't have one yet.
+    Generate image prompts for an existing article that doesn't have any yet.
     """
     query = scoped_query(Article, article_id, current_user)
     result = await db.execute(query)
@@ -1595,20 +1595,20 @@ async def generate_article_image_prompt(
     if not article.content:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Article has no content to generate an image prompt from",
+            detail="Article has no content to generate image prompts from",
         )
 
     try:
-        image_prompt = await content_ai_service.generate_image_prompt(
+        image_prompts = await content_ai_service.generate_image_prompts(
             title=article.title,
             content=article.content,
             keyword=article.keyword,
         )
-        article.image_prompt = image_prompt
+        article.image_prompts = image_prompts
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate image prompt: {str(e)}",
+            detail=f"Failed to generate image prompts: {str(e)}",
         )
 
     await db.commit()
