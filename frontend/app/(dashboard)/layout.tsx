@@ -57,6 +57,7 @@ import { KeyboardShortcutsDialog } from "@/components/ui/keyboard-shortcuts-dial
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { PostHogProvider, PostHogPageview } from "@/components/PostHogProvider";
+import { GenerationTrackerProvider } from "@/components/GenerationTrackerProvider";
 import { Suspense } from "react";
 
 // Tier hierarchy: higher number = higher plan
@@ -927,9 +928,11 @@ export default function DashboardLayout({
       <Suspense fallback={null}>
         <PostHogPageview />
       </Suspense>
-      <ProjectProvider>
-        <DashboardContent>{children}</DashboardContent>
-      </ProjectProvider>
+      <GenerationTrackerProvider>
+        <ProjectProvider>
+          <DashboardContent>{children}</DashboardContent>
+        </ProjectProvider>
+      </GenerationTrackerProvider>
     </PostHogProvider>
   );
 }
