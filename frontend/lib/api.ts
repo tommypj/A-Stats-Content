@@ -626,6 +626,12 @@ export const api = {
         url: "/images/bulk-delete",
         data: { ids },
       }),
+    setFeatured: (imageId: string, data: { article_id: string }) =>
+      apiRequest<GeneratedImage>({
+        method: "POST",
+        url: `/images/${imageId}/set-featured`,
+        data,
+      }),
   },
 
   // WordPress
