@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect, useRef } from "react";
+import { Suspense, useState, useEffect, useRef, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -88,8 +88,11 @@ function GenerateImageContent() {
     staleTime: 30_000,
   });
 
-  const articles = (articlesData?.items ?? []).filter(
-    (a) => a.status === "completed" || a.status === "published"
+  const articles = useMemo(
+    () => (articlesData?.items ?? []).filter(
+      (a) => a.status === "completed" || a.status === "published"
+    ),
+    [articlesData]
   );
 
   const { data: wpStatus } = useQuery({
@@ -130,6 +133,12 @@ function GenerateImageContent() {
   });
 
   // Auto-fill prompt when article selection changes
+  // Only depend on articleId — not articles — to avoid resetting state on background refetches
+  const selectedArticle = useMemo(
+    () => articles.find((a) => a.id === articleId),
+    [articles, articleId]
+  );
+
   useEffect(() => {
     if (!articleId) {
       setArticlePrompts([]);
@@ -141,17 +150,17 @@ function GenerateImageContent() {
       }
       return;
     }
-    const selected = articles.find((a) => a.id === articleId);
-    if (selected?.image_prompts && selected.image_prompts.length > 0) {
-      setArticlePrompts([...selected.image_prompts]);
+    if (selectedArticle?.image_prompts && selectedArticle.image_prompts.length > 0) {
+      setArticlePrompts([...selectedArticle.image_prompts]);
       setPromptCardImages({});
       setGeneratingIndex(null);
       setPromptSource("article");
-    } else if (selected) {
+    } else if (selectedArticle) {
       // Article exists but has no prompts — keep manual mode
       setArticlePrompts([]);
     }
-  }, [articleId, articles]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [articleId]);
 
   function handleSendToWordPress() {
     if (!generatedImage || wpUploadMutation.isPending) return;
@@ -590,11 +599,11 @@ function GenerateImageContent() {
             Preview
           </h3>
 
-          {loading || generatedImage?.status === "generating" ? (
+          {(loading || generatedImage?.status === "generating") && generatingIndex === null ? (
             <AIGenerationProgress
               type="image"
               title={prompt.slice(0, 60)}
-              isGenerating={loading || generatedImage?.status === "generating"}
+              isGenerating={true}
             />
           ) : !generatedImage ? (
             <div className="aspect-square bg-surface-secondary rounded-xl flex items-center justify-center">
