@@ -24,6 +24,7 @@ import { api, parseApiError, Outline } from "@/lib/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { toast } from "sonner";
+import { useGenerationTracker } from "@/stores/generation-tracker";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
@@ -563,11 +564,15 @@ function CreateOutlineModal({
   const [targetAudience, setTargetAudience] = useState("");
   const [tone, setTone] = useState("professional");
   const [wordCount, setWordCount] = useState(1500);
+  const { track } = useGenerationTracker();
 
   const createMutation = useMutation({
     mutationFn: (data: { keyword: string; target_audience?: string; tone: string; word_count_target: number; auto_generate: boolean }) =>
       api.outlines.create(data),
-    onSuccess: () => {
+    onSuccess: (outline) => {
+      if (outline.status === "generating" || outline.status === "draft") {
+        track({ id: outline.id, type: "outline", status: "generating", title: keyword.trim().slice(0, 60), startedAt: Date.now() });
+      }
       onCreate();
     },
     onError: (error) => {
