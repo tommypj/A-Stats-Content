@@ -80,7 +80,7 @@ class JourneyTemplates:
         {self._cta_button("Go to Dashboard", f"{self._frontend_url}/dashboard")}
         """
         return (
-            self._base_layout(content, f"{self._frontend_url}/email-preferences/unsubscribe/{{{{token}}}}"),
+            self._base_layout(content, "{unsubscribe_url}"),
             "Your A-Stats account is ready — let's get started",
         )
 
@@ -98,7 +98,7 @@ class JourneyTemplates:
         {self._cta_button("Create an Outline", f"{self._frontend_url}/dashboard/outlines")}
         """
         return (
-            self._base_layout(content, f"{self._frontend_url}/email-preferences/unsubscribe/{{{{token}}}}"),
+            self._base_layout(content, "{unsubscribe_url}"),
             "Your first SEO outline is 30 seconds away",
         )
 
@@ -116,7 +116,7 @@ class JourneyTemplates:
         {self._cta_button("Generate Article", f"{self._frontend_url}/dashboard/articles")}
         """
         return (
-            self._base_layout(content, f"{self._frontend_url}/email-preferences/unsubscribe/{{{{token}}}}"),
+            self._base_layout(content, "{unsubscribe_url}"),
             "Your outline is ready — generate your article now",
         )
 
@@ -134,7 +134,7 @@ class JourneyTemplates:
         {self._cta_button("View My Outlines", f"{self._frontend_url}/dashboard/articles")}
         """
         return (
-            self._base_layout(content, f"{self._frontend_url}/email-preferences/unsubscribe/{{{{token}}}}"),
+            self._base_layout(content, "{unsubscribe_url}"),
             "Your outline is waiting to become an article",
         )
 
@@ -159,7 +159,7 @@ class JourneyTemplates:
         {self._cta_button("Connect Integrations", f"{self._frontend_url}/dashboard/settings?tab=integrations")}
         """
         return (
-            self._base_layout(content, f"{self._frontend_url}/email-preferences/unsubscribe/{{{{token}}}}"),
+            self._base_layout(content, "{unsubscribe_url}"),
             "Connect WordPress & GA4 to unlock your full workflow",
         )
 
@@ -187,7 +187,7 @@ class JourneyTemplates:
         {self._cta_button("Go to Dashboard", f"{self._frontend_url}/dashboard")}
         """
         return (
-            self._base_layout(content, f"{self._frontend_url}/email-preferences/unsubscribe/{{{{token}}}}"),
+            self._base_layout(content, "{unsubscribe_url}"),
             f"Your week 1 recap: {outlines_count} outlines, {articles_count} articles",
         )
 
@@ -208,7 +208,7 @@ class JourneyTemplates:
         {self._cta_button("View Plans", f"{self._frontend_url}/dashboard/settings?tab=billing")}
         """
         return (
-            self._base_layout(content, f"{self._frontend_url}/email-preferences/unsubscribe/{{{{token}}}}"),
+            self._base_layout(content, "{unsubscribe_url}"),
             f"You've used {current_usage} of {limit} {resource}",
         )
 
@@ -227,7 +227,7 @@ class JourneyTemplates:
         {self._cta_button("Upgrade Now", f"{self._frontend_url}/dashboard/settings?tab=billing")}
         """
         return (
-            self._base_layout(content, f"{self._frontend_url}/email-preferences/unsubscribe/{{{{token}}}}"),
+            self._base_layout(content, "{unsubscribe_url}"),
             f"You've reached your {resource} limit — upgrade to continue",
         )
 
@@ -253,7 +253,7 @@ class JourneyTemplates:
         {self._cta_button("See Plans", f"{self._frontend_url}/dashboard/settings?tab=billing")}
         """
         return (
-            self._base_layout(content, f"{self._frontend_url}/email-preferences/unsubscribe/{{{{token}}}}"),
+            self._base_layout(content, "{unsubscribe_url}"),
             "Unlock bulk workflows, templates, and more",
         )
 
@@ -271,7 +271,7 @@ class JourneyTemplates:
         {self._cta_button("View Plans", f"{self._frontend_url}/dashboard/settings?tab=billing")}
         """
         return (
-            self._base_layout(content, f"{self._frontend_url}/email-preferences/unsubscribe/{{{{token}}}}"),
+            self._base_layout(content, "{unsubscribe_url}"),
             f"Your site audit found {issues_count} issues to fix",
         )
 
@@ -291,7 +291,7 @@ class JourneyTemplates:
         {self._cta_button("Check My Dashboard", f"{self._frontend_url}/dashboard")}
         """
         return (
-            self._base_layout(content, f"{self._frontend_url}/email-preferences/unsubscribe/{{{{token}}}}"),
+            self._base_layout(content, "{unsubscribe_url}"),
             "Your content might need attention",
         )
 
@@ -310,7 +310,7 @@ class JourneyTemplates:
         {self._cta_button("See What's New", f"{self._frontend_url}/dashboard")}
         """
         return (
-            self._base_layout(content, f"{self._frontend_url}/email-preferences/unsubscribe/{{{{token}}}}"),
+            self._base_layout(content, "{unsubscribe_url}"),
             "New features waiting for you on A-Stats",
         )
 
@@ -328,7 +328,7 @@ class JourneyTemplates:
         {self._cta_button("Return to Dashboard", f"{self._frontend_url}/dashboard")}
         """
         return (
-            self._base_layout(content, f"{self._frontend_url}/email-preferences/unsubscribe/{{{{token}}}}"),
+            self._base_layout(content, "{unsubscribe_url}"),
             "We'd love to help you get back on track",
         )
 
@@ -354,7 +354,7 @@ class JourneyTemplates:
         {self._cta_button("Go to Dashboard", f"{self._frontend_url}/dashboard")}
         """
         return (
-            self._base_layout(content, f"{self._frontend_url}/email-preferences/unsubscribe/{{{{token}}}}"),
+            self._base_layout(content, "{unsubscribe_url}"),
             f"Weekly digest: {articles_generated} articles, {decay_alerts} alerts",
         )
 
@@ -374,7 +374,7 @@ class JourneyTemplates:
         {self._cta_button("Review Article", f"{self._frontend_url}/dashboard")}
         """
         return (
-            self._base_layout(content, f"{self._frontend_url}/email-preferences/unsubscribe/{{{{token}}}}"),
+            self._base_layout(content, "{unsubscribe_url}"),
             f'"{article_title}" is losing rankings — take action',
         )
 
