@@ -217,7 +217,7 @@ class Article(Base, TimestampMixin):
     ai_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
     generation_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
     generation_error: Mapped[str | None] = mapped_column(Text, nullable=True)
-    image_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    image_prompts: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
     # Pipeline metadata (added by architecture review improvements)
     quality_tier: Mapped[str | None] = mapped_column(String(10), nullable=True)
