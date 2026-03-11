@@ -1342,6 +1342,24 @@ export const api = {
           data,
         }),
     },
+    emails: {
+      templates: () =>
+        apiRequest<{ templates: Array<{ email_key: string; phase: string; priority: number }>; total: number }>({
+          url: "/admin/emails/templates",
+        }),
+      preview: (data: { email_key: string; user_name?: string }) =>
+        apiRequest<{ email_key: string; subject: string; html: string }>({
+          method: "POST",
+          url: "/admin/emails/preview",
+          data,
+        }),
+      sendTest: (data: { email_key: string; recipient_email: string; user_name?: string }) =>
+        apiRequest<{ message: string; sent: boolean }>({
+          method: "POST",
+          url: "/admin/emails/send-test",
+          data,
+        }),
+    },
   },
 
   // Projects (Multi-tenancy)

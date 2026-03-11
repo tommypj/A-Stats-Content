@@ -23,6 +23,7 @@ import {
   Rss,
   Tag,
   Bug,
+  Mail,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { api, parseApiError } from "@/lib/api";
@@ -54,6 +55,7 @@ const navigation = [
   { name: "Generations", href: "/admin/generations", icon: Sparkles },
   { name: "Error Logs", href: "/admin/error-logs", icon: Bug },
   { name: "Alerts", href: "/admin/alerts", icon: Bell },
+  { name: "Emails", href: "/admin/emails", icon: Mail },
 ];
 
 const secondaryNavigation = [
