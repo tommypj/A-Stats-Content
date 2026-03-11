@@ -11,6 +11,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, Outline, parseApiError } from "@/lib/api";
 import { toast } from "sonner";
+import { useGenerationTracker } from "@/stores/generation-tracker";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AIGenerationProgress } from "@/components/ui/ai-generation-progress";
@@ -29,6 +30,7 @@ function NewArticleContent() {
   const outlineId = searchParams.get("outline");
   const queryClient = useQueryClient();
 
+  const { track, suppress, unsuppress, remove } = useGenerationTracker();
   const [error, setError] = useState("");
 
   // Manual creation fields
@@ -55,6 +57,9 @@ function NewArticleContent() {
     return () => {
       mountedRef.current = false;
       pollingRef.current = false;
+      // Let global tracker take over for any in-progress article generations
+      const gens = useGenerationTracker.getState().generations;
+      gens.filter((g) => g.type === "article").forEach((g) => useGenerationTracker.getState().unsuppress(g.id));
     };
   }, []);
 
@@ -97,6 +102,10 @@ function NewArticleContent() {
           : undefined,
       });
 
+      // Track in global generation tracker
+      track({ id: article.id, type: "article", status: "generating", title: outline?.title?.slice(0, 60) || outline?.keyword || "Article", startedAt: Date.now(), articleId: article.id });
+      suppress(article.id);
+
       // Poll GET /articles/{id} every 3s until completed/failed (max ~12 minutes)
       pollingRef.current = true;
       const MAX_POLLS = 240; // 240 × 3s = 12 minutes
@@ -111,9 +120,11 @@ function NewArticleContent() {
         try {
           const updated = await api.articles.get(article.id);
           if (updated.status === "completed" || updated.status === "published") {
+            remove(article.id);
             return article.id;
           }
           if (updated.status === "failed") {
+            remove(article.id);
             throw new Error("Article generation failed. Please try again.");
           }
           // still "generating" — keep polling
@@ -126,6 +137,8 @@ function NewArticleContent() {
       }
 
       if (polls >= MAX_POLLS) {
+        // Don't remove — let global tracker continue polling since backend may still be working
+        unsuppress(article.id);
         throw new Error("Generation is taking longer than expected. Check your articles list for the result.");
       }
 
