@@ -353,6 +353,28 @@ async def get_current_user(
             # interfering with the calling route's transaction boundary.
             await db.flush()
 
+    # Track last_active_at (throttled to once per hour via Redis)
+    try:
+        from infrastructure.redis import get_redis_text
+
+        redis = await get_redis_text()
+        if redis:
+            throttle_key = f"last_active:{user.id}"
+            was_set = await redis.set(throttle_key, "1", ex=3600, nx=True)
+            if was_set:
+                from datetime import UTC, datetime as _dt
+
+                from sqlalchemy import update as _sa_update
+
+                await db.execute(
+                    _sa_update(User)
+                    .where(User.id == user.id)
+                    .values(last_active_at=_dt.now(UTC))
+                )
+                await db.flush()
+    except Exception as _e:
+        logger.debug("last_active_at update failed: %s", _e)
+
     return user
 
 

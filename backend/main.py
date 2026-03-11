@@ -261,12 +261,35 @@ async def lifespan(app: FastAPI):
         _site_audit_cleanup_loop(), name="site-audit-cleanup"
     )
 
+    # Email journey worker (sends scheduled journey emails + checks inactive users)
+    from services.email_journey_worker import EmailJourneyWorker
+
+    journey_worker = EmailJourneyWorker()
+    journey_email_task = asyncio.create_task(
+        journey_worker.run_email_loop(), name="journey-email-worker"
+    )
+    journey_inactivity_task = asyncio.create_task(
+        journey_worker.run_inactivity_loop(), name="journey-inactivity-check"
+    )
+
     logger.info("Application started successfully!")
 
     yield
 
     # Shutdown
     logger.info("Shutting down...")
+
+    # Stop email journey worker
+    journey_email_task.cancel()
+    journey_inactivity_task.cancel()
+    try:
+        await journey_email_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await journey_inactivity_task
+    except asyncio.CancelledError:
+        pass
 
     # Stop task-queue cleanup loop
     cleanup_task.cancel()
