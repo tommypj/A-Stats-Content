@@ -533,6 +533,18 @@ async def _run_article_generation(
             await db.commit()
             logger.info("Article %s generated successfully", article_id)
 
+            # Fire journey event (fire-and-forget)
+            try:
+                from services.email_journey import EmailJourneyService
+                journey = EmailJourneyService(db)
+                await journey.emit(
+                    "article.generated",
+                    user_id=user_id,
+                    metadata={"article_count": 0},
+                )
+            except Exception as e:
+                logger.error("Journey event article.generated failed: %s", e)
+
             # Notify any waiting SSE stream of completion
             try:
                 from infrastructure.redis import get_redis_text

@@ -168,6 +168,15 @@ async def create_outline(
         await db.commit()
 
     await db.refresh(outline)
+
+    # Fire journey event (fire-and-forget)
+    try:
+        from services.email_journey import EmailJourneyService
+        journey = EmailJourneyService(db)
+        await journey.emit("outline.created", user_id=current_user.id)
+    except Exception as e:
+        logger.error("Journey event outline.created failed: %s", e)
+
     return outline
 
 

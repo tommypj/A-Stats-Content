@@ -817,14 +817,13 @@ async def verify_email(
     user.email_verification_expires = None
     await db.commit()
 
-    # Send welcome email (fire-and-forget — failure does not block verification)
+    # Emit journey event (fire-and-forget — failure does not block verification)
     try:
-        await email_service.send_welcome_email(
-            to_email=user.email,
-            user_name=user.name or user.email,
-        )
+        from services.email_journey import EmailJourneyService
+        journey = EmailJourneyService(db)
+        await journey.emit("user.verified", user_id=user.id)
     except Exception as e:
-        logger.error("Failed to send welcome email to %s: %s", user.email, e)
+        logger.error("Failed to emit user.verified journey event: %s", e)
 
     return {"message": "Email has been verified successfully"}
 
@@ -1410,12 +1409,11 @@ async def google_oauth_callback(
         await db.refresh(user)
 
         try:
-            await email_service.send_welcome_email(
-                to_email=user.email,
-                user_name=user.name or user.email,
-            )
+            from services.email_journey import EmailJourneyService
+            journey = EmailJourneyService(db)
+            await journey.emit("user.verified", user_id=user.id)
         except Exception as e:
-            logger.error("Failed to send welcome email after Google signup: %s", e)
+            logger.error("Failed to emit user.verified journey event after Google signup: %s", e)
     else:
         # Update profile picture if not already set
         if google_picture and not user.avatar_url:
