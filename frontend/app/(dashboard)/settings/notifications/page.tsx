@@ -10,6 +10,9 @@ import {
   Mail,
   CreditCard as BillingIcon,
   Megaphone,
+  GraduationCap,
+  Lightbulb,
+  Bell,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, parseApiError, NotificationPreferences } from "@/lib/api";
@@ -201,6 +204,43 @@ export default function NotificationsSettingsPage() {
                 icon={Mail}
                 checked={prefs.email_weekly_digest}
                 onChange={(v) => handleToggle("email_weekly_digest", v)}
+                disabled={saving}
+              />
+            </div>
+          </Card>
+
+          {/* Email Journey */}
+          <Card className="p-6">
+            <div className="flex items-center gap-3 mb-2">
+              <Mail className="h-5 w-5 text-primary-400" />
+              <h2 className="text-lg font-display font-semibold text-text-primary">Email Journey</h2>
+            </div>
+            <p className="text-sm text-text-muted mb-2">
+              Helpful emails to get the most out of your account at every stage.
+            </p>
+            <div className="divide-y divide-surface-tertiary">
+              <ToggleRow
+                label="Onboarding tips"
+                description="Getting started guides and feature introductions"
+                icon={GraduationCap}
+                checked={prefs.email_onboarding}
+                onChange={(v) => handleToggle("email_onboarding", v)}
+                disabled={saving}
+              />
+              <ToggleRow
+                label="Usage tips & upgrade suggestions"
+                description="Feature recommendations based on your usage patterns"
+                icon={Lightbulb}
+                checked={prefs.email_conversion_tips}
+                onChange={(v) => handleToggle("email_conversion_tips", v)}
+                disabled={saving}
+              />
+              <ToggleRow
+                label="Re-engagement reminders"
+                description="Reminders when you haven't visited in a while"
+                icon={Bell}
+                checked={prefs.email_reengagement}
+                onChange={(v) => handleToggle("email_reengagement", v)}
                 disabled={saving}
               />
             </div>
