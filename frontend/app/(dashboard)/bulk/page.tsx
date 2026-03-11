@@ -29,6 +29,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TierGate } from "@/components/ui/tier-gate";
+import { useGenerationTracker } from "@/stores/generation-tracker";
 
 const STATUS_CONFIG: Record<string, { icon: typeof CheckCircle2; color: string; label: string }> = {
   pending: { icon: Clock, color: "text-text-muted", label: "Pending" },
@@ -47,6 +48,7 @@ export default function BulkContentPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [pollingActive, setPollingActive] = useState(false);
+  const { track, suppress, unsuppress, remove } = useGenerationTracker();
 
   const loadData = useCallback(async () => {
     try {
@@ -79,6 +81,17 @@ export default function BulkContentPage() {
       try {
         const jobsRes = await api.bulk.jobs({ page: 1, page_size: 20 });
         setJobs(jobsRes.items);
+
+        // Remove completed/failed jobs from global tracker
+        const trackerState = useGenerationTracker.getState();
+        for (const j of jobsRes.items) {
+          if (trackerState.generations.some((g) => g.id === j.id)) {
+            if (j.status === "completed" || j.status === "partially_failed" || j.status === "failed" || j.status === "cancelled") {
+              remove(j.id);
+            }
+          }
+        }
+
         const hasActive = jobsRes.items.some((j) => j.status === "processing" || j.status === "pending");
         if (!hasActive) setPollingActive(false);
       } catch {
@@ -87,6 +100,14 @@ export default function BulkContentPage() {
     }, 5000);
     return () => clearInterval(interval);
   }, [pollingActive, jobs.length]);
+
+  // Unsuppress tracked bulk jobs on unmount
+  useEffect(() => {
+    return () => {
+      const gens = useGenerationTracker.getState().generations;
+      gens.filter((g) => g.type === "bulk").forEach((g) => useGenerationTracker.getState().unsuppress(g.id));
+    };
+  }, []);
 
   const parseKeywords = (): BulkKeywordInput[] => {
     const uniqueKeywords = [...new Set(
@@ -117,6 +138,8 @@ export default function BulkContentPage() {
         keywords: kws,
         template_id: templateId || undefined,
       });
+      track({ id: job.id, type: "bulk", status: "generating", title: `${job.total_items} keywords`, startedAt: Date.now() });
+      suppress(job.id);
       toast.success(`Bulk job started with ${job.total_items} keywords`);
       setKeywords("");
       setJobs((prev) => [job, ...prev]);
