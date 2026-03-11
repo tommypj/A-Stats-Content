@@ -1,0 +1,21 @@
+Based on this article, generate exactly 3 distinct image prompts for AI image generation. Each prompt should describe a completely different visual concept for a featured image.
+
+Title: {title}
+Keyword: {keyword}
+Content excerpt:
+{content_excerpt}
+
+Requirements for EACH prompt:
+- Describe a specific visual scene, not abstract concepts
+- Include details about composition, lighting, colors, and mood
+- Do NOT include any text or words in the image description
+- Keep each prompt under 200 words
+- Optimize for photographic or editorial style
+
+Make the 3 prompts meaningfully different:
+- Prompt 1: A close-up or portrait-style composition focusing on a person or detail
+- Prompt 2: A wider establishing shot showing environment or context
+- Prompt 3: A creative or conceptual approach with dramatic lighting or unique perspective
+
+Respond with ONLY a JSON array of exactly 3 strings. Example format:
+["prompt one text here", "prompt two text here", "prompt three text here"]

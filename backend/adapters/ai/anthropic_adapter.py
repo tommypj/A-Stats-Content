@@ -763,6 +763,51 @@ class AnthropicContentService:
 
         return message.content[0].text.strip()
 
+    async def generate_image_prompts(
+        self,
+        title: str,
+        content: str,
+        keyword: str,
+    ) -> list[str]:
+        """
+        Generate 3 distinct image prompts optimized for AI image generation.
+
+        Returns:
+            A list of up to 3 image prompt strings.
+        """
+        if not self._client:
+            return [f"A visually striking image representing {keyword}, related to {title}"]
+
+        prompt = prompt_loader.format(
+            "image_prompts",
+            title=title,
+            keyword=keyword,
+            content_excerpt=content[:1500],
+        )
+
+        message = await _retry_with_backoff(
+            lambda: self._client.messages.create(
+                model=self._model,
+                max_tokens=800,
+                messages=[{"role": "user", "content": prompt}],
+            )
+        )
+
+        raw = message.content[0].text.strip()
+
+        # Parse JSON array response
+        try:
+            prompts = json.loads(raw)
+            if isinstance(prompts, list) and len(prompts) >= 1:
+                result = [str(p).strip() for p in prompts[:3] if str(p).strip()]
+                if result:
+                    return result
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        # Fallback: treat entire response as a single prompt
+        return [raw] if raw else [f"A visually striking image representing {keyword}, related to {title}"]
+
     async def fact_check_content(self, content: str) -> list[str]:
         """
         Self-review pass: ask the AI to list any specific statistics,
