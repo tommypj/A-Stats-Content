@@ -20,6 +20,7 @@ import { api, getImageUrl, parseApiError, GeneratedImage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AIGenerationProgress } from "@/components/ui/ai-generation-progress";
+import { useGenerationTracker } from "@/stores/generation-tracker";
 
 const IMAGE_STYLES = [
   { value: "realistic", label: "Realistic" },
@@ -67,6 +68,8 @@ function GenerateImageContent() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const promptCardPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMountedRef = useRef(true);
+  const activePollingIds = useRef<string[]>([]);
+  const { track, suppress, unsuppress, remove } = useGenerationTracker();
   const [articlePrompts, setArticlePrompts] = useState<string[]>([]);
   const [generatingIndex, setGeneratingIndex] = useState<number | null>(null);
   const [promptCardImages, setPromptCardImages] = useState<Record<number, GeneratedImage | null>>({});
@@ -77,6 +80,8 @@ function GenerateImageContent() {
       isMountedRef.current = false;
       if (pollRef.current) clearInterval(pollRef.current);
       if (promptCardPollRef.current) clearInterval(promptCardPollRef.current);
+      // Let global tracker take over for any in-progress generations
+      activePollingIds.current.forEach((id) => unsuppress(id));
     };
   }, []);
 
@@ -197,6 +202,9 @@ function GenerateImageContent() {
       {
         onSuccess: (image) => {
           setGeneratedImage(image);
+          track({ id: image.id, type: "image", status: "generating", title: prompt.trim().slice(0, 60), startedAt: Date.now() });
+          suppress(image.id);
+          activePollingIds.current = [...activePollingIds.current, image.id];
           pollImageStatus(image.id);
         },
         onError: () => {
@@ -226,6 +234,9 @@ function GenerateImageContent() {
       {
         onSuccess: (image) => {
           setPromptCardImages((prev) => ({ ...prev, [index]: image }));
+          track({ id: image.id, type: "image", status: "generating", title: articlePrompts[index]?.slice(0, 60) || "Image", startedAt: Date.now() });
+          suppress(image.id);
+          activePollingIds.current = [...activePollingIds.current, image.id];
           pollPromptCardImage(index, image.id);
         },
         onError: () => {
@@ -256,6 +267,8 @@ function GenerateImageContent() {
           setPromptCardImages((prev) => ({ ...prev, [index]: image }));
           setGeneratingIndex(null);
           queryClient.invalidateQueries({ queryKey: ["images"] });
+          remove(imageId);
+          activePollingIds.current = activePollingIds.current.filter((id) => id !== imageId);
           if (promptCardPollRef.current) clearInterval(promptCardPollRef.current);
           promptCardPollRef.current = null;
         } else if (image.status === "failed" || attempts >= maxAttempts) {
@@ -264,11 +277,15 @@ function GenerateImageContent() {
             [index]: image.status === "failed" ? image : { ...image, status: "failed" } as GeneratedImage,
           }));
           setGeneratingIndex(null);
+          remove(imageId);
+          activePollingIds.current = activePollingIds.current.filter((id) => id !== imageId);
           if (promptCardPollRef.current) clearInterval(promptCardPollRef.current);
           promptCardPollRef.current = null;
         }
       } catch {
         setGeneratingIndex(null);
+        remove(imageId);
+        activePollingIds.current = activePollingIds.current.filter((id) => id !== imageId);
         if (promptCardPollRef.current) clearInterval(promptCardPollRef.current);
         promptCardPollRef.current = null;
       }
@@ -294,23 +311,31 @@ function GenerateImageContent() {
         if (image.status === "completed") {
           setGeneratedImage(image);
           queryClient.invalidateQueries({ queryKey: ["images"] });
+          remove(imageId);
+          activePollingIds.current = activePollingIds.current.filter((id) => id !== imageId);
           if (pollRef.current) clearInterval(pollRef.current);
           pollRef.current = null;
         } else if (image.status === "failed") {
           setError("Image generation failed. Please try again.");
           setGeneratedImage((prev) => prev ? { ...prev, status: "failed" } : prev);
+          remove(imageId);
+          activePollingIds.current = activePollingIds.current.filter((id) => id !== imageId);
           if (pollRef.current) clearInterval(pollRef.current);
           pollRef.current = null;
         } else if (attempts >= maxAttempts) {
           toast.error("Image generation timed out. Please try again.");
           setError("Image generation timed out. Please try again.");
           setGeneratedImage((prev) => prev ? { ...prev, status: "failed" } : prev);
+          remove(imageId);
+          activePollingIds.current = activePollingIds.current.filter((id) => id !== imageId);
           if (pollRef.current) clearInterval(pollRef.current);
           pollRef.current = null;
         }
       } catch (err) {
         if (!isMountedRef.current) return;
         setError("Failed to check generation status");
+        remove(imageId);
+        activePollingIds.current = activePollingIds.current.filter((id) => id !== imageId);
         if (pollRef.current) clearInterval(pollRef.current);
         pollRef.current = null;
       }
