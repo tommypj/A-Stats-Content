@@ -3,7 +3,8 @@
 import logging
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from starlette.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -245,3 +246,63 @@ async def update_notification_preferences(
     await db.commit()
     await db.refresh(prefs)
     return prefs
+
+
+# ---------------------------------------------------------------------------
+# Email Journey Unsubscribe
+# ---------------------------------------------------------------------------
+
+# Map category -> preference column(s) to disable
+_CATEGORY_TO_PREF_COLUMNS: dict[str, list[str]] = {
+    "onboarding": ["email_onboarding"],
+    "conversion_tips": ["email_conversion_tips"],
+    "reengagement": ["email_reengagement"],
+    "usage": ["email_usage_80_percent", "email_usage_limit_reached"],
+    "weekly_digest": ["email_weekly_digest"],
+    "content_decay": ["email_content_decay"],
+}
+
+
+@router.post("/unsubscribe")
+async def one_click_unsubscribe(
+    request: Request,
+    token: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """One-click unsubscribe from a journey email category (RFC 8058).
+
+    Token is in the URL query string. Email clients POST to this URL
+    with body 'List-Unsubscribe=One-Click' (form-encoded).
+    """
+    from services.email_journey_unsubscribe import verify_unsubscribe_token
+
+    result = verify_unsubscribe_token(token)
+    if not result:
+        raise HTTPException(status_code=400, detail="Invalid or expired unsubscribe token")
+
+    user_id = result["user_id"]
+    category = result["category"]
+    columns = _CATEGORY_TO_PREF_COLUMNS.get(category, [])
+    if not columns:
+        raise HTTPException(status_code=400, detail="Unknown email category")
+
+    prefs = await _get_or_create_preferences(db, user_id)
+    for col in columns:
+        setattr(prefs, col, False)
+    await db.commit()
+
+    return {"message": "Successfully unsubscribed"}
+
+
+@router.get("/unsubscribe")
+async def unsubscribe_redirect(
+    request: Request,
+    token: str = Query(...),
+) -> RedirectResponse:
+    """Redirect to notification preferences page for managing subscriptions."""
+    from infrastructure.config.settings import get_settings
+
+    settings = get_settings()
+    return RedirectResponse(
+        url=f"{settings.frontend_url}/settings?tab=notifications"
+    )

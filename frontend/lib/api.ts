@@ -3535,6 +3535,9 @@ export interface NotificationPreferences {
   email_weekly_digest: boolean;
   email_billing_alerts: boolean;
   email_product_updates: boolean;
+  email_onboarding: boolean;
+  email_conversion_tips: boolean;
+  email_reengagement: boolean;
 }
 
 // Notification types

@@ -248,6 +248,43 @@ class GenerationTracker:
             logger.error("Failed to check user-level limit for user %s: %s", user_id, e)
             return False  # Fail closed
 
+    async def get_usage_percentage(self, user_id: str, resource_type: str) -> int:
+        """Return current usage as a percentage of the limit (0-100+)."""
+        try:
+            from infrastructure.database.models.user import User
+            from core.plans import PLANS
+
+            user_result = await self.db.execute(select(User).where(User.id == user_id))
+            user = user_result.scalar_one_or_none()
+            if not user:
+                return 0
+
+            now = datetime.now(UTC)
+            tier = user.subscription_tier or "free"
+            if user.subscription_expires and user.subscription_expires < now:
+                tier = "free"
+
+            plan = PLANS.get(tier, PLANS["free"])
+            limits = plan.get("limits", {})
+
+            limit_key = f"{resource_type}s_per_month"
+            limit = limits.get(limit_key, 0)
+
+            if limit == -1:
+                return 0  # unlimited — never at capacity
+            if limit == 0:
+                return 100  # no allowance
+
+            usage_field = _USAGE_FIELD_MAP.get(resource_type)
+            if not usage_field:
+                return 0
+            current_usage = getattr(user, usage_field, 0) or 0
+
+            return int((current_usage / limit) * 100)
+        except Exception:
+            logger.exception("Failed to get usage percentage")
+            return 0
+
     async def _reset_user_usage_if_needed(self, user) -> bool:
         """Reset user-level monthly usage counters if the billing period has elapsed.
 

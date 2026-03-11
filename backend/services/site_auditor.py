@@ -1007,6 +1007,17 @@ async def run_site_audit(audit_id: str) -> None:
             audit.completed_at = datetime.now(UTC)
             await db.commit()
 
+            try:
+                from services.email_journey import EmailJourneyService
+                journey = EmailJourneyService(db)
+                await journey.emit(
+                    "audit.completed",
+                    user_id=user_id,
+                    metadata={"issues_count": total_issues},
+                )
+            except Exception as e:
+                logger.error("Journey event audit.completed failed: %s", e)
+
             elapsed = time.monotonic() - start_time
             logger.info(
                 "Site audit completed for %s: %d pages, %d issues (C:%d W:%d I:%d), score=%d in %.1fs",

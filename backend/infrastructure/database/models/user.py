@@ -131,6 +131,7 @@ class User(Base, TimestampMixin):
 
     # Login tracking
     last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     login_count: Mapped[int] = mapped_column(default=0, nullable=False)
 
     # Suspension fields

@@ -238,6 +238,13 @@ async def gsc_oauth_callback(
         await db.commit()
         await db.refresh(connection)
 
+        try:
+            from services.email_journey import EmailJourneyService
+            journey = EmailJourneyService(db)
+            await journey.emit("integration.connected", user_id=current_user.id)
+        except Exception as e:
+            logger.error("Journey event integration.connected failed: %s", e)
+
         return {
             "message": "GSC connected successfully",
             "connected_at": connection.connected_at,

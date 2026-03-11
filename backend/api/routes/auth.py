@@ -353,6 +353,28 @@ async def get_current_user(
             # interfering with the calling route's transaction boundary.
             await db.flush()
 
+    # Track last_active_at (throttled to once per hour via Redis)
+    try:
+        from infrastructure.redis import get_redis_text
+
+        redis = await get_redis_text()
+        if redis:
+            throttle_key = f"last_active:{user.id}"
+            was_set = await redis.set(throttle_key, "1", ex=3600, nx=True)
+            if was_set:
+                from datetime import UTC, datetime as _dt
+
+                from sqlalchemy import update as _sa_update
+
+                await db.execute(
+                    _sa_update(User)
+                    .where(User.id == user.id)
+                    .values(last_active_at=_dt.now(UTC))
+                )
+                await db.flush()
+    except Exception as _e:
+        logger.debug("last_active_at update failed: %s", _e)
+
     return user
 
 
@@ -795,14 +817,13 @@ async def verify_email(
     user.email_verification_expires = None
     await db.commit()
 
-    # Send welcome email (fire-and-forget — failure does not block verification)
+    # Emit journey event (fire-and-forget — failure does not block verification)
     try:
-        await email_service.send_welcome_email(
-            to_email=user.email,
-            user_name=user.name or user.email,
-        )
+        from services.email_journey import EmailJourneyService
+        journey = EmailJourneyService(db)
+        await journey.emit("user.verified", user_id=user.id)
     except Exception as e:
-        logger.error("Failed to send welcome email to %s: %s", user.email, e)
+        logger.error("Failed to emit user.verified journey event: %s", e)
 
     return {"message": "Email has been verified successfully"}
 
@@ -1388,12 +1409,11 @@ async def google_oauth_callback(
         await db.refresh(user)
 
         try:
-            await email_service.send_welcome_email(
-                to_email=user.email,
-                user_name=user.name or user.email,
-            )
+            from services.email_journey import EmailJourneyService
+            journey = EmailJourneyService(db)
+            await journey.emit("user.verified", user_id=user.id)
         except Exception as e:
-            logger.error("Failed to send welcome email after Google signup: %s", e)
+            logger.error("Failed to emit user.verified journey event after Google signup: %s", e)
     else:
         # Update profile picture if not already set
         if google_picture and not user.avatar_url:

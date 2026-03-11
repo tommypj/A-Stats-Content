@@ -49,5 +49,10 @@ class NotificationPreferences(Base, TimestampMixin):
     # Product updates and announcements
     email_product_updates: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    # Email journey preferences
+    email_onboarding: Mapped[bool] = mapped_column(default=True, nullable=False)
+    email_conversion_tips: Mapped[bool] = mapped_column(default=True, nullable=False)
+    email_reengagement: Mapped[bool] = mapped_column(default=True, nullable=False)
+
     def __repr__(self) -> str:
         return f"<NotificationPreferences(user_id={self.user_id})>"
