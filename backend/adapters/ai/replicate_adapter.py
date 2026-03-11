@@ -69,42 +69,42 @@ class GeneratedImage:
 STYLE_CONFIG = {
     "realistic": {
         "style_type": "Realistic",
-        "prompt_suffix": "ultra realistic, photorealistic, natural skin textures, natural lighting, lifelike details",
+        "prompt_suffix": "shot on Canon EOS R5, natural skin texture with pores and imperfections, available light, muted natural color palette, candid expression, no retouching",
     },
     "photographic": {
         "style_type": "Realistic",
         "style_preset": "Photography",
-        "prompt_suffix": "professional DSLR photography, sharp focus, natural depth of field",
+        "prompt_suffix": "35mm film photography, natural grain, true-to-life skin tones, soft available light, shallow depth of field, unstaged moment",
     },
     "artistic": {
         "style_type": "General",
-        "prompt_suffix": "artistic illustration, creative, vibrant colors",
+        "prompt_suffix": "artistic illustration, creative, organic color palette",
     },
     "minimalist": {
         "style_type": "Design",
-        "prompt_suffix": "minimalist design, clean lines, simple composition",
+        "prompt_suffix": "minimalist design, clean lines, simple composition, muted tones",
     },
     "dramatic": {
         "style_type": "Realistic",
-        "prompt_suffix": "dramatic lighting, high contrast, cinematic mood",
+        "prompt_suffix": "dramatic natural light, deep shadows, visible skin texture, raw unedited feel, muted earth tones",
     },
     "vintage": {
         "style_type": "General",
         "style_preset": "Vintage",
-        "prompt_suffix": "vintage aesthetic, retro color grading, film grain",
+        "prompt_suffix": "vintage 35mm film, Kodak Portra color palette, natural grain, warm faded tones",
     },
     "modern": {
         "style_type": "Design",
-        "prompt_suffix": "modern design, sleek, contemporary aesthetic",
+        "prompt_suffix": "modern editorial design, sleek, natural tones, contemporary aesthetic",
     },
     "abstract": {
         "style_type": "General",
-        "prompt_suffix": "abstract art, geometric forms, conceptual",
+        "prompt_suffix": "abstract art, geometric forms, conceptual, organic textures",
     },
     "watercolor": {
         "style_type": "General",
         "style_preset": "Watercolor",
-        "prompt_suffix": "watercolor painting, soft edges, flowing colors",
+        "prompt_suffix": "watercolor painting, soft edges, flowing natural colors",
     },
 }
 

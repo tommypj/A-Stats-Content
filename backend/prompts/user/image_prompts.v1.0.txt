@@ -8,9 +8,10 @@ Content excerpt:
 Requirements for EACH prompt:
 - Describe a specific visual scene, not abstract concepts
 - Include details about composition, lighting, colors, and mood
+- Emphasize natural, authentic aesthetics: real skin textures, candid expressions, available light, muted earth-tone palettes
+- Avoid anything that looks overly polished, airbrushed, or artificially perfect
 - Do NOT include any text or words in the image description
 - Keep each prompt under 200 words
-- Optimize for photographic or editorial style
 
 Make the 3 prompts meaningfully different:
 - Prompt 1: A close-up or portrait-style composition focusing on a person or detail
