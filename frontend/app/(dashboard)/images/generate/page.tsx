@@ -66,6 +66,9 @@ function GenerateImageContent() {
   const [wpUploaded, setWpUploaded] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMountedRef = useRef(true);
+  const [articlePrompts, setArticlePrompts] = useState<string[]>([]);
+  const [generatingIndex, setGeneratingIndex] = useState<number | null>(null);
+  const [promptCardImages, setPromptCardImages] = useState<Record<number, GeneratedImage | null>>({});
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -119,9 +122,24 @@ function GenerateImageContent() {
     },
   });
 
+  const setFeaturedMutation = useMutation({
+    mutationFn: (data: { imageId: string; articleId: string }) =>
+      api.images.setFeatured(data.imageId, { article_id: data.articleId }),
+    onSuccess: () => {
+      toast.success("Image set as featured!");
+      queryClient.invalidateQueries({ queryKey: ["articles"] });
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message || "Failed to set featured image");
+    },
+  });
+
   // Auto-fill prompt when article selection changes
   useEffect(() => {
     if (!articleId) {
+      setArticlePrompts([]);
+      setPromptCardImages({});
+      setGeneratingIndex(null);
       if (promptSource === "article") {
         setPrompt("");
         setPromptSource("manual");
@@ -129,9 +147,14 @@ function GenerateImageContent() {
       return;
     }
     const selected = articles.find((a) => a.id === articleId);
-    if (selected?.image_prompt) {
-      setPrompt(selected.image_prompt);
+    if (selected?.image_prompts && selected.image_prompts.length > 0) {
+      setArticlePrompts([...selected.image_prompts]);
+      setPromptCardImages({});
+      setGeneratingIndex(null);
       setPromptSource("article");
+    } else if (selected) {
+      // Article exists but has no prompts — keep manual mode
+      setArticlePrompts([]);
     }
   }, [articleId, articles]);
 
@@ -165,6 +188,75 @@ function GenerateImageContent() {
       height: selectedSize?.height,
       article_id: articleId || undefined,
     });
+  }
+
+  function handleGenerateForPrompt(index: number) {
+    const promptText = articlePrompts[index]?.trim();
+    if (!promptText || generateMutation.isPending) return;
+
+    setError("");
+    setGeneratingIndex(index);
+    setPromptCardImages((prev) => ({ ...prev, [index]: null }));
+
+    const selectedSize = IMAGE_SIZES.find((s) => s.value === size);
+    generateMutation.mutate(
+      {
+        prompt: promptText,
+        style,
+        width: selectedSize?.width,
+        height: selectedSize?.height,
+        article_id: articleId || undefined,
+      },
+      {
+        onSuccess: (image) => {
+          setPromptCardImages((prev) => ({ ...prev, [index]: image }));
+          pollPromptCardImage(index, image.id);
+        },
+        onError: () => {
+          setError(`Failed to generate image for prompt ${index + 1}`);
+          setGeneratingIndex(null);
+        },
+      }
+    );
+  }
+
+  function pollPromptCardImage(index: number, imageId: string) {
+    const maxAttempts = 90;
+    let attempts = 0;
+
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      if (!isMountedRef.current) {
+        if (pollRef.current) clearInterval(pollRef.current);
+        pollRef.current = null;
+        return;
+      }
+      try {
+        attempts++;
+        const image = await api.images.get(imageId);
+        if (!isMountedRef.current) return;
+
+        if (image.status === "completed") {
+          setPromptCardImages((prev) => ({ ...prev, [index]: image }));
+          setGeneratingIndex(null);
+          queryClient.invalidateQueries({ queryKey: ["images"] });
+          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = null;
+        } else if (image.status === "failed" || attempts >= maxAttempts) {
+          setPromptCardImages((prev) => ({
+            ...prev,
+            [index]: image.status === "failed" ? image : { ...image, status: "failed" } as GeneratedImage,
+          }));
+          setGeneratingIndex(null);
+          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+      } catch {
+        setGeneratingIndex(null);
+        if (pollRef.current) clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    }, 2000);
   }
 
   function pollImageStatus(imageId: string) {
@@ -249,6 +341,7 @@ function GenerateImageContent() {
         {/* Generation Form */}
         <Card className="p-6">
           <form onSubmit={handleGenerate} className="space-y-6">
+            {(!articleId || articlePrompts.length === 0) && (
             <div>
               <label htmlFor="image-prompt" className="block text-sm font-medium text-text-secondary mb-2">
                 Image Prompt *
@@ -274,6 +367,7 @@ function GenerateImageContent() {
                 </p>
               )}
             </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -339,12 +433,121 @@ function GenerateImageContent() {
               )}
             </div>
 
+            {/* Article Prompt Cards */}
+            {articleId && articlePrompts.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-text-secondary">
+                  AI-Generated Prompts ({articlePrompts.length})
+                </h3>
+                {articlePrompts.map((p, index) => {
+                  const cardImage = promptCardImages[index];
+                  const isGenerating = generatingIndex === index;
+                  const isCompleted = cardImage?.status === "completed";
+                  const isFailed = cardImage?.status === "failed";
+
+                  return (
+                    <Card key={index} className="p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-text-muted uppercase tracking-wide">
+                          Prompt {index + 1}
+                        </span>
+                        {isCompleted && (
+                          <span className="text-xs text-primary-600 flex items-center gap-1">
+                            <CheckCircle2 className="h-3 w-3" /> Generated
+                          </span>
+                        )}
+                      </div>
+
+                      <textarea
+                        value={p}
+                        onChange={(e) => {
+                          const updated = [...articlePrompts];
+                          updated[index] = e.target.value;
+                          setArticlePrompts(updated);
+                        }}
+                        rows={3}
+                        disabled={isGenerating || isCompleted}
+                        className="w-full px-3 py-2 text-sm rounded-lg border border-surface-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all resize-none disabled:opacity-60 disabled:bg-surface-secondary"
+                      />
+
+                      {isGenerating && (
+                        <div className="flex items-center gap-2 text-sm text-primary-600">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Generating image...
+                        </div>
+                      )}
+
+                      {isCompleted && cardImage.url && (
+                        <div className="relative aspect-video rounded-lg overflow-hidden bg-surface-secondary">
+                          <Image
+                            src={getImageUrl(cardImage.url)}
+                            alt={cardImage.alt_text || `Generated image ${index + 1}`}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                      )}
+
+                      {isFailed && (
+                        <p className="text-sm text-red-600">Generation failed. Try editing the prompt.</p>
+                      )}
+
+                      <div className="flex gap-2">
+                        {!isCompleted && !isGenerating && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => handleGenerateForPrompt(index)}
+                            disabled={generateMutation.isPending || !p.trim()}
+                          >
+                            <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                            Generate
+                          </Button>
+                        )}
+                        {isCompleted && articleId && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setFeaturedMutation.mutate({ imageId: cardImage.id, articleId })}
+                            disabled={setFeaturedMutation.isPending}
+                          >
+                            <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
+                            Set as Featured
+                          </Button>
+                        )}
+                        {isCompleted && cardImage.url && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              const link = document.createElement("a");
+                              link.href = getImageUrl(cardImage.url!);
+                              link.download = `image-${cardImage.id}.png`;
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }}
+                          >
+                            <Download className="h-3.5 w-3.5 mr-1.5" />
+                            Download
+                          </Button>
+                        )}
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+
             {error && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-sm text-red-600">{error}</p>
               </div>
             )}
 
+            {(!articleId || articlePrompts.length === 0) && (
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? (
                 <>
@@ -358,6 +561,7 @@ function GenerateImageContent() {
                 </>
               )}
             </Button>
+            )}
           </form>
 
           {/* Tips */}
