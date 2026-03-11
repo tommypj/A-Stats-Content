@@ -10,7 +10,7 @@ Orchestrates a 10-step self-correcting multi-model pipeline:
   4. Article           → Claude Sonnet 4.6 (publication-quality prose)
   5. SEO vs SERP check → Gemini Flash (lightweight)
   6. Fact-check        → Claude Haiku 4.5 (lightweight)
-  7. Image prompt      → Claude Sonnet 4.6 (lightweight)
+  7. Image prompts     → Claude Sonnet 4.6 (lightweight)
      Steps 5-7 run in parallel
   8. SEO repair loop   → Claude Sonnet 4.6 (section-level regeneration)
   9. Fact-check repair → Claude Haiku 4.5 (auto-fix flagged claims)
@@ -88,7 +88,7 @@ class PipelineResult:
     article: GeneratedArticle
     serp_analysis: SERPAnalysis | None = None
     research_data: ResearchData | None = None
-    image_prompt: str | None = None
+    image_prompts: list[str] | None = None
     flagged_stats: list[str] = field(default_factory=list)
     serp_seo: dict = field(default_factory=dict)
     models_used: dict[str, str] = field(default_factory=dict)
@@ -266,7 +266,7 @@ class ContentPipeline:
         Steps 1+2 run in parallel (Gemini SERP + research, with Redis cache).
         Step 3: outline via OpenAI (fallback Claude).
         Step 4: article via Claude (enriched with research context).
-        Steps 5+6+7 run in parallel (SERP SEO check + AI fact-check + image prompt).
+        Steps 5+6+7 run in parallel (SERP SEO check + AI fact-check + image prompts).
         """
         models_used: dict[str, str] = {}
         run_meta = PipelineRunMetadata()
@@ -438,7 +438,7 @@ class ContentPipeline:
         )
 
         # ----------------------------------------------------------------
-        # Steps 5 + 6 + 7: SEO check, fact-check, image prompt (parallel)
+        # Steps 5 + 6 + 7: SEO check, fact-check, image prompts (parallel)
         # ----------------------------------------------------------------
         async def _seo_check() -> dict:
             if serp_analysis:
@@ -458,22 +458,22 @@ class ContentPipeline:
                 logger.warning("AI fact-check failed: %s", e)
                 return []
 
-        async def _image_prompt() -> str | None:
+        async def _image_prompts() -> list[str] | None:
             try:
                 return await asyncio.wait_for(
-                    content_ai_service.generate_image_prompt(
+                    content_ai_service.generate_image_prompts(
                         title=title or outline.title,
                         content=article.content,
                         keyword=keyword,
                     ),
-                    timeout=30.0,
+                    timeout=45.0,
                 )
             except Exception as e:
-                logger.warning("Image prompt generation failed: %s", e)
+                logger.warning("Image prompts generation failed: %s", e)
                 return None
 
-        serp_seo, ai_flags, image_prompt = await asyncio.gather(
-            _seo_check(), _fact_check(), _image_prompt()
+        serp_seo, ai_flags, image_prompts = await asyncio.gather(
+            _seo_check(), _fact_check(), _image_prompts()
         )
 
         # Merge regex + AI flagged stats, deduplicate
@@ -603,7 +603,7 @@ class ContentPipeline:
             article=article,
             serp_analysis=serp_analysis,
             research_data=research_data,
-            image_prompt=image_prompt,
+            image_prompts=image_prompts,
             flagged_stats=flagged_stats,
             serp_seo=serp_seo,
             models_used=models_used,
