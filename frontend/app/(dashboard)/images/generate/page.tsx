@@ -65,6 +65,7 @@ function GenerateImageContent() {
   const [wpUploading, setWpUploading] = useState(false);
   const [wpUploaded, setWpUploaded] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const promptCardPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMountedRef = useRef(true);
   const [articlePrompts, setArticlePrompts] = useState<string[]>([]);
   const [generatingIndex, setGeneratingIndex] = useState<number | null>(null);
@@ -75,6 +76,7 @@ function GenerateImageContent() {
     return () => {
       isMountedRef.current = false;
       if (pollRef.current) clearInterval(pollRef.current);
+      if (promptCardPollRef.current) clearInterval(promptCardPollRef.current);
     };
   }, []);
 
@@ -101,13 +103,6 @@ function GenerateImageContent() {
   const generateMutation = useMutation({
     mutationFn: (data: { prompt: string; style: string; width?: number; height?: number; article_id?: string }) =>
       api.images.generate(data),
-    onSuccess: (image) => {
-      setGeneratedImage(image);
-      pollImageStatus(image.id);
-    },
-    onError: () => {
-      setError("Failed to generate image. Please try again.");
-    },
   });
 
   const wpUploadMutation = useMutation({
@@ -181,13 +176,24 @@ function GenerateImageContent() {
     setWpUploaded(false);
 
     const selectedSize = IMAGE_SIZES.find(s => s.value === size);
-    generateMutation.mutate({
-      prompt: prompt.trim(),
-      style,
-      width: selectedSize?.width,
-      height: selectedSize?.height,
-      article_id: articleId || undefined,
-    });
+    generateMutation.mutate(
+      {
+        prompt: prompt.trim(),
+        style,
+        width: selectedSize?.width,
+        height: selectedSize?.height,
+        article_id: articleId || undefined,
+      },
+      {
+        onSuccess: (image) => {
+          setGeneratedImage(image);
+          pollImageStatus(image.id);
+        },
+        onError: () => {
+          setError("Failed to generate image. Please try again.");
+        },
+      }
+    );
   }
 
   function handleGenerateForPrompt(index: number) {
@@ -224,11 +230,11 @@ function GenerateImageContent() {
     const maxAttempts = 90;
     let attempts = 0;
 
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(async () => {
+    if (promptCardPollRef.current) clearInterval(promptCardPollRef.current);
+    promptCardPollRef.current = setInterval(async () => {
       if (!isMountedRef.current) {
-        if (pollRef.current) clearInterval(pollRef.current);
-        pollRef.current = null;
+        if (promptCardPollRef.current) clearInterval(promptCardPollRef.current);
+        promptCardPollRef.current = null;
         return;
       }
       try {
@@ -240,21 +246,21 @@ function GenerateImageContent() {
           setPromptCardImages((prev) => ({ ...prev, [index]: image }));
           setGeneratingIndex(null);
           queryClient.invalidateQueries({ queryKey: ["images"] });
-          if (pollRef.current) clearInterval(pollRef.current);
-          pollRef.current = null;
+          if (promptCardPollRef.current) clearInterval(promptCardPollRef.current);
+          promptCardPollRef.current = null;
         } else if (image.status === "failed" || attempts >= maxAttempts) {
           setPromptCardImages((prev) => ({
             ...prev,
             [index]: image.status === "failed" ? image : { ...image, status: "failed" } as GeneratedImage,
           }));
           setGeneratingIndex(null);
-          if (pollRef.current) clearInterval(pollRef.current);
-          pollRef.current = null;
+          if (promptCardPollRef.current) clearInterval(promptCardPollRef.current);
+          promptCardPollRef.current = null;
         }
       } catch {
         setGeneratingIndex(null);
-        if (pollRef.current) clearInterval(pollRef.current);
-        pollRef.current = null;
+        if (promptCardPollRef.current) clearInterval(promptCardPollRef.current);
+        promptCardPollRef.current = null;
       }
     }, 2000);
   }
