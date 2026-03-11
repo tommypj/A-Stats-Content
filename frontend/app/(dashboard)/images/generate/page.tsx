@@ -163,10 +163,11 @@ function GenerateImageContent() {
   }, [articleId]);
 
   function handleSendToWordPress() {
-    if (!generatedImage || wpUploadMutation.isPending) return;
+    const img = generatedImage ?? activePromptCardImage;
+    if (!img || wpUploadMutation.isPending) return;
     wpUploadMutation.mutate({
-      image_id: generatedImage.id,
-      alt_text: generatedImage.alt_text || undefined,
+      image_id: img.id,
+      alt_text: img.alt_text || undefined,
     });
   }
 
@@ -317,11 +318,12 @@ function GenerateImageContent() {
   }
 
   function handleDownload() {
-    if (!generatedImage?.url) return;
+    const img = generatedImage ?? activePromptCardImage;
+    if (!img?.url) return;
 
     const link = document.createElement("a");
-    link.href = getImageUrl(generatedImage.url);
-    link.download = `image-${generatedImage.id}.png`;
+    link.href = getImageUrl(img.url);
+    link.download = `image-${img.id}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -332,6 +334,16 @@ function GenerateImageContent() {
   }
 
   const loading = generateMutation.isPending;
+
+  // Unified preview: for prompt cards, show the active/last-generated card image; for standalone, use generatedImage
+  const activePromptCardImage = generatingIndex !== null
+    ? promptCardImages[generatingIndex] ?? null
+    : Object.values(promptCardImages).filter(Boolean).pop() ?? null;
+  const previewImage = generatedImage ?? activePromptCardImage;
+  const isGeneratingAny = loading || generatingIndex !== null || previewImage?.status === "generating";
+  const previewPromptText = generatingIndex !== null
+    ? (articlePrompts[generatingIndex] ?? prompt).slice(0, 60)
+    : prompt.slice(0, 60);
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -599,20 +611,20 @@ function GenerateImageContent() {
             Preview
           </h3>
 
-          {(loading || generatedImage?.status === "generating") && generatingIndex === null ? (
+          {isGeneratingAny && previewImage?.status !== "completed" ? (
             <AIGenerationProgress
               type="image"
-              title={prompt.slice(0, 60)}
+              title={previewPromptText}
               isGenerating={true}
             />
-          ) : !generatedImage ? (
+          ) : !previewImage || previewImage.status === "generating" ? (
             <div className="aspect-square bg-surface-secondary rounded-xl flex items-center justify-center">
               <div className="text-center text-text-muted">
                 <ImageIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
                 <p className="text-sm">Your generated image will appear here</p>
               </div>
             </div>
-          ) : generatedImage.status === "failed" ? (
+          ) : previewImage.status === "failed" ? (
             <div className="aspect-square bg-red-50 rounded-xl flex items-center justify-center border border-red-200">
               <div className="text-center text-red-600">
                 <p className="text-sm font-medium">Generation failed</p>
@@ -623,8 +635,8 @@ function GenerateImageContent() {
             <>
               <div className="relative aspect-square bg-surface-secondary rounded-xl overflow-hidden mb-4">
                 <Image
-                  src={getImageUrl(generatedImage.url)}
-                  alt={generatedImage.alt_text || generatedImage.prompt}
+                  src={getImageUrl(previewImage.url)}
+                  alt={previewImage.alt_text || previewImage.prompt}
                   fill
                   className="object-contain"
                   sizes="(max-width: 1024px) 100vw, 50vw"
@@ -639,7 +651,7 @@ function GenerateImageContent() {
                     Image generated successfully!
                   </p>
                   <p className="text-xs text-green-700 mt-0.5">
-                    {generatedImage.width}×{generatedImage.height} · {generatedImage.style}
+                    {previewImage.width}×{previewImage.height} · {previewImage.style}
                   </p>
                 </div>
               </div>
@@ -650,7 +662,7 @@ function GenerateImageContent() {
                   Prompt
                 </label>
                 <p className="text-sm text-text-primary">
-                  {generatedImage.prompt}
+                  {previewImage.prompt}
                 </p>
               </div>
 
