@@ -872,6 +872,20 @@ async def handle_webhook(
         await db.commit()
         await db.refresh(user)
 
+        # Emit journey event for tier-changing webhook events
+        if event_name in (
+            WebhookEventType.SUBSCRIPTION_CREATED.value,
+            WebhookEventType.SUBSCRIPTION_UPDATED.value,
+            WebhookEventType.SUBSCRIPTION_EXPIRED.value,
+            WebhookEventType.SUBSCRIPTION_RESUMED.value,
+        ):
+            try:
+                from services.email_journey import EmailJourneyService
+                journey = EmailJourneyService(db)
+                await journey.emit("user.tier_changed", user_id=user.id)
+            except Exception as e:
+                logger.error("Journey event user.tier_changed failed: %s", e)
+
         logger.info(f"Webhook processed successfully for user {user_id}")
 
     except Exception as e:

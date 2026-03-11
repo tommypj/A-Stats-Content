@@ -225,6 +225,13 @@ async def connect_wordpress(
     await db.commit()
     await db.refresh(project)
 
+    try:
+        from services.email_journey import EmailJourneyService
+        journey = EmailJourneyService(db)
+        await journey.emit("integration.connected", user_id=current_user.id)
+    except Exception as e:
+        logger.error("Journey event integration.connected failed: %s", e)
+
     return WordPressConnectionResponse(
         site_url=site_url,
         username=request.username,
