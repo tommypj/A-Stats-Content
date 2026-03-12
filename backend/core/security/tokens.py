@@ -5,7 +5,8 @@ JWT token service for authentication.
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import InvalidTokenError
 
 
 @dataclass
@@ -148,7 +149,7 @@ class TokenService:
             required_fields = ["sub", "exp", "type"]
             for field in required_fields:
                 if field not in payload:
-                    raise JWTError(f"Missing required field: {field}")
+                    raise InvalidTokenError(f"Missing required field: {field}")
 
             return TokenPayload(
                 sub=payload.get("sub"),
@@ -158,7 +159,7 @@ class TokenService:
                 email=payload.get("email"),
                 role=payload.get("role"),
             )
-        except JWTError:
+        except InvalidTokenError:
             return None
 
     def verify_access_token(self, token: str) -> TokenPayload | None:
@@ -258,7 +259,7 @@ class TokenService:
                 return None
 
             return payload.get("sub"), payload.get("email")
-        except JWTError:
+        except InvalidTokenError:
             return None
 
     def verify_password_reset_token(self, token: str) -> str | None:
@@ -282,5 +283,5 @@ class TokenService:
                 return None
 
             return payload.get("sub")
-        except JWTError:
+        except InvalidTokenError:
             return None
