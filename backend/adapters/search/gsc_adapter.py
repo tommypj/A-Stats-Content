@@ -195,13 +195,13 @@ class GSCAdapter:
             return credentials
 
         except httpx.HTTPError as e:
-            logger.error(f"HTTP error during token exchange: {e}")
+            logger.error("HTTP error during token exchange: %s", e)
             raise GSCAuthError(f"Failed to exchange authorization code: {e}")
         except KeyError as e:
-            logger.error(f"Missing required field in token response: {e}")
+            logger.error("Missing required field in token response: %s", e)
             raise GSCAuthError(f"Invalid token response: missing {e}")
         except Exception as e:
-            logger.error(f"Unexpected error during token exchange: {e}")
+            logger.error("Unexpected error during token exchange: %s", e)
             raise GSCAuthError(f"Token exchange failed: {e}")
 
     def refresh_tokens(self, credentials: GSCCredentials) -> GSCCredentials:
@@ -251,10 +251,10 @@ class GSCAdapter:
             )
 
         except httpx.HTTPError as e:
-            logger.error(f"HTTP error during token refresh: {e}")
+            logger.error("HTTP error during token refresh: %s", e)
             raise GSCAuthError(f"Failed to refresh tokens: {e}")
         except Exception as e:
-            logger.error(f"Unexpected error during token refresh: {e}")
+            logger.error("Unexpected error during token refresh: %s", e)
             raise GSCAuthError(f"Token refresh failed: {e}")
 
     def _get_service(self, credentials: GSCCredentials):
@@ -300,7 +300,7 @@ class GSCAdapter:
             return service, credentials
 
         except Exception as e:
-            logger.error(f"Failed to create API service: {e}")
+            logger.error("Failed to create API service: %s", e)
             raise GSCAuthError(f"Failed to authenticate with Google API: {e}")
 
     def list_sites(
@@ -325,22 +325,23 @@ class GSCAdapter:
             response = service.sites().list().execute()
 
             logger.info(
-                f"GSC sites API raw response keys: {list(response.keys()) if response else 'None'}"
+                "GSC sites API raw response keys: %s",
+                list(response.keys()) if response else "None",
             )
-            logger.info(f"GSC sites API raw response: {response}")
+            logger.info("GSC sites API raw response: %s", response)
 
             sites = response.get("siteEntry", [])
-            logger.info(f"Retrieved {len(sites)} verified sites")
+            logger.info("Retrieved %s verified sites", len(sites))
 
             return sites, updated_creds
 
         except HttpError as e:
             if e.resp.status == 403:
                 raise GSCQuotaError("Google Search Console API quota exceeded")
-            logger.error(f"Google API error while listing sites: {e}")
+            logger.error("Google API error while listing sites: %s", e)
             raise GSCAPIError(f"Failed to list sites: {e}")
         except Exception as e:
-            logger.error(f"Unexpected error while listing sites: {e}")
+            logger.error("Unexpected error while listing sites: %s", e)
             raise GSCAPIError(f"Failed to list sites: {e}")
 
     def get_search_analytics(
@@ -372,7 +373,7 @@ class GSCAdapter:
         try:
             service, updated_creds = self._get_service(credentials)
 
-            logger.info(f"Fetching search analytics for {site_url} from {start_date} to {end_date}")
+            logger.info("Fetching search analytics for %s from %s to %s", site_url, start_date, end_date)
 
             request_body = {
                 "startDate": start_date.isoformat(),
@@ -387,17 +388,17 @@ class GSCAdapter:
             )
 
             rows = response.get("rows", [])
-            logger.info(f"Retrieved {len(rows)} search analytics rows")
+            logger.info("Retrieved %s search analytics rows", len(rows))
 
             return rows
 
         except HttpError as e:
             if e.resp.status == 403:
                 raise GSCQuotaError("Google Search Console API quota exceeded")
-            logger.error(f"Google API error while fetching search analytics: {e}")
+            logger.error("Google API error while fetching search analytics: %s", e)
             raise GSCAPIError(f"Failed to fetch search analytics: {e}")
         except Exception as e:
-            logger.error(f"Unexpected error while fetching search analytics: {e}")
+            logger.error("Unexpected error while fetching search analytics: %s", e)
             raise GSCAPIError(f"Failed to fetch search analytics: {e}")
 
     def get_keyword_rankings(
@@ -456,7 +457,7 @@ class GSCAdapter:
         # Sort by clicks descending
         keywords.sort(key=lambda x: x["clicks"], reverse=True)
 
-        logger.info(f"Retrieved {len(keywords)} keyword rankings")
+        logger.info("Retrieved %s keyword rankings", len(keywords))
         return keywords
 
     def get_page_performance(
@@ -515,7 +516,7 @@ class GSCAdapter:
         # Sort by clicks descending
         pages.sort(key=lambda x: x["clicks"], reverse=True)
 
-        logger.info(f"Retrieved {len(pages)} page performance metrics")
+        logger.info("Retrieved %s page performance metrics", len(pages))
         return pages
 
     def get_daily_stats(
@@ -574,7 +575,7 @@ class GSCAdapter:
         # Sort by date ascending
         daily_stats.sort(key=lambda x: x["date"])
 
-        logger.info(f"Retrieved {len(daily_stats)} days of statistics")
+        logger.info("Retrieved %s days of statistics", len(daily_stats))
         return daily_stats
 
     def get_device_breakdown(
@@ -625,7 +626,7 @@ class GSCAdapter:
                 }
             )
 
-        logger.info(f"Retrieved device breakdown with {len(devices)} device types")
+        logger.info("Retrieved device breakdown with %s device types", len(devices))
         return devices
 
     def get_country_breakdown(
@@ -681,7 +682,7 @@ class GSCAdapter:
         # Sort by clicks descending
         countries.sort(key=lambda x: x["clicks"], reverse=True)
 
-        logger.info(f"Retrieved top {len(countries)} countries")
+        logger.info("Retrieved top %s countries", len(countries))
         return countries
 
     def inspect_url(
@@ -736,22 +737,22 @@ class GSCAdapter:
                 "rich_results_verdict": rich_results.get("verdict", "VERDICT_UNSPECIFIED"),
             }
 
-            logger.info(f"URL inspection for {url}: verdict={result['verdict']}")
+            logger.info("URL inspection for %s: verdict=%s", url, result['verdict'])
             return result, credentials
 
         except HttpError as e:
             if e.resp.status == 403:
-                logger.warning(f"Quota exceeded for URL inspection: {e}")
+                logger.warning("Quota exceeded for URL inspection: %s", e)
                 raise GSCQuotaError("URL Inspection API quota exceeded")
             elif e.resp.status == 429:
-                logger.warning(f"Rate limited for URL inspection: {e}")
+                logger.warning("Rate limited for URL inspection: %s", e)
                 raise GSCQuotaError("URL Inspection API rate limited — try again later")
-            logger.error(f"URL inspection API error: {e}")
+            logger.error("URL inspection API error: %s", e)
             raise GSCAPIError(f"URL inspection failed: {e}")
         except (GSCAuthError, GSCQuotaError):
             raise
         except Exception as e:
-            logger.error(f"Unexpected error during URL inspection: {e}")
+            logger.error("Unexpected error during URL inspection: %s", e)
             raise GSCAPIError(f"URL inspection failed: {e}")
 
 

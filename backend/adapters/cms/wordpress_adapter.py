@@ -166,13 +166,13 @@ class WordPressAdapter:
                 error_message = response.text or f"HTTP {response.status_code}"
                 error_code = response.status_code
 
-            logger.error(f"WordPress API error [{error_code}]: {error_message}")
+            logger.error("WordPress API error [%s]: %s", error_code, error_message)
             raise WordPressAPIError(f"API error [{error_code}]: {error_message}")
 
         try:
             return response.json()
         except Exception as e:
-            logger.error(f"Failed to parse WordPress API response: {e}")
+            logger.error("Failed to parse WordPress API response: %s", e)
             raise WordPressAPIError(f"Invalid JSON response: {e}")
 
     async def test_connection(self) -> bool:
@@ -186,27 +186,27 @@ class WordPressAdapter:
             client = self._get_client()
             url = self._build_url("users/me")
 
-            logger.info(f"Testing WordPress connection to {self.connection.site_url}")
+            logger.info("Testing WordPress connection to %s", self.connection.site_url)
             response = await client.get(url)
 
             # Always handle response to get proper error handling
             user_data = await self._handle_response(response)
 
             logger.info(
-                f"WordPress connection successful. "
-                f"Authenticated as: {user_data.get('name', 'Unknown')}"
+                "WordPress connection successful. Authenticated as: %s",
+                user_data.get('name', 'Unknown'),
             )
             self.connection.is_valid = True
             return True
 
         except httpx.ConnectError as e:
-            logger.error(f"Failed to connect to WordPress site: {e}")
+            logger.error("Failed to connect to WordPress site: %s", e)
             raise WordPressConnectionError(
                 f"Cannot connect to {self.connection.site_url}. "
                 "Check the site URL and network connection."
             )
         except httpx.TimeoutException as e:
-            logger.error(f"WordPress connection timeout: {e}")
+            logger.error("WordPress connection timeout: %s", e)
             raise WordPressConnectionError(
                 f"Connection timeout. Site did not respond within {self.timeout} seconds."
             )
@@ -214,7 +214,7 @@ class WordPressAdapter:
             self.connection.is_valid = False
             raise
         except Exception as e:
-            logger.error(f"Unexpected error testing WordPress connection: {e}")
+            logger.error("Unexpected error testing WordPress connection: %s", e)
             self.connection.is_valid = False
             raise WordPressConnectionError(f"Connection test failed: {e}")
 
@@ -239,13 +239,13 @@ class WordPressAdapter:
             response = await client.get(url, params=params)
             categories = await self._handle_response(response)
 
-            logger.info(f"Retrieved {len(categories)} categories")
+            logger.info("Retrieved %s categories", len(categories))
             return categories
 
         except (WordPressAuthError, WordPressAPIError):
             raise
         except Exception as e:
-            logger.error(f"Failed to fetch categories: {e}")
+            logger.error("Failed to fetch categories: %s", e)
             raise WordPressAPIError(f"Failed to fetch categories: {e}")
 
     async def get_tags(self) -> list[dict[str, Any]]:
@@ -269,13 +269,13 @@ class WordPressAdapter:
             response = await client.get(url, params=params)
             tags = await self._handle_response(response)
 
-            logger.info(f"Retrieved {len(tags)} tags")
+            logger.info("Retrieved %s tags", len(tags))
             return tags
 
         except (WordPressAuthError, WordPressAPIError):
             raise
         except Exception as e:
-            logger.error(f"Failed to fetch tags: {e}")
+            logger.error("Failed to fetch tags: %s", e)
             raise WordPressAPIError(f"Failed to fetch tags: {e}")
 
     async def upload_media(
@@ -300,13 +300,13 @@ class WordPressAdapter:
         """
         try:
             # Download the image first
-            logger.info(f"Downloading image from {image_url}")
+            logger.info("Downloading image from %s", image_url)
             async with httpx.AsyncClient(timeout=self.timeout) as download_client:
                 image_response = await download_client.get(image_url)
                 image_response.raise_for_status()
                 image_data = image_response.content
 
-            logger.info(f"Downloaded {len(image_data)} bytes")
+            logger.info("Downloaded %s bytes", len(image_data))
 
             # Determine content type
             content_type = "image/jpeg"
@@ -329,7 +329,7 @@ class WordPressAdapter:
             if alt_text:
                 data["alt_text"] = alt_text
 
-            logger.info(f"Uploading image to WordPress: {filename}")
+            logger.info("Uploading image to WordPress: %s", filename)
 
             # We need to create a new client for multipart/form-data
             credentials = f"{self.connection.username}:{self.connection.app_password}"
@@ -348,18 +348,18 @@ class WordPressAdapter:
                 media = await self._handle_response(response)
 
             logger.info(
-                f"Media uploaded successfully. "
-                f"ID: {media.get('id')}, URL: {media.get('source_url')}"
+                "Media uploaded successfully. ID: %s, URL: %s",
+                media.get('id'), media.get('source_url'),
             )
             return media
 
         except httpx.HTTPError as e:
-            logger.error(f"HTTP error during media upload: {e}")
+            logger.error("HTTP error during media upload: %s", e)
             raise WordPressAPIError(f"Failed to upload media: {e}")
         except (WordPressAuthError, WordPressAPIError):
             raise
         except Exception as e:
-            logger.error(f"Unexpected error during media upload: {e}")
+            logger.error("Unexpected error during media upload: %s", e)
             raise WordPressAPIError(f"Media upload failed: {e}")
 
     async def create_post(
@@ -421,19 +421,20 @@ class WordPressAdapter:
                     "_yoast_wpseo_metadesc": meta_description,
                 }
 
-            logger.info(f"Creating WordPress post: {title} (status: {status})")
+            logger.info("Creating WordPress post: %s (status: %s)", title, status)
             response = await client.post(url, json=post_data)
             post = await self._handle_response(response)
 
             logger.info(
-                f"Post created successfully. ID: {post.get('id')}, Link: {post.get('link')}"
+                "Post created successfully. ID: %s, Link: %s",
+                post.get('id'), post.get('link'),
             )
             return post
 
         except (WordPressAuthError, WordPressAPIError):
             raise
         except Exception as e:
-            logger.error(f"Failed to create post: {e}")
+            logger.error("Failed to create post: %s", e)
             raise WordPressAPIError(f"Post creation failed: {e}")
 
     async def update_post(
@@ -461,17 +462,17 @@ class WordPressAdapter:
             # Filter out None values
             update_data = {k: v for k, v in kwargs.items() if v is not None}
 
-            logger.info(f"Updating WordPress post {post_id}")
+            logger.info("Updating WordPress post %s", post_id)
             response = await client.post(url, json=update_data)
             post = await self._handle_response(response)
 
-            logger.info(f"Post {post_id} updated successfully")
+            logger.info("Post %s updated successfully", post_id)
             return post
 
         except (WordPressAuthError, WordPressAPIError):
             raise
         except Exception as e:
-            logger.error(f"Failed to update post {post_id}: {e}")
+            logger.error("Failed to update post %s: %s", post_id, e)
             raise WordPressAPIError(f"Post update failed: {e}")
 
     async def list_posts(
@@ -510,13 +511,13 @@ class WordPressAdapter:
             response = await client.get(url, params=params)
             posts = await self._handle_response(response)
 
-            logger.info(f"Retrieved {len(posts)} WordPress posts")
+            logger.info("Retrieved %s WordPress posts", len(posts))
             return posts
 
         except (WordPressAuthError, WordPressAPIError):
             raise
         except Exception as e:
-            logger.error(f"Failed to fetch WordPress posts: {e}")
+            logger.error("Failed to fetch WordPress posts: %s", e)
             raise WordPressAPIError(f"Failed to fetch posts: {e}")
 
     async def get_post(self, post_id: int) -> dict[str, Any]:
@@ -536,17 +537,18 @@ class WordPressAdapter:
             client = self._get_client()
             url = self._build_url(f"posts/{post_id}")
 
-            logger.info(f"Retrieving WordPress post {post_id}")
+            logger.info("Retrieving WordPress post %s", post_id)
             response = await client.get(url)
             post = await self._handle_response(response)
 
             logger.info(
-                f"Retrieved post {post_id}: {post.get('title', {}).get('rendered', 'Untitled')}"
+                "Retrieved post %s: %s",
+                post_id, post.get('title', {}).get('rendered', 'Untitled'),
             )
             return post
 
         except (WordPressAuthError, WordPressAPIError):
             raise
         except Exception as e:
-            logger.error(f"Failed to retrieve post {post_id}: {e}")
+            logger.error("Failed to retrieve post %s: %s", post_id, e)
             raise WordPressAPIError(f"Post retrieval failed: {e}")

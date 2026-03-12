@@ -83,7 +83,7 @@ class KnowledgeService:
             source = result.scalar_one_or_none()
 
             if not source:
-                logger.error(f"KnowledgeSource {source_id} not found")
+                logger.error("KnowledgeSource %s not found", source_id)
                 return False
 
             # Resolve project_id: caller-supplied → source record → "personal" fallback
@@ -94,7 +94,7 @@ class KnowledgeService:
             source.processing_started_at = datetime.now(UTC)
             await db.commit()
 
-            logger.info(f"Processing document: {source.title} ({source_id})")
+            logger.info("Processing document: %s (%s)", source.title, source_id)
 
             # 3. Read and process file into chunks
             source_metadata = {
@@ -117,13 +117,13 @@ class KnowledgeService:
             if not chunks:
                 raise ValueError("No chunks extracted from document")
 
-            logger.info(f"Extracted {len(chunks)} chunks from document")
+            logger.info("Extracted %s chunks from document", len(chunks))
 
             # 4. Generate embeddings for all chunks
             chunk_texts = [chunk.content for chunk in chunks]
             embeddings = await self.embeddings.embed_texts(chunk_texts)
 
-            logger.info(f"Generated {len(embeddings)} embeddings")
+            logger.info("Generated %s embeddings", len(embeddings))
 
             # 5. Store in ChromaDB
             from adapters.knowledge.chroma_adapter import Document as ChromaDocument
@@ -144,7 +144,7 @@ class KnowledgeService:
                 project_id=resolved_project_id,
             )
 
-            logger.info(f"Stored {len(chunks)} chunks in ChromaDB")
+            logger.info("Stored %s chunks in ChromaDB", len(chunks))
 
             # 6. Update KnowledgeSource with statistics
             total_chars = sum(len(chunk.content) for chunk in chunks)
@@ -157,14 +157,14 @@ class KnowledgeService:
             await db.commit()
 
             logger.info(
-                f"Successfully processed document {source_id}: "
-                f"{len(chunks)} chunks, {total_chars} chars"
+                "Successfully processed document %s: %s chunks, %s chars",
+                source_id, len(chunks), total_chars,
             )
 
             return True
 
         except Exception as e:
-            logger.error(f"Failed to process document {source_id}: {e}", exc_info=True)
+            logger.error("Failed to process document %s: %s", source_id, e, exc_info=True)
 
             # Update status to 'failed' with error message
             try:
@@ -180,7 +180,7 @@ class KnowledgeService:
                     await db.commit()
 
             except Exception as db_error:
-                logger.error(f"Failed to update error status: {db_error}")
+                logger.error("Failed to update error status: %s", db_error)
 
             return False
 
@@ -236,7 +236,7 @@ class KnowledgeService:
                 project_id=resolved_project_id,
             )
 
-            logger.info(f"Retrieved {len(results)} chunks for query")
+            logger.info("Retrieved %s chunks for query", len(results))
 
             # 3. Build context from results
             if not results:
@@ -303,7 +303,7 @@ Answer:"""
                     await db.commit()
 
                 except Exception as e:
-                    logger.error(f"Failed to log query: {e}")
+                    logger.error("Failed to log query: %s", e)
                     # Don't fail the query if logging fails
                     await db.rollback()
 
@@ -315,7 +315,7 @@ Answer:"""
             }
 
         except Exception as e:
-            logger.error(f"Failed to process query: {e}", exc_info=True)
+            logger.error("Failed to process query: %s", e, exc_info=True)
 
             query_time_ms = int((time.time() - start_time) * 1000)
 
@@ -336,7 +336,7 @@ Answer:"""
                     await db.commit()
 
                 except Exception as log_error:
-                    logger.error(f"Failed to log error query: {log_error}")
+                    logger.error("Failed to log error query: %s", log_error)
                     await db.rollback()
 
             # Return generic error — do not leak internal exception details
@@ -380,7 +380,7 @@ Answer:"""
             source = result.scalar_one_or_none()
 
             if not source:
-                logger.warning(f"KnowledgeSource {source_id} not found for user {user_id}")
+                logger.warning("KnowledgeSource %s not found for user %s", source_id, user_id)
                 return False
 
             # Resolve project_id: caller-supplied → source record → "personal" fallback
@@ -393,7 +393,7 @@ Answer:"""
                 project_id=resolved_project_id,
             )
 
-            logger.info(f"Deleted chunks from ChromaDB for source {source_id}")
+            logger.info("Deleted chunks from ChromaDB for source %s", source_id)
 
             # 3. Delete file from storage (if exists)
             if source.file_url:
@@ -401,20 +401,20 @@ Answer:"""
                     file_path = Path(source.file_url)
                     if file_path.exists():
                         file_path.unlink()
-                        logger.info(f"Deleted file: {source.file_url}")
+                        logger.info("Deleted file: %s", source.file_url)
                 except Exception as e:
-                    logger.warning(f"Failed to delete file {source.file_url}: {e}")
+                    logger.warning("Failed to delete file %s: %s", source.file_url, e)
 
             # 4. Delete KnowledgeSource record (CASCADE will delete related queries)
             await db.delete(source)
             await db.commit()
 
-            logger.info(f"Successfully deleted source {source_id}")
+            logger.info("Successfully deleted source %s", source_id)
 
             return True
 
         except Exception as e:
-            logger.error(f"Failed to delete source {source_id}: {e}", exc_info=True)
+            logger.error("Failed to delete source %s: %s", source_id, e, exc_info=True)
             await db.rollback()
             return False
 
@@ -474,7 +474,7 @@ Answer:"""
             }
 
         except Exception as e:
-            logger.error(f"Failed to get statistics for user {user_id}: {e}")
+            logger.error("Failed to get statistics for user %s: %s", user_id, e)
             return {
                 "total_sources": 0,
                 "completed_sources": 0,
