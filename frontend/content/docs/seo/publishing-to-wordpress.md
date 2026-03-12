@@ -110,7 +110,7 @@ To disconnect a site, go to **Settings > Integrations > WordPress**, click the s
 Not currently. The integration is publish-only. You can copy and paste content from WordPress into a new A-Stats article if you want to manage existing posts from A-Stats going forward.
 
 **Does the integration support custom post types?**
-Not at this time. A-Stats publishes to the standard `posts` endpoint. Custom post types require API extensions that vary by WordPress theme and plugin setup.
+Not at this time. A-Stats publishes to WordPress's standard blog post format. Custom post types require plugin-specific configurations that vary by WordPress theme and setup.
 
 **Will images in my article be uploaded to WordPress?**
 Images hosted on A-Stats are embedded via their A-Stats URLs. They will display correctly in the WordPress post as long as the A-Stats image URL is publicly accessible. If you want images hosted in your WordPress media library, upload them to WordPress first and insert them into your A-Stats article via their WordPress URL.

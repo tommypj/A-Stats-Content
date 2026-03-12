@@ -33,15 +33,13 @@ Effective queries are specific and phrased as questions or clear topics:
 
 ## How Responses Are Generated
 
-When you submit a query, the system performs these steps:
+When you submit a query:
 
-1. **Semantic search** — Your query is converted into a vector embedding and compared against all stored document chunks. The top matching chunks are retrieved based on semantic similarity, not just keyword overlap.
+1. **Search** — A-Stats searches your uploaded documents for passages that match the meaning of your question — not just keyword overlap.
 
-2. **Context assembly** — The retrieved chunks (up to a configured limit) are assembled into a context window alongside your original query.
+2. **Answer synthesis** — The AI reads the most relevant passages and generates a coherent, natural-language response based on your documents. It does not supplement with general knowledge the way article generation does.
 
-3. **Answer synthesis** — The AI model reads the assembled context and generates a coherent, natural-language response. It uses only the retrieved content to answer; it does not supplement with general knowledge in the same way as article generation.
-
-4. **Source attribution** — The response includes references to the source documents that contributed to the answer.
+3. **Source attribution** — The response includes references to the source documents that contributed to the answer.
 
 ## Accuracy and Limitations
 
@@ -53,7 +51,7 @@ When you submit a query, the system performs these steps:
 
 ### Known Limitations
 - The system can only answer questions based on content that has been uploaded. If information is not in any source document, it cannot be retrieved.
-- Long documents are split into chunks, and very long answers may require information from multiple chunks that do not all get retrieved in a single query.
+- Long documents are split into sections during indexing, and very long answers may require information spread across multiple sections that do not all surface in a single query.
 - Heavily formatted documents (tables, bullet-heavy slides exported to PDF) may not parse as cleanly as prose-based documents, which can affect retrieval quality.
 
 > **Tip:** If you notice the AI consistently missing a key fact during article generation, try querying for that fact directly. If it does not surface, the relevant document may need to be re-uploaded or the information added to a document that is already in the vault.
@@ -62,10 +60,10 @@ When you submit a query, the system performs these steps:
 
 The query interface is a diagnostic tool as much as a reference tool. Use it to:
 
-- **Verify coverage** — Confirm that critical information is indexed before running a large batch of article generation.
+- **Verify coverage** — Confirm that critical information is findable before running a large batch of article generation.
 - **Debug weak output** — If generated articles lack specific detail, query for that detail to see whether the vault has the relevant content.
 - **Spot gaps** — If a query returns a poor result, you know which document you need to upload to fill that gap.
 
 ## Result Limits and Performance
 
-Each query retrieves up to 500 document chunks for context assembly. For typical business documents, this is more than sufficient. Very large knowledge vaults (dozens of large documents) may see slightly slower response times on complex queries, but accuracy is not affected by vault size — only retrieval speed.
+Each query searches across your full document library. Very large knowledge vaults (dozens of large documents) may see slightly slower response times on complex queries, but accuracy is not affected by vault size — only speed.

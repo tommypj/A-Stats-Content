@@ -4,17 +4,13 @@ The Knowledge Vault is a private document library that makes AI-generated conten
 
 Without a Knowledge Vault, the AI works entirely from its general training data. With it, generated content reflects your proprietary knowledge, terminology, and positioning.
 
-## How RAG Works
+## How It Works
 
-RAG stands for Retrieval-Augmented Generation. When you trigger AI generation, the platform runs a two-step process:
+When you generate an article, A-Stats automatically searches your uploaded documents for information relevant to the topic. It finds matching content based on meaning — not just keywords — so related concepts surface even when exact words differ.
 
-1. **Retrieval** — The system searches your uploaded documents for passages that are semantically relevant to the current topic or prompt. It does not do a simple keyword search; it matches meaning, so related concepts surface even when exact words differ.
+The AI then uses those relevant passages alongside its general knowledge to produce content that sounds like it comes from someone who has read your internal materials.
 
-2. **Augmentation** — The retrieved passages are injected into the AI prompt as additional context. The model then generates content that incorporates that context alongside its general knowledge.
-
-The result is output that sounds like it comes from someone who has read your internal materials, not a generic AI assistant.
-
-> **Tip:** The more specific and well-organized your source documents are, the more precisely the retrieval step can match relevant passages to each generation task.
+> **Tip:** The more specific and well-organized your source documents are, the better A-Stats can find and use the right information for each article.
 
 ## Supported File Types
 

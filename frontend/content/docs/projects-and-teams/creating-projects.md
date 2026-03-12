@@ -48,7 +48,7 @@ Each project contains:
 | Articles | All published, draft, and scheduled articles |
 | Outlines | Content outlines and brief structures |
 | Images | AI-generated and uploaded image library |
-| Knowledge Vault | Uploaded document sources for RAG |
+| Knowledge Vault | Uploaded reference documents for AI-powered content generation |
 | Social Media | Scheduled and published social posts |
 | Analytics | SEO performance, AEO scores, content decay alerts |
 | Settings | Integrations, brand voice, team members |

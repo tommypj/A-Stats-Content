@@ -27,11 +27,7 @@ You can upload multiple files in a single session. Each file is queued and proce
 
 ## Processing Time
 
-After uploading, each document goes through a processing pipeline:
-
-1. Text is extracted from the file.
-2. The text is split into chunks of manageable size.
-3. Each chunk is converted into a vector embedding and stored in the knowledge index.
+After uploading, A-Stats reads and indexes your document so the AI can reference it during content generation.
 
 Processing typically completes in **10–60 seconds** for most documents. Larger files may take a few minutes. A status indicator on the source card shows the current state:
 
@@ -46,13 +42,13 @@ Do not navigate away during initial upload, but you can safely leave the Knowled
 ## Managing Sources
 
 ### Viewing Sources
-All uploaded sources appear in a list on the Knowledge Vault page. Each card shows the file name, description, processing status, upload date, and an approximate chunk count (the number of text segments stored in the index).
+All uploaded sources appear in a list on the Knowledge Vault page. Each card shows the file name, description, processing status, and upload date.
 
 ### Editing Source Details
 Click the edit icon on any source card to update its display name or description. Changing these fields does not re-process the document.
 
 ### Deleting Sources
-Click the delete icon on a source card and confirm the deletion. The document and all its associated vector embeddings are removed immediately. Any future generation tasks in the project will no longer have access to that source's content.
+Click the delete icon on a source card and confirm the deletion. The document is removed immediately. Any future generation tasks in the project will no longer have access to that source's content.
 
 > **Tip:** Deleting a source does not affect articles that were already generated using it — those articles retain their content. Only future generation tasks are affected.
 

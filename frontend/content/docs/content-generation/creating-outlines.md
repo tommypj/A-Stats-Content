@@ -70,7 +70,7 @@ On the outline detail page you can:
 
 Changes are saved automatically. You do not need to click a Save button.
 
-> **Tip:** If you are using Knowledge Vault sources, add a section description like "Draw on our product documentation for this section" to signal to the AI where to use the injected context.
+> **Tip:** If you are using Knowledge Vault sources, add a section description like "Draw on our product documentation for this section" to guide the AI toward your uploaded reference material.
 
 ---
 

@@ -1,34 +1,34 @@
-## Revenue Attribution
+## Connect Content to Business Outcomes
 
-Traffic is not a business outcome. Pageviews and sessions tell you what people read, but they do not tell you what that reading was worth. Revenue attribution closes the gap by connecting individual pieces of content to the conversions and revenue they influenced.
+Traffic alone doesn't tell you what content is worth. A page with 10,000 monthly visitors and zero conversions is less valuable than one with 500 visitors that consistently drives signups. Revenue attribution closes the gap by showing which content pages actually contribute to conversions.
 
-## The Problem Attribution Solves
+---
 
-Most content teams report on traffic volume because it is the easiest metric to measure. But a page with 10,000 monthly visitors and zero conversions is less valuable than a page with 500 visitors that consistently drives signups or purchases. Without attribution, both pages look equally important in a traffic report -- and budget decisions get made on incomplete information.
+## What You See
 
-A-Stats tracks which content pages users engage with before completing a defined conversion goal, then assigns credit to the content that contributed to the outcome.
-
-## How It Works
-
-A-Stats integrates with Google Analytics 4 to capture conversion events and map them back to content touchpoints. The system uses a last-touch attribution model by default: the content page a user visited most recently before converting receives credit for that conversion.
-
-Key data points surfaced in the attribution report:
-
-| Column | Description |
+| Column | What It Shows |
 |---|---|
-| **Attributed conversions** | Number of goal completions influenced by a specific page |
-| **Attributed revenue** | Monetary value of those conversions, based on goal values you define |
+| **Attributed conversions** | Goal completions influenced by a specific page |
+| **Attributed revenue** | Monetary value of those conversions |
 | **Conversion rate** | Conversions divided by unique visitors to the page |
 | **Unique converting visitors** | Distinct users who visited the page and later completed a goal |
 
-The attribution window is 30 days, capturing the reality that content-driven buying journeys often span multiple sessions over days or weeks.
+The attribution window is 30 days, capturing the reality that content-driven buying journeys often span multiple sessions.
 
-## What This Changes
+---
 
-With attribution data, your content strategy shifts from "write more, hope for traffic" to targeted investment in the content that moves the business forward. Pages with strong conversion rates deserve more internal links, backlink investment, and promotion. Pages with high traffic but no conversions may need intent realignment or stronger calls to action.
+## Smarter Content Decisions
 
-> **Tip:** Filter the attribution report by individual conversion goals to understand which content drives different types of business outcomes -- lead generation, trial signups, purchases, or enterprise inquiries.
+With attribution data, your strategy shifts from "write more, hope for traffic" to targeted investment in what actually moves the business:
 
-## Availability
+- **High conversion rate** — these pages deserve more internal links, backlink investment, and social promotion
+- **High traffic, no conversions** — may need intent realignment or stronger calls to action
+- **Filter by goal type** — understand which content drives leads vs. trial signups vs. purchases vs. enterprise inquiries
 
-Revenue attribution requires a connected Google Analytics 4 account and is available on Professional and Agency plans.
+---
+
+## How It Works
+
+A-Stats integrates with Google Analytics 4 to capture conversion events and map them back to content touchpoints. The system uses last-touch attribution by default: the content page visited most recently before a conversion receives credit.
+
+> Revenue attribution requires Google Analytics 4 and is available on Professional and Agency plans.

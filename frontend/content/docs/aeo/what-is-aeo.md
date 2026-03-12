@@ -21,7 +21,7 @@ This means that content strategy today has two goals: rank on Google (traditiona
 
 ## How AI Engines Select Content to Cite
 
-AI language models and retrieval-augmented generation (RAG) systems select content to cite based on several factors:
+AI search engines and answer systems select content to cite based on several factors:
 
 ### Clarity of the Answer
 

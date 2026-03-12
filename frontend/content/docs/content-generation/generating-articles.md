@@ -8,11 +8,10 @@ Generation typically takes 30–90 seconds depending on the target word count an
 
 ## What Happens During Generation
 
-1. **Limit check** — The platform confirms you have remaining generation credits for your plan before the job starts. If you are at your limit, generation is blocked and you will see an upgrade prompt.
-2. **Context injection** — Any [Knowledge Vault](/docs/knowledge-vault) sources attached to the project are retrieved and injected as reference material for relevant sections.
-3. **AI writing** — The AI writes each section according to its heading and description, respecting the writing style, voice, and custom instructions set in [AI Settings](/docs/content-generation/ai-settings).
-4. **Article saved** — The finished article is saved to your project with a status of **Draft**.
-5. **Credit logged** — One generation credit is deducted from your monthly usage.
+1. **Credit check** — A-Stats confirms you have remaining generation credits for your plan. If you are at your limit, you will see an upgrade prompt.
+2. **Knowledge applied** — If your project has [Knowledge Vault](/docs/knowledge-vault) sources, the AI draws on relevant information from those documents while writing.
+3. **Article written** — The AI writes each section according to its heading and description, following the writing style, voice, and custom instructions set in [AI Settings](/docs/content-generation/ai-settings).
+4. **Draft ready** — The finished article is saved to your project as a **Draft**, and one generation credit is deducted.
 
 > **Tip:** Generation credits reset at the start of each billing cycle. You can check your current usage in **Settings → Billing**.
 

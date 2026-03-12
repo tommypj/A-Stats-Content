@@ -19,7 +19,7 @@ This means multiple projects can each carry a different voice -- ideal for agenc
 
 ### Consistency Across Articles
 
-Once configured, Brand Voice applies automatically. You do not need to re-enter instructions for each article. The AI references your voice settings during every stage of the content pipeline -- from outline creation through final article generation -- so the output stays consistent whether you produce one article a week or fifty.
+Once configured, Brand Voice applies automatically. You do not need to re-enter instructions for each article. The AI references your voice settings during every stage — from outline creation through final article generation — so the output stays consistent whether you produce one article a week or fifty.
 
 ### Updating Your Voice
 

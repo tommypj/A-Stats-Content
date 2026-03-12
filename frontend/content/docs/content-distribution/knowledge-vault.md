@@ -8,9 +8,9 @@ The result: AI-generated articles that reflect your specific expertise, terminol
 
 ## How It Works
 
-When you upload a document to the Knowledge Vault, A-Stats processes it into searchable chunks and stores them in a vector database. During article generation, the AI retrieves the most relevant passages from your uploaded documents and weaves them into the content it produces.
+When you upload a document to the Knowledge Vault, A-Stats indexes it so the AI can search and reference it. During article generation, the AI finds the most relevant passages from your uploaded documents and weaves them into the content it produces.
 
-This is the same retrieval-augmented generation (RAG) approach used by enterprise AI systems — applied to your content workflow.
+This means your generated articles draw on your actual expertise — not just general AI knowledge.
 
 ---
 

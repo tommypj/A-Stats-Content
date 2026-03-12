@@ -1,6 +1,6 @@
 ## What's Included
 
-Every A-Stats plan is built around the same AI content pipeline. The difference between tiers comes down to volume, integrations, team capabilities, and support level. Here is what each plan provides.
+Every A-Stats plan gives you the same AI content creation tools. The difference between tiers comes down to volume, integrations, team capabilities, and support level. Here is what each plan provides.
 
 ### Content Generation
 
@@ -12,7 +12,7 @@ Every A-Stats plan is built around the same AI content pipeline. The difference 
 | AI image generation | -- | Yes | Yes | Yes |
 | Content calendar | -- | Yes | Yes | Yes |
 
-All AI articles are produced by a multi-model pipeline that handles research, outlining, and long-form writing. Brand Voice settings ensure output matches your style regardless of plan.
+Every AI article goes through automated research, outlining, and long-form writing. Brand Voice settings ensure output matches your style regardless of plan.
 
 ### SEO and AEO
 

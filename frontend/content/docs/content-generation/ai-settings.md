@@ -68,7 +68,7 @@ Custom instructions are applied on every generation run in the project until you
 
 ## Knowledge Vault Context
 
-If your project has sources uploaded to the [Knowledge Vault](/docs/knowledge-vault), the AI can draw on that material when generating content. Relevant chunks from your sources are automatically retrieved and injected into the generation prompt when they match the outline's topic.
+If your project has sources uploaded to the [Knowledge Vault](/docs/knowledge-vault), the AI can draw on that material when generating content. Relevant information from your sources is automatically found and used when it matches the outline's topic.
 
 What this means in practice:
 
