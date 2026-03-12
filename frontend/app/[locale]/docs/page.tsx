@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { DOC_CATEGORIES, getSearchableArticles } from "@/lib/docs";
+import { getCategoriesByTier, getSearchableArticles } from "@/lib/docs";
 import DocsSearch from "@/components/docs/DocsSearch";
 import {
   Rocket,
@@ -32,7 +32,8 @@ const ICON_MAP: Record<string, React.ElementType> = {
 };
 
 export default function DocsHomePage() {
-  const searchArticles = getSearchableArticles();
+  const categories = getCategoriesByTier("features");
+  const searchArticles = getSearchableArticles("features");
 
   return (
     <div className="space-y-10">
@@ -42,8 +43,8 @@ export default function DocsHomePage() {
           Documentation
         </h1>
         <p className="mt-2 text-text-secondary max-w-xl">
-          Everything you need to know about using A-Stats to create content, track
-          SEO performance, and grow your audience.
+          Discover how A-Stats helps you create content, optimize for search engines
+          and AI, and grow your audience.
         </p>
         <div className="mt-6">
           <DocsSearch articles={searchArticles} linkPrefix="/docs" />
@@ -52,7 +53,7 @@ export default function DocsHomePage() {
 
       {/* Category grid */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {DOC_CATEGORIES.map((cat) => {
+        {categories.map((cat) => {
           const Icon = ICON_MAP[cat.icon] || Rocket;
           return (
             <Link

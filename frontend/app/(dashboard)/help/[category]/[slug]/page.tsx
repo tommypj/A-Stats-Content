@@ -14,7 +14,7 @@ export default function HelpArticlePage() {
   const articleSlug = params.slug as string;
 
   const article = getArticle(categorySlug, articleSlug);
-  const { prev, next } = getPrevNextArticles(categorySlug, articleSlug);
+  const { prev, next } = getPrevNextArticles(categorySlug, articleSlug, "guides");
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 

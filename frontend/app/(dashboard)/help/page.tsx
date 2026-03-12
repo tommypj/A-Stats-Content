@@ -24,7 +24,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { DOC_CATEGORIES, type SearchableDoc } from "@/lib/docs";
+import { getCategoriesByTier, type SearchableDoc } from "@/lib/docs";
 
 const ICON_MAP: Record<string, React.ElementType> = {
   Rocket,
@@ -41,8 +41,9 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Settings,
 };
 
-// Build search index from manifest
-const searchArticles: SearchableDoc[] = DOC_CATEGORIES.flatMap((cat) =>
+// Build search index from guides tier only
+const guidesCategories = getCategoriesByTier("guides");
+const searchArticles: SearchableDoc[] = guidesCategories.flatMap((cat) =>
   cat.articles.map((article) => ({
     title: article.title,
     description: article.description,
@@ -122,7 +123,7 @@ export default function HelpPage() {
           Browse by Topic
         </h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {DOC_CATEGORIES.map((cat) => {
+          {guidesCategories.map((cat) => {
             const Icon = ICON_MAP[cat.icon] || Rocket;
             return (
               <Link key={cat.slug} href={`/help/${cat.slug}`}>

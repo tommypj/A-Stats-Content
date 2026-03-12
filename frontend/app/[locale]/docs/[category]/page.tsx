@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCategory, DOC_CATEGORIES } from "@/lib/docs";
+import { getCategory, getCategoriesByTier } from "@/lib/docs";
 import { ChevronRight } from "lucide-react";
 
 export function generateStaticParams() {
-  return DOC_CATEGORIES.map((cat) => ({ category: cat.slug }));
+  return getCategoriesByTier("features").map((cat) => ({ category: cat.slug }));
 }
 
 export function generateMetadata({ params }: { params: { category: string } }) {

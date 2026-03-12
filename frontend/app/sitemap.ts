@@ -1,5 +1,5 @@
 import { MetadataRoute } from "next";
-import { DOC_CATEGORIES } from "@/lib/docs";
+import { getCategoriesByTier } from "@/lib/docs";
 
 const baseUrl = "https://a-stats.app";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -106,14 +106,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  const docsCategoryRoutes: MetadataRoute.Sitemap = DOC_CATEGORIES.map(cat => ({
+  const featuresCategories = getCategoriesByTier("features");
+  const docsCategoryRoutes: MetadataRoute.Sitemap = featuresCategories.map(cat => ({
     url: `${baseUrl}/en/docs/${cat.slug}`,
     lastModified: new Date(),
     changeFrequency: "weekly" as const,
     priority: 0.6,
   }));
 
-  const docsArticleRoutes: MetadataRoute.Sitemap = DOC_CATEGORIES.flatMap(cat =>
+  const docsArticleRoutes: MetadataRoute.Sitemap = featuresCategories.flatMap(cat =>
     cat.articles.map(article => ({
       url: `${baseUrl}/en/docs/${cat.slug}/${article.slug}`,
       lastModified: new Date(),
