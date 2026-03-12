@@ -22,6 +22,16 @@ _pool: Optional[aioredis.Redis] = None
 _pool_text: Optional[aioredis.Redis] = None
 
 
+def redis_key(key: str) -> str:
+    """Prefix a Redis key with the environment namespace.
+
+    All Redis keys should use this helper to prevent collisions when
+    multiple environments (dev, staging, prod) share the same Redis instance.
+    """
+    settings = get_settings()
+    return f"{settings.redis_key_prefix}:{key}"
+
+
 async def get_redis() -> Optional[aioredis.Redis]:
     """Get or create a shared Redis connection pool (decode_responses=False)."""
     global _pool

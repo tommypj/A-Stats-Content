@@ -103,7 +103,7 @@ class PipelineResult:
 
 _SERP_CACHE_TTL = 86400  # 24 hours
 
-from infrastructure.redis import get_redis_text
+from infrastructure.redis import get_redis_text, redis_key
 
 
 async def _get_redis_pool():
@@ -113,7 +113,7 @@ async def _get_redis_pool():
 
 def _serp_cache_key(prefix: str, keyword: str, language: str) -> str:
     h = hashlib.sha256(f"{keyword.lower().strip()}:{language}".encode()).hexdigest()[:16]
-    return f"serp_cache:{prefix}:{h}"
+    return redis_key(f"serp_cache:{prefix}:{h}")
 
 
 async def _cache_get(key: str) -> dict | None:

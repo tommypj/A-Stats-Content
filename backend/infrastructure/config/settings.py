@@ -60,6 +60,7 @@ class Settings(BaseSettings):
 
     # Redis (for background tasks and caching)
     redis_url: str = "redis://localhost:6379/0"
+    redis_key_prefix: str = "astats"  # Namespace prefix to prevent collisions when sharing a Redis instance
 
     # Authentication / JWT
     secret_key: str = ""

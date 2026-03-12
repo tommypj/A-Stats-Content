@@ -9,7 +9,7 @@ Uses the centralized Redis pool from infrastructure/redis.py.
 import logging
 from datetime import UTC, datetime
 
-from infrastructure.redis import get_redis_text
+from infrastructure.redis import get_redis_text, redis_key
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +22,17 @@ class PostQueueManager:
     Falls back gracefully if Redis is not available.
     """
 
-    QUEUE_KEY = "social:post_queue"
-    SCHEDULED_SET = "social:scheduled_posts"
-    PROCESSING_SET = "social:processing_posts"
+    @property
+    def QUEUE_KEY(self) -> str:
+        return redis_key("social:post_queue")
+
+    @property
+    def SCHEDULED_SET(self) -> str:
+        return redis_key("social:scheduled_posts")
+
+    @property
+    def PROCESSING_SET(self) -> str:
+        return redis_key("social:processing_posts")
 
     async def _get_redis(self):
         """Get a Redis connection from the centralized pool."""

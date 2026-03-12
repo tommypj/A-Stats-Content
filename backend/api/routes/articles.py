@@ -547,12 +547,12 @@ async def _run_article_generation(
 
             # Notify any waiting SSE stream of completion
             try:
-                from infrastructure.redis import get_redis_text
+                from infrastructure.redis import get_redis_text, redis_key as _rk
 
                 _rc = await get_redis_text()
                 if _rc is not None:
                     await _rc.publish(
-                        f"article:{article_id}:status",
+                        _rk(f"article:{article_id}:status"),
                         json.dumps({"status": "completed", "article_id": article_id}),
                     )
             except Exception as _pub_err:
@@ -578,12 +578,12 @@ async def _run_article_generation(
                         logger.info("Marked article %s as failed", article_id)
                         # Notify any waiting SSE stream of failure
                         try:
-                            from infrastructure.redis import get_redis_text
+                            from infrastructure.redis import get_redis_text, redis_key as _rk
 
                             _rc = await get_redis_text()
                             if _rc is not None:
                                 await _rc.publish(
-                                    f"article:{article_id}:status",
+                                    _rk(f"article:{article_id}:status"),
                                     json.dumps({"status": "failed", "article_id": article_id, "error": str(e)[:200]}),
                                 )
                         except Exception as _pub_err:
@@ -768,7 +768,7 @@ async def stream_article_status(
             yield f"event: failed\ndata: {json.dumps({'status': 'failed', 'article_id': article_id})}\n\n"
             return
 
-        from infrastructure.redis import get_redis_text
+        from infrastructure.redis import get_redis_text, redis_key as _rk
 
         _rc = await get_redis_text()
         if _rc is None:
@@ -776,7 +776,7 @@ async def stream_article_status(
             return
         pubsub = _rc.pubsub()
         try:
-            await pubsub.subscribe(f"article:{article_id}:status")
+            await pubsub.subscribe(_rk(f"article:{article_id}:status"))
 
             # Re-check after subscribing to close the race window
             await db.refresh(article)
@@ -982,15 +982,16 @@ async def get_keyword_suggestions(
     """Get AI-powered keyword suggestions based on a seed keyword."""
     require_tier("starter")(current_user)
     normalized = body.seed_keyword.strip().lower()
-    redis_key = f"kw_research:{current_user.id}:{normalized}"
+
+    from infrastructure.redis import get_redis_text, redis_key as _rk
+
+    kw_cache_key = _rk(f"kw_research:{current_user.id}:{normalized}")
 
     # 1. Redis fast-path
-    from infrastructure.redis import get_redis_text
-
     try:
         redis_client = await get_redis_text()
         if redis_client is not None:
-            cached_raw = await redis_client.get(redis_key)
+            cached_raw = await redis_client.get(kw_cache_key)
             if cached_raw:
                 result = json.loads(cached_raw)
                 result["cached"] = True
@@ -1018,7 +1019,7 @@ async def get_keyword_suggestions(
             if redis_client is not None:
                 ttl = int((cached_row.expires_at - now).total_seconds())
                 if ttl > 0:
-                    await redis_client.setex(redis_key, ttl, cached_row.result_json)
+                    await redis_client.setex(kw_cache_key, ttl, cached_row.result_json)
         except Exception:
             pass
         return result
@@ -1033,7 +1034,7 @@ async def get_keyword_suggestions(
     _monthly_limit = _PLANS.get(_tier, _PLANS["free"])["limits"].get(
         "keyword_researches_per_month", 3
     )
-    _count_key = f"kw_count:{current_user.id}:{_now.year}:{_now.month}"
+    _count_key = _rk(f"kw_count:{current_user.id}:{_now.year}:{_now.month}")
     try:
         redis_client = await get_redis_text()
         if redis_client is not None:
@@ -1111,7 +1112,7 @@ Only return the JSON array, no other text."""
         try:
             redis_client = await get_redis_text()
             if redis_client is not None:
-                _count_key = f"kw_count:{current_user.id}:{now.year}:{now.month}"
+                _count_key = _rk(f"kw_count:{current_user.id}:{now.year}:{now.month}")
                 await redis_client.incr(_count_key)
                 await redis_client.expire(_count_key, 35 * 86400)
         except Exception as _inc_err:
@@ -1142,7 +1143,7 @@ Only return the JSON array, no other text."""
         try:
             redis_client = await get_redis_text()
             if redis_client is not None:
-                await redis_client.setex(redis_key, REDIS_KW_TTL, result_str)
+                await redis_client.setex(kw_cache_key, REDIS_KW_TTL, result_str)
         except Exception as redis_err:
             logger.warning("Failed to store keyword research in Redis: %s", redis_err)
 
