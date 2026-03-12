@@ -591,12 +591,6 @@ export const api = {
         method: "POST",
         url: `/articles/${articleId}/aeo-score`,
       }),
-    aeoOptimize: (articleId: string) =>
-      apiRequest<AEOSuggestionsResponse>({
-        method: "POST",
-        url: `/articles/${articleId}/aeo-optimize`,
-        timeout: 60000,
-      }),
   },
 
   // Images
@@ -769,11 +763,6 @@ export const api = {
       apiRequest<DecayDetectionResponse>({
         method: "POST",
         url: "/analytics/decay/detect",
-      }),
-    markAlertRead: (alertId: string) =>
-      apiRequest<{ message: string }>({
-        method: "POST",
-        url: `/analytics/decay/alerts/${alertId}/read`,
       }),
     resolveAlert: (alertId: string) =>
       apiRequest<{ message: string }>({
@@ -1505,14 +1494,6 @@ export const api = {
         method: "PUT",
         url: "/notifications/preferences",
         data,
-      }),
-  },
-
-  // Background task status polling
-  tasks: {
-    getStatus: (taskId: string) =>
-      apiRequest<TaskStatus>({
-        url: `/notifications/tasks/${taskId}/status`,
       }),
   },
 
@@ -2479,15 +2460,6 @@ export interface AEOOverviewResponse {
   bottom_articles: AEOArticleSummary[];
 }
 
-export interface AEOSuggestionsResponse {
-  suggestions: Array<{
-    action: string;
-    description: string;
-    category?: string;
-    estimated_impact?: "high" | "medium" | "low";
-  }>;
-}
-
 // Revenue Attribution types
 export interface ConversionGoal {
   id: string;
@@ -2782,14 +2754,6 @@ export interface SocialAccount {
 export interface SocialAccountListResponse {
   accounts: SocialAccount[];
   total: number;
-}
-
-export interface ConnectSocialAccountInput {
-  platform: SocialPlatform;
-  access_token: string;
-  refresh_token?: string;
-  username: string;
-  display_name?: string;
 }
 
 export interface SocialPostTarget {
@@ -3574,20 +3538,6 @@ export interface GenerationStatusResponse {
   page?: number;
   page_size?: number;
   has_more?: boolean;
-}
-
-/**
- * Status snapshot returned by GET /notifications/tasks/{task_id}/status
- * Reflects the in-memory TaskQueue record (not the DB row).
- */
-export interface TaskStatus {
-  task_id: string;
-  /** "running" | "completed" | "failed" */
-  status: "running" | "completed" | "failed";
-  result: unknown | null;
-  error: string | null;
-  created_at: string;
-  completed_at: string | null;
 }
 
 // ---------------------------------------------------------------------------

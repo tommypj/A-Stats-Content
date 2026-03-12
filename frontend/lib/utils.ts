@@ -59,24 +59,10 @@ export function truncate(text: string, length: number): string {
 }
 
 /**
- * Generate a random ID
- */
-export function generateId(): string {
-  return crypto.randomUUID();
-}
-
-/**
  * Capitalize the first letter of a string
  */
 export function capitalize(str: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1);
-}
-
-/**
- * Sleep for a specified duration
- */
-export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**

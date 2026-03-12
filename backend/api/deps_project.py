@@ -4,10 +4,10 @@ Project content access dependencies for multi-tenancy.
 Provides helper functions to filter content by project ownership and verify access permissions.
 """
 
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
-from sqlalchemy import and_, select, text
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.routes.auth import get_current_user
@@ -29,59 +29,6 @@ ContentModel = (
     | KnowledgeSource
     | GSCConnection
 )
-
-
-def get_content_filter(user: User, project_id: str | None = None):
-    """
-    Returns SQLAlchemy filter for content queries based on ownership.
-
-    This function creates a filter that can be applied to any content query to ensure
-    users only access content they own (personal) or their project owns (project content).
-
-    Usage:
-        ```python
-        # Personal content only
-        filter_clause = get_content_filter(current_user, project_id=None)
-        stmt = select(Article).where(filter_clause)
-
-        # Project content (user must be verified as project member separately)
-        filter_clause = get_content_filter(current_user, project_id=project_uuid)
-        stmt = select(Article).where(filter_clause)
-        ```
-
-    Args:
-        user: The authenticated user making the request
-        project_id: Optional project ID. If provided, filters by project_id.
-                If None, filters by user_id (personal content).
-
-    Returns:
-        SQLAlchemy filter clause that can be used in .where()
-
-    Notes:
-        - If project_id is provided, the calling code MUST verify the user is a member
-          of that project before calling this function.
-        - This function only creates the filter; it doesn't verify permissions.
-        - The filter assumes the model has both user_id and project_id columns.
-    """
-    # PROJ-46: ContentModel is a Union type alias — accessing .project_id/.user_id on it
-    # would raise AttributeError at runtime. All content models share these column names
-    # so we use SQLAlchemy text() comparisons which are model-agnostic.
-    # Callers must pass a concrete model to .where() separately or use apply_content_filters().
-    if project_id:
-        # Project content filter
-        # NOTE: Caller must verify user is a project member before using this filter
-        return and_(
-            # Content belongs to the project
-            text("project_id = :project_id").bindparams(project_id=str(project_id)),
-        )
-    else:
-        # Personal content filter
-        return and_(
-            # Content belongs to user
-            text("user_id = :user_id").bindparams(user_id=str(user.id)),
-            # And is NOT project content (project_id is null)
-            text("project_id IS NULL"),
-        )
 
 
 async def verify_project_membership(
@@ -246,36 +193,6 @@ async def verify_content_edit(
     )
 
 
-# Helper function to build content list query with project filtering
-def apply_content_filters(
-    stmt: Any,
-    user: User,
-    project_id: str | None = None,
-) -> Any:
-    """
-    Apply content ownership filters to a SQLAlchemy statement.
-
-    This is a convenience function that applies get_content_filter to an existing query.
-
-    Args:
-        stmt: SQLAlchemy select statement
-        user: The authenticated user
-        project_id: Optional project ID to filter by
-
-    Returns:
-        Modified statement with filters applied
-
-    Usage:
-        ```python
-        stmt = select(Article)
-        stmt = apply_content_filters(stmt, current_user, project_id=request.args.project_id)
-        results = await db.execute(stmt)
-        ```
-    """
-    content_filter = get_content_filter(user, project_id)
-    return stmt.where(content_filter)
-
-
 # =============================================================================
 # Project Management Dependencies (for project CRUD routes)
 # =============================================================================
@@ -353,79 +270,6 @@ async def get_project_member(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not a member of this project",
-        )
-
-    return member
-
-
-async def require_project_membership(
-    project_id: str,
-    current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
-) -> "ProjectMember":
-    """
-    Dependency to require project membership.
-
-    Args:
-        project_id: Project ID from path parameter
-        current_user: Current authenticated user
-        db: Database session
-
-    Returns:
-        ProjectMember object
-
-    Raises:
-        HTTPException: 403 if user is not a member
-
-    Usage:
-        @router.get("/projects/{project_id}/something")
-        async def get_something(
-            member: Annotated[ProjectMember, Depends(require_project_membership)],
-        ):
-            # member is guaranteed to exist
-            return {"project_id": member.project_id, "role": member.role}
-    """
-    return await get_project_member(project_id, current_user.id, db)
-
-
-async def require_project_role(
-    project_id: str,
-    current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
-    required_roles: list[str] = None,
-) -> "ProjectMember":
-    """
-    Dependency to require specific project role.
-
-    Args:
-        project_id: Project ID from path parameter
-        current_user: Current authenticated user
-        db: Database session
-        required_roles: List of allowed roles (e.g., ["owner", "admin"])
-
-    Returns:
-        ProjectMember object
-
-    Raises:
-        HTTPException: 403 if user doesn't have required role
-
-    Usage:
-        @router.put("/projects/{project_id}/settings")
-        async def update_settings(
-            project_id: str,
-            member: Annotated[ProjectMember, Depends(require_project_role)],
-        ):
-            # Check role manually if needed
-            if member.role not in [ProjectMemberRole.OWNER.value, ProjectMemberRole.ADMIN.value]:
-                raise HTTPException(403, "Admin access required")
-            # ...
-    """
-    member = await get_project_member(project_id, current_user.id, db)
-
-    if required_roles and member.role not in required_roles:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"This action requires one of the following roles: {', '.join(required_roles)}",
         )
 
     return member
