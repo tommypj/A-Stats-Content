@@ -338,7 +338,7 @@ async def get_revenue_by_article(
             "page": page,
             "page_size": page_size,
             "total_items": total_items,
-            "total_pages": total_pages,
+            "pages": total_pages,
         },
         "items": items,
     }
@@ -408,7 +408,7 @@ async def get_revenue_by_keyword(
             "page": page,
             "page_size": page_size,
             "total_items": total_items,
-            "total_pages": total_pages,
+            "pages": total_pages,
         },
         "items": items,
     }

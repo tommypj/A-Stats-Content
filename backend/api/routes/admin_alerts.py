@@ -125,7 +125,7 @@ async def list_alerts(
         total=total,
         page=page,
         page_size=page_size,
-        total_pages=ceil(total / page_size) if total > 0 else 0,
+        pages=ceil(total / page_size) if total > 0 else 0,
     )
 
 

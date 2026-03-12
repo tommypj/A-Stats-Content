@@ -192,7 +192,7 @@ async def list_projects(
     total = (await db.execute(total_stmt)).scalar() or 0
 
     if total == 0:
-        return ProjectListResponse(projects=[], total=0, page=page, page_size=page_size, total_pages=0)
+        return ProjectListResponse(projects=[], total=0, page=page, page_size=page_size, pages=0)
 
     # Paginated membership fetch with eager-loaded project (no N+1)
     offset = (page - 1) * page_size
@@ -251,7 +251,7 @@ async def list_projects(
         total=total,
         page=page,
         page_size=page_size,
-        total_pages=total_pages,
+        pages=total_pages,
     )
 
 

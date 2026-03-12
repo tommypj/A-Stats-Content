@@ -261,7 +261,7 @@ async def list_users(
         total=total,
         page=page,
         page_size=page_size,
-        total_pages=total_pages,
+        pages=total_pages,
     )
 
 
@@ -804,7 +804,7 @@ async def list_audit_logs(
         total=total,
         page=page,
         page_size=page_size,
-        total_pages=total_pages,
+        pages=total_pages,
     )
 
 

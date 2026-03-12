@@ -161,7 +161,7 @@ export default function BlogListClient({
       const data = await res.json();
       setPosts(data.items);
       setTotal(data.total);
-      setTotalPages(data.total_pages);
+      setTotalPages(data.pages);
       setPage(p);
     } catch {
       toast.error("Failed to load posts. Please try again.");

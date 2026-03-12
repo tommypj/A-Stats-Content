@@ -159,7 +159,7 @@ async def list_posts(
         total=total,
         page=page,
         page_size=page_size,
-        total_pages=ceil(total / page_size) if total else 1,
+        pages=ceil(total / page_size) if total else 1,
     )
 
 

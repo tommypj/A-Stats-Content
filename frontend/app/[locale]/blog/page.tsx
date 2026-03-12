@@ -10,16 +10,16 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 async function fetchPosts(page = 1): Promise<{
   items: BlogPostCard[];
   total: number;
-  total_pages: number;
+  pages: number;
 }> {
   try {
     const res = await fetch(`${API_URL}/api/v1/blog/posts?page=${page}&page_size=12`, {
       next: { revalidate: 60 },
     });
-    if (!res.ok) return { items: [], total: 0, total_pages: 1 };
+    if (!res.ok) return { items: [], total: 0, pages: 1 };
     return res.json();
   } catch {
-    return { items: [], total: 0, total_pages: 1 };
+    return { items: [], total: 0, pages: 1 };
   }
 }
 
@@ -113,7 +113,7 @@ export default async function BlogPage() {
             initialTotal={postsData.total}
             initialPage={1}
             categories={categories}
-            totalPages={postsData.total_pages}
+            totalPages={postsData.pages}
           />
         </Suspense>
     </div>

@@ -39,7 +39,7 @@ class GenerationLogListResponse(BaseModel):
     total: int
     page: int
     page_size: int
-    total_pages: int
+    pages: int
 
 
 class GenerationStatsResponse(BaseModel):
@@ -100,7 +100,7 @@ class AdminAlertListResponse(BaseModel):
     total: int
     page: int
     page_size: int
-    total_pages: int
+    pages: int
 
 
 class AdminAlertCountResponse(BaseModel):

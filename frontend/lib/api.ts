@@ -2974,7 +2974,7 @@ export interface AdminUserListResponse {
   total: number;
   page: number;
   page_size: number;
-  total_pages: number;
+  pages: number;
 }
 
 export interface AdminUpdateUserInput {
@@ -3201,7 +3201,7 @@ export interface AdminArticleListResponse {
   total: number;
   page: number;
   page_size: number;
-  total_pages: number;
+  pages: number;
 }
 
 export interface AdminOutlineListResponse {
@@ -3209,7 +3209,7 @@ export interface AdminOutlineListResponse {
   total: number;
   page: number;
   page_size: number;
-  total_pages: number;
+  pages: number;
 }
 
 export interface AdminImageListResponse {
@@ -3217,7 +3217,7 @@ export interface AdminImageListResponse {
   total: number;
   page: number;
   page_size: number;
-  total_pages: number;
+  pages: number;
 }
 
 export interface AdminAuditQueryParams {
@@ -3250,7 +3250,7 @@ export interface AdminAuditLogListResponse {
   total: number;
   page: number;
   page_size: number;
-  total_pages: number;
+  pages: number;
 }
 
 export interface AdminGenerationQueryParams {
@@ -3279,7 +3279,7 @@ export interface AdminGenerationListResponse {
   total: number;
   page: number;
   page_size: number;
-  total_pages: number;
+  pages: number;
 }
 
 export interface AdminGenerationStats {
@@ -3326,7 +3326,7 @@ export interface AdminAlertListResponse {
   total: number;
   page: number;
   page_size: number;
-  total_pages: number;
+  pages: number;
 }
 
 export interface AdminAlertCount {
@@ -3386,7 +3386,7 @@ export interface AdminErrorLogListResponse {
   total: number;
   page: number;
   page_size: number;
-  total_pages: number;
+  pages: number;
 }
 
 export interface AdminErrorTypeStat {
@@ -3588,7 +3588,7 @@ export interface BlogPostListResponse {
   total: number;
   page: number;
   page_size: number;
-  total_pages: number;
+  pages: number;
 }
 
 export interface AdminBlogPostListItem {
@@ -3607,7 +3607,7 @@ export interface AdminBlogPostListResponse {
   total: number;
   page: number;
   page_size: number;
-  total_pages: number;
+  pages: number;
 }
 
 export interface AdminBlogPostCreate {

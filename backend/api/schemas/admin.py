@@ -397,7 +397,7 @@ class UserListResponse(BaseModel):
     total: int
     page: int
     page_size: int
-    total_pages: int
+    pages: int
 
 
 # ============================================================================
@@ -440,7 +440,7 @@ class AuditLogListResponse(BaseModel):
     total: int
     page: int
     page_size: int
-    total_pages: int
+    pages: int
 
 
 # ============================================================================

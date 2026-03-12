@@ -57,7 +57,7 @@ export default function AdminUsersPage() {
       const response = await api.admin.users.list(params);
       setUsers(response.users);
       setTotal(response.total);
-      setPages(response.total_pages);
+      setPages(response.pages);
     } catch (err) {
       const apiError = parseApiError(err);
       setError(apiError.message);

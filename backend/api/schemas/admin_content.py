@@ -42,7 +42,7 @@ class AdminArticleListResponse(BaseModel):
     total: int
     page: int
     page_size: int
-    total_pages: int
+    pages: int
 
 
 class AdminArticleDetail(BaseModel):
@@ -99,7 +99,7 @@ class AdminOutlineListResponse(BaseModel):
     total: int
     page: int
     page_size: int
-    total_pages: int
+    pages: int
 
 
 # --- Image Schemas ---
@@ -131,7 +131,7 @@ class AdminImageListResponse(BaseModel):
     total: int
     page: int
     page_size: int
-    total_pages: int
+    pages: int
 
 
 # --- Social Post Schemas ---
@@ -160,7 +160,7 @@ class AdminSocialPostListResponse(BaseModel):
     total: int
     page: int
     page_size: int
-    total_pages: int
+    pages: int
 
 
 # --- Bulk Delete Schemas ---
