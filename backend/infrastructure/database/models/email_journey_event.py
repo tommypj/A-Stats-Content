@@ -5,7 +5,7 @@ Email journey event database model.
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import Column, DateTime, Index, Integer, String, text
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -25,6 +25,7 @@ class EmailJourneyEvent(Base):
     )
     user_id: Mapped[str] = mapped_column(
         UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -47,13 +48,13 @@ class EmailJourneyEvent(Base):
 
     __table_args__ = (
         Index(
-            "ix_ueje_user_email_active",
+            "uix_journey_user_email_key",
             "user_id",
             "email_key",
             unique=True,
             postgresql_where=text("status IN ('scheduled', 'sent')"),
         ),
-        Index("ix_ueje_status_scheduled", "status", "scheduled_for"),
+        Index("ix_journey_status_scheduled", "status", "scheduled_for"),
     )
 
     def __repr__(self) -> str:

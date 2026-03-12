@@ -174,7 +174,7 @@ export default function AdminArticlesPage() {
           </p>
         </div>
         <Link
-          href="/admin/content"
+          href="/admin/content/articles"
           className="px-4 py-2 bg-surface border border-surface-tertiary rounded-lg hover:bg-surface-secondary text-sm font-medium"
         >
           Back to Content

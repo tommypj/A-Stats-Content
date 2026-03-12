@@ -401,6 +401,7 @@ async def get_image(
         query = select(GeneratedImage).where(
             GeneratedImage.id == image_id,
             GeneratedImage.user_id == current_user.id,
+            GeneratedImage.project_id.is_(None),
         )
     result = await db.execute(query)
     image = result.scalar_one_or_none()
@@ -432,6 +433,7 @@ async def delete_image(
         query = select(GeneratedImage).where(
             GeneratedImage.id == image_id,
             GeneratedImage.user_id == current_user.id,
+            GeneratedImage.project_id.is_(None),
         )
     result = await db.execute(query)
     image = result.scalar_one_or_none()

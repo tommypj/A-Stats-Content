@@ -69,7 +69,7 @@ async def _blacklist_token(token: str, ttl_seconds: int = 604800) -> None:
 
         from infrastructure.redis import get_redis
 
-        token_hash = hashlib.sha256(token.encode()).hexdigest()[:16]
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
         r = await get_redis()
         if r is None:
             return
@@ -89,7 +89,7 @@ async def _is_token_blacklisted(token: str) -> bool:
 
         from infrastructure.redis import get_redis
 
-        token_hash = hashlib.sha256(token.encode()).hexdigest()[:16]
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
         r = await get_redis()
         if r is None:
             return False
@@ -127,7 +127,7 @@ async def _register_session(
         if r is None:
             return
         key = f"user_sessions:{user_id}"
-        token_hash = hashlib.sha256(session_token.encode()).hexdigest()[:16]
+        token_hash = hashlib.sha256(session_token.encode()).hexdigest()
         now = time.time()
         await r.zadd(key, {token_hash: now})
         await r.expire(key, ttl)
@@ -151,7 +151,7 @@ async def _revoke_session(user_id: str, session_token: str) -> None:
         r = await get_redis()
         if r is None:
             return
-        token_hash = hashlib.sha256(session_token.encode()).hexdigest()[:16]
+        token_hash = hashlib.sha256(session_token.encode()).hexdigest()
         await r.zrem(f"user_sessions:{user_id}", token_hash)
     except Exception as e:
         logger.warning("Could not revoke session in Redis: %s", e)
@@ -536,11 +536,9 @@ async def login(
     tier = user.subscription_tier or "free"
     await _register_session(str(user.id), refresh_token, tier=tier, ttl=refresh_ttl_seconds)
 
-    # Return tokens in the JSON body (backward compat) AND set HttpOnly cookies
-    # for browser-based clients (XSS protection).
+    # H-02: Tokens are conveyed ONLY via HttpOnly cookies to prevent XSS exfiltration.
+    # The JSON body contains only non-sensitive metadata.
     response_data = {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
         "token_type": "bearer",
         "expires_in": settings.jwt_access_token_expire_minutes * 60,
     }
@@ -619,11 +617,8 @@ async def refresh_token(
         role=user.role,
     )
 
-    # Return tokens in the JSON body (backward compat) AND rotate the HttpOnly
-    # cookies so the next refresh cycle picks up the new refresh token.
+    # H-02: Tokens are conveyed ONLY via HttpOnly cookies to prevent XSS exfiltration.
     response_data = {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
         "token_type": "bearer",
         "expires_in": settings.jwt_access_token_expire_minutes * 60,
     }

@@ -251,7 +251,7 @@ function ScheduleModal({
                   Only articles with status &quot;Ready&quot; can be scheduled.
                 </p>
                 <Link
-                  href="/outlines/new"
+                  href="/outlines"
                   className="mt-3 inline-block text-sm text-primary-600 hover:underline"
                 >
                   Create a new outline
