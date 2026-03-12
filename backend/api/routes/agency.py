@@ -210,7 +210,9 @@ async def get_client_workspace_for_agency(
     response_model=AgencyProfileResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit("20/minute")
 async def create_agency_profile(
+    request: Request,
     body: AgencyProfileCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -252,7 +254,9 @@ async def get_profile(
 
 
 @router.put("/profile", response_model=AgencyProfileResponse)
+@limiter.limit("30/minute")
 async def update_agency_profile(
+    request: Request,
     body: AgencyProfileUpdate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -278,7 +282,9 @@ async def update_agency_profile(
 
 
 @router.delete("/profile", status_code=status.HTTP_200_OK)
+@limiter.limit("5/minute")
 async def delete_agency_profile(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -318,7 +324,9 @@ async def list_client_workspaces(
     response_model=ClientWorkspaceResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit("20/minute")
 async def create_client_workspace(
+    request: Request,
     body: ClientWorkspaceCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -392,8 +400,10 @@ async def get_client_workspace(
 
 
 @router.put("/clients/{workspace_id}", response_model=ClientWorkspaceResponse)
+@limiter.limit("30/minute")
 async def update_client_workspace(
     workspace_id: str,
+    request: Request,
     body: ClientWorkspaceUpdate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -420,8 +430,10 @@ async def update_client_workspace(
 
 
 @router.delete("/clients/{workspace_id}", status_code=status.HTTP_200_OK)
+@limiter.limit("5/minute")
 async def delete_client_workspace(
     workspace_id: str,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -457,8 +469,10 @@ async def enable_client_portal(
 
 
 @router.post("/clients/{workspace_id}/disable-portal", response_model=ClientWorkspaceResponse)
+@limiter.limit("5/minute")
 async def disable_client_portal(
     workspace_id: str,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -503,7 +517,9 @@ async def list_report_templates(
     response_model=ReportTemplateResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit("20/minute")
 async def create_report_template(
+    request: Request,
     body: ReportTemplateCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -525,8 +541,10 @@ async def create_report_template(
 
 
 @router.put("/templates/{template_id}", response_model=ReportTemplateResponse)
+@limiter.limit("30/minute")
 async def update_report_template(
     template_id: str,
+    request: Request,
     body: ReportTemplateUpdate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -561,8 +579,10 @@ async def update_report_template(
 
 
 @router.delete("/templates/{template_id}", status_code=status.HTTP_200_OK)
+@limiter.limit("5/minute")
 async def delete_report_template(
     template_id: str,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -600,7 +620,9 @@ async def delete_report_template(
     response_model=GeneratedReportResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit("20/minute")
 async def generate_report(
+    request: Request,
     body: GenerateReportRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

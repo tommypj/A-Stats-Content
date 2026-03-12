@@ -6,11 +6,12 @@ import logging
 from datetime import datetime, timedelta, timezone
 from math import ceil
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import case, cast, Date, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps_admin import get_current_admin_user
+from api.middleware.rate_limit import limiter
 from api.schemas.error_log import (
     ErrorLogListResponse,
     ErrorLogResolveRequest,
@@ -350,9 +351,11 @@ async def get_error_log(
 
 
 @router.put("/{error_id}", response_model=ErrorLogResponse)
+@limiter.limit("20/minute")
 async def update_error_log(
     error_id: str,
-    request: ErrorLogResolveRequest,
+    request: Request,
+    body: ErrorLogResolveRequest,
     admin_user: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -367,16 +370,16 @@ async def update_error_log(
             detail="Error log not found",
         )
 
-    error.is_resolved = request.is_resolved
-    if request.is_resolved:
+    error.is_resolved = body.is_resolved
+    if body.is_resolved:
         error.resolved_at = datetime.now(timezone.utc)
         error.resolved_by = admin_user.id
     else:
         error.resolved_at = None
         error.resolved_by = None
 
-    if request.resolution_notes is not None:
-        error.resolution_notes = request.resolution_notes
+    if body.resolution_notes is not None:
+        error.resolution_notes = body.resolution_notes
 
     await db.commit()
     await db.refresh(error)

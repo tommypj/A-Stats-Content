@@ -4,11 +4,12 @@ import asyncio
 import logging
 
 import resend
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr
 
 from adapters.email.journey_templates import JourneyTemplates
 from api.deps_admin import get_current_admin_user
+from api.middleware.rate_limit import limiter
 from infrastructure.config.settings import get_settings
 from infrastructure.database.models.user import User
 
@@ -117,7 +118,9 @@ async def list_email_templates(
 
 
 @router.post("/preview", response_model=EmailPreviewResponse)
+@limiter.limit("20/minute")
 async def preview_email_template(
+    request: Request,
     body: EmailPreviewRequest,
     admin_user: User = Depends(get_current_admin_user),
 ) -> EmailPreviewResponse:
@@ -134,7 +137,9 @@ async def preview_email_template(
 
 
 @router.post("/send-test")
+@limiter.limit("20/minute")
 async def send_test_email(
+    request: Request,
     body: SendTestEmailRequest,
     admin_user: User = Depends(get_current_admin_user),
 ) -> dict:

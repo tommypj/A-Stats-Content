@@ -375,8 +375,10 @@ async def list_audit_issues(
 
 
 @router.delete("/audits/{audit_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("5/minute")
 async def delete_audit(
     audit_id: str,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

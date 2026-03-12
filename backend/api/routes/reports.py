@@ -167,8 +167,10 @@ async def get_report(
 
 
 @router.delete("/{report_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("5/minute")
 async def delete_report(
     report_id: str,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:

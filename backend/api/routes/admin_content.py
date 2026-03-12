@@ -248,8 +248,10 @@ async def get_article_detail(
 
 
 @router.delete("/articles/{article_id}", response_model=DeleteResponse)
+@limiter.limit("20/minute")
 async def delete_article(
     article_id: str,
+    request: Request,
     admin_user: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -389,8 +391,10 @@ async def list_all_outlines(
 
 
 @router.delete("/outlines/{outline_id}", response_model=DeleteResponse)
+@limiter.limit("20/minute")
 async def delete_outline(
     outline_id: str,
+    request: Request,
     admin_user: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -543,8 +547,10 @@ async def list_all_images(
 
 
 @router.delete("/images/{image_id}", response_model=DeleteResponse)
+@limiter.limit("20/minute")
 async def delete_image(
     image_id: str,
+    request: Request,
     admin_user: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -729,8 +735,10 @@ async def list_all_social_posts(
 
 
 @router.delete("/social-posts/{post_id}", response_model=DeleteResponse)
+@limiter.limit("20/minute")
 async def delete_social_post(
     post_id: str,
+    request: Request,
     admin_user: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db),
 ):

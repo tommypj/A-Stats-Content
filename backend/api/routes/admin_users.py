@@ -11,6 +11,7 @@ from sqlalchemy import and_, asc, delete, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adapters.email.resend_adapter import email_service
+from api.middleware.rate_limit import limiter
 from api.deps_admin import get_current_admin_user, get_current_super_admin_user
 from api.schemas.admin import (
     AdminUserInfo,
@@ -290,12 +291,13 @@ async def get_user_detail(
 
 
 @router.put("/users/{user_id}", response_model=UserActionResponse)
+@limiter.limit("20/minute")
 async def update_user(
     user_id: str,
-    request: UserUpdateRequest,
+    request: Request,
+    body: UserUpdateRequest,
     db: AsyncSession = Depends(get_db),
     admin_user: User = Depends(get_current_admin_user),
-    http_request: Request = None,
     user_agent: str | None = Header(None),
 ) -> UserActionResponse:
     """
@@ -328,10 +330,10 @@ async def update_user(
             )
 
     # Prevent self-demotion for super_admin
-    if request.role and user.id == admin_user.id:
+    if body.role and user.id == admin_user.id:
         if (
             admin_user.role == UserRole.SUPER_ADMIN.value
-            and request.role != UserRole.SUPER_ADMIN.value
+            and body.role != UserRole.SUPER_ADMIN.value
         ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -339,7 +341,7 @@ async def update_user(
             )
 
     # Prevent privilege escalation: only super_admin can assign admin-level roles
-    if request.role and request.role in [UserRole.SUPER_ADMIN.value, UserRole.ADMIN.value]:
+    if body.role and body.role in [UserRole.SUPER_ADMIN.value, UserRole.ADMIN.value]:
         if admin_user.role != UserRole.SUPER_ADMIN.value:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -347,30 +349,30 @@ async def update_user(
             )
 
     # Update role
-    if request.role and request.role != user.role:
+    if body.role and body.role != user.role:
         old_values["role"] = user.role
-        new_values["role"] = request.role
-        user.role = request.role
+        new_values["role"] = body.role
+        user.role = body.role
         changes["role"] = f"{old_values['role']} -> {new_values['role']}"
 
     # Update subscription tier
-    if request.subscription_tier and request.subscription_tier != user.subscription_tier:
+    if body.subscription_tier and body.subscription_tier != user.subscription_tier:
         old_values["subscription_tier"] = user.subscription_tier
-        new_values["subscription_tier"] = request.subscription_tier
-        user.subscription_tier = request.subscription_tier
+        new_values["subscription_tier"] = body.subscription_tier
+        user.subscription_tier = body.subscription_tier
         changes["subscription_tier"] = (
             f"{old_values['subscription_tier']} -> {new_values['subscription_tier']}"
         )
 
     # Update suspension status
-    if request.is_suspended is not None:
+    if body.is_suspended is not None:
         old_status = user.status
-        if request.is_suspended:
+        if body.is_suspended:
             user.status = UserStatus.SUSPENDED.value
             user.suspended_at = datetime.now(UTC)
-            if request.suspended_reason:
+            if body.suspended_reason:
                 # Store reason in metadata for now
-                changes["suspended_reason"] = request.suspended_reason
+                changes["suspended_reason"] = body.suspended_reason
         else:
             user.status = UserStatus.ACTIVE.value
             user.suspended_at = None
@@ -405,7 +407,7 @@ async def update_user(
             "old_values": old_values,
             "new_values": new_values,
         },
-        ip_address=get_client_ip(http_request),
+        ip_address=get_client_ip(request),
         user_agent=user_agent,
     )
 
@@ -417,12 +419,13 @@ async def update_user(
 
 
 @router.post("/users/{user_id}/suspend", response_model=UserActionResponse)
+@limiter.limit("20/minute")
 async def suspend_user(
     user_id: str,
-    request: SuspendUserRequest,
+    request: Request,
+    body: SuspendUserRequest,
     db: AsyncSession = Depends(get_db),
     admin_user: User = Depends(get_current_admin_user),
-    http_request: Request = None,
     user_agent: str | None = Header(None),
 ) -> UserActionResponse:
     """
@@ -451,7 +454,7 @@ async def suspend_user(
     user.status = UserStatus.SUSPENDED.value
     user.is_suspended = True
     user.suspended_at = datetime.now(UTC)
-    user.suspended_reason = request.reason  # ADM-07: persist reason to DB field
+    user.suspended_reason = body.reason  # ADM-07: persist reason to DB field
 
     await db.commit()
     await db.refresh(user)
@@ -466,14 +469,14 @@ async def suspend_user(
         action=AuditAction.USER_SUSPENDED,
         target_type=AuditTargetType.USER,
         target_id=user.id,
-        description=f"Suspended user {user.email}: {request.reason}",
+        description=f"Suspended user {user.email}: {body.reason}",
         metadata={
-            "reason": request.reason,
+            "reason": body.reason,
             "old_status": old_status,
             "new_status": user.status,
             "suspended_at": user.suspended_at.isoformat(),
         },
-        ip_address=get_client_ip(http_request),
+        ip_address=get_client_ip(request),
         user_agent=user_agent,
     )
 
@@ -485,12 +488,13 @@ async def suspend_user(
 
 
 @router.post("/users/{user_id}/unsuspend", response_model=UserActionResponse)
+@limiter.limit("20/minute")
 async def unsuspend_user(
     user_id: str,
-    request: UnsuspendUserRequest,
+    request: Request,
+    body: UnsuspendUserRequest,
     db: AsyncSession = Depends(get_db),
     admin_user: User = Depends(get_current_admin_user),
-    http_request: Request = None,
     user_agent: str | None = Header(None),
 ) -> UserActionResponse:
     """
@@ -531,14 +535,14 @@ async def unsuspend_user(
         target_type=AuditTargetType.USER,
         target_id=user.id,
         description=f"Unsuspended user {user.email}"
-        + (f": {request.reason}" if request.reason else ""),
+        + (f": {body.reason}" if body.reason else ""),
         metadata={
-            "reason": request.reason,
+            "reason": body.reason,
             "old_status": old_status,
             "new_status": user.status,
             "was_suspended_at": old_suspended_at.isoformat() if old_suspended_at else None,
         },
-        ip_address=get_client_ip(http_request),
+        ip_address=get_client_ip(request),
         user_agent=user_agent,
     )
 
@@ -550,12 +554,13 @@ async def unsuspend_user(
 
 
 @router.delete("/users/{user_id}", response_model=DeleteUserResponse)
+@limiter.limit("20/minute")
 async def delete_user(
     user_id: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     admin_user: User = Depends(get_current_super_admin_user),
     soft_delete: bool = Query(True, description="Soft delete (true) or hard delete (false)"),
-    http_request: Request = None,
     user_agent: str | None = Header(None),
 ) -> DeleteUserResponse:
     """
@@ -611,7 +616,7 @@ async def delete_user(
             "soft_delete": soft_delete,
             "deleted_at": deleted_at.isoformat(),
         },
-        ip_address=get_client_ip(http_request),
+        ip_address=get_client_ip(request),
         user_agent=user_agent,
     )
 
@@ -624,12 +629,13 @@ async def delete_user(
 
 
 @router.post("/users/{user_id}/reset-password", response_model=UserActionResponse)
+@limiter.limit("20/minute")
 async def force_password_reset(
     user_id: str,
-    request: PasswordResetRequest,
+    request: Request,
+    body: PasswordResetRequest,
     db: AsyncSession = Depends(get_db),
     admin_user: User = Depends(get_current_admin_user),
-    http_request: Request = None,
     user_agent: str | None = Header(None),
 ) -> UserActionResponse:
     """
@@ -657,7 +663,7 @@ async def force_password_reset(
     await db.refresh(user)
 
     # Send email if requested
-    if request.send_email:
+    if body.send_email:
         try:
             await email_service.send_password_reset_email(
                 to_email=user.email,
@@ -681,9 +687,9 @@ async def force_password_reset(
         description=f"Forced password reset for user {user.email}",
         metadata={
             "email_sent": email_sent,
-            "send_email_requested": request.send_email,
+            "send_email_requested": body.send_email,
         },
-        ip_address=get_client_ip(http_request),
+        ip_address=get_client_ip(request),
         user_agent=user_agent,
     )
 
@@ -809,11 +815,12 @@ async def list_audit_logs(
 
 
 @router.post("/users/{user_id}/reset-usage", response_model=UserActionResponse)
+@limiter.limit("20/minute")
 async def reset_user_usage(
     user_id: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     admin_user: User = Depends(get_current_admin_user),
-    http_request: Request = None,
     user_agent: str | None = Header(None),
 ) -> UserActionResponse:
     """
@@ -854,7 +861,7 @@ async def reset_user_usage(
             "old_outlines": old_outlines,
             "old_images": old_images,
         },
-        ip_address=get_client_ip(http_request),
+        ip_address=get_client_ip(request),
         user_agent=user_agent,
     )
 

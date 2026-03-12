@@ -10,11 +10,12 @@ from datetime import UTC, datetime
 from urllib.parse import urlparse
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from PIL import Image as PILImage
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.middleware.rate_limit import limiter
 from api.dependencies import require_tier
 from api.routes.auth import get_current_user
 from api.schemas.wordpress import (
@@ -164,8 +165,10 @@ async def test_wp_connection(site_url: str, username: str, app_password: str) ->
 
 
 @router.post("/connect", response_model=WordPressConnectionResponse)
+@limiter.limit("20/minute")
 async def connect_wordpress(
-    request: WordPressConnectRequest,
+    request: Request,
+    body: WordPressConnectRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -190,13 +193,13 @@ async def connect_wordpress(
         )
 
     # Validate URL before making any HTTP requests
-    _validate_wp_url(request.site_url)
+    _validate_wp_url(body.site_url)
 
     # Test the connection first
     test_result = await test_wp_connection(
-        request.site_url,
-        request.username,
-        request.app_password,
+        body.site_url,
+        body.username,
+        body.app_password,
     )
 
     if not test_result["success"]:
@@ -206,17 +209,17 @@ async def connect_wordpress(
         )
 
     # Encrypt the app password
-    encrypted_password = encrypt_credential(request.app_password, settings.secret_key)
+    encrypted_password = encrypt_credential(body.app_password, settings.secret_key)
 
     # Normalize site URL
-    site_url = request.site_url.rstrip("/")
+    site_url = body.site_url.rstrip("/")
     if not site_url.startswith("http"):
         site_url = f"https://{site_url}"
 
     # Store credentials in project model
     project.wordpress_credentials = {
         "site_url": site_url,
-        "username": request.username,
+        "username": body.username,
         "app_password_encrypted": encrypted_password,
         "connected_at": datetime.now(UTC).isoformat(),
         "last_tested_at": datetime.now(UTC).isoformat(),
@@ -234,7 +237,7 @@ async def connect_wordpress(
 
     return WordPressConnectionResponse(
         site_url=site_url,
-        username=request.username,
+        username=body.username,
         is_connected=True,
         connected_at=datetime.now(UTC),
         last_tested_at=datetime.now(UTC),
@@ -243,7 +246,9 @@ async def connect_wordpress(
 
 
 @router.post("/disconnect", response_model=WordPressDisconnectResponse)
+@limiter.limit("5/minute")
 async def disconnect_wordpress(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -461,8 +466,10 @@ async def get_wordpress_tags(
 
 
 @router.post("/publish", response_model=WordPressPublishResponse)
+@limiter.limit("20/minute")
 async def publish_to_wordpress(
-    request: WordPressPublishRequest,
+    request: Request,
+    body: WordPressPublishRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -481,7 +488,7 @@ async def publish_to_wordpress(
     # user cannot publish an article that belongs to a different project.
     result = await db.execute(
         select(Article).where(
-            Article.id == request.article_id,
+            Article.id == body.article_id,
             Article.user_id == current_user.id,
             Article.project_id == current_user.current_project_id,
         )
@@ -564,7 +571,7 @@ async def publish_to_wordpress(
     post_data = {
         "title": article.title,
         "content": article.content_html or article.content,
-        "status": request.status,
+        "status": body.status,
         "excerpt": article.meta_description or "",
     }
 
@@ -572,17 +579,17 @@ async def publish_to_wordpress(
         post_data["featured_media"] = featured_media_id
 
     # Add categories if provided
-    if request.categories:
-        post_data["categories"] = request.categories
+    if body.categories:
+        post_data["categories"] = body.categories
 
     # Add tags if provided
-    if request.tags:
-        post_data["tags"] = request.tags
+    if body.tags:
+        post_data["tags"] = body.tags
 
     try:
         async with _wp_client(timeout=30.0) as client:
             # If article was already published and update_existing is True, update it
-            if article.wordpress_post_id and request.update_existing:
+            if article.wordpress_post_id and body.update_existing:
                 # Update existing post
                 update_url = (
                     f"{wp_creds['site_url']}/wp-json/wp/v2/posts/{article.wordpress_post_id}"
@@ -914,8 +921,10 @@ async def _upload_image_to_wp(
 
 
 @router.post("/upload-media", response_model=WordPressMediaUploadResponse)
+@limiter.limit("5/minute")
 async def upload_media_to_wordpress(
-    request: WordPressMediaUploadRequest,
+    request: Request,
+    body: WordPressMediaUploadRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -945,7 +954,7 @@ async def upload_media_to_wordpress(
     # cannot upload images from a different project's context.
     result = await db.execute(
         select(GeneratedImage).where(
-            GeneratedImage.id == request.image_id,
+            GeneratedImage.id == body.image_id,
             GeneratedImage.user_id == current_user.id,
             GeneratedImage.project_id == current_user.current_project_id,
         )
@@ -969,8 +978,8 @@ async def upload_media_to_wordpress(
     try:
         async with _wp_client(timeout=60.0) as client:
             # Generate SEO metadata if the image belongs to an article
-            seo_title = request.title
-            seo_alt = request.alt_text
+            seo_title = body.title
+            seo_alt = body.alt_text
             seo_caption = None
             seo_description = None
 

@@ -5,12 +5,13 @@ Admin alerts API routes.
 import logging
 from math import ceil
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import desc, func, select
 from sqlalchemy import update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps_admin import get_current_admin_user
+from api.middleware.rate_limit import limiter
 from api.schemas.generation import (
     AdminAlertCountResponse,
     AdminAlertListResponse,
@@ -130,9 +131,11 @@ async def list_alerts(
 
 
 @router.put("/{alert_id}", response_model=AdminAlertResponse)
+@limiter.limit("20/minute")
 async def update_alert(
     alert_id: str,
-    request: AdminAlertUpdateRequest,
+    request: Request,
+    body: AdminAlertUpdateRequest,
     admin_user: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -146,10 +149,10 @@ async def update_alert(
             detail="Alert not found",
         )
 
-    if request.is_read is not None:
-        alert.is_read = request.is_read
-    if request.is_resolved is not None:
-        alert.is_resolved = request.is_resolved
+    if body.is_read is not None:
+        alert.is_read = body.is_read
+    if body.is_resolved is not None:
+        alert.is_resolved = body.is_resolved
 
     await db.commit()
     await db.refresh(alert)
@@ -183,7 +186,9 @@ async def update_alert(
 
 
 @router.post("/mark-all-read")
+@limiter.limit("20/minute")
 async def mark_all_read(
+    request: Request,
     admin_user: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db),
 ):

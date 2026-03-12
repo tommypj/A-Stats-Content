@@ -8,6 +8,7 @@ from starlette.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.middleware.rate_limit import limiter
 from api.routes.auth import get_current_user
 from api.schemas.notification_preferences import (
     NotificationPreferencesResponse,
@@ -227,7 +228,9 @@ async def get_notification_preferences(
 
 
 @router.put("/preferences", response_model=NotificationPreferencesResponse)
+@limiter.limit("30/minute")
 async def update_notification_preferences(
+    request: Request,
     body: NotificationPreferencesUpdate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -264,6 +267,7 @@ _CATEGORY_TO_PREF_COLUMNS: dict[str, list[str]] = {
 
 
 @router.post("/unsubscribe")
+@limiter.limit("20/minute")
 async def one_click_unsubscribe(
     request: Request,
     token: str = Query(...),

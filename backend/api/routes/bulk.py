@@ -167,7 +167,9 @@ async def list_templates(
 
 
 @router.post("/templates", response_model=TemplateResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("20/minute")
 async def create_template(
+    request: Request,
     body: CreateTemplateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -205,8 +207,10 @@ async def create_template(
 
 
 @router.put("/templates/{template_id}", response_model=TemplateResponse)
+@limiter.limit("30/minute")
 async def update_template(
     template_id: str,
+    request: Request,
     body: UpdateTemplateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -251,8 +255,10 @@ async def update_template(
 
 
 @router.delete("/templates/{template_id}")
+@limiter.limit("5/minute")
 async def delete_template(
     template_id: str,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
