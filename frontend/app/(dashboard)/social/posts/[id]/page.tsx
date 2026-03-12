@@ -198,7 +198,7 @@ export default function PostDetailPage() {
             <div className="flex items-center gap-4 text-sm text-text-secondary">
               <span className="flex items-center gap-1">
                 <Clock className="h-4 w-4" />
-                Scheduled: {format(parseISO(post.scheduled_at), "MMM d, yyyy 'at' h:mm a")}
+                {post.scheduled_at ? `Scheduled: ${format(parseISO(post.scheduled_at), "MMM d, yyyy 'at' h:mm a")}` : "Published immediately"}
               </span>
               {post.published_at && (
                 <span className="flex items-center gap-1 text-green-600">

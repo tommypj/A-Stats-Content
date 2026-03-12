@@ -129,7 +129,8 @@ export default function SocialDashboard() {
     }
   };
 
-  const formatDate = (date: string) => {
+  const formatDate = (date: string | null | undefined) => {
+    if (!date) return "Published immediately";
     return new Date(date).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",

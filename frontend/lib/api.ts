@@ -2786,7 +2786,7 @@ export interface SocialPost {
   project_id?: string;
   content: string;
   media_urls?: string[];
-  scheduled_at: string;
+  scheduled_at?: string | null;
   status: SocialPostStatus;
   targets: SocialPostTarget[];
   created_at: string;

@@ -64,14 +64,15 @@ export function CalendarView({
   const [draggedPost, setDraggedPost] = useState<string | null>(null);
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
 
-  // Filter posts by platform
-  const filteredPosts = posts.filter((post) =>
+  // Filter posts by platform (exclude posts without scheduled_at — e.g. publish-now posts)
+  const scheduledPosts = posts.filter((post) => post.scheduled_at);
+  const filteredPosts = scheduledPosts.filter((post) =>
     filterPlatform === "all" ? true : getPostPlatforms(post).includes(filterPlatform)
   );
 
   // Group posts by date
   const postsByDate = filteredPosts.reduce((acc, post) => {
-    const dateKey = format(parseISO(post.scheduled_at), "yyyy-MM-dd");
+    const dateKey = format(parseISO(post.scheduled_at!), "yyyy-MM-dd");
     if (!acc[dateKey]) {
       acc[dateKey] = [];
     }
@@ -291,7 +292,7 @@ export function CalendarView({
                 </div>
                 <p className="text-sm line-clamp-3">{post.content}</p>
                 <div className="text-xs text-text-secondary mt-2">
-                  {format(parseISO(post.scheduled_at), "h:mm a")}
+                  {format(parseISO(post.scheduled_at!), "h:mm a")}
                 </div>
               </div>
             ))}
@@ -306,13 +307,13 @@ export function CalendarView({
   const renderDayView = () => {
     const dateKey = format(selectedDate, "yyyy-MM-dd");
     const dayPosts = (postsByDate[dateKey] || []).sort((a, b) =>
-      parseISO(a.scheduled_at).getTime() - parseISO(b.scheduled_at).getTime()
+      parseISO(a.scheduled_at!).getTime() - parseISO(b.scheduled_at!).getTime()
     );
 
     const hours: JSX.Element[] = [];
     for (let hour = 0; hour < 24; hour++) {
       const hourPosts = dayPosts.filter(
-        (post) => parseISO(post.scheduled_at).getHours() === hour
+        (post) => parseISO(post.scheduled_at!).getHours() === hour
       );
 
       hours.push(
@@ -345,7 +346,7 @@ export function CalendarView({
                 </div>
                 <p className="text-sm">{post.content}</p>
                 <div className="text-xs text-text-secondary mt-2">
-                  {format(parseISO(post.scheduled_at), "h:mm a")}
+                  {format(parseISO(post.scheduled_at!), "h:mm a")}
                 </div>
               </div>
             ))}

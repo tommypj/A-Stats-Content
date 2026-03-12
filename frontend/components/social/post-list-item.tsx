@@ -30,7 +30,7 @@ export function PostListItem({
   onDelete,
   onRetry,
 }: PostListItemProps) {
-  const scheduledDate = parseISO(post.scheduled_at);
+  const scheduledDate = post.scheduled_at ? parseISO(post.scheduled_at) : null;
   const isPosted = post.status === "published" || post.status === "partially_published";
   const isFailed = post.status === "failed";
   const canEdit = post.status === "draft" || post.status === "scheduled" || post.status === "failed";
@@ -56,7 +56,7 @@ export function PostListItem({
               <p className="text-sm line-clamp-2 mb-2">{post.content}</p>
               <div className="flex items-center gap-3 text-xs text-text-secondary">
                 <span>
-                  {isPosted ? "Posted" : "Scheduled"} {format(scheduledDate, "MMM d, yyyy 'at' h:mm a")}
+                  {isPosted ? "Posted" : "Scheduled"} {scheduledDate ? format(scheduledDate, "MMM d, yyyy 'at' h:mm a") : "immediately"}
                 </span>
                 {isPosted && post.published_at && (
                   <span className="text-green-600">
