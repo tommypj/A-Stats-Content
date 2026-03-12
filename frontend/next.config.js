@@ -59,6 +59,12 @@ const nextConfig = {
     ],
   },
 
+  // Ensure content/docs markdown files are included in Vercel serverless bundles
+  outputFileTracingIncludes: {
+    "/\\[locale\\]/docs/\\[category\\]/\\[slug\\]": ["./content/docs/**/*.md"],
+    "/api/docs-content/\\[...path\\]": ["./content/docs/**/*.md"],
+  },
+
   // Environment variables exposed to the browser
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",

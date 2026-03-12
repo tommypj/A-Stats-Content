@@ -1,14 +1,15 @@
 import { notFound } from "next/navigation";
 import {
-  getCategoriesByTier,
+  DOC_CATEGORIES,
   getArticle,
+  getCategory,
   getPrevNextArticles,
 } from "@/lib/docs";
 import { getDocContent } from "@/lib/docs-server";
 import DocsArticle from "@/components/docs/DocsArticle";
 
 export function generateStaticParams() {
-  return getCategoriesByTier("features").flatMap((cat) =>
+  return DOC_CATEGORIES.flatMap((cat) =>
     cat.articles.map((article) => ({
       category: cat.slug,
       slug: article.slug,
@@ -40,7 +41,9 @@ export default function DocsArticlePage({
   const content = getDocContent(params.category, params.slug);
   if (!content) notFound();
 
-  const { prev, next } = getPrevNextArticles(params.category, params.slug, "features");
+  const cat = getCategory(params.category);
+  const tier = cat?.tier === "all" ? undefined : cat?.tier === "features" ? "features" : "guides";
+  const { prev, next } = getPrevNextArticles(params.category, params.slug, tier as "features" | "guides" | undefined);
 
   return (
     <DocsArticle
