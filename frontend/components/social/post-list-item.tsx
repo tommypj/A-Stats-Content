@@ -31,9 +31,9 @@ export function PostListItem({
   onRetry,
 }: PostListItemProps) {
   const scheduledDate = parseISO(post.scheduled_at);
-  const isPosted = post.status === "posted";
+  const isPosted = post.status === "published" || post.status === "partially_published";
   const isFailed = post.status === "failed";
-  const canEdit = post.status === "pending" || post.status === "failed";
+  const canEdit = post.status === "draft" || post.status === "scheduled" || post.status === "failed";
 
   return (
     <Card className="p-4 hover:shadow-md transition-shadow">

@@ -14,22 +14,26 @@ export function PostStatusBadge({ status, className }: PostStatusBadgeProps) {
     SocialPostStatus,
     { label: string; variant: "default" | "secondary" | "success" | "warning" | "danger"; icon?: React.ReactNode }
   > = {
-    pending: {
-      label: "Pending",
+    draft: {
+      label: "Draft",
+      variant: "secondary",
+    },
+    scheduled: {
+      label: "Scheduled",
       variant: "warning",
     },
-    queued: {
-      label: "Queued",
-      variant: "default",
-    },
-    posting: {
-      label: "Posting",
+    publishing: {
+      label: "Publishing",
       variant: "default",
       icon: <Loader2 className="w-3 h-3 animate-spin mr-1" />,
     },
-    posted: {
-      label: "Posted",
+    published: {
+      label: "Published",
       variant: "success",
+    },
+    partially_published: {
+      label: "Partial",
+      variant: "warning",
     },
     failed: {
       label: "Failed",
@@ -41,7 +45,7 @@ export function PostStatusBadge({ status, className }: PostStatusBadgeProps) {
     },
   };
 
-  const config = statusConfig[status];
+  const config = statusConfig[status] ?? { label: status, variant: "default" as const };
 
   return (
     <Badge variant={config.variant} className={className}>

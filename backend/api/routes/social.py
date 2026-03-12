@@ -13,7 +13,7 @@ from datetime import UTC, date, datetime
 from urllib.parse import quote, urlencode
 
 import httpx
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,6 +47,7 @@ from api.schemas.social import (
 )
 from core.security.encryption import encrypt_credential
 from infrastructure.config.settings import settings
+from adapters.storage.image_storage import get_storage_adapter
 from infrastructure.database.connection import get_db
 from infrastructure.database.models import (
     Platform,
@@ -94,6 +95,119 @@ def validate_content_length(content: str, platform: str) -> tuple[bool, str | No
         )
 
     return True, None
+
+
+async def _dispatch_post_to_platforms(post: ScheduledPost, db: AsyncSession) -> None:
+    """
+    Dispatch a post to all its target platforms immediately.
+
+    Updates post status to PUBLISHED, PARTIALLY_PUBLISHED, or FAILED
+    based on the results.
+    """
+    from services.social_scheduler import SocialSchedulerService
+
+    scheduler = SocialSchedulerService()
+
+    # Load targets with their accounts
+    result = await db.execute(
+        select(PostTarget)
+        .options(selectinload(PostTarget.social_account))
+        .where(PostTarget.scheduled_post_id == post.id)
+    )
+    targets = result.scalars().all()
+
+    if not targets:
+        post.status = PostStatus.FAILED.value
+        post.publish_error = "No target accounts found"
+        await db.commit()
+        return
+
+    success_count = 0
+    failed_count = 0
+
+    for target in targets:
+        if not target.social_account or not target.social_account.is_active:
+            target.publish_error = "Account disconnected or inactive"
+            failed_count += 1
+            continue
+
+        try:
+            result = await scheduler.publish_to_platform(post, target, target.social_account, db)
+            if result.success:
+                success_count += 1
+            else:
+                failed_count += 1
+        except Exception as e:
+            logger.error("Error publishing to %s: %s", target.social_account.platform, e)
+            target.publish_error = str(e)[:500]
+            failed_count += 1
+
+    # Update post status
+    if success_count > 0 and failed_count == 0:
+        post.status = PostStatus.PUBLISHED.value
+        post.published_at = datetime.now(UTC)
+    elif success_count > 0:
+        post.status = PostStatus.PARTIALLY_PUBLISHED.value
+        post.published_at = datetime.now(UTC)
+        post.publish_error = f"{failed_count} of {success_count + failed_count} targets failed"
+    else:
+        post.status = PostStatus.FAILED.value
+        post.publish_error = f"All {failed_count} targets failed"
+
+    await db.commit()
+
+
+async def _build_post_response(
+    post_id: str, user_id, db: AsyncSession
+) -> ScheduledPostResponse:
+    """Load a post with targets and build the API response."""
+    result = await db.execute(
+        select(ScheduledPost).where(
+            and_(
+                ScheduledPost.id == post_id,
+                ScheduledPost.user_id == user_id,
+            )
+        )
+    )
+    post = result.scalar_one()
+    await db.refresh(post)
+
+    target_result = await db.execute(
+        select(PostTarget)
+        .options(selectinload(PostTarget.social_account))
+        .where(PostTarget.scheduled_post_id == post.id)
+    )
+    targets = target_result.scalars().all()
+
+    return ScheduledPostResponse(
+        id=str(post.id),
+        content=post.content,
+        media_urls=post.media_urls,
+        link_url=post.link_url,
+        scheduled_at=post.scheduled_at,
+        status=post.status,
+        published_at=post.published_at,
+        publish_error=post.publish_error,
+        article_id=str(post.article_id) if post.article_id else None,
+        targets=[
+            PostTargetResponse(
+                id=str(t.id),
+                social_account_id=str(t.social_account_id),
+                platform=t.social_account.platform,
+                platform_username=t.social_account.platform_username,
+                platform_content=t.platform_content,
+                is_published=t.is_published,
+                published_at=t.published_at,
+                platform_post_id=t.platform_post_id,
+                platform_post_url=t.platform_post_url,
+                publish_error=t.publish_error,
+                analytics_data=t.analytics_data,
+            )
+            for t in targets
+        ],
+        created_at=post.created_at,
+        updated_at=post.updated_at,
+    )
 
 
 # ============================================
@@ -626,7 +740,9 @@ async def _linkedin_exchange_and_profile(code: str) -> tuple[dict, dict]:
 
 
 @router.delete("/accounts/{account_id}", response_model=DisconnectAccountResponse)
+@limiter.limit("5/minute")
 async def disconnect_account(
+    request: Request,
     account_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -659,7 +775,9 @@ async def disconnect_account(
 
 
 @router.post("/accounts/{account_id}/verify", response_model=VerifyAccountResponse)
+@limiter.limit("20/minute")
 async def verify_account(
+    request: Request,
     account_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -705,6 +823,54 @@ async def verify_account(
 
 
 # ============================================
+# Media Upload Endpoints
+# ============================================
+
+_ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+_MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
+
+
+@router.post("/media/upload")
+@limiter.limit("20/minute")
+async def upload_social_media(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Upload an image for use in social media posts."""
+    require_tier("starter")(current_user)
+
+    # Validate content type
+    if file.content_type not in _ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported file type: {file.content_type}. Allowed: JPEG, PNG, GIF, WebP.",
+        )
+
+    # Read and validate size
+    image_data = await file.read()
+    if len(image_data) > _MAX_UPLOAD_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="File too large. Maximum size is 10 MB.",
+        )
+
+    if len(image_data) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is empty.",
+        )
+
+    # Save via storage adapter (reuses image storage infrastructure)
+    adapter = get_storage_adapter()
+    filename = file.filename or "upload.png"
+    relative_path = await adapter.save_image(image_data, filename)
+    url = await adapter.get_image_url(relative_path)
+
+    return {"url": url, "path": relative_path}
+
+
+# ============================================
 # Post Scheduling Endpoints
 # ============================================
 
@@ -736,8 +902,8 @@ async def create_scheduled_post(
             detail="One or more social accounts not found or not owned by user",
         )
 
-    # Validate scheduled_at is in the future
-    if body.scheduled_at and body.scheduled_at < datetime.now(UTC):
+    # Validate scheduled_at is in the future (skip for publish_now)
+    if not body.publish_now and body.scheduled_at and body.scheduled_at < datetime.now(UTC):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Scheduled time must be in the future",
@@ -753,7 +919,12 @@ async def create_scheduled_post(
             )
 
     # Determine status
-    post_status = PostStatus.SCHEDULED.value if body.scheduled_at else PostStatus.DRAFT.value
+    if body.publish_now:
+        post_status = PostStatus.PUBLISHING.value
+    elif body.scheduled_at:
+        post_status = PostStatus.SCHEDULED.value
+    else:
+        post_status = PostStatus.DRAFT.value
 
     # Create scheduled post
     scheduled_post = ScheduledPost(
@@ -789,46 +960,13 @@ async def create_scheduled_post(
     await db.commit()
     await db.refresh(scheduled_post)
 
-    # Load targets with account data
-    result = await db.execute(
-        select(PostTarget)
-        .options(selectinload(PostTarget.social_account))
-        .where(PostTarget.scheduled_post_id == scheduled_post.id)
-    )
-    targets = result.scalars().all()
+    # If publish_now, dispatch immediately to all platforms
+    if body.publish_now:
+        scheduled_post.publish_attempted_at = datetime.now(UTC)
+        await db.commit()
+        await _dispatch_post_to_platforms(scheduled_post, db)
 
-    # Build response
-    target_responses = [
-        PostTargetResponse(
-            id=str(t.id),
-            social_account_id=str(t.social_account_id),
-            platform=t.social_account.platform,
-            platform_username=t.social_account.platform_username,
-            platform_content=t.platform_content,
-            is_published=t.is_published,
-            published_at=t.published_at,
-            platform_post_id=t.platform_post_id,
-            platform_post_url=t.platform_post_url,
-            publish_error=t.publish_error,
-            analytics_data=t.analytics_data,
-        )
-        for t in targets
-    ]
-
-    return ScheduledPostResponse(
-        id=str(scheduled_post.id),
-        content=scheduled_post.content,
-        media_urls=scheduled_post.media_urls,
-        link_url=scheduled_post.link_url,
-        scheduled_at=scheduled_post.scheduled_at,
-        status=scheduled_post.status,
-        published_at=scheduled_post.published_at,
-        publish_error=scheduled_post.publish_error,
-        article_id=str(scheduled_post.article_id) if scheduled_post.article_id else None,
-        targets=target_responses,
-        created_at=scheduled_post.created_at,
-        updated_at=scheduled_post.updated_at,
-    )
+    return await _build_post_response(scheduled_post.id, current_user.id, db)
 
 
 @router.get("/posts", response_model=ScheduledPostListResponse)
@@ -992,9 +1130,11 @@ async def get_scheduled_post(
 
 
 @router.put("/posts/{post_id}", response_model=ScheduledPostResponse)
+@limiter.limit("30/minute")
 async def update_scheduled_post(
+    request: Request,
     post_id: str,
-    request: UpdatePostRequest,
+    body: UpdatePostRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1024,22 +1164,22 @@ async def update_scheduled_post(
         )
 
     # Update fields
-    if request.content is not None:
-        post.content = request.content
+    if body.content is not None:
+        post.content = body.content
 
-    if request.scheduled_at is not None:
-        post.scheduled_at = request.scheduled_at
+    if body.scheduled_at is not None:
+        post.scheduled_at = body.scheduled_at
         # Update status if scheduling
         if post.status == PostStatus.DRAFT.value:
             post.status = PostStatus.SCHEDULED.value
 
-    if request.media_urls is not None:
-        post.media_urls = request.media_urls
+    if body.media_urls is not None:
+        post.media_urls = body.media_urls
 
-    if request.link_url is not None:
-        post.link_url = request.link_url
+    if body.link_url is not None:
+        post.link_url = body.link_url
 
-    if request.status is not None:
+    if body.status is not None:
         # SM-11: only allow DRAFT ↔ SCHEDULED transitions from user input;
         # PUBLISHING, PUBLISHED, and FAILED are system-managed states.
         _allowed_transitions = {
@@ -1048,12 +1188,12 @@ async def update_scheduled_post(
         }
         current = post.status
         allowed = _allowed_transitions.get(current, set())
-        if request.status not in allowed:
+        if body.status not in allowed:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Cannot transition post from '{current}' to '{request.status}'",
+                detail=f"Cannot transition post from '{current}' to '{body.status}'",
             )
-        post.status = request.status
+        post.status = body.status
 
     await db.commit()
     await db.refresh(post)
@@ -1100,7 +1240,9 @@ async def update_scheduled_post(
 
 
 @router.delete("/posts/{post_id}")
+@limiter.limit("5/minute")
 async def delete_scheduled_post(
+    request: Request,
     post_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -1129,19 +1271,15 @@ async def delete_scheduled_post(
     return {"message": "Scheduled post deleted successfully"}
 
 
-@router.post("/posts/{post_id}/publish-now")
+@router.post("/posts/{post_id}/publish-now", response_model=ScheduledPostResponse)
+@limiter.limit("20/minute")
 async def publish_post_now(
+    request: Request,
     post_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Publish a scheduled post immediately.
-
-    NOTE: Placeholder implementation.
-    In production, this would trigger the actual publishing to platforms
-    via background jobs/workers (Celery, etc.)
-    """
+    """Publish a scheduled post immediately."""
     require_tier("starter")(current_user)
     result = await db.execute(
         select(ScheduledPost).where(
@@ -1165,20 +1303,15 @@ async def publish_post_now(
             detail="Post already published",
         )
 
-    # NOTE: Background job integration pending. Currently sets status to
-    # "publishing" synchronously. A Celery/ARQ task should pick up posts
-    # in "publishing" status and dispatch them to platform adapters.
-
-    # Update status
+    # Dispatch to all targets
     post.status = PostStatus.PUBLISHING.value
     post.publish_attempted_at = datetime.now(UTC)
-
     await db.commit()
 
-    return {
-        "message": "Post publishing initiated",
-        "status": post.status,
-    }
+    await _dispatch_post_to_platforms(post, db)
+
+    # Reload post with targets for response
+    return await _build_post_response(post.id, current_user.id, db)
 
 
 # ============================================
@@ -1418,7 +1551,9 @@ async def get_post_analytics(
 
 
 @router.post("/preview", response_model=PreviewResponse)
+@limiter.limit("20/minute")
 async def preview_post(
+    request: Request,
     content: str = Body(..., embed=True),
     platform: str = Body(..., embed=True),
 ):

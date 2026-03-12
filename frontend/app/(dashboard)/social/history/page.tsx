@@ -190,10 +190,10 @@ export default function SocialHistoryPage() {
             className="px-4 py-2 border border-surface-tertiary rounded-lg text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             <option value="all">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="queued">Queued</option>
-            <option value="posting">Posting</option>
-            <option value="posted">Posted</option>
+            <option value="draft">Draft</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="publishing">Publishing</option>
+            <option value="published">Published</option>
             <option value="failed">Failed</option>
             <option value="cancelled">Cancelled</option>
           </select>

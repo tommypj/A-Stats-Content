@@ -10,25 +10,34 @@ import { PlatformSelector } from "@/components/social/platform-selector";
 import { PostPreview } from "@/components/social/post-preview";
 import { SchedulePicker } from "@/components/social/schedule-picker";
 import {
-  Image as ImageIcon,
   X,
   AlertCircle,
   CheckCircle,
   Upload,
+  Send,
+  Clock,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { TierGate } from "@/components/ui/tier-gate";
 
 const DRAFT_KEY = "social_compose_draft";
 
+interface MediaItem {
+  previewUrl: string; // blob URL for display
+  remoteUrl: string | null; // uploaded URL from backend (null while uploading)
+  uploading: boolean;
+  error: string | null;
+}
+
 export default function ComposePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [content, setContent] = useState("");
-  const [mediaUrls, setMediaUrls] = useState<string[]>([]);
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
   const [scheduledAt, setScheduledAt] = useState(
-    new Date(Date.now() + 3600000).toISOString() // Default to 1 hour from now
+    new Date(Date.now() + 3600000).toISOString()
   );
   const [timezone, setTimezone] = useState(() => {
     try {
@@ -38,15 +47,16 @@ export default function ComposePage() {
     }
   });
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
   const [accountsInitialised, setAccountsInitialised] = useState(false);
-  const blobUrlsRef = useRef<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Revoke all blob URLs on unmount to prevent memory leaks
+  // Revoke all blob URLs on unmount
   useEffect(() => {
     return () => {
-      blobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      mediaItems.forEach((item) => URL.revokeObjectURL(item.previewUrl));
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Restore draft from localStorage on mount
@@ -58,7 +68,6 @@ export default function ComposePage() {
         if (draft.content) setContent(draft.content);
         if (draft.scheduledAt) setScheduledAt(draft.scheduledAt);
         if (draft.timezone) setTimezone(draft.timezone);
-        // selectedAccountIds restored after accounts load
         toast.info("Draft restored");
       }
     } catch {
@@ -66,7 +75,7 @@ export default function ComposePage() {
     }
   }, []);
 
-  // Auto-save draft to localStorage (debounced 500ms)
+  // Auto-save draft (debounced 500ms)
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!content && selectedAccountIds.length === 0) return;
@@ -76,7 +85,7 @@ export default function ComposePage() {
           JSON.stringify({ content, selectedAccountIds, scheduledAt, timezone })
         );
       } catch {
-        // storage full — ignore
+        // storage full
       }
     }, 500);
     return () => clearTimeout(timer);
@@ -125,82 +134,139 @@ export default function ComposePage() {
   const createPostMutation = useMutation({
     mutationFn: (data: Parameters<typeof api.social.createPost>[0]) =>
       api.social.createPost(data),
-    onSuccess: () => {
-      localStorage.removeItem(DRAFT_KEY);
-      setSuccess(true);
-      queryClient.invalidateQueries({ queryKey: ["social", "posts"] });
-      setTimeout(() => {
-        router.push("/social");
-      }, 2000);
-    },
-    onError: (err) => {
-      setError(parseApiError(err).message);
-    },
   });
 
   const submitting = createPostMutation.isPending;
+  const anyUploading = mediaItems.some((item) => item.uploading);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const validate = (): boolean => {
     setError(null);
-    setSuccess(false);
-
-    // Validation
     if (!content.trim()) {
       setError("Please enter some content for your post");
-      return;
+      return false;
     }
-
     if (selectedAccountIds.length === 0) {
       setError("Please select at least one platform");
-      return;
+      return false;
     }
-
-    // Filter out blob: URLs — only send actual remote URLs to the backend
-    const remoteMediaUrls = mediaUrls.filter((url) => !url.startsWith("blob:"));
-    const blobCount = mediaUrls.length - remoteMediaUrls.length;
-    if (blobCount > 0) {
-      toast.error("Image upload failed — post will be sent without images");
+    if (anyUploading) {
+      setError("Please wait for images to finish uploading");
+      return false;
     }
-
-    createPostMutation.mutate({
-      content,
-      media_urls: remoteMediaUrls.length > 0 ? remoteMediaUrls : undefined,
-      scheduled_at: scheduledAt,
-      platforms: accounts
-        .filter((a) => selectedAccountIds.includes(a.id))
-        .map((a) => a.platform),
-      account_ids: selectedAccountIds,
-    });
+    const failedUploads = mediaItems.filter((item) => item.error);
+    if (failedUploads.length > 0) {
+      setError("Some images failed to upload. Remove them or try re-uploading.");
+      return false;
+    }
+    return true;
   };
 
-  const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const submitPost = (publishNow: boolean) => {
+    if (!validate()) return;
+    setSuccess(null);
+
+    const remoteUrls = mediaItems
+      .map((item) => item.remoteUrl)
+      .filter((url): url is string => url !== null);
+
+    createPostMutation.mutate(
+      {
+        content,
+        media_urls: remoteUrls.length > 0 ? remoteUrls : undefined,
+        scheduled_at: publishNow ? undefined : scheduledAt,
+        publish_now: publishNow,
+        platforms: accounts
+          .filter((a) => selectedAccountIds.includes(a.id))
+          .map((a) => a.platform),
+        account_ids: selectedAccountIds,
+      },
+      {
+        onSuccess: (post) => {
+          localStorage.removeItem(DRAFT_KEY);
+          queryClient.invalidateQueries({ queryKey: ["social"] });
+          if (publishNow) {
+            const failed = post.status === "failed";
+            if (failed) {
+              setError("Post failed to publish. Check the post details for more information.");
+              router.push(`/social/posts/${post.id}`);
+            } else {
+              setSuccess("Post published successfully!");
+              setTimeout(() => router.push("/social"), 2000);
+            }
+          } else {
+            setSuccess("Post scheduled successfully!");
+            setTimeout(() => router.push("/social"), 2000);
+          }
+        },
+        onError: (err) => {
+          setError(parseApiError(err).message);
+        },
+      }
+    );
+  };
+
+  const handleSchedule = (e: React.FormEvent) => {
+    e.preventDefault();
+    submitPost(false);
+  };
+
+  const handlePublishNow = () => {
+    submitPost(true);
+  };
+
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    if (mediaUrls.length + files.length > 4) {
-      setError("Maximum 4 media files allowed");
+    if (mediaItems.length + files.length > 4) {
+      setError("Maximum 4 images allowed");
       return;
     }
 
-    // Create object URLs for preview display
-    // Note: blob URLs are for local preview only and are filtered out before API submission
-    const urls = Array.from(files).map((file) => URL.createObjectURL(file));
-    blobUrlsRef.current.push(...urls);
-    setMediaUrls([...mediaUrls, ...urls]);
+    for (const file of Array.from(files)) {
+      const previewUrl = URL.createObjectURL(file);
+      const newItem: MediaItem = {
+        previewUrl,
+        remoteUrl: null,
+        uploading: true,
+        error: null,
+      };
+
+      setMediaItems((prev) => [...prev, newItem]);
+
+      // Upload in background
+      try {
+        const result = await api.social.uploadMedia(file);
+        setMediaItems((prev) =>
+          prev.map((item) =>
+            item.previewUrl === previewUrl
+              ? { ...item, remoteUrl: result.url, uploading: false }
+              : item
+          )
+        );
+      } catch (err) {
+        const message = parseApiError(err).message;
+        setMediaItems((prev) =>
+          prev.map((item) =>
+            item.previewUrl === previewUrl
+              ? { ...item, uploading: false, error: message }
+              : item
+          )
+        );
+        toast.error(`Failed to upload ${file.name}: ${message}`);
+      }
+    }
+
+    // Reset file input so the same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleRemoveMedia = (index: number) => {
-    const removed = mediaUrls[index];
-    if (removed?.startsWith("blob:")) {
-      URL.revokeObjectURL(removed);
+    const removed = mediaItems[index];
+    if (removed) {
+      URL.revokeObjectURL(removed.previewUrl);
     }
-    setMediaUrls(mediaUrls.filter((_, i) => i !== index));
-  };
-
-  const getSelectedAccount = () => {
-    if (selectedAccountIds.length === 0) return null;
-    return accounts.find((a) => a.id === selectedAccountIds[0]);
+    setMediaItems(mediaItems.filter((_, i) => i !== index));
   };
 
   if (loading) {
@@ -237,13 +303,13 @@ export default function ComposePage() {
   return (
     <TierGate minimum="starter" feature="Social Media">
     <div className="space-y-6">
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSchedule} className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-display font-bold text-text-primary">Create Post</h1>
             <p className="text-text-secondary mt-1">
-              Compose and schedule your social media post
+              Compose and publish or schedule your social media post
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -254,8 +320,23 @@ export default function ComposePage() {
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={submitting} isLoading={submitting}>
-              {submitting ? "Publishing..." : "Schedule Post"}
+            <Button
+              type="submit"
+              variant="outline"
+              disabled={submitting || anyUploading}
+              isLoading={submitting && !createPostMutation.variables?.publish_now}
+              leftIcon={<Clock className="h-4 w-4" />}
+            >
+              Schedule Post
+            </Button>
+            <Button
+              type="button"
+              onClick={handlePublishNow}
+              disabled={submitting || anyUploading}
+              isLoading={submitting && createPostMutation.variables?.publish_now === true}
+              leftIcon={<Send className="h-4 w-4" />}
+            >
+              Publish Now
             </Button>
           </div>
         </div>
@@ -265,7 +346,7 @@ export default function ComposePage() {
           <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl flex items-center gap-3">
             <CheckCircle className="h-5 w-5 text-green-500" />
             <div>
-              <p className="text-green-600 font-medium">Post scheduled successfully!</p>
+              <p className="text-green-600 font-medium">{success}</p>
               <p className="text-green-500 text-sm">
                 Redirecting to dashboard...
               </p>
@@ -313,15 +394,36 @@ export default function ComposePage() {
               </h2>
 
               {/* Media Preview */}
-              {mediaUrls.length > 0 && (
+              {mediaItems.length > 0 && (
                 <div className="grid grid-cols-2 gap-4 mb-4">
-                  {mediaUrls.map((url, index) => (
-                    <div key={url} className="relative group">
+                  {mediaItems.map((item, index) => (
+                    <div key={item.previewUrl} className="relative group">
                       <img
-                        src={url}
+                        src={item.previewUrl}
                         alt={`Media ${index + 1}`}
                         className="w-full h-48 object-cover rounded-xl"
                       />
+                      {/* Upload overlay */}
+                      {item.uploading && (
+                        <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center">
+                          <Loader2 className="h-8 w-8 text-white animate-spin" />
+                        </div>
+                      )}
+                      {/* Error overlay */}
+                      {item.error && (
+                        <div className="absolute inset-0 bg-red-500/20 rounded-xl flex items-center justify-center">
+                          <div className="text-center px-2">
+                            <AlertCircle className="h-6 w-6 text-red-500 mx-auto mb-1" />
+                            <p className="text-xs text-red-600 font-medium">Upload failed</p>
+                          </div>
+                        </div>
+                      )}
+                      {/* Success indicator */}
+                      {item.remoteUrl && !item.uploading && (
+                        <div className="absolute top-2 left-2">
+                          <CheckCircle className="h-5 w-5 text-green-500 drop-shadow" />
+                        </div>
+                      )}
                       <button
                         type="button"
                         aria-label="Remove media"
@@ -336,21 +438,24 @@ export default function ComposePage() {
               )}
 
               {/* Upload Button */}
-              <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-surface-tertiary rounded-xl hover:bg-surface-secondary transition-colors cursor-pointer">
-                <input
-                  type="file"
-                  accept="image/*,video/*"
-                  multiple
-                  onChange={handleMediaUpload}
-                  className="hidden"
-                />
-                <Upload className="h-5 w-5 text-text-secondary" />
-                <span className="text-text-secondary">
-                  Click to upload images or videos
-                </span>
-              </label>
+              {mediaItems.length < 4 && (
+                <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-surface-tertiary rounded-xl hover:bg-surface-secondary transition-colors cursor-pointer">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    multiple
+                    onChange={handleMediaUpload}
+                    className="hidden"
+                  />
+                  <Upload className="h-5 w-5 text-text-secondary" />
+                  <span className="text-text-secondary">
+                    Click to upload images
+                  </span>
+                </label>
+              )}
               <p className="text-xs text-text-tertiary mt-2">
-                Supported: JPG, PNG, GIF, MP4 (max 4 files)
+                Supported: JPG, PNG, GIF, WebP (max 4 images, 10 MB each)
               </p>
             </Card>
 
@@ -369,7 +474,7 @@ export default function ComposePage() {
                         key={account.id}
                         platform={account.platform}
                         content={content}
-                        mediaUrls={mediaUrls}
+                        mediaUrls={mediaItems.map((item) => item.previewUrl)}
                         accountName={account.platform_display_name}
                         accountUsername={account.platform_username}
                         profileImageUrl={account.profile_image_url}
@@ -402,6 +507,9 @@ export default function ComposePage() {
               <h3 className="text-lg font-semibold text-text-primary mb-4">
                 Schedule
               </h3>
+              <p className="text-xs text-text-secondary mb-3">
+                Set a date and time for scheduled posting, or use &quot;Publish Now&quot; to post immediately.
+              </p>
               <SchedulePicker
                 selectedDate={scheduledAt}
                 onDateChange={setScheduledAt}

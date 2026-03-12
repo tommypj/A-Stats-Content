@@ -984,6 +984,15 @@ export const api = {
       apiRequest<SocialPost>({
         url: `/social/posts/${id}`,
       }),
+    uploadMedia: async (file: File): Promise<{ url: string; path: string }> => {
+      const formData = new FormData();
+      formData.append("file", file);
+      return apiRequest<{ url: string; path: string }>({
+        method: "POST",
+        url: "/social/media/upload",
+        data: formData,
+      });
+    },
     createPost: (data: CreateSocialPostInput) =>
       apiRequest<SocialPost>({
         method: "POST",
@@ -1016,7 +1025,7 @@ export const api = {
       apiRequest<SocialPost>({
         method: "PUT",
         url: `/social/posts/${id}`,
-        data: { status: "pending", target_ids: targetIds },
+        data: { status: "scheduled", target_ids: targetIds },
       }),
     accounts: () =>
       apiRequest<SocialAccountListResponse>({
@@ -2738,7 +2747,7 @@ export interface KnowledgeStats {
 
 // Social Media types
 export type SocialPlatform = "twitter" | "linkedin" | "facebook" | "instagram";
-export type SocialPostStatus = "pending" | "queued" | "posting" | "posted" | "failed" | "cancelled";
+export type SocialPostStatus = "draft" | "scheduled" | "publishing" | "published" | "partially_published" | "failed" | "cancelled";
 
 export interface SocialAccount {
   id: string;
@@ -2817,7 +2826,8 @@ export interface SocialPostQueryParams {
 export interface CreateSocialPostInput {
   content: string;
   media_urls?: string[];
-  scheduled_at: string;
+  scheduled_at?: string;
+  publish_now?: boolean;
   platforms: SocialPlatform[];
   account_ids?: string[];
   project_id?: string;

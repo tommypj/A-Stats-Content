@@ -55,10 +55,10 @@ export default function SocialDashboard() {
     data: recentPostedData,
     isLoading: recentPostedLoading,
   } = useQuery({
-    queryKey: ["social", "posts", { page: 1, page_size: 20, status: "posted" }],
+    queryKey: ["social", "posts", { page: 1, page_size: 20, status: "published" }],
     queryFn: async () => {
       try {
-        return await api.social.posts({ page: 1, page_size: 20, status: "posted" });
+        return await api.social.posts({ page: 1, page_size: 20, status: "published" });
       } catch (err) {
         toast.error(parseApiError(err).message);
         throw err;
@@ -76,7 +76,7 @@ export default function SocialDashboard() {
   const upcomingPosts = useMemo(() => {
     if (!upcomingData) return [];
     return upcomingData.items.filter(
-      (p) => p.status !== "posted" && p.status !== "failed" && p.status !== "cancelled"
+      (p) => p.status !== "published" && p.status !== "failed" && p.status !== "cancelled"
     );
   }, [upcomingData]);
 

@@ -33,6 +33,7 @@ _ALLOWED_MEDIA_DOMAINS = {
     "pbxt.replicate.delivery",
     "cdn.replicate.com",
     "uploads.a-stats.online",
+    "api.a-stats.online",
 }
 
 

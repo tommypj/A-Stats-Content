@@ -60,7 +60,7 @@ export default function PostDetailPage() {
   const { data: analyticsData, isLoading: analyticsLoading } = useQuery({
     queryKey: ["social", "analytics", postId],
     queryFn: () => api.social.analytics(postId),
-    enabled: !!postId && post?.status === "posted",
+    enabled: !!postId && (post?.status === "published" || post?.status === "partially_published"),
     staleTime: 60_000,
   });
 
@@ -160,8 +160,8 @@ export default function PostDetailPage() {
     );
   }
 
-  const canEdit = post.status === "pending" || post.status === "failed";
-  const canPublishNow = post.status === "pending";
+  const canEdit = post.status === "draft" || post.status === "scheduled" || post.status === "failed";
+  const canPublishNow = post.status === "draft" || post.status === "scheduled";
   const hasFailed = post.status === "failed" || post.targets?.some((t) => getTargetStatus(t) === "failed");
 
   return (
@@ -363,7 +363,7 @@ export default function PostDetailPage() {
           </Card>
 
           {/* Analytics */}
-          {post.status === "posted" && (
+          {(post.status === "published" || post.status === "partially_published") && (
             <div>
               {analyticsLoading ? (
                 <Card className="p-6">

@@ -149,7 +149,7 @@ export function CalendarView({
               {(expandedDays.has(dateKey) ? dayPosts : dayPosts.slice(0, 3)).map((post) => (
                 <div
                   key={post.id}
-                  draggable={post.status === "pending" && !!onReschedule}
+                  draggable={post.status === "scheduled" && !!onReschedule}
                   onDragStart={() => setDraggedPost(post.id)}
                   onDragEnd={() => setDraggedPost(null)}
                   onClick={(e) => {
@@ -160,9 +160,9 @@ export function CalendarView({
                     "text-xs p-1.5 rounded cursor-pointer transition-all",
                     "bg-surface-secondary hover:bg-surface-tertiary",
                     "border-l-2 truncate",
-                    post.status === "posted" && "border-green-500",
+                    post.status === "published" && "border-green-500",
                     post.status === "failed" && "border-red-500",
-                    post.status === "pending" && "border-yellow-500",
+                    post.status === "scheduled" && "border-yellow-500",
                     draggedPost === post.id && "opacity-50"
                   )}
                   title={post.content}

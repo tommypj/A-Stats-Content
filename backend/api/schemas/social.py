@@ -83,6 +83,7 @@ class CreatePostRequest(BaseModel):
     media_urls: list[str] | None = Field(None, max_length=10)
     link_url: str | None = Field(None, max_length=2048)
     article_id: str | None = None
+    publish_now: bool = Field(False, description="Publish immediately instead of scheduling")
     project_id: str | None = Field(None, description="Project ID for project content")
     targets: list[PostTargetRequest] | None = Field(None, description="Platform-specific overrides")
 
