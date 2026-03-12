@@ -23,7 +23,7 @@ class RefundBlockedEmail(Base):
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
     blocked_by: Mapped[str | None] = mapped_column(
-        UUID(as_uuid=False), ForeignKey("users.id"), nullable=True
+        UUID(as_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

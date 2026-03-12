@@ -157,6 +157,7 @@ class AdminAlert(Base, TimestampMixin):
         UUID(as_uuid=False),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
     )
 
     # Project context
@@ -164,6 +165,7 @@ class AdminAlert(Base, TimestampMixin):
         UUID(as_uuid=False),
         ForeignKey("projects.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
     )
 
     # Alert state

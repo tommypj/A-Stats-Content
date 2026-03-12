@@ -194,7 +194,6 @@ class BlogPost(Base, TimestampMixin):
     # Indexes
     __table_args__ = (
         Index("ix_blog_posts_status_published_at", "status", "published_at"),
-        Index("ix_blog_posts_deleted_at", "deleted_at"),
     )
 
     def __repr__(self) -> str:

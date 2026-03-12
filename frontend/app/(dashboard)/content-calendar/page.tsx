@@ -169,6 +169,7 @@ function ScheduleModal({
             </div>
             <button
               onClick={onClose}
+              aria-label="Close"
               className="p-1.5 rounded-lg hover:bg-surface-secondary transition-colors"
             >
               <X className="h-4 w-4 text-text-secondary" />
@@ -342,6 +343,7 @@ function DayPanel({ date, items, onClose, onRefresh, onOpenSchedule }: DayPanelP
           </div>
           <button
             onClick={onClose}
+            aria-label="Close"
             className="p-1.5 rounded-lg hover:bg-surface-secondary transition-colors"
           >
             <X className="h-4 w-4 text-text-secondary" />

@@ -93,6 +93,7 @@ class BulkJob(Base, TimestampMixin):
         UUID(as_uuid=False),
         ForeignKey("content_templates.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
     )
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

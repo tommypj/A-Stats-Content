@@ -19,7 +19,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, TimestampMixin
@@ -221,8 +221,8 @@ class Article(Base, TimestampMixin):
 
     # Pipeline metadata (added by architecture review improvements)
     quality_tier: Mapped[str | None] = mapped_column(String(10), nullable=True)
-    schemas: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    run_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    schemas: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    run_metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     # Soft delete
     deleted_at: Mapped[datetime | None] = mapped_column(

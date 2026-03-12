@@ -47,9 +47,9 @@ export default function PublicFooter() {
             <ul className="space-y-2.5">
               {[
                 { label: t("footer.resourcesBlog"), href: "/blog" },
-                { label: t("footer.resourcesDocumentation"), href: "/en/docs" },
-                { label: t("footer.resourcesHelpCenter"), href: "/en/docs/getting-started/quick-start" },
-                { label: t("footer.resourcesApiReference"), href: "/en/docs" },
+                { label: t("footer.resourcesDocumentation"), href: "/docs" },
+                { label: t("footer.resourcesHelpCenter"), href: "/docs/getting-started/quick-start" },
+                { label: t("footer.resourcesApiReference"), href: "/docs" },
               ].map(({ label, href }, i) => (
                 <li key={i}>
                   <Link href={href} className="text-sm text-primary-200/60 hover:text-white transition-colors">

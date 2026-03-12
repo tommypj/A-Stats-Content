@@ -166,7 +166,7 @@ export default function HelpPage() {
             </div>
           </a>
           <Link
-            href="/en/docs"
+            href="/docs"
             className="flex items-center gap-3 p-4 rounded-xl bg-surface-secondary hover:bg-surface-tertiary transition-colors"
           >
             <BookOpen className="h-5 w-5 text-primary-500" />

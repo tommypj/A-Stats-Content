@@ -156,7 +156,7 @@ class User(Base, TimestampMixin):
         Index("ix_users_subscription", "subscription_tier", "subscription_expires"),
         Index("ix_users_lemonsqueezy", "lemonsqueezy_customer_id"),
         Index("ix_users_role", "role"),
-        Index("ix_users_current_project", "current_project_id"),
+        Index("ix_users_current_project_id", "current_project_id"),
     )
 
     def __repr__(self) -> str:

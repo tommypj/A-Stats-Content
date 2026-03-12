@@ -69,6 +69,7 @@ class SystemErrorLog(Base, TimestampMixin):
         UUID(as_uuid=False),
         ForeignKey("projects.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
     )
     resource_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     resource_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), nullable=True)
@@ -100,6 +101,7 @@ class SystemErrorLog(Base, TimestampMixin):
         UUID(as_uuid=False),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
     )
     resolution_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -122,6 +124,7 @@ class SystemErrorLog(Base, TimestampMixin):
     __table_args__ = (
         Index("ix_system_error_logs_type_severity", "error_type", "severity"),
         Index("ix_system_error_logs_resolved_created", "is_resolved", "created_at"),
+        Index("ix_system_error_logs_fingerprint", "error_fingerprint"),
     )
 
     def __repr__(self) -> str:

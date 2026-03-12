@@ -499,6 +499,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             )}
             <button
               onClick={() => setSidebarOpen(false)}
+              aria-label="Close"
               className="lg:hidden p-1 rounded-lg hover:bg-primary-800"
             >
               <X className="h-5 w-5 text-cream-300" />

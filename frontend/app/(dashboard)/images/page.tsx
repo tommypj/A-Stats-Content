@@ -880,6 +880,7 @@ export default function ImagesPage() {
               <button
                 onClick={closeRegenModal}
                 disabled={regenLoading}
+                aria-label="Close"
                 className="p-1.5 rounded-lg hover:bg-surface-secondary disabled:opacity-50"
               >
                 <X className="h-4 w-4 text-text-muted" />

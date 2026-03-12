@@ -191,6 +191,7 @@ class AuditIssue(Base):
         UUID(as_uuid=False),
         ForeignKey("audit_pages.id", ondelete="CASCADE"),
         nullable=True,
+        index=True,
     )
 
     # Issue details

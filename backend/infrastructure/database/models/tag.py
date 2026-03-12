@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Index, String, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -39,7 +39,7 @@ class Tag(Base, TimestampMixin):
     )
 
     __table_args__ = (
-        UniqueConstraint("user_id", "name", name="uq_tags_user_name"),
+        Index("uq_tags_user_name", "user_id", "name", unique=True, postgresql_where=text("deleted_at IS NULL")),
     )
 
     user = relationship("User", lazy="select")
