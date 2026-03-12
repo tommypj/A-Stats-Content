@@ -991,6 +991,7 @@ export const api = {
         method: "POST",
         url: "/social/media/upload",
         data: formData,
+        headers: { "Content-Type": undefined },
       });
     },
     createPost: (data: CreateSocialPostInput) =>
