@@ -122,7 +122,7 @@ class ReplicateImageService:
             self._client = None
         else:
             self._client = replicate.Client(api_token=settings.replicate_api_token)
-            logger.info(f"Replicate client initialized with model: {self._model}")
+            logger.info("Replicate client initialized with model: %s", self._model)
 
     async def generate_image(
         self,
@@ -182,7 +182,7 @@ class ReplicateImageService:
             else:
                 image_url = str(output)
 
-            logger.info(f"Generated image URL: {image_url}")
+            logger.info("Generated image URL: %s", image_url)
 
             return GeneratedImage(
                 url=image_url,
@@ -194,7 +194,7 @@ class ReplicateImageService:
             )
 
         except Exception as e:
-            logger.error(f"Replicate image generation failed: {e}", exc_info=True)
+            logger.error("Replicate image generation failed: %s", e, exc_info=True)
             raise
 
     def _run_model(self, prompt: str, width: int, height: int, style_cfg: dict):
@@ -244,9 +244,8 @@ class ReplicateImageService:
             input_params["style_preset"] = style_cfg["style_preset"]
 
         logger.info(
-            f"Calling Replicate model {self._model} with "
-            f"aspect_ratio={aspect_ratio}, style_type={style_cfg.get('style_type')}, "
-            f"style_preset={style_cfg.get('style_preset')}"
+            "Calling Replicate model %s with aspect_ratio=%s, style_type=%s, style_preset=%s",
+            self._model, aspect_ratio, style_cfg.get('style_type'), style_cfg.get('style_preset'),
         )
 
         output = self._client.run(
@@ -254,7 +253,7 @@ class ReplicateImageService:
             input=input_params,
         )
 
-        logger.info(f"Replicate output type: {type(output)}, value: {output}")
+        logger.info("Replicate output type: %s, value: %s", type(output), output)
         return output
 
     def _mock_image(

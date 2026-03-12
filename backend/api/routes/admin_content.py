@@ -186,7 +186,7 @@ async def list_all_articles(
         total=total,
         page=page,
         page_size=page_size,
-        total_pages=ceil(total / page_size) if total > 0 else 0,
+        pages=ceil(total / page_size) if total > 0 else 0,
     )
 
 
@@ -293,7 +293,7 @@ async def delete_article(
         details={"title": article_title, "deleted_by_admin": admin_user.email},
     )
 
-    logger.info(f"Admin {admin_user.email} deleted article {article_id} ({article_title})")
+    logger.info("Admin %s deleted article %s (%s)", admin_user.email, article_id, article_title)
 
     return DeleteResponse(
         success=True,
@@ -384,7 +384,7 @@ async def list_all_outlines(
         total=total,
         page=page,
         page_size=page_size,
-        total_pages=ceil(total / page_size) if total > 0 else 0,
+        pages=ceil(total / page_size) if total > 0 else 0,
     )
 
 
@@ -434,7 +434,7 @@ async def delete_outline(
         details={"title": outline_title, "deleted_by_admin": admin_user.email},
     )
 
-    logger.info(f"Admin {admin_user.email} deleted outline {outline_id} ({outline_title})")
+    logger.info("Admin %s deleted outline %s (%s)", admin_user.email, outline_id, outline_title)
 
     return DeleteResponse(
         success=True,
@@ -538,7 +538,7 @@ async def list_all_images(
         total=total,
         page=page,
         page_size=page_size,
-        total_pages=ceil(total / page_size) if total > 0 else 0,
+        pages=ceil(total / page_size) if total > 0 else 0,
     )
 
 
@@ -618,7 +618,7 @@ async def delete_image(
         },
     )
 
-    logger.info(f"Admin {admin_user.email} deleted image {image_id} ({image_prompt})")
+    logger.info("Admin %s deleted image %s (%s)", admin_user.email, image_id, image_prompt)
 
     return DeleteResponse(
         success=True,
@@ -724,7 +724,7 @@ async def list_all_social_posts(
         total=total,
         page=page,
         page_size=page_size,
-        total_pages=ceil(total / page_size) if total > 0 else 0,
+        pages=ceil(total / page_size) if total > 0 else 0,
     )
 
 
@@ -770,7 +770,7 @@ async def delete_social_post(
         },
     )
 
-    logger.info(f"Admin {admin_user.email} deleted social post {post_id}")
+    logger.info("Admin %s deleted social post %s", admin_user.email, post_id)
 
     return DeleteResponse(
         success=True,
@@ -855,7 +855,7 @@ async def bulk_delete_content(
             for audit_log in audit_entries:
                 db.add(audit_log)
         except Exception as e:
-            logger.error(f"Failed to bulk delete {body.content_type}: {e}")
+            logger.error("Failed to bulk delete %s: %s", body.content_type, e)
             await db.rollback()
             # All found items failed
             failed_ids.extend(list(found_items.keys()))

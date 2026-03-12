@@ -373,7 +373,7 @@ async def get_gsc_sites(
             connection.token_expiry = updated_creds.token_expiry
             await db.commit()
 
-        logger.info(f"GSC list_sites: returning {len(sites_data)} sites")
+        logger.info("GSC list_sites: returning %s sites", len(sites_data))
 
         # Transform to response format
         sites = [
@@ -389,7 +389,7 @@ async def get_gsc_sites(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"GSC list_sites failed: {type(e).__name__}: {e}", exc_info=True)
+        logger.error("GSC list_sites failed: %s: %s", type(e).__name__, e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch GSC sites",

@@ -208,7 +208,7 @@ class DocumentProcessor:
             logger.error("pypdf not installed. Install with: pip install pypdf")
             raise RuntimeError("pypdf required for PDF processing")
         except Exception as e:
-            logger.error(f"Failed to extract PDF text: {e}")
+            logger.error("Failed to extract PDF text: %s", e)
             raise
 
     async def extract_text_docx(self, file: BinaryIO) -> str:
@@ -232,7 +232,7 @@ class DocumentProcessor:
             logger.error("python-docx not installed. Install with: pip install python-docx")
             raise RuntimeError("python-docx required for DOCX processing")
         except Exception as e:
-            logger.error(f"Failed to extract DOCX text: {e}")
+            logger.error("Failed to extract DOCX text: %s", e)
             raise
 
     async def extract_text_html(self, file: BinaryIO) -> str:
@@ -269,7 +269,7 @@ class DocumentProcessor:
             logger.error("beautifulsoup4 not installed. Install with: pip install beautifulsoup4")
             raise RuntimeError("beautifulsoup4 required for HTML processing")
         except Exception as e:
-            logger.error(f"Failed to extract HTML text: {e}")
+            logger.error("Failed to extract HTML text: %s", e)
             raise
 
     def chunk_text(self, text: str) -> list[ProcessedChunk]:

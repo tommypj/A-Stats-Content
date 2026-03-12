@@ -80,9 +80,9 @@ class ChromaAdapter:
             self.client = chromadb.HttpClient(host=self.host, port=self.port)
             # Test connection
             self.client.heartbeat()
-            logger.info(f"ChromaDB client connected to {self.host}:{self.port}")
+            logger.info("ChromaDB client connected to %s:%s", self.host, self.port)
         except Exception as e:
-            logger.error(f"Failed to connect to ChromaDB: {e}")
+            logger.error("Failed to connect to ChromaDB: %s", e)
             raise ChromaDBConnectionError(
                 f"Could not connect to ChromaDB at {self.host}:{self.port}: {e}"
             )
@@ -125,10 +125,10 @@ class ChromaAdapter:
                 name=collection_name,
                 metadata={"hnsw:space": "cosine"},  # Use cosine similarity
             )
-            logger.debug(f"Retrieved collection: {collection_name}")
+            logger.debug("Retrieved collection: %s", collection_name)
             return collection
         except Exception as e:
-            logger.error(f"Failed to get collection {collection_name}: {e}")
+            logger.error("Failed to get collection %s: %s", collection_name, e)
             raise ChromaDBError(f"Could not get collection: {e}")
 
     async def add_documents(
@@ -177,12 +177,13 @@ class ChromaAdapter:
             )
 
             logger.info(
-                f"Added {len(documents)} documents to collection for user {user_id} / project {project_id}"
+                "Added %s documents to collection for user %s / project %s",
+                len(documents), user_id, project_id,
             )
             return ids
 
         except Exception as e:
-            logger.error(f"Failed to add documents to collection: {e}")
+            logger.error("Failed to add documents to collection: %s", e)
             raise ChromaDBError(f"Could not add documents: {e}")
 
     async def query(
@@ -256,12 +257,13 @@ class ChromaAdapter:
                     )
 
             logger.debug(
-                f"Query returned {len(query_results)} results for user {user_id} / project {project_id}"
+                "Query returned %s results for user %s / project %s",
+                len(query_results), user_id, project_id,
             )
             return query_results
 
         except Exception as e:
-            logger.error(f"Failed to query collection: {e}")
+            logger.error("Failed to query collection: %s", e)
             raise ChromaDBError(f"Query failed: {e}")
 
     async def delete_document(
@@ -285,12 +287,13 @@ class ChromaAdapter:
             await self._run_in_executor(collection.delete, ids=[document_id])
 
             logger.info(
-                f"Deleted document {document_id} from collection for user {user_id} / project {project_id}"
+                "Deleted document %s from collection for user %s / project %s",
+                document_id, user_id, project_id,
             )
             return True
 
         except Exception as e:
-            logger.error(f"Failed to delete document {document_id}: {e}")
+            logger.error("Failed to delete document %s: %s", document_id, e)
             return False
 
     async def delete_by_source(
@@ -314,13 +317,14 @@ class ChromaAdapter:
             await self._run_in_executor(collection.delete, where={"source_id": source_id})
 
             logger.info(
-                f"Deleted all documents with source_id={source_id} for user {user_id} / project {project_id}"
+                "Deleted all documents with source_id=%s for user %s / project %s",
+                source_id, user_id, project_id,
             )
             # Note: ChromaDB doesn't return count of deleted items
             return 1  # Return 1 to indicate success
 
         except Exception as e:
-            logger.error(f"Failed to delete documents by source {source_id}: {e}")
+            logger.error("Failed to delete documents by source %s: %s", source_id, e)
             return 0
 
     async def get_collection_stats(
@@ -360,7 +364,7 @@ class ChromaAdapter:
             }
 
         except Exception as e:
-            logger.error(f"Failed to get collection stats: {e}")
+            logger.error("Failed to get collection stats: %s", e)
             raise ChromaDBError(f"Could not get collection stats: {e}")
 
     async def delete_collection(self, user_id: str, project_id: str = "personal") -> bool:
@@ -380,11 +384,11 @@ class ChromaAdapter:
             # Delete is synchronous, run in executor
             await self._run_in_executor(self.client.delete_collection, name=collection_name)
 
-            logger.info(f"Deleted collection {collection_name}")
+            logger.info("Deleted collection %s", collection_name)
             return True
 
         except Exception as e:
-            logger.error(f"Failed to delete collection: {e}")
+            logger.error("Failed to delete collection: %s", e)
             return False
 
     async def _run_in_executor(self, func, *args, **kwargs):

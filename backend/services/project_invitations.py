@@ -43,7 +43,7 @@ async def expire_old_invitations(db: AsyncSession) -> int:
 
     if expired_count > 0:
         await db.commit()
-        logger.info(f"Marked {expired_count} project invitations as expired")
+        logger.info("Marked %s project invitations as expired", expired_count)
 
     return expired_count
 
@@ -89,6 +89,6 @@ async def cleanup_old_invitations(db: AsyncSession, days_old: int = 30) -> int:
 
     if deleted_count > 0:
         await db.commit()
-        logger.info(f"Deleted {deleted_count} old project invitations")
+        logger.info("Deleted %s old project invitations", deleted_count)
 
     return deleted_count

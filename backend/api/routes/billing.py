@@ -322,7 +322,7 @@ async def get_customer_portal(current_user: Annotated[User, Depends(get_current_
     # Format: https://YOUR_STORE.lemonsqueezy.com/billing
     portal_url = f"https://{settings.lemonsqueezy_store_slug}.lemonsqueezy.com/billing"
 
-    logger.info(f"Generated customer portal URL for user {current_user.id}")
+    logger.info("Generated customer portal URL for user %s", current_user.id)
 
     return CustomerPortalResponse(portal_url=portal_url)
 
@@ -353,7 +353,7 @@ async def cancel_subscription(
             detail="Subscription is already cancelled or expired",
         )
 
-    logger.info(f"Subscription cancellation requested for user {current_user.id}")
+    logger.info("Subscription cancellation requested for user %s", current_user.id)
 
     adapter = LemonSqueezyAdapter()
     try:
@@ -648,12 +648,12 @@ async def handle_webhook(
     event_id = meta.get("event_id") or payload.get("id")
     if event_id:
         try:
-            from infrastructure.redis import get_redis
+            from infrastructure.redis import get_redis, redis_key as _redis_key
 
             r = await get_redis()
             if r is not None:
-                redis_key = f"webhook:processed:{event_id}"
-                is_new = await r.set(redis_key, "1", nx=True, ex=86400)
+                dedup_key = _redis_key(f"webhook:processed:{event_id}")
+                is_new = await r.set(dedup_key, "1", nx=True, ex=86400)
             else:
                 is_new = True  # No Redis — proceed without idempotency check
             if not is_new:
@@ -716,7 +716,7 @@ async def handle_webhook(
     user = result.scalar_one_or_none()
 
     if not user:
-        logger.error(f"User {user_id} not found for webhook")
+        logger.error("User %s not found for webhook", user_id)
         return {"status": "error", "message": "User not found"}
 
     # Skip webhook processing for refunded users — refund handler already downgraded them.
@@ -773,7 +773,7 @@ async def handle_webhook(
             if renews_at:
                 user.subscription_expires = _parse_iso_datetime(renews_at)
 
-            logger.info(f"Subscription created for user {user_id}: tier={tier}")
+            logger.info("Subscription created for user %s: tier=%s", user_id, tier)
 
         elif event_name == WebhookEventType.SUBSCRIPTION_UPDATED.value:
             # Subscription updated (plan change, status change, etc.)
@@ -790,11 +790,13 @@ async def handle_webhook(
             # Let it expire naturally
             if subscription_status in ["cancelled", "paused", "expired"]:
                 logger.info(
-                    f"Subscription {subscription_status} for user {user_id}, will expire at {renews_at}"
+                    "Subscription %s for user %s, will expire at %s",
+                    subscription_status, user_id, renews_at,
                 )
             else:
                 logger.info(
-                    f"Subscription updated for user {user_id}: tier={tier}, status={subscription_status}"
+                    "Subscription updated for user %s: tier=%s, status=%s",
+                    user_id, tier, subscription_status,
                 )
 
         elif event_name == WebhookEventType.SUBSCRIPTION_CANCELLED.value:
@@ -819,14 +821,14 @@ async def handle_webhook(
             user.subscription_expires = None
             user.lemonsqueezy_subscription_id = None
 
-            logger.info(f"Subscription expired for user {user_id}, downgraded to free")
+            logger.info("Subscription expired for user %s, downgraded to free", user_id)
 
         elif event_name == WebhookEventType.SUBSCRIPTION_PAYMENT_SUCCESS.value:
             # Payment successful - update renewal date
             if renews_at:
                 user.subscription_expires = _parse_iso_datetime(renews_at)
 
-            logger.info(f"Payment successful for user {user_id}, renews at {renews_at}")
+            logger.info("Payment successful for user %s, renews at %s", user_id, renews_at)
 
         elif event_name == WebhookEventType.SUBSCRIPTION_PAYMENT_FAILED.value:
             # Payment failed - don't downgrade yet, let LemonSqueezy retry
@@ -845,7 +847,7 @@ async def handle_webhook(
             if renews_at:
                 user.subscription_expires = _parse_iso_datetime(renews_at)
 
-            logger.info(f"Subscription resumed for user {user_id}")
+            logger.info("Subscription resumed for user %s", user_id)
 
         elif event_name == WebhookEventType.SUBSCRIPTION_PAUSED.value:
             # Subscription paused - keep tier until expiration
@@ -863,10 +865,10 @@ async def handle_webhook(
             if renews_at:
                 user.subscription_expires = _parse_iso_datetime(renews_at)
 
-            logger.info(f"Subscription unpaused for user {user_id}")
+            logger.info("Subscription unpaused for user %s", user_id)
 
         else:
-            logger.warning(f"Unknown webhook event type: {event_name}")
+            logger.warning("Unknown webhook event type: %s", event_name)
 
         # Commit changes
         await db.commit()
@@ -886,7 +888,7 @@ async def handle_webhook(
             except Exception as e:
                 logger.error("Journey event user.tier_changed failed: %s", e)
 
-        logger.info(f"Webhook processed successfully for user {user_id}")
+        logger.info("Webhook processed successfully for user %s", user_id)
 
     except Exception as e:
         logger.error("Webhook processing failed: %s", str(e), exc_info=True)

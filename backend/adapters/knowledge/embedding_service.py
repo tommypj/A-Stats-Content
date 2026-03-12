@@ -96,14 +96,14 @@ class EmbeddingService:
                 embedding = items[0].get("embedding")
                 if embedding is None:
                     raise EmbeddingError("OpenAI API returned no embedding vector")
-                logger.debug(f"Generated embedding for text of length {len(text)}")
+                logger.debug("Generated embedding for text of length %s", len(text))
                 return embedding
 
         except httpx.HTTPStatusError as e:
-            logger.error(f"OpenAI API error: {e.response.status_code} - {e.response.text}")
+            logger.error("OpenAI API error: %s - %s", e.response.status_code, e.response.text)
             raise EmbeddingError(f"Failed to generate embedding: {e}")
         except Exception as e:
-            logger.error(f"Unexpected error generating embedding: {e}")
+            logger.error("Unexpected error generating embedding: %s", e)
             raise EmbeddingError(f"Embedding generation failed: {e}")
 
     async def embed_texts(self, texts: list[str]) -> list[list[float]]:
@@ -144,14 +144,14 @@ class EmbeddingService:
                 embeddings = [item["embedding"] for item in items if "embedding" in item]
                 if not embeddings:
                     raise EmbeddingError("OpenAI API returned no embedding vectors")
-                logger.info(f"Generated {len(embeddings)} embeddings using model {self.model}")
+                logger.info("Generated %s embeddings using model %s", len(embeddings), self.model)
                 return embeddings
 
         except httpx.HTTPStatusError as e:
-            logger.error(f"OpenAI API error: {e.response.status_code} - {e.response.text}")
+            logger.error("OpenAI API error: %s - %s", e.response.status_code, e.response.text)
             raise EmbeddingError(f"Failed to generate embeddings: {e}")
         except Exception as e:
-            logger.error(f"Unexpected error generating embeddings: {e}")
+            logger.error("Unexpected error generating embeddings: %s", e)
             raise EmbeddingError(f"Batch embedding generation failed: {e}")
 
     async def embed_text_mock(self, text: str) -> list[float]:
@@ -181,7 +181,7 @@ class EmbeddingService:
             normalized = (byte_val / 255.0) * 2 - 1
             embedding.append(normalized)
 
-        logger.debug(f"Generated mock embedding with dimension {dimension}")
+        logger.debug("Generated mock embedding with dimension %s", dimension)
         return embedding
 
     def get_embedding_dimension(self) -> int:

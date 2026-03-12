@@ -1043,7 +1043,7 @@ class AnthropicContentService:
             return data.get("suggestions", [])
 
         except Exception as e:
-            logger.error(f"Failed to generate content suggestions: {e}")
+            logger.error("Failed to generate content suggestions: %s", e)
             raise
 
     async def generate_content_cluster(
@@ -1135,11 +1135,11 @@ class AnthropicContentService:
             )
 
             response_text = message.content[0].text
-            logger.debug(f"Generated text response ({len(response_text)} chars)")
+            logger.debug("Generated text response (%s chars)", len(response_text))
             return response_text
 
         except Exception as e:
-            logger.error(f"Failed to generate text: {e}")
+            logger.error("Failed to generate text: %s", e)
             raise
 
 
