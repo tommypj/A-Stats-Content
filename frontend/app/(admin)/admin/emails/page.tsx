@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
-import { api, parseApiError } from "@/lib/api";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api, parseApiError, EmailTemplateOverride } from "@/lib/api";
 import { toast } from "sonner";
-import { Mail, Send, Eye, Loader2 } from "lucide-react";
+import { Mail, Send, Eye, Loader2, Pencil, ArrowLeft, Save, RotateCcw, Code, Monitor } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface EmailTemplate {
   email_key: string;
@@ -38,6 +41,8 @@ function groupByPhase(templates: EmailTemplate[]): Record<string, EmailTemplate[
 }
 
 export default function AdminEmailsPage() {
+  const queryClient = useQueryClient();
+
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedKey, setSelectedKey] = useState<string>("");
@@ -48,6 +53,56 @@ export default function AdminEmailsPage() {
   const [previewing, setPreviewing] = useState(false);
   const [sending, setSending] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const editIframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Edit mode state
+  const [editMode, setEditMode] = useState(false);
+  const [editSubject, setEditSubject] = useState("");
+  const [editHtml, setEditHtml] = useState("");
+  const [editTab, setEditTab] = useState<"editor" | "preview">("editor");
+
+  // --- Overrides query ---
+  const { data: overridesData } = useQuery({
+    queryKey: ["admin", "email-overrides"],
+    queryFn: () => api.admin.emails.getOverrides(),
+    staleTime: 30_000,
+  });
+
+  const overridesMap = useMemo(() => {
+    const map = new Map<string, EmailTemplateOverride>();
+    if (overridesData?.overrides) {
+      for (const o of overridesData.overrides) {
+        map.set(o.email_key, o);
+      }
+    }
+    return map;
+  }, [overridesData]);
+
+  // --- Save override mutation ---
+  const saveOverrideMutation = useMutation({
+    mutationFn: (params: { email_key: string; data: { subject?: string | null; html?: string | null } }) =>
+      api.admin.emails.saveOverride(params.email_key, params.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "email-overrides"] });
+      toast.success("Template override saved successfully.");
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
+
+  // --- Delete override mutation ---
+  const deleteOverrideMutation = useMutation({
+    mutationFn: (email_key: string) => api.admin.emails.deleteOverride(email_key),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "email-overrides"] });
+      toast.success("Template reset to default.");
+      setEditMode(false);
+    },
+    onError: (err) => {
+      toast.error(parseApiError(err).message);
+    },
+  });
 
   const loadTemplates = useCallback(async () => {
     try {
@@ -90,6 +145,8 @@ export default function AdminEmailsPage() {
   useEffect(() => {
     if (selectedKey) {
       loadPreview();
+      // Exit edit mode when switching templates
+      setEditMode(false);
     }
   }, [selectedKey]);
 
@@ -125,6 +182,38 @@ export default function AdminEmailsPage() {
     }
   };
 
+  const handleEnterEditMode = () => {
+    const override = overridesMap.get(selectedKey);
+    if (override) {
+      setEditSubject(override.subject || previewSubject);
+      setEditHtml(override.html || previewHtml);
+    } else {
+      setEditSubject(previewSubject);
+      setEditHtml(previewHtml);
+    }
+    setEditTab("editor");
+    setEditMode(true);
+  };
+
+  const handleSaveOverride = () => {
+    if (!selectedKey) return;
+    saveOverrideMutation.mutate({
+      email_key: selectedKey,
+      data: {
+        subject: editSubject || null,
+        html: editHtml || null,
+      },
+    });
+  };
+
+  const handleResetToDefault = () => {
+    if (!selectedKey) return;
+    if (!window.confirm("Reset this template to its default? This will remove your custom override.")) {
+      return;
+    }
+    deleteOverrideMutation.mutate(selectedKey);
+  };
+
   const grouped = groupByPhase(templates);
 
   if (loading) {
@@ -144,7 +233,7 @@ export default function AdminEmailsPage() {
           Email Journey Templates
         </h1>
         <p className="mt-1 text-text-secondary">
-          Preview and test email templates from all journey phases. Select a template to preview its rendered HTML and send test emails.
+          Preview, edit, and test email templates from all journey phases. Select a template to preview its rendered HTML and send test emails.
         </p>
       </div>
 
@@ -173,6 +262,7 @@ export default function AdminEmailsPage() {
                     {group.map((t) => (
                       <option key={t.email_key} value={t.email_key}>
                         {t.email_key.replace(/_/g, " ")}
+                        {overridesMap.has(t.email_key) ? " \u2713" : ""}
                       </option>
                     ))}
                   </optgroup>
@@ -184,12 +274,20 @@ export default function AdminEmailsPage() {
                 .map((t) => (
                   <option key={t.email_key} value={t.email_key}>
                     {t.email_key.replace(/_/g, " ")}
+                    {overridesMap.has(t.email_key) ? " \u2713" : ""}
                   </option>
                 ))}
             </select>
-            <p className="mt-2 text-xs text-text-muted">
-              {templates.length} template{templates.length !== 1 ? "s" : ""} available
-            </p>
+            <div className="mt-2 flex items-center justify-between">
+              <p className="text-xs text-text-muted">
+                {templates.length} template{templates.length !== 1 ? "s" : ""} available
+              </p>
+              {overridesMap.has(selectedKey) && (
+                <span className="inline-flex items-center rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700">
+                  Overridden
+                </span>
+              )}
+            </div>
           </div>
 
           {/* User Name Input */}
@@ -256,61 +354,204 @@ export default function AdminEmailsPage() {
           </div>
         </div>
 
-        {/* Right: Preview panel */}
+        {/* Right: Preview / Edit panel */}
         <div className="lg:col-span-2 space-y-4">
           {/* Subject line */}
-          {previewSubject && (
+          {!editMode && previewSubject && (
             <div className="bg-white rounded-xl border border-surface-tertiary shadow-sm p-4">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-text-muted uppercase tracking-wider">
-                  Subject
-                </span>
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                    Subject
+                  </span>
+                  <p className="mt-1 text-sm font-medium text-text-primary">
+                    {previewSubject}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleEnterEditMode}
+                  disabled={!previewHtml}
+                >
+                  <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                  Edit Template
+                </Button>
               </div>
-              <p className="mt-1 text-sm font-medium text-text-primary">
-                {previewSubject}
-              </p>
             </div>
           )}
 
-          {/* HTML Preview */}
-          <div className="bg-white rounded-xl border border-surface-tertiary shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-surface-tertiary">
-              <h3 className="text-sm font-medium text-text-primary">
-                Email Preview
-              </h3>
-            </div>
-            {previewing ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="h-6 w-6 animate-spin text-text-muted" />
+          {/* Edit Mode */}
+          {editMode && (
+            <div className="space-y-4">
+              {/* Edit header with back button */}
+              <div className="flex items-center justify-between">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEditMode(false)}
+                >
+                  <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
+                  Back to Preview
+                </Button>
+                <div className="flex items-center gap-2">
+                  {overridesMap.has(selectedKey) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleResetToDefault}
+                      disabled={deleteOverrideMutation.isPending}
+                    >
+                      {deleteOverrideMutation.isPending ? (
+                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                      )}
+                      Reset to Default
+                    </Button>
+                  )}
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleSaveOverride}
+                    disabled={saveOverrideMutation.isPending}
+                  >
+                    {saveOverrideMutation.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <Save className="h-3.5 w-3.5 mr-1.5" />
+                    )}
+                    Save Override
+                  </Button>
+                </div>
               </div>
-            ) : previewHtml ? (
-              <div className="flex justify-center p-4 bg-surface-secondary">
-                <iframe
-                  ref={iframeRef}
-                  srcDoc={previewHtml}
-                  title="Email preview"
-                  className="w-full max-w-[640px] min-h-[600px] bg-white border border-surface-tertiary rounded-lg"
-                  sandbox="allow-same-origin"
-                  style={{ border: "none" }}
-                  onLoad={() => {
-                    // Auto-resize iframe to content height
-                    const iframe = iframeRef.current;
-                    if (iframe?.contentDocument?.body) {
-                      const height = iframe.contentDocument.body.scrollHeight;
-                      iframe.style.height = `${Math.max(600, height + 40)}px`;
-                    }
-                  }}
+
+              {/* Subject input */}
+              <div className="bg-white rounded-xl border border-surface-tertiary shadow-sm p-4">
+                <label
+                  htmlFor="edit-subject"
+                  className="block text-xs font-medium text-text-muted uppercase tracking-wider mb-2"
+                >
+                  Subject Line
+                </label>
+                <input
+                  id="edit-subject"
+                  type="text"
+                  value={editSubject}
+                  onChange={(e) => setEditSubject(e.target.value)}
+                  placeholder="Email subject line"
+                  className="w-full border border-surface-tertiary rounded-lg px-3 py-2 text-sm text-text-primary bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 />
               </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-20 text-text-muted">
-                <Mail className="h-10 w-10 mb-3 opacity-30" />
-                <p className="text-sm">
-                  Select a template to preview its rendered HTML
-                </p>
+
+              {/* Editor tabs */}
+              <div className="bg-white rounded-xl border border-surface-tertiary shadow-sm overflow-hidden">
+                <div className="px-4 py-3 border-b border-surface-tertiary flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setEditTab("editor")}
+                      className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+                        editTab === "editor"
+                          ? "bg-primary-100 text-primary-700"
+                          : "text-text-secondary hover:text-text-primary hover:bg-surface-secondary"
+                      )}
+                    >
+                      <Code className="h-3.5 w-3.5" />
+                      HTML Editor
+                    </button>
+                    <button
+                      onClick={() => setEditTab("preview")}
+                      className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+                        editTab === "preview"
+                          ? "bg-primary-100 text-primary-700"
+                          : "text-text-secondary hover:text-text-primary hover:bg-surface-secondary"
+                      )}
+                    >
+                      <Monitor className="h-3.5 w-3.5" />
+                      Live Preview
+                    </button>
+                  </div>
+                  <p className="text-xs text-text-muted">
+                    Include <code className="bg-surface-secondary px-1 py-0.5 rounded text-xs">{"{unsubscribe_url}"}</code> for the unsubscribe link
+                  </p>
+                </div>
+
+                {editTab === "editor" ? (
+                  <div className="p-4">
+                    <textarea
+                      value={editHtml}
+                      onChange={(e) => setEditHtml(e.target.value)}
+                      className="w-full min-h-[500px] font-mono text-sm border border-surface-tertiary rounded-lg px-3 py-2 text-text-primary bg-surface-secondary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-y"
+                      placeholder="Paste or write your HTML email template here..."
+                      spellCheck={false}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex justify-center p-4 bg-surface-secondary">
+                    <iframe
+                      ref={editIframeRef}
+                      srcDoc={editHtml}
+                      title="Edit preview"
+                      className="w-full max-w-[640px] min-h-[600px] bg-white border border-surface-tertiary rounded-lg"
+                      sandbox="allow-same-origin"
+                      style={{ border: "none" }}
+                      onLoad={() => {
+                        const iframe = editIframeRef.current;
+                        if (iframe?.contentDocument?.body) {
+                          const height = iframe.contentDocument.body.scrollHeight;
+                          iframe.style.height = `${Math.max(600, height + 40)}px`;
+                        }
+                      }}
+                    />
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* Default Preview (non-edit mode) */}
+          {!editMode && (
+            <div className="bg-white rounded-xl border border-surface-tertiary shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-surface-tertiary">
+                <h3 className="text-sm font-medium text-text-primary">
+                  Email Preview
+                </h3>
+              </div>
+              {previewing ? (
+                <div className="flex items-center justify-center py-20">
+                  <Loader2 className="h-6 w-6 animate-spin text-text-muted" />
+                </div>
+              ) : previewHtml ? (
+                <div className="flex justify-center p-4 bg-surface-secondary">
+                  <iframe
+                    ref={iframeRef}
+                    srcDoc={previewHtml}
+                    title="Email preview"
+                    className="w-full max-w-[640px] min-h-[600px] bg-white border border-surface-tertiary rounded-lg"
+                    sandbox="allow-same-origin"
+                    style={{ border: "none" }}
+                    onLoad={() => {
+                      // Auto-resize iframe to content height
+                      const iframe = iframeRef.current;
+                      if (iframe?.contentDocument?.body) {
+                        const height = iframe.contentDocument.body.scrollHeight;
+                        iframe.style.height = `${Math.max(600, height + 40)}px`;
+                      }
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-20 text-text-muted">
+                  <Mail className="h-10 w-10 mb-3 opacity-30" />
+                  <p className="text-sm">
+                    Select a template to preview its rendered HTML
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

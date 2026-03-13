@@ -22,6 +22,7 @@ from .tag import ArticleTag, OutlineTag, Tag
 from .template import ArticleTemplate
 from .content import Article, ArticleRevision, ContentStatus, ContentTone, GeneratedImage, Outline
 from .email_journey_event import EmailJourneyEvent
+from .email_template_override import EmailTemplateOverride
 from .error_log import SystemErrorLog
 from .notification_preferences import NotificationPreferences
 from .refund_blocked_email import RefundBlockedEmail
@@ -108,4 +109,5 @@ __all__ = [
     "NotificationPreferences",
     "RefundBlockedEmail",
     "EmailJourneyEvent",
+    "EmailTemplateOverride",
 ]

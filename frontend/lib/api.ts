@@ -1359,6 +1359,21 @@ export const api = {
           url: "/admin/emails/send-test",
           data,
         }),
+      getOverrides: () =>
+        apiRequest<{ overrides: EmailTemplateOverride[] }>({
+          url: "/admin/emails/overrides",
+        }),
+      saveOverride: (email_key: string, data: { subject?: string | null; html?: string | null }) =>
+        apiRequest<EmailTemplateOverride>({
+          method: "PUT",
+          url: `/admin/emails/overrides/${email_key}`,
+          data,
+        }),
+      deleteOverride: (email_key: string) =>
+        apiRequest<{ deleted: boolean }>({
+          method: "DELETE",
+          url: `/admin/emails/overrides/${email_key}`,
+        }),
     },
   },
 
@@ -3650,6 +3665,14 @@ export interface AdminBlogPostUpdate {
   category_id?: string;
   tag_ids?: string[];
   schema_faq?: Record<string, unknown>;
+}
+
+// Email Template Overrides
+export interface EmailTemplateOverride {
+  email_key: string;
+  subject: string | null;
+  html: string | null;
+  updated_at: string | null;
 }
 
 // Article Templates

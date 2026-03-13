@@ -14,6 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adapters.email.journey_templates import JourneyTemplates
+from adapters.email.template_resolver import resolve_template
 from infrastructure.config.settings import get_settings
 from infrastructure.database import async_session_maker
 from infrastructure.database.models.email_journey_event import EmailJourneyEvent
@@ -246,6 +247,9 @@ class EmailJourneyWorker:
                 user.id,
             )
             return False
+
+        # Check for DB template overrides
+        html_body, subject = await resolve_template(db, base_key, html_body, subject)
 
         # Replace unsubscribe placeholder with actual URL
         # Lazy import — module may not exist yet
