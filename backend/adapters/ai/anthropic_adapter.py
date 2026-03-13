@@ -721,7 +721,28 @@ class AnthropicContentService:
         elif "```" in response_text:
             response_text = response_text.split("```")[1].split("```")[0]
 
-        data = json.loads(response_text.strip())
+        response_text = response_text.strip()
+
+        try:
+            data = json.loads(response_text)
+        except json.JSONDecodeError:
+            # AI often produces unescaped newlines inside JSON string values.
+            # Fall back to regex extraction for each platform key.
+            import re
+
+            data = {}
+            for key in ("twitter", "linkedin", "facebook", "instagram"):
+                # Match "key": "value" allowing for multiline values
+                pattern = rf'"{key}"\s*:\s*"((?:[^"\\]|\\.)*)"'
+                match = re.search(pattern, response_text, re.DOTALL)
+                if match:
+                    # Unescape the matched value
+                    raw = match.group(1)
+                    data[key] = raw.replace("\\n", "\n").replace('\\"', '"')
+
+            if not data:
+                logger.error("Failed to parse social posts JSON: %s", response_text[:500])
+                raise ValueError("Failed to parse AI response as JSON")
 
         return {
             "twitter": data.get("twitter", ""),
