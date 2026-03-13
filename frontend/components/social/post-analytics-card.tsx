@@ -51,14 +51,14 @@ function MetricCard({ icon, label, value, subValue, trend, className }: MetricCa
 }
 
 export function PostAnalyticsCard({ analytics, className }: PostAnalyticsCardProps) {
-  // Aggregate analytics from all platforms
-  const totalLikes = analytics.reduce((sum, a) => sum + a.likes, 0);
-  const totalComments = analytics.reduce((sum, a) => sum + a.comments, 0);
-  const totalShares = analytics.reduce((sum, a) => sum + a.shares, 0);
-  const totalImpressions = analytics.reduce((sum, a) => sum + a.impressions, 0);
+  // Aggregate analytics from all platforms (fields may be undefined for fresh posts)
+  const totalLikes = analytics.reduce((sum, a) => sum + (a.likes ?? 0), 0);
+  const totalComments = analytics.reduce((sum, a) => sum + (a.comments ?? 0), 0);
+  const totalShares = analytics.reduce((sum, a) => sum + (a.shares ?? 0), 0);
+  const totalImpressions = analytics.reduce((sum, a) => sum + (a.impressions ?? 0), 0);
   const avgEngagementRate =
     analytics.length > 0
-      ? analytics.reduce((sum, a) => sum + a.engagement_rate, 0) / analytics.length
+      ? analytics.reduce((sum, a) => sum + (a.engagement_rate ?? 0), 0) / analytics.length
       : 0;
 
   if (analytics.length === 0) {
@@ -124,22 +124,22 @@ export function PostAnalyticsCard({ analytics, className }: PostAnalyticsCardPro
               <div className="flex items-center gap-6 text-sm text-text-secondary">
                 <div className="flex items-center gap-1">
                   <Heart className="h-4 w-4" />
-                  <span>{platformAnalytics.likes}</span>
+                  <span>{platformAnalytics.likes ?? 0}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <MessageCircle className="h-4 w-4" />
-                  <span>{platformAnalytics.comments}</span>
+                  <span>{platformAnalytics.comments ?? 0}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Share2 className="h-4 w-4" />
-                  <span>{platformAnalytics.shares}</span>
+                  <span>{platformAnalytics.shares ?? 0}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Eye className="h-4 w-4" />
-                  <span>{platformAnalytics.impressions}</span>
+                  <span>{platformAnalytics.impressions ?? 0}</span>
                 </div>
                 <div className="font-medium text-primary-500">
-                  {platformAnalytics.engagement_rate.toFixed(2)}%
+                  {(platformAnalytics.engagement_rate ?? 0).toFixed(2)}%
                 </div>
               </div>
             </div>
