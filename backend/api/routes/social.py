@@ -286,15 +286,18 @@ async def initiate_connection(
         else:
             redirect_uri = settings.facebook_redirect_uri
 
-        params = urlencode(
-            {
-                "client_id": settings.facebook_app_id,
-                "redirect_uri": redirect_uri,
-                "state": state,
-                "scope": scope,
-                "response_type": "code",
-            }
-        )
+        oauth_params = {
+            "client_id": settings.facebook_app_id,
+            "redirect_uri": redirect_uri,
+            "state": state,
+            "scope": scope,
+            "response_type": "code",
+            # Force Facebook to re-show the permissions dialog so users
+            # can grant Instagram-specific scopes even if they already
+            # authorized the app for Facebook.
+            "auth_type": "rerequest",
+        }
+        params = urlencode(oauth_params)
         authorization_url = f"https://www.facebook.com/v21.0/dialog/oauth?{params}"
 
     elif platform == "twitter":
