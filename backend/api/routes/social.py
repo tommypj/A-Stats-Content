@@ -575,10 +575,24 @@ async def _facebook_exchange_and_profile(code: str, platform: str = "facebook") 
             access_token = short_token
             expires_in = token_data.get("expires_in", 3600)
 
-        # Step 3: Get user's Pages (we store Page access tokens for posting)
+        # Debug: log what permissions this token actually has
+        perm_resp = await client.get(
+            "https://graph.facebook.com/v21.0/me/permissions",
+            params={"access_token": access_token},
+        )
+        if perm_resp.status_code == 200:
+            perms = perm_resp.json().get("data", [])
+            logger.info("OAuth granted permissions: %s", perms)
+        else:
+            logger.warning("Failed to fetch permissions: %s", perm_resp.text)
+
+        # Step 3: Get user's Pages with instagram_business_account in one call
         pages_resp = await client.get(
             "https://graph.facebook.com/v21.0/me/accounts",
-            params={"access_token": access_token},
+            params={
+                "access_token": access_token,
+                "fields": "id,name,access_token,instagram_business_account",
+            },
         )
 
         if pages_resp.status_code != 200:
@@ -587,11 +601,8 @@ async def _facebook_exchange_and_profile(code: str, platform: str = "facebook") 
 
         pages_data = pages_resp.json()
         pages = pages_data.get("data", [])
-        logger.info(
-            "Facebook pages found: %d — %s",
-            len(pages),
-            [(p.get("id"), p.get("name")) for p in pages],
-        )
+        # Log full response for debugging
+        logger.info("Facebook pages response: %s", pages_resp.text[:1000])
 
         if not pages:
             raise ValueError("No Facebook Pages found for this account")
@@ -604,23 +615,12 @@ async def _facebook_exchange_and_profile(code: str, platform: str = "facebook") 
                 if not page_token or not page_id:
                     continue
 
-                ig_resp = await client.get(
-                    f"https://graph.facebook.com/v21.0/{page_id}",
-                    params={
-                        "fields": "instagram_business_account",
-                        "access_token": page_token,
-                    },
-                )
+                ig_account = page.get("instagram_business_account")
                 logger.info(
-                    "IG lookup for page %s (%s): status=%d body=%s",
-                    page_id, page.get("name"), ig_resp.status_code,
-                    ig_resp.text[:300],
+                    "IG on page %s (%s): %s",
+                    page_id, page.get("name"), ig_account,
                 )
 
-                if ig_resp.status_code != 200:
-                    continue
-
-                ig_account = ig_resp.json().get("instagram_business_account")
                 if not ig_account or not ig_account.get("id"):
                     continue
 
