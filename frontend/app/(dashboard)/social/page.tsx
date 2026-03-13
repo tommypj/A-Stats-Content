@@ -80,6 +80,13 @@ export default function SocialDashboard() {
     );
   }, [upcomingData]);
 
+  const isThisWeek = (date: string) => {
+    const postDate = new Date(date);
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    return postDate >= weekAgo && postDate <= now;
+  };
+
   const stats = useMemo(() => {
     const scheduled = upcomingPosts.length;
     const postedThisWeek = (recentPostedData?.items ?? []).filter(
@@ -91,13 +98,6 @@ export default function SocialDashboard() {
       totalPosted: recentPostedData?.total ?? 0,
     };
   }, [upcomingPosts, recentPostedData]);
-
-  const isThisWeek = (date: string) => {
-    const postDate = new Date(date);
-    const now = new Date();
-    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    return postDate >= weekAgo && postDate <= now;
-  };
 
   const getPlatformIcon = (platform: string) => {
     switch (platform) {
