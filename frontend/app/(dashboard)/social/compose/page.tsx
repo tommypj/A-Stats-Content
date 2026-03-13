@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, SocialAccount, SocialPlatform, SocialPostsData, parseApiError } from "@/lib/api";
+import { api, SocialAccount, SocialPlatform, SocialPostsData, GeneratedImage, parseApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PlatformSelector } from "@/components/social/platform-selector";
@@ -159,12 +159,27 @@ export default function ComposePage() {
     setSelectedAccountIds(connectedIds);
   }, [accounts, accountsInitialised]);
 
-  // --- Handle article selection: generate posts + attach image ---
+  // --- React Query: fetch article images when article is selected ---
+
+  const { data: articleImagesData } = useQuery({
+    queryKey: ["images", "article", selectedArticleId],
+    queryFn: () => api.images.list({ article_id: selectedArticleId, page_size: 20 }),
+    enabled: !!selectedArticleId,
+    staleTime: 30_000,
+  });
+
+  const articleImages = useMemo(
+    () => (articleImagesData?.items ?? []).filter((img) => img.status === "completed" && img.url),
+    [articleImagesData]
+  );
+
+  // --- Handle article selection: generate posts ---
 
   const handleArticleSelect = async (articleId: string) => {
     setSelectedArticleId(articleId);
     setGeneratedPosts(null);
     setArticleImageAttached(false);
+    setMediaItems([]);
 
     if (!articleId) return;
 
@@ -175,7 +190,6 @@ export default function ComposePage() {
     setGenerating(true);
     setError(null);
     try {
-      // Try to load existing social posts first, generate if empty
       let posts: SocialPostsData;
       const existing = article.social_posts;
       if (existing && (existing.twitter?.text || existing.linkedin?.text || existing.facebook?.text)) {
@@ -187,7 +201,6 @@ export default function ComposePage() {
       }
       setGeneratedPosts(posts);
 
-      // Set the first available platform's content into the editor
       const firstPlatform = (["facebook", "twitter", "linkedin", "instagram"] as SocialPlatform[])
         .find((p) => posts[p]?.text);
       if (firstPlatform) {
@@ -201,24 +214,29 @@ export default function ComposePage() {
     } finally {
       setGenerating(false);
     }
+  };
 
-    // Attach featured image if available
-    if (article.featured_image_id) {
-      try {
-        const image = await api.images.get(article.featured_image_id);
-        if (image.url && image.status === "completed") {
-          setMediaItems([{
-            previewUrl: image.url,
-            remoteUrl: image.url,
-            uploading: false,
-            error: null,
-          }]);
-          setArticleImageAttached(true);
-        }
-      } catch {
-        // Image fetch failed — not critical
-      }
+  const handleSelectArticleImage = (image: GeneratedImage) => {
+    // Check if this image is already attached
+    if (mediaItems.some((item) => item.remoteUrl === image.url)) {
+      toast.info("This image is already attached");
+      return;
     }
+    if (mediaItems.length >= 4) {
+      toast.warning("Maximum 4 images allowed");
+      return;
+    }
+    setMediaItems((prev) => [
+      ...prev,
+      {
+        previewUrl: image.url,
+        remoteUrl: image.url,
+        uploading: false,
+        error: null,
+      },
+    ]);
+    setArticleImageAttached(true);
+    toast.success("Image attached to post");
   };
 
   // Switch content when platform tab changes (only in article mode)
@@ -516,11 +534,57 @@ export default function ComposePage() {
                   </span>
                 </div>
               )}
-              {selectedArticle && articleImageAttached && (
-                <div className="flex items-center gap-2 mt-2 text-sm text-green-600">
-                  <ImageIcon className="h-4 w-4" />
-                  Featured image attached
+
+              {/* Article Image Picker */}
+              {selectedArticleId && articleImages.length > 0 && (
+                <div className="mt-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <ImageIcon className="h-4 w-4 text-text-secondary" />
+                    <h3 className="text-sm font-medium text-text-primary">
+                      Select an Image ({articleImages.length} available)
+                    </h3>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    {articleImages.map((image) => {
+                      const isSelected = mediaItems.some((item) => item.remoteUrl === image.url);
+                      return (
+                        <button
+                          key={image.id}
+                          type="button"
+                          onClick={() => handleSelectArticleImage(image)}
+                          className={`relative group rounded-lg overflow-hidden border-2 transition-all ${
+                            isSelected
+                              ? "border-primary-500 ring-2 ring-primary-500/30"
+                              : "border-surface-tertiary hover:border-primary-300"
+                          }`}
+                        >
+                          <img
+                            src={image.url}
+                            alt={image.alt_text || image.prompt}
+                            className="w-full h-24 object-cover"
+                          />
+                          {isSelected && (
+                            <div className="absolute inset-0 bg-primary-500/20 flex items-center justify-center">
+                              <CheckCircle className="h-6 w-6 text-primary-500 drop-shadow" />
+                            </div>
+                          )}
+                          {!isSelected && (
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                              <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                                Select
+                              </span>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
+              )}
+              {selectedArticleId && articleImages.length === 0 && !generating && (
+                <p className="mt-3 text-xs text-text-tertiary">
+                  No generated images found for this article. You can upload images manually below.
+                </p>
               )}
             </Card>
 

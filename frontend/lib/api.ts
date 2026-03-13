@@ -595,7 +595,7 @@ export const api = {
 
   // Images
   images: {
-    list: (params?: { page?: number; page_size?: number; project_id?: string; prompt?: string; style?: string }) =>
+    list: (params?: { page?: number; page_size?: number; project_id?: string; article_id?: string; prompt?: string; style?: string }) =>
       apiRequest<{ items: GeneratedImage[]; total: number }>({
         url: "/images",
         params,
