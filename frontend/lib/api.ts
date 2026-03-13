@@ -74,11 +74,12 @@ export const apiClient: AxiosInstance = axios.create({
  */
 export function getImageUrl(url: string | null | undefined): string {
   if (!url) return "";
-  // Already a full URL
+  // Already a full URL (e.g. Replicate delivery URLs)
   if (url.startsWith("http://") || url.startsWith("https://")) return url;
-  // Relative path — prepend API base URL
+  // Relative path — prepend API base URL + /uploads/ (backend serves static files there)
   const base = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/api\/v1\/?$/, "");
-  return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
+  const path = url.startsWith("/") ? url : `/uploads/${url}`;
+  return `${base}${path}`;
 }
 
 /**

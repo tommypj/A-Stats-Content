@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, SocialAccount, SocialPlatform, SocialPostsData, GeneratedImage, parseApiError } from "@/lib/api";
+import { api, SocialAccount, SocialPlatform, SocialPostsData, GeneratedImage, parseApiError, getImageUrl } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PlatformSelector } from "@/components/social/platform-selector";
@@ -218,7 +218,8 @@ export default function ComposePage() {
 
   const handleSelectArticleImage = (image: GeneratedImage) => {
     // Check if this image is already attached
-    if (mediaItems.some((item) => item.remoteUrl === image.url)) {
+    const resolvedUrl = getImageUrl(image.local_path || image.url);
+    if (mediaItems.some((item) => item.remoteUrl === resolvedUrl)) {
       toast.info("This image is already attached");
       return;
     }
@@ -229,8 +230,8 @@ export default function ComposePage() {
     setMediaItems((prev) => [
       ...prev,
       {
-        previewUrl: image.url,
-        remoteUrl: image.url,
+        previewUrl: resolvedUrl,
+        remoteUrl: resolvedUrl,
         uploading: false,
         error: null,
       },
@@ -546,7 +547,8 @@ export default function ComposePage() {
                   </div>
                   <div className="grid grid-cols-3 gap-3">
                     {articleImages.map((image) => {
-                      const isSelected = mediaItems.some((item) => item.remoteUrl === image.url);
+                      const resolvedUrl = getImageUrl(image.local_path || image.url);
+                      const isSelected = mediaItems.some((item) => item.remoteUrl === resolvedUrl);
                       return (
                         <button
                           key={image.id}
@@ -559,7 +561,7 @@ export default function ComposePage() {
                           }`}
                         >
                           <img
-                            src={image.url}
+                            src={resolvedUrl}
                             alt={image.alt_text || image.prompt}
                             className="w-full h-24 object-cover"
                           />
