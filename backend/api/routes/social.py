@@ -277,10 +277,19 @@ async def initiate_connection(
         else:
             scope = "public_profile,pages_show_list,pages_read_engagement,pages_manage_posts"
 
+        # Instagram uses the same Facebook OAuth dialog but must redirect back
+        # to /social/instagram/callback so the platform mismatch guard (SM-06) passes.
+        if platform == "instagram":
+            redirect_uri = settings.facebook_redirect_uri.replace(
+                "/social/facebook/callback", "/social/instagram/callback"
+            )
+        else:
+            redirect_uri = settings.facebook_redirect_uri
+
         params = urlencode(
             {
                 "client_id": settings.facebook_app_id,
-                "redirect_uri": settings.facebook_redirect_uri,
+                "redirect_uri": redirect_uri,
                 "state": state,
                 "scope": scope,
                 "response_type": "code",
@@ -417,7 +426,7 @@ async def oauth_callback(
         # Instagram business accounts authenticate through the Facebook Graph API,
         # so the token exchange flow is identical for both platforms.
         try:
-            tokens, profile = await _facebook_exchange_and_profile(code)
+            tokens, profile = await _facebook_exchange_and_profile(code, platform=platform)
         except (httpx.HTTPError, ValueError, KeyError) as e:
             logger.warning("Facebook/Instagram OAuth exchange failed: %s", e)
             return RedirectResponse(
@@ -508,11 +517,19 @@ async def oauth_callback(
 # SM-40: TODO: This helper should only raise ValueError/httpx.HTTPError (not HTTPException)
 # so that the route handler controls the HTTP response. Any HTTPException added here
 # would bypass FastAPI's exception handling if caught by the caller's generic except clause.
-async def _facebook_exchange_and_profile(code: str) -> tuple[dict, dict]:
+async def _facebook_exchange_and_profile(code: str, platform: str = "facebook") -> tuple[dict, dict]:
     """
     Exchange Facebook OAuth code for a long-lived page access token
     and fetch the user's Facebook Page profile.
     """
+    # redirect_uri must match exactly what was sent in the authorization request
+    if platform == "instagram":
+        redirect_uri = settings.facebook_redirect_uri.replace(
+            "/social/facebook/callback", "/social/instagram/callback"
+        )
+    else:
+        redirect_uri = settings.facebook_redirect_uri
+
     async with httpx.AsyncClient(timeout=15.0) as client:
         # Step 1: Exchange code for short-lived user access token
         token_resp = await client.get(
@@ -520,7 +537,7 @@ async def _facebook_exchange_and_profile(code: str) -> tuple[dict, dict]:
             params={
                 "client_id": settings.facebook_app_id,
                 "client_secret": settings.facebook_app_secret,
-                "redirect_uri": settings.facebook_redirect_uri,
+                "redirect_uri": redirect_uri,
                 "code": code,
             },
         )
@@ -579,15 +596,61 @@ async def _facebook_exchange_and_profile(code: str) -> tuple[dict, dict]:
                 page_id = page.get("id")
                 if not page_token or not page_id:
                     raise ValueError("Facebook page response missing 'access_token' or 'id'")
+
+                tokens = {
+                    "access_token": page_token,
+                    "expires_at": None,  # Page tokens don't expire
+                }
+
+                # For Instagram: resolve the linked IG Business Account
+                if platform == "instagram":
+                    ig_resp = await client.get(
+                        f"https://graph.facebook.com/v21.0/{page_id}",
+                        params={
+                            "fields": "instagram_business_account",
+                            "access_token": page_token,
+                        },
+                    )
+                    ig_account = None
+                    if ig_resp.status_code == 200:
+                        ig_account = ig_resp.json().get("instagram_business_account")
+                    if not ig_account or not ig_account.get("id"):
+                        raise ValueError(
+                            "No Instagram Business Account found. "
+                            "Ensure your Facebook Page has a linked Instagram Business Account."
+                        )
+                    ig_id = ig_account["id"]
+                    # Fetch IG profile details
+                    ig_profile_resp = await client.get(
+                        f"https://graph.facebook.com/v21.0/{ig_id}",
+                        params={
+                            "fields": "id,name,username,profile_picture_url",
+                            "access_token": page_token,
+                        },
+                    )
+                    if ig_profile_resp.status_code == 200:
+                        ig_data = ig_profile_resp.json()
+                        profile = {
+                            "id": ig_id,
+                            "username": ig_data.get("username", ""),
+                            "display_name": ig_data.get("name", ig_data.get("username", "Instagram Business")),
+                            "profile_image": ig_data.get("profile_picture_url"),
+                        }
+                    else:
+                        profile = {
+                            "id": ig_id,
+                            "username": page.get("name", ""),
+                            "display_name": page.get("name", "Instagram Business"),
+                            "profile_image": None,
+                        }
+                    return tokens, profile
+
+                # For Facebook: use the Page profile
                 profile = {
                     "id": page_id,
                     "username": page.get("name", ""),
                     "display_name": page.get("name", ""),
                     "profile_image": f"https://graph.facebook.com/v21.0/{page_id}/picture?type=small",
-                }
-                tokens = {
-                    "access_token": page_token,
-                    "expires_at": None,  # Page tokens don't expire
                 }
                 return tokens, profile
 
