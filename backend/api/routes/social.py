@@ -260,7 +260,8 @@ async def initiate_connection(
     # (Twitter needs code_verifier stored alongside state for PKCE)
     state = secrets.token_urlsafe(32)
 
-    if platform in ("facebook", "instagram"):
+    if platform == "instagram":
+        # Instagram has its own OAuth flow via instagram.com (not facebook.com)
         if not settings.facebook_app_id or not settings.facebook_app_secret:
             raise HTTPException(
                 status_code=status.HTTP_501_NOT_IMPLEMENTED,
@@ -268,36 +269,38 @@ async def initiate_connection(
             )
         await _store_oauth_state(state, str(current_user.id), platform=platform)
 
-        # Instagram business accounts need additional scopes to access the
-        # linked IG account via the Facebook Graph API.
-        if platform == "instagram":
-            scope = (
-                "instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement"
-            )
-        else:
-            scope = "public_profile,pages_show_list,pages_read_engagement,pages_manage_posts"
+        redirect_uri = settings.facebook_redirect_uri.replace(
+            "/social/facebook/callback", "/social/instagram/callback"
+        )
+        params = urlencode(
+            {
+                "client_id": settings.facebook_app_id,
+                "redirect_uri": redirect_uri,
+                "state": state,
+                "scope": "instagram_basic,instagram_content_publish",
+                "response_type": "code",
+            }
+        )
+        authorization_url = f"https://www.instagram.com/oauth/authorize?{params}"
 
-        # Instagram uses the same Facebook OAuth dialog but must redirect back
-        # to /social/instagram/callback so the platform mismatch guard (SM-06) passes.
-        if platform == "instagram":
-            redirect_uri = settings.facebook_redirect_uri.replace(
-                "/social/facebook/callback", "/social/instagram/callback"
+    elif platform == "facebook":
+        if not settings.facebook_app_id or not settings.facebook_app_secret:
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail="Facebook/Instagram integration is not configured. Please set FACEBOOK_APP_ID and FACEBOOK_APP_SECRET.",
             )
-        else:
-            redirect_uri = settings.facebook_redirect_uri
+        await _store_oauth_state(state, str(current_user.id), platform=platform)
 
-        oauth_params = {
-            "client_id": settings.facebook_app_id,
-            "redirect_uri": redirect_uri,
-            "state": state,
-            "scope": scope,
-            "response_type": "code",
-            # Force Facebook to re-show the permissions dialog so users
-            # can grant Instagram-specific scopes even if they already
-            # authorized the app for Facebook.
-            "auth_type": "rerequest",
-        }
-        params = urlencode(oauth_params)
+        redirect_uri = settings.facebook_redirect_uri
+        params = urlencode(
+            {
+                "client_id": settings.facebook_app_id,
+                "redirect_uri": redirect_uri,
+                "state": state,
+                "scope": "public_profile,pages_show_list,pages_read_engagement,pages_manage_posts",
+                "response_type": "code",
+            }
+        )
         authorization_url = f"https://www.facebook.com/v21.0/dialog/oauth?{params}"
 
     elif platform == "twitter":
@@ -425,13 +428,21 @@ async def oauth_callback(
     if not user:
         return RedirectResponse(url=f"{frontend_callback}?error=user_not_found&platform={platform}")
 
-    if platform in ("facebook", "instagram"):
-        # Instagram business accounts authenticate through the Facebook Graph API,
-        # so the token exchange flow is identical for both platforms.
+    if platform == "instagram":
+        # Instagram Login uses its own token exchange endpoints
         try:
-            tokens, profile = await _facebook_exchange_and_profile(code, platform=platform)
+            tokens, profile = await _instagram_exchange_and_profile(code)
         except (httpx.HTTPError, ValueError, KeyError) as e:
-            logger.warning("Facebook/Instagram OAuth exchange failed: %s", e)
+            logger.warning("Instagram OAuth exchange failed: %s", e)
+            return RedirectResponse(
+                url=f"{frontend_callback}?error=token_exchange_failed&platform={platform}"
+            )
+
+    elif platform == "facebook":
+        try:
+            tokens, profile = await _facebook_exchange_and_profile(code, platform="facebook")
+        except (httpx.HTTPError, ValueError, KeyError) as e:
+            logger.warning("Facebook OAuth exchange failed: %s", e)
             return RedirectResponse(
                 url=f"{frontend_callback}?error=token_exchange_failed&platform={platform}"
             )
@@ -525,13 +536,7 @@ async def _facebook_exchange_and_profile(code: str, platform: str = "facebook") 
     Exchange Facebook OAuth code for a long-lived page access token
     and fetch the user's Facebook Page profile.
     """
-    # redirect_uri must match exactly what was sent in the authorization request
-    if platform == "instagram":
-        redirect_uri = settings.facebook_redirect_uri.replace(
-            "/social/facebook/callback", "/social/instagram/callback"
-        )
-    else:
-        redirect_uri = settings.facebook_redirect_uri
+    redirect_uri = settings.facebook_redirect_uri
 
     async with httpx.AsyncClient(timeout=15.0) as client:
         # Step 1: Exchange code for short-lived user access token
@@ -604,51 +609,6 @@ async def _facebook_exchange_and_profile(code: str, platform: str = "facebook") 
                     "access_token": page_token,
                     "expires_at": None,  # Page tokens don't expire
                 }
-
-                # For Instagram: resolve the linked IG Business Account
-                if platform == "instagram":
-                    ig_resp = await client.get(
-                        f"https://graph.facebook.com/v21.0/{page_id}",
-                        params={
-                            "fields": "instagram_business_account",
-                            "access_token": page_token,
-                        },
-                    )
-                    ig_account = None
-                    if ig_resp.status_code == 200:
-                        ig_account = ig_resp.json().get("instagram_business_account")
-                    if not ig_account or not ig_account.get("id"):
-                        raise ValueError(
-                            "No Instagram Business Account found. "
-                            "Ensure your Facebook Page has a linked Instagram Business Account."
-                        )
-                    ig_id = ig_account["id"]
-                    # Fetch IG profile details
-                    ig_profile_resp = await client.get(
-                        f"https://graph.facebook.com/v21.0/{ig_id}",
-                        params={
-                            "fields": "id,name,username,profile_picture_url",
-                            "access_token": page_token,
-                        },
-                    )
-                    if ig_profile_resp.status_code == 200:
-                        ig_data = ig_profile_resp.json()
-                        profile = {
-                            "id": ig_id,
-                            "username": ig_data.get("username", ""),
-                            "display_name": ig_data.get("name", ig_data.get("username", "Instagram Business")),
-                            "profile_image": ig_data.get("profile_picture_url"),
-                        }
-                    else:
-                        profile = {
-                            "id": ig_id,
-                            "username": page.get("name", ""),
-                            "display_name": page.get("name", "Instagram Business"),
-                            "profile_image": None,
-                        }
-                    return tokens, profile
-
-                # For Facebook: use the Page profile
                 profile = {
                     "id": page_id,
                     "username": page.get("name", ""),
@@ -692,6 +652,89 @@ async def _facebook_exchange_and_profile(code: str, platform: str = "facebook") 
             "username": me_data.get("name", ""),
             "display_name": me_data.get("name", ""),
             "profile_image": picture_url,
+        }
+        return tokens, profile
+
+
+async def _instagram_exchange_and_profile(code: str) -> tuple[dict, dict]:
+    """
+    Exchange Instagram OAuth code for a long-lived token and fetch IG profile.
+
+    Uses Instagram Login endpoints (api.instagram.com / graph.instagram.com)
+    instead of Facebook's Graph API.
+    """
+    redirect_uri = settings.facebook_redirect_uri.replace(
+        "/social/facebook/callback", "/social/instagram/callback"
+    )
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        # Step 1: Exchange code for short-lived token via Instagram's token endpoint
+        token_resp = await client.post(
+            "https://api.instagram.com/oauth/access_token",
+            data={
+                "client_id": settings.facebook_app_id,
+                "client_secret": settings.facebook_app_secret,
+                "grant_type": "authorization_code",
+                "redirect_uri": redirect_uri,
+                "code": code,
+            },
+        )
+        if token_resp.status_code != 200:
+            logger.warning("Instagram token exchange failed: %s", token_resp.text)
+            raise ValueError(f"Instagram token exchange failed: {token_resp.text}")
+
+        token_data = token_resp.json()
+        short_token = token_data.get("access_token")
+        ig_user_id = str(token_data.get("user_id", ""))
+        if not short_token:
+            raise ValueError("Instagram token response missing 'access_token'")
+
+        # Step 2: Exchange for long-lived token (60 days)
+        long_resp = await client.get(
+            "https://graph.instagram.com/access_token",
+            params={
+                "grant_type": "ig_exchange_token",
+                "client_secret": settings.facebook_app_secret,
+                "access_token": short_token,
+            },
+        )
+        if long_resp.status_code == 200:
+            long_data = long_resp.json()
+            access_token = long_data.get("access_token", short_token)
+        else:
+            logger.warning("Failed to get long-lived IG token, using short-lived: %s", long_resp.text)
+            access_token = short_token
+
+        # Step 3: Fetch profile info
+        profile_resp = await client.get(
+            "https://graph.instagram.com/v21.0/me",
+            params={
+                "fields": "user_id,username,name,profile_picture_url",
+                "access_token": access_token,
+            },
+        )
+        if profile_resp.status_code == 200:
+            profile_data = profile_resp.json()
+            # user_id from the profile endpoint is the IG Business Account ID
+            ig_id = str(profile_data.get("user_id", ig_user_id))
+            profile = {
+                "id": ig_id,
+                "username": profile_data.get("username", ""),
+                "display_name": profile_data.get("name", profile_data.get("username", "Instagram")),
+                "profile_image": profile_data.get("profile_picture_url"),
+            }
+        else:
+            logger.warning("Instagram profile fetch failed: %s", profile_resp.text)
+            profile = {
+                "id": ig_user_id,
+                "username": "",
+                "display_name": "Instagram",
+                "profile_image": None,
+            }
+
+        tokens = {
+            "access_token": access_token,
+            "expires_at": None,  # Long-lived tokens last 60 days but don't have exact expiry
         }
         return tokens, profile
 
