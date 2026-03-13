@@ -6,7 +6,7 @@ export const metadata: Metadata = {
 };
 
 export default function CookiePolicyPage() {
-  const lastUpdated = "March 10, 2026";
+  const lastUpdated = "March 14, 2026";
 
   return (
     <article className="prose prose-neutral max-w-none">
@@ -64,11 +64,17 @@ export default function CookiePolicyPage() {
                 <td className="p-3">Stores your cookie consent preference (&ldquo;all&rdquo; or &ldquo;necessary&rdquo;)</td>
                 <td className="p-3">Persistent</td>
               </tr>
-              <tr>
+              <tr className="border-b border-surface-tertiary">
                 <td className="p-3 font-mono text-xs">_ga, _ga_*</td>
                 <td className="p-3">Cookie</td>
                 <td className="p-3">Google Analytics — only set if you accept analytics cookies (IP anonymised)</td>
                 <td className="p-3">2 years</td>
+              </tr>
+              <tr>
+                <td className="p-3 font-mono text-xs">ph_*</td>
+                <td className="p-3">Cookie / Local Storage</td>
+                <td className="p-3">PostHog product analytics — only set if you accept analytics cookies</td>
+                <td className="p-3">1 year</td>
               </tr>
             </tbody>
           </table>

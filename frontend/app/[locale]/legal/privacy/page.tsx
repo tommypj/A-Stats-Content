@@ -6,7 +6,7 @@ export const metadata: Metadata = {
 };
 
 export default function PrivacyPolicyPage() {
-  const lastUpdated = "February 28, 2026";
+  const lastUpdated = "March 14, 2026";
 
   return (
     <article className="prose prose-neutral max-w-none">
@@ -35,6 +35,14 @@ export default function PrivacyPolicyPage() {
         <p className="text-text-secondary leading-relaxed mb-4">
           Articles, outlines, images, keywords, and other content you generate or upload are stored
           to provide the service. You retain full ownership of your content.
+        </p>
+        <h3 className="text-base font-semibold text-text-primary mb-2">Social Media Data</h3>
+        <p className="text-text-secondary leading-relaxed mb-4">
+          If you connect social media accounts (Facebook, Instagram, LinkedIn), we store encrypted
+          OAuth access tokens and page tokens to publish content on your behalf. We also store your
+          platform username, display name, and profile image URL for identification within the app.
+          Post content, media URLs, scheduling data, and engagement metrics (likes, comments, shares,
+          impressions) are stored to provide the social publishing and analytics features.
         </p>
         <h3 className="text-base font-semibold text-text-primary mb-2">Usage Data</h3>
         <p className="text-text-secondary leading-relaxed mb-4">
@@ -71,10 +79,17 @@ export default function PrivacyPolicyPage() {
           We share data with third parties only as necessary to operate the service:
         </p>
         <ul className="list-disc pl-5 space-y-2 text-text-secondary">
-          <li><strong>Anthropic</strong> — Your prompts and article context are sent to the Claude API to generate content. Anthropic&apos;s privacy policy governs their data handling.</li>
+          <li><strong>Anthropic</strong> — Article content is generated via the Claude API. Anthropic&apos;s privacy policy governs their data handling.</li>
+          <li><strong>Google (Gemini API)</strong> — SERP research and keyword analysis are processed via Google&apos;s Gemini API.</li>
+          <li><strong>OpenAI</strong> — Content outlines are generated via the GPT API.</li>
           <li><strong>Replicate</strong> — Image generation requests are processed via Replicate&apos;s hosted models.</li>
+          <li><strong>Facebook / Instagram (Meta)</strong> — When you connect a Facebook or Instagram account, we use Meta&apos;s APIs to publish posts and retrieve engagement metrics on your behalf.</li>
+          <li><strong>LinkedIn</strong> — When you connect a LinkedIn account, we use LinkedIn&apos;s API to publish posts on your behalf.</li>
           <li><strong>LemonSqueezy</strong> — Payment processing and subscription management.</li>
-          <li><strong>Resend</strong> — Transactional email delivery.</li>
+          <li><strong>Resend</strong> — Transactional and journey email delivery.</li>
+          <li><strong>PostHog</strong> — Product analytics to understand feature usage (anonymised). Only active if you consent to analytics cookies.</li>
+          <li><strong>Sentry</strong> — Error monitoring to detect and fix bugs. May capture technical context (e.g. stack traces) but not personal content.</li>
+          <li><strong>Google Analytics 4</strong> — Website analytics with anonymised IP. Only active if you consent to analytics cookies.</li>
           <li><strong>Railway / Vercel</strong> — Infrastructure hosting (database, backend, frontend).</li>
         </ul>
       </section>

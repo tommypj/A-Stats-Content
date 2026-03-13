@@ -6,7 +6,7 @@ export const metadata: Metadata = {
 };
 
 export default function TermsOfServicePage() {
-  const lastUpdated = "March 9, 2026";
+  const lastUpdated = "March 14, 2026";
 
   return (
     <article className="prose prose-neutral max-w-none">
@@ -107,7 +107,23 @@ export default function TermsOfServicePage() {
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xl font-semibold text-text-primary mb-3">7. Acceptable Use</h2>
+        <h2 className="text-xl font-semibold text-text-primary mb-3">7. Social Media Publishing</h2>
+        <p className="text-text-secondary leading-relaxed mb-4">
+          The Service allows you to connect third-party social media accounts (Facebook, Instagram,
+          LinkedIn) and publish content to those platforms. By using this feature, you acknowledge and
+          agree that:
+        </p>
+        <ul className="list-disc pl-5 space-y-2 text-text-secondary">
+          <li>You are solely responsible for content published to your social media accounts through the Service, including compliance with each platform&apos;s terms of service and community guidelines.</li>
+          <li>We act as a tool to facilitate publishing on your behalf — we do not review, approve, or endorse the content you publish.</li>
+          <li>You must have the necessary rights and permissions for any content (text, images, links) you publish through the Service.</li>
+          <li>We are not liable for any consequences arising from content published to third-party platforms, including account suspensions, content removals, or violations of platform policies.</li>
+          <li>Social media platform APIs and features may change without notice, which may temporarily affect the Service&apos;s publishing capabilities.</li>
+        </ul>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-xl font-semibold text-text-primary mb-3">8. Acceptable Use</h2>
         <p className="text-text-secondary leading-relaxed mb-3">You agree not to:</p>
         <ul className="list-disc pl-5 space-y-2 text-text-secondary">
           <li>Use the Service to generate illegal, harmful, deceptive, or abusive content</li>
@@ -124,7 +140,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xl font-semibold text-text-primary mb-3">8. Intellectual Property</h2>
+        <h2 className="text-xl font-semibold text-text-primary mb-3">9. Intellectual Property</h2>
         <p className="text-text-secondary leading-relaxed">
           The Service, including its design, software, trademarks, and branding, is owned by A-Stats
           and protected by intellectual property law. Nothing in these Terms transfers any ownership
@@ -133,7 +149,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xl font-semibold text-text-primary mb-3">9. Disclaimer of Warranties</h2>
+        <h2 className="text-xl font-semibold text-text-primary mb-3">10. Disclaimer of Warranties</h2>
         <p className="text-text-secondary leading-relaxed">
           THE SERVICE IS PROVIDED &ldquo;AS IS&rdquo; AND &ldquo;AS AVAILABLE&rdquo; WITHOUT WARRANTY OF ANY KIND.
           WE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING FITNESS FOR A PARTICULAR
@@ -143,7 +159,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xl font-semibold text-text-primary mb-3">10. Limitation of Liability</h2>
+        <h2 className="text-xl font-semibold text-text-primary mb-3">11. Limitation of Liability</h2>
         <p className="text-text-secondary leading-relaxed">
           TO THE MAXIMUM EXTENT PERMITTED BY LAW, A-STATS SHALL NOT BE LIABLE FOR ANY INDIRECT,
           INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR LOSS OF PROFITS OR REVENUES,
@@ -153,7 +169,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xl font-semibold text-text-primary mb-3">11. Termination</h2>
+        <h2 className="text-xl font-semibold text-text-primary mb-3">12. Termination</h2>
         <p className="text-text-secondary leading-relaxed">
           You may cancel your subscription at any time from the billing settings page. We may
           suspend or terminate your account for violations of these Terms, non-payment, or if
@@ -167,7 +183,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xl font-semibold text-text-primary mb-3">12. Changes to Terms</h2>
+        <h2 className="text-xl font-semibold text-text-primary mb-3">13. Changes to Terms</h2>
         <p className="text-text-secondary leading-relaxed">
           We may update these Terms from time to time. Material changes will be communicated at
           least 14 days in advance by email or in-app notice. Continued use of the Service after
@@ -176,7 +192,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xl font-semibold text-text-primary mb-3">13. Governing Law</h2>
+        <h2 className="text-xl font-semibold text-text-primary mb-3">14. Governing Law</h2>
         <p className="text-text-secondary leading-relaxed">
           These Terms are governed by and construed in accordance with the laws of the jurisdiction
           in which A-Stats is incorporated, without regard to conflict of law principles.
@@ -184,7 +200,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xl font-semibold text-text-primary mb-3">14. Contact</h2>
+        <h2 className="text-xl font-semibold text-text-primary mb-3">15. Contact</h2>
         <p className="text-text-secondary leading-relaxed">
           Questions about these Terms? Contact us at{" "}
           <a href="mailto:legal@astats.app" className="text-primary-600 hover:underline">
