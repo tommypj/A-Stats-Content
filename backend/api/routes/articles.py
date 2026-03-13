@@ -273,8 +273,10 @@ def analyze_seo(content: str, keyword: str, title: str, meta_description: str) -
 
 
 @router.post("", response_model=ArticleResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("20/minute")
 async def create_article(
-    request: ArticleCreateRequest,
+    request: Request,
+    body: ArticleCreateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -282,7 +284,7 @@ async def create_article(
     Create a new article manually.
     """
     article_id = str(uuid4())
-    slug = slugify(request.title)
+    slug = slugify(body.title)
 
     # Check slug uniqueness (scoped to project, excluding soft-deleted)
     project_id = getattr(current_user, "current_project_id", None)
@@ -293,8 +295,8 @@ async def create_article(
     if existing.scalar_one_or_none():
         slug = f"{slug}-{article_id[:8]}"
 
-    word_count = len(request.content.split()) if request.content else 0
-    content_html = markdown.markdown(request.content) if request.content else None
+    word_count = len(body.content.split()) if body.content else 0
+    content_html = markdown.markdown(body.content) if body.content else None
 
     project_id = getattr(current_user, "current_project_id", None)
 
@@ -302,25 +304,25 @@ async def create_article(
         id=article_id,
         user_id=current_user.id,
         project_id=project_id,
-        outline_id=request.outline_id,
-        title=request.title,
+        outline_id=body.outline_id,
+        title=body.title,
         slug=slug,
-        keyword=request.keyword,
-        meta_description=request.meta_description,
-        content=request.content,
+        keyword=body.keyword,
+        meta_description=body.meta_description,
+        content=body.content,
         content_html=content_html,
         word_count=word_count,
-        read_time=calculate_read_time(request.content) if request.content else None,
+        read_time=calculate_read_time(body.content) if body.content else None,
         status=ContentStatus.DRAFT.value,
     )
 
     # Run SEO analysis if content exists
-    if request.content:
+    if body.content:
         seo_result = analyze_seo(
-            request.content,
-            request.keyword,
-            request.title,
-            request.meta_description or "",
+            body.content,
+            body.keyword,
+            body.title,
+            body.meta_description or "",
         )
         article.seo_score = seo_result["score"]
         article.seo_analysis = seo_result
@@ -1297,7 +1299,9 @@ async def export_article(
 
 
 @router.post("/bulk-delete", response_model=BulkDeleteResponse)
+@limiter.limit("10/minute")
 async def bulk_delete_articles(
+    request: Request,
     body: BulkDeleteRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -1354,9 +1358,11 @@ async def get_article(
 
 
 @router.put("/{article_id}", response_model=ArticleResponse)
+@limiter.limit("30/minute")
 async def update_article(
+    request: Request,
     article_id: str,
-    request: ArticleUpdateRequest,
+    body: ArticleUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1374,7 +1380,7 @@ async def update_article(
         )
 
     ALLOWED_UPDATE_FIELDS = {"title", "keyword", "meta_description", "content", "status", "planned_date", "auto_publish"}
-    update_data = request.model_dump(exclude_unset=True)
+    update_data = body.model_dump(exclude_unset=True)
 
     # Save a revision before overwriting content (only when content actually changes)
     if "content" in update_data and update_data["content"] != article.content:
@@ -1744,9 +1750,11 @@ async def generate_social_posts(
 
 
 @router.put("/{article_id}/social-posts", response_model=SocialPostsResponse)
+@limiter.limit("30/minute")
 async def update_social_post(
+    request: Request,
     article_id: str,
-    request: SocialPostUpdateRequest,
+    body: SocialPostUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1762,9 +1770,9 @@ async def update_social_post(
         )
 
     social_posts = dict(article.social_posts or {})
-    social_posts[request.platform] = {
-        "text": request.text,
-        "generated_at": (social_posts.get(request.platform, {}) or {}).get("generated_at"),
+    social_posts[body.platform] = {
+        "text": body.text,
+        "generated_at": (social_posts.get(body.platform, {}) or {}).get("generated_at"),
     }
 
     article.social_posts = social_posts
@@ -1860,7 +1868,9 @@ async def get_article_revision(
     "/{article_id}/revisions/{revision_id}/restore",
     response_model=ArticleResponse,
 )
+@limiter.limit("20/minute")
 async def restore_article_revision(
+    request: Request,
     article_id: str,
     revision_id: str,
     current_user: User = Depends(get_current_user),
@@ -2129,7 +2139,9 @@ async def get_aeo_score(
 
 
 @router.post("/{article_id}/aeo-score")
+@limiter.limit("20/minute")
 async def refresh_aeo_score(
+    request: Request,
     article_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

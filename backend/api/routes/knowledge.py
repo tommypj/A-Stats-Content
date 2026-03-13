@@ -419,9 +419,11 @@ async def get_source(
 
 
 @router.put("/sources/{source_id}", response_model=KnowledgeSourceResponse)
+@limiter.limit("30/minute")
 async def update_source(
+    request: Request,
     source_id: str,
-    request: KnowledgeSourceUpdateRequest,
+    body: KnowledgeSourceUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -439,7 +441,7 @@ async def update_source(
             status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge source not found"
         )
 
-    for field, value in request.model_dump(exclude_unset=True).items():
+    for field, value in body.model_dump(exclude_unset=True).items():
         setattr(source, field, value)
 
     await db.commit()
@@ -471,7 +473,9 @@ async def update_source(
 
 
 @router.delete("/sources/{source_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("5/minute")
 async def delete_source(
+    request: Request,
     source_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -745,9 +749,11 @@ async def get_knowledge_stats(
 
 
 @router.post("/sources/{source_id}/reprocess", response_model=ReprocessResponse)
+@limiter.limit("20/minute")
 async def reprocess_source(
+    request: Request,
     source_id: str,
-    request: ReprocessRequest = ReprocessRequest(),
+    body: ReprocessRequest = ReprocessRequest(),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -773,7 +779,7 @@ async def reprocess_source(
             status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge source not found"
         )
 
-    if source.status == SourceStatus.COMPLETED.value and not request.force:
+    if source.status == SourceStatus.COMPLETED.value and not body.force:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Source already processed. Use force=true to reprocess.",

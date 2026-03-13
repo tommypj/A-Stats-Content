@@ -8,12 +8,13 @@ import re
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import and_, func, select
 from sqlalchemy import update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, selectinload
 
+from api.middleware.rate_limit import limiter
 from api.dependencies import require_tier
 from api.deps_project import (
     get_project_by_id,
@@ -97,7 +98,9 @@ async def ensure_unique_slug(db: AsyncSession, slug: str, project_id: str | None
 
 
 @router.post("", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("20/minute")
 async def create_project(
+    request: Request,
     data: ProjectCreate,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -362,7 +365,9 @@ async def get_brand_voice(
 
 
 @router.put("/current/brand-voice", response_model=BrandVoiceSettings)
+@limiter.limit("30/minute")
 async def update_brand_voice(
+    request: Request,
     data: BrandVoiceSettings,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -412,8 +417,10 @@ async def update_brand_voice(
 
 
 @router.post("/switch", response_model=SwitchProjectResponse)
+@limiter.limit("20/minute")
 async def switch_project_by_body(
-    request: SwitchProjectRequest,
+    request: Request,
+    body: SwitchProjectRequest,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
@@ -423,7 +430,7 @@ async def switch_project_by_body(
     Accepts project_id in the request body. Pass null to switch to personal workspace.
     """
     require_tier("starter")(current_user)
-    if request.project_id is None:
+    if body.project_id is None:
         # Switch to personal workspace — find the user's personal project
         personal_result = await db.execute(
             select(Project).where(
@@ -444,15 +451,15 @@ async def switch_project_by_body(
         )
 
     # Verify membership before switching
-    await get_project_member(request.project_id, current_user.id, db)
+    await get_project_member(body.project_id, current_user.id, db)
 
     # Update user's current project
-    current_user.current_project_id = request.project_id
+    current_user.current_project_id = body.project_id
     await db.commit()
 
     return SwitchProjectResponse(
         message="Switched to project successfully",
-        current_project_id=request.project_id,
+        current_project_id=body.project_id,
     )
 
 
@@ -530,7 +537,9 @@ async def get_project(
 
 
 @router.put("/{project_id}", response_model=ProjectResponse)
+@limiter.limit("30/minute")
 async def update_project(
+    request: Request,
     project_id: str,
     data: ProjectUpdate,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -584,7 +593,9 @@ async def update_project(
 
 
 @router.delete("/{project_id}", response_model=ProjectDeleteResponse)
+@limiter.limit("5/minute")
 async def delete_project(
+    request: Request,
     project_id: str,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -698,7 +709,9 @@ async def list_project_members(
 
 
 @router.patch("/{project_id}/members/{member_user_id}", response_model=UpdateMemberRoleResponse)
+@limiter.limit("30/minute")
 async def update_member_role(
+    request: Request,
     project_id: str,
     member_user_id: str,
     data: UpdateMemberRoleRequest,
@@ -751,7 +764,9 @@ async def update_member_role(
 
 
 @router.delete("/{project_id}/members/{member_user_id}", response_model=RemoveMemberResponse)
+@limiter.limit("5/minute")
 async def remove_member(
+    request: Request,
     project_id: str,
     member_user_id: str,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -803,7 +818,9 @@ async def remove_member(
 
 
 @router.post("/{project_id}/leave", response_model=LeaveProjectResponse)
+@limiter.limit("20/minute")
 async def leave_project(
+    request: Request,
     project_id: str,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -830,7 +847,9 @@ async def leave_project(
 
 
 @router.post("/{project_id}/transfer-ownership", response_model=TransferOwnershipResponse)
+@limiter.limit("5/minute")
 async def transfer_ownership(
+    request: Request,
     project_id: str,
     data: TransferOwnershipRequest,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -875,7 +894,9 @@ async def transfer_ownership(
 
 
 @router.post("/{project_id}/switch", response_model=SwitchProjectResponse)
+@limiter.limit("20/minute")
 async def switch_project(
+    request: Request,
     project_id: str,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],

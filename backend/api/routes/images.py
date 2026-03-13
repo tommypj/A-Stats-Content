@@ -345,7 +345,9 @@ async def list_images(
 
 
 @router.post("/bulk-delete", response_model=BulkDeleteResponse)
+@limiter.limit("10/minute")
 async def bulk_delete_images(
+    request: Request,
     body: BulkDeleteRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -416,7 +418,9 @@ async def get_image(
 
 
 @router.delete("/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("5/minute")
 async def delete_image(
+    request: Request,
     image_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -461,9 +465,11 @@ async def delete_image(
 
 
 @router.post("/{image_id}/set-featured", response_model=ImageResponse)
+@limiter.limit("20/minute")
 async def set_featured_image(
+    request: Request,
     image_id: str,
-    request: ImageSetFeaturedRequest,
+    body: ImageSetFeaturedRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -494,12 +500,12 @@ async def set_featured_image(
     # Verify article exists and belongs to user or project
     if current_user.current_project_id:
         article_query = select(Article).where(
-            Article.id == request.article_id,
+            Article.id == body.article_id,
             Article.project_id == current_user.current_project_id,
         )
     else:
         article_query = select(Article).where(
-            Article.id == request.article_id,
+            Article.id == body.article_id,
             Article.user_id == current_user.id,
         )
     article_result = await db.execute(article_query)
@@ -516,7 +522,7 @@ async def set_featured_image(
 
     # If image doesn't have article_id set, set it
     if not image.article_id:
-        image.article_id = request.article_id
+        image.article_id = body.article_id
 
     await db.commit()
     await db.refresh(image)

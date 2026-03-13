@@ -438,7 +438,9 @@ async def export_outline(
 
 
 @router.post("/bulk-delete", response_model=BulkDeleteResponse)
+@limiter.limit("10/minute")
 async def bulk_delete_outlines(
+    request: Request,
     body: BulkDeleteRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -495,9 +497,11 @@ async def get_outline(
 
 
 @router.put("/{outline_id}", response_model=OutlineResponse)
+@limiter.limit("30/minute")
 async def update_outline(
+    request: Request,
     outline_id: str,
-    request: OutlineUpdateRequest,
+    body: OutlineUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -525,7 +529,7 @@ async def update_outline(
         "status",
     }
     # Update fields
-    update_data = request.model_dump(exclude_unset=True)
+    update_data = body.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         if field not in ALLOWED_UPDATE_FIELDS:
             continue

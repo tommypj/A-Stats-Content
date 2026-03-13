@@ -187,7 +187,9 @@ async def list_project_invitations(
     response_model=ProjectInvitationResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit("20/minute")
 async def create_project_invitation(
+    request: Request,
     project_id: str,
     invitation: ProjectInvitationCreate,
     project: Project = Depends(require_project_admin),
@@ -320,7 +322,9 @@ async def create_project_invitation(
 
 
 @router.delete("/{project_id}/invitations/{invitation_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("5/minute")
 async def revoke_project_invitation(
+    request: Request,
     project_id: str,
     invitation_id: str,
     project: Project = Depends(require_project_admin),
@@ -369,7 +373,9 @@ async def revoke_project_invitation(
 @router.post(
     "/{project_id}/invitations/{invitation_id}/resend", response_model=ProjectInvitationResponse
 )
+@limiter.limit("20/minute")
 async def resend_project_invitation(
+    request: Request,
     project_id: str,
     invitation_id: str,
     project: Project = Depends(require_project_admin),
