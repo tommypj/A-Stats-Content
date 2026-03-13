@@ -581,75 +581,102 @@ async def _facebook_exchange_and_profile(code: str, platform: str = "facebook") 
             params={"access_token": access_token},
         )
 
-        if pages_resp.status_code == 200:
-            pages_data = pages_resp.json()
-            pages = pages_data.get("data", [])
+        if pages_resp.status_code != 200:
+            logger.warning("Failed to fetch Facebook Pages: %s", pages_resp.text)
+            raise ValueError("Failed to fetch Facebook Pages")
 
-            if pages:
-                # Use the first page — its token never expires as long as
-                # the user remains an admin and the app has permissions
-                page = pages[0]
+        pages_data = pages_resp.json()
+        pages = pages_data.get("data", [])
+        logger.info(
+            "Facebook pages found: %d — %s",
+            len(pages),
+            [(p.get("id"), p.get("name")) for p in pages],
+        )
+
+        if not pages:
+            raise ValueError("No Facebook Pages found for this account")
+
+        # For Instagram: search ALL pages for a linked IG Business Account
+        if platform == "instagram":
+            for page in pages:
                 page_token = page.get("access_token")
                 page_id = page.get("id")
                 if not page_token or not page_id:
-                    raise ValueError("Facebook page response missing 'access_token' or 'id'")
+                    continue
 
+                ig_resp = await client.get(
+                    f"https://graph.facebook.com/v21.0/{page_id}",
+                    params={
+                        "fields": "instagram_business_account",
+                        "access_token": page_token,
+                    },
+                )
+                logger.info(
+                    "IG lookup for page %s (%s): status=%d body=%s",
+                    page_id, page.get("name"), ig_resp.status_code,
+                    ig_resp.text[:300],
+                )
+
+                if ig_resp.status_code != 200:
+                    continue
+
+                ig_account = ig_resp.json().get("instagram_business_account")
+                if not ig_account or not ig_account.get("id"):
+                    continue
+
+                # Found it — fetch profile and return
+                ig_id = ig_account["id"]
+                ig_profile_resp = await client.get(
+                    f"https://graph.facebook.com/v21.0/{ig_id}",
+                    params={
+                        "fields": "id,name,username,profile_picture_url",
+                        "access_token": page_token,
+                    },
+                )
+                if ig_profile_resp.status_code == 200:
+                    ig_data = ig_profile_resp.json()
+                    profile = {
+                        "id": ig_id,
+                        "username": ig_data.get("username", ""),
+                        "display_name": ig_data.get("name", ig_data.get("username", "Instagram Business")),
+                        "profile_image": ig_data.get("profile_picture_url"),
+                    }
+                else:
+                    profile = {
+                        "id": ig_id,
+                        "username": "",
+                        "display_name": "Instagram Business",
+                        "profile_image": None,
+                    }
                 tokens = {
                     "access_token": page_token,
-                    "expires_at": None,  # Page tokens don't expire
-                }
-
-                # For Instagram: resolve the linked IG Business Account ID
-                # (the Content Publishing API needs the IG user ID, not the FB Page ID)
-                if platform == "instagram":
-                    ig_resp = await client.get(
-                        f"https://graph.facebook.com/v21.0/{page_id}",
-                        params={
-                            "fields": "instagram_business_account",
-                            "access_token": page_token,
-                        },
-                    )
-                    ig_account = None
-                    if ig_resp.status_code == 200:
-                        ig_account = ig_resp.json().get("instagram_business_account")
-                    if not ig_account or not ig_account.get("id"):
-                        raise ValueError(
-                            "No Instagram Business Account found. "
-                            "Ensure your Facebook Page has a linked Instagram Business Account."
-                        )
-                    ig_id = ig_account["id"]
-                    ig_profile_resp = await client.get(
-                        f"https://graph.facebook.com/v21.0/{ig_id}",
-                        params={
-                            "fields": "id,name,username,profile_picture_url",
-                            "access_token": page_token,
-                        },
-                    )
-                    if ig_profile_resp.status_code == 200:
-                        ig_data = ig_profile_resp.json()
-                        profile = {
-                            "id": ig_id,
-                            "username": ig_data.get("username", ""),
-                            "display_name": ig_data.get("name", ig_data.get("username", "Instagram Business")),
-                            "profile_image": ig_data.get("profile_picture_url"),
-                        }
-                    else:
-                        profile = {
-                            "id": ig_id,
-                            "username": "",
-                            "display_name": "Instagram Business",
-                            "profile_image": None,
-                        }
-                    return tokens, profile
-
-                # For Facebook: use the Page profile
-                profile = {
-                    "id": page_id,
-                    "username": page.get("name", ""),
-                    "display_name": page.get("name", ""),
-                    "profile_image": f"https://graph.facebook.com/v21.0/{page_id}/picture?type=small",
+                    "expires_at": None,
                 }
                 return tokens, profile
+
+            # None of the pages had a linked IG account
+            raise ValueError(
+                "No Instagram Business Account found on any of your Facebook Pages. "
+                "Link your Instagram Business/Creator account to a Facebook Page first."
+            )
+
+        # For Facebook: use the first page
+        page = pages[0]
+        page_token = page.get("access_token")
+        page_id = page.get("id")
+        if not page_token or not page_id:
+            raise ValueError("Facebook page response missing 'access_token' or 'id'")
+        tokens = {
+            "access_token": page_token,
+            "expires_at": None,  # Page tokens don't expire
+        }
+        profile = {
+            "id": page_id,
+            "username": page.get("name", ""),
+            "display_name": page.get("name", ""),
+            "profile_image": f"https://graph.facebook.com/v21.0/{page_id}/picture?type=small",
+        }
+        return tokens, profile
 
         # Fallback: Use user profile if no pages
         me_resp = await client.get(
