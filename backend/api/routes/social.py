@@ -260,8 +260,7 @@ async def initiate_connection(
     # (Twitter needs code_verifier stored alongside state for PKCE)
     state = secrets.token_urlsafe(32)
 
-    if platform == "instagram":
-        # Instagram has its own OAuth flow via instagram.com (not facebook.com)
+    if platform in ("facebook", "instagram"):
         if not settings.facebook_app_id or not settings.facebook_app_secret:
             raise HTTPException(
                 status_code=status.HTTP_501_NOT_IMPLEMENTED,
@@ -269,35 +268,22 @@ async def initiate_connection(
             )
         await _store_oauth_state(state, str(current_user.id), platform=platform)
 
-        redirect_uri = settings.facebook_redirect_uri.replace(
-            "/social/facebook/callback", "/social/instagram/callback"
-        )
-        params = urlencode(
-            {
-                "client_id": settings.facebook_app_id,
-                "redirect_uri": redirect_uri,
-                "state": state,
-                "scope": "instagram_basic,instagram_content_publish",
-                "response_type": "code",
-            }
-        )
-        authorization_url = f"https://www.instagram.com/oauth/authorize?{params}"
-
-    elif platform == "facebook":
-        if not settings.facebook_app_id or not settings.facebook_app_secret:
-            raise HTTPException(
-                status_code=status.HTTP_501_NOT_IMPLEMENTED,
-                detail="Facebook/Instagram integration is not configured. Please set FACEBOOK_APP_ID and FACEBOOK_APP_SECRET.",
-            )
-        await _store_oauth_state(state, str(current_user.id), platform=platform)
-
+        # Both Facebook and Instagram use Facebook Login OAuth — Instagram Business
+        # accounts are managed through Facebook Pages. Both redirect back to the
+        # facebook callback URI (the SM-06 guard allows this pairing).
         redirect_uri = settings.facebook_redirect_uri
+
+        if platform == "instagram":
+            scope = "instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement"
+        else:
+            scope = "public_profile,pages_show_list,pages_read_engagement,pages_manage_posts"
+
         params = urlencode(
             {
                 "client_id": settings.facebook_app_id,
                 "redirect_uri": redirect_uri,
                 "state": state,
-                "scope": "public_profile,pages_show_list,pages_read_engagement,pages_manage_posts",
+                "scope": scope,
                 "response_type": "code",
             }
         )
@@ -409,7 +395,13 @@ async def oauth_callback(
 
     # SM-06: Reject if the callback platform doesn't match the platform the flow was initiated for.
     # Prevents cross-platform state reuse (e.g. using a twitter state on /facebook/callback).
-    if stored_platform and stored_platform != platform:
+    # Exception: Instagram uses Facebook's OAuth dialog, so an instagram state arriving at
+    # the /facebook/callback endpoint is expected and allowed.
+    platform_match = (
+        stored_platform == platform
+        or (stored_platform == "instagram" and platform == "facebook")
+    )
+    if stored_platform and not platform_match:
         logger.warning(
             "SM-06: OAuth state platform mismatch — stored=%r, callback=%r",
             stored_platform,
@@ -418,6 +410,9 @@ async def oauth_callback(
         return RedirectResponse(
             url=f"{frontend_callback}?error=platform_mismatch&platform={platform}"
         )
+    # Use the stored platform as the real platform (instagram state on facebook callback)
+    if stored_platform:
+        platform = stored_platform
 
     if not user_id:
         return RedirectResponse(url=f"{frontend_callback}?error=invalid_state&platform={platform}")
@@ -428,21 +423,11 @@ async def oauth_callback(
     if not user:
         return RedirectResponse(url=f"{frontend_callback}?error=user_not_found&platform={platform}")
 
-    if platform == "instagram":
-        # Instagram Login uses its own token exchange endpoints
+    if platform in ("facebook", "instagram"):
         try:
-            tokens, profile = await _instagram_exchange_and_profile(code)
+            tokens, profile = await _facebook_exchange_and_profile(code, platform=platform)
         except (httpx.HTTPError, ValueError, KeyError) as e:
-            logger.warning("Instagram OAuth exchange failed: %s", e)
-            return RedirectResponse(
-                url=f"{frontend_callback}?error=token_exchange_failed&platform={platform}"
-            )
-
-    elif platform == "facebook":
-        try:
-            tokens, profile = await _facebook_exchange_and_profile(code, platform="facebook")
-        except (httpx.HTTPError, ValueError, KeyError) as e:
-            logger.warning("Facebook OAuth exchange failed: %s", e)
+            logger.warning("Facebook/Instagram OAuth exchange failed: %s", e)
             return RedirectResponse(
                 url=f"{frontend_callback}?error=token_exchange_failed&platform={platform}"
             )
@@ -609,6 +594,51 @@ async def _facebook_exchange_and_profile(code: str, platform: str = "facebook") 
                     "access_token": page_token,
                     "expires_at": None,  # Page tokens don't expire
                 }
+
+                # For Instagram: resolve the linked IG Business Account ID
+                # (the Content Publishing API needs the IG user ID, not the FB Page ID)
+                if platform == "instagram":
+                    ig_resp = await client.get(
+                        f"https://graph.facebook.com/v21.0/{page_id}",
+                        params={
+                            "fields": "instagram_business_account",
+                            "access_token": page_token,
+                        },
+                    )
+                    ig_account = None
+                    if ig_resp.status_code == 200:
+                        ig_account = ig_resp.json().get("instagram_business_account")
+                    if not ig_account or not ig_account.get("id"):
+                        raise ValueError(
+                            "No Instagram Business Account found. "
+                            "Ensure your Facebook Page has a linked Instagram Business Account."
+                        )
+                    ig_id = ig_account["id"]
+                    ig_profile_resp = await client.get(
+                        f"https://graph.facebook.com/v21.0/{ig_id}",
+                        params={
+                            "fields": "id,name,username,profile_picture_url",
+                            "access_token": page_token,
+                        },
+                    )
+                    if ig_profile_resp.status_code == 200:
+                        ig_data = ig_profile_resp.json()
+                        profile = {
+                            "id": ig_id,
+                            "username": ig_data.get("username", ""),
+                            "display_name": ig_data.get("name", ig_data.get("username", "Instagram Business")),
+                            "profile_image": ig_data.get("profile_picture_url"),
+                        }
+                    else:
+                        profile = {
+                            "id": ig_id,
+                            "username": "",
+                            "display_name": "Instagram Business",
+                            "profile_image": None,
+                        }
+                    return tokens, profile
+
+                # For Facebook: use the Page profile
                 profile = {
                     "id": page_id,
                     "username": page.get("name", ""),
