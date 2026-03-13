@@ -45,7 +45,7 @@ from api.schemas.social import (
     UpdatePostRequest,
     VerifyAccountResponse,
 )
-from core.security.encryption import encrypt_credential
+from core.security.encryption import decrypt_credential, encrypt_credential
 from infrastructure.config.settings import settings
 from adapters.storage.image_storage import get_storage_adapter
 from infrastructure.database.connection import get_db
@@ -1790,4 +1790,63 @@ async def facebook_data_deletion(
     return {
         "url": f"{frontend_url}/legal/data-deletion?code={confirmation_code}",
         "confirmation_code": confirmation_code,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Debug: Facebook token permissions
+# ---------------------------------------------------------------------------
+
+@router.get("/social/debug/facebook-token")
+async def debug_facebook_token(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """
+    Debug endpoint — calls Facebook's token debug API to show what
+    permissions the stored page token actually has.  Useful for diagnosing
+    (#200) Permissions errors.
+    """
+    result = await db.execute(
+        select(SocialAccount).where(
+            and_(
+                SocialAccount.user_id == user.id,
+                SocialAccount.platform == "facebook",
+                SocialAccount.is_active.is_(True),
+            )
+        )
+    )
+    account = result.scalar_one_or_none()
+    if not account:
+        raise HTTPException(status_code=404, detail="No active Facebook account found")
+
+    page_token = decrypt_credential(account.access_token_encrypted, settings.secret_key)
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        # Use Facebook's debug_token endpoint
+        debug_resp = await client.get(
+            "https://graph.facebook.com/v21.0/debug_token",
+            params={
+                "input_token": page_token,
+                "access_token": f"{settings.facebook_app_id}|{settings.facebook_app_secret}",
+            },
+        )
+        debug_data = debug_resp.json()
+
+        # Also try a simple /me call with the page token to see what identity it resolves to
+        me_resp = await client.get(
+            "https://graph.facebook.com/v21.0/me",
+            params={
+                "fields": "id,name",
+                "access_token": page_token,
+            },
+        )
+        me_data = me_resp.json()
+
+    return {
+        "account_id": str(account.id),
+        "platform_user_id": account.platform_user_id,
+        "platform_username": account.platform_username,
+        "token_debug": debug_data,
+        "token_identity": me_data,
     }

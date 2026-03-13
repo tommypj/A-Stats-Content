@@ -64,11 +64,11 @@ class FacebookAdapter(BaseSocialAdapter):
     platform = SocialPlatform.FACEBOOK
 
     # OAuth 2.0 endpoints
-    OAUTH_AUTH_URL = "https://www.facebook.com/v18.0/dialog/oauth"
-    OAUTH_TOKEN_URL = "https://graph.facebook.com/v18.0/oauth/access_token"
+    OAUTH_AUTH_URL = "https://www.facebook.com/v21.0/dialog/oauth"
+    OAUTH_TOKEN_URL = "https://graph.facebook.com/v21.0/oauth/access_token"
 
     # API endpoints
-    API_BASE_URL = "https://graph.facebook.com/v18.0"
+    API_BASE_URL = "https://graph.facebook.com/v21.0"
 
     # OAuth scopes
     SCOPES = [
@@ -413,8 +413,14 @@ class FacebookAdapter(BaseSocialAdapter):
 
                 if response.status_code not in [200, 201]:
                     error_data = response.json() if response.text else {}
-                    error_msg = error_data.get("error", {}).get("message", "Post creation failed")
-                    logger.error("Facebook API error: %s", error_msg)
+                    error_obj = error_data.get("error", {})
+                    error_msg = error_obj.get("message", "Post creation failed")
+                    error_code = error_obj.get("code", "unknown")
+                    error_subcode = error_obj.get("error_subcode", "none")
+                    logger.error(
+                        "Facebook API error (code=%s, subcode=%s): %s | full: %s",
+                        error_code, error_subcode, error_msg, error_data,
+                    )
                     raise SocialAPIError(f"Post creation failed: {error_msg}")
 
                 result = response.json()
