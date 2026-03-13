@@ -32,6 +32,7 @@ _ALLOWED_MEDIA_DOMAINS = {
     "pbxt.replicate.delivery",
     "cdn.replicate.com",
     "uploads.a-stats.online",
+    "api.a-stats.app",
 }
 
 
@@ -427,6 +428,11 @@ class LinkedInAdapter(BaseSocialAdapter):
                     content_type,
                 )
                 media_assets.append({"status": "READY", "media": upload_result.media_id})
+
+            # Fall back to text-only if no media survived validation/upload
+            if not media_assets:
+                logger.warning("No media assets uploaded successfully, falling back to text-only post")
+                return await self.post_text(credentials, text)
 
             # Create UGC post with media
             post_data = {
