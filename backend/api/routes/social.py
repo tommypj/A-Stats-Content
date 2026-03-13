@@ -654,11 +654,29 @@ async def _facebook_exchange_and_profile(code: str, platform: str = "facebook") 
                 }
                 return tokens, profile
 
-            # None of the pages had a linked IG account
-            raise ValueError(
-                "No Instagram Business Account found on any of your Facebook Pages. "
-                "Link your Instagram Business/Creator account to a Facebook Page first."
+            # None of the pages had a linked IG account via the API.
+            # Fall back: store the first page's token and ID. The IG Business Account
+            # ID will be resolved at publish time by the Instagram adapter.
+            logger.warning(
+                "No instagram_business_account found on any page. "
+                "Falling back to first page for Instagram connection."
             )
+            page = pages[0]
+            page_token = page.get("access_token")
+            page_id = page.get("id")
+            if not page_token or not page_id:
+                raise ValueError("Facebook page response missing 'access_token' or 'id'")
+            tokens = {
+                "access_token": page_token,
+                "expires_at": None,
+            }
+            profile = {
+                "id": page_id,
+                "username": page.get("name", ""),
+                "display_name": f"Instagram ({page.get('name', 'Connected')})",
+                "profile_image": None,
+            }
+            return tokens, profile
 
         # For Facebook: use the first page
         page = pages[0]

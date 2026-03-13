@@ -445,6 +445,24 @@ class InstagramAdapter(BaseSocialAdapter):
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
+                # If user_id is a Facebook Page ID (not an IG account ID),
+                # resolve the linked Instagram Business Account at publish time.
+                ig_check_resp = await client.get(
+                    f"{self.API_BASE_URL}/{user_id}",
+                    params={
+                        "fields": "instagram_business_account",
+                        "access_token": access_token,
+                    },
+                )
+                if ig_check_resp.status_code == 200:
+                    ig_biz = ig_check_resp.json().get("instagram_business_account")
+                    if ig_biz and ig_biz.get("id"):
+                        logger.info(
+                            "Resolved IG Business Account %s from page %s",
+                            ig_biz["id"], user_id,
+                        )
+                        user_id = ig_biz["id"]
+
                 # Step 1: Create a media container
                 logger.info("Creating Instagram media container for account %s", user_id)
                 container_resp = await client.post(
