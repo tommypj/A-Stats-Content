@@ -130,6 +130,7 @@ export default function AccountsPage() {
   };
 
   const availablePlatforms: SocialPlatform[] = ["twitter", "linkedin", "facebook", "instagram"];
+  const comingSoonPlatforms: SocialPlatform[] = ["twitter"];
 
   if (loading) {
     return (
@@ -283,14 +284,15 @@ export default function AccountsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {availablePlatforms.map((platform) => {
             const isConnected = accounts.some((a) => a.platform === platform);
+            const isComingSoon = comingSoonPlatforms.includes(platform);
             return (
               <Card
                 key={platform}
-                className="p-6 hover:bg-surface-secondary transition-colors"
+                className={`p-6 transition-colors ${isComingSoon ? "opacity-60" : "hover:bg-surface-secondary"}`}
               >
                 <div className="flex flex-col items-center text-center gap-4">
                   <div
-                    className={`${getPlatformColor(platform)} p-4 rounded-xl text-white`}
+                    className={`${getPlatformColor(platform)} p-4 rounded-xl text-white ${isComingSoon ? "grayscale" : ""}`}
                   >
                     {getPlatformIcon(platform, "h-8 w-8")}
                   </div>
@@ -299,19 +301,25 @@ export default function AccountsPage() {
                       {getPlatformName(platform)}
                     </h3>
                     <p className="text-xs text-text-secondary mt-1">
-                      {isConnected ? "Already connected" : "Not connected"}
+                      {isComingSoon ? "Coming Soon" : isConnected ? "Already connected" : "Not connected"}
                     </p>
                   </div>
-                  <Button
-                    size="sm"
-                    variant={isConnected ? "outline" : "primary"}
-                    onClick={() => handleConnect(platform)}
-                    isLoading={connectingPlatform === platform}
-                    leftIcon={<ExternalLink className="h-3 w-3" />}
-                    className="w-full"
-                  >
-                    {isConnected ? "Add Another" : "Connect"}
-                  </Button>
+                  {isComingSoon ? (
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-surface-secondary text-text-secondary">
+                      Coming Soon
+                    </span>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant={isConnected ? "outline" : "primary"}
+                      onClick={() => handleConnect(platform)}
+                      isLoading={connectingPlatform === platform}
+                      leftIcon={<ExternalLink className="h-3 w-3" />}
+                      className="w-full"
+                    >
+                      {isConnected ? "Add Another" : "Connect"}
+                    </Button>
+                  )}
                 </div>
               </Card>
             );
@@ -330,10 +338,10 @@ export default function AccountsPage() {
               you'll be able to choose which accounts to publish to.
             </p>
             <ul className="mt-3 space-y-1 text-sm text-text-secondary list-disc list-inside">
-              <li>Twitter: Requires Twitter Developer account</li>
-              <li>LinkedIn: Supports personal and company pages</li>
               <li>Facebook: Can connect pages and groups</li>
               <li>Instagram: Business accounts only (via Facebook)</li>
+              <li>LinkedIn: Supports personal profiles and company pages</li>
+              <li>X (Twitter): Coming soon</li>
             </ul>
           </div>
         </div>

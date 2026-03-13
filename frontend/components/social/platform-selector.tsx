@@ -18,6 +18,8 @@ const PLATFORM_LIMITS = {
   instagram: 2200,
 };
 
+const COMING_SOON_PLATFORMS: SocialPlatform[] = ["twitter"];
+
 export function PlatformSelector({
   accounts,
   selectedAccountIds,
@@ -111,18 +113,21 @@ export function PlatformSelector({
           const isSelected = selectedAccountIds.includes(account.id);
           const limitStatus = getCharacterLimitStatus(account.platform);
           const limit = PLATFORM_LIMITS[account.platform];
+          const isComingSoon = COMING_SOON_PLATFORMS.includes(account.platform);
 
           return (
             <button
               key={account.id}
               type="button"
-              onClick={() => handleToggle(account.id)}
+              onClick={() => !isComingSoon && handleToggle(account.id)}
               className={`w-full p-4 border rounded-xl transition-all ${
-                isSelected
-                  ? "border-primary-500 bg-primary-500/5"
-                  : "border-surface-tertiary hover:bg-surface-secondary"
+                isComingSoon
+                  ? "opacity-50 cursor-not-allowed border-surface-tertiary"
+                  : isSelected
+                    ? "border-primary-500 bg-primary-500/5"
+                    : "border-surface-tertiary hover:bg-surface-secondary"
               } ${!account.is_active ? "opacity-50 cursor-not-allowed" : ""}`}
-              disabled={!account.is_active}
+              disabled={!account.is_active || isComingSoon}
             >
               <div className="flex items-center gap-3">
                 {/* Checkbox */}
@@ -145,9 +150,16 @@ export function PlatformSelector({
 
                 {/* Account Info */}
                 <div className="flex-1 text-left min-w-0">
-                  <p className="font-medium text-text-primary truncate">
-                    {account.platform_display_name}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-text-primary truncate">
+                      {account.platform_display_name}
+                    </p>
+                    {isComingSoon && (
+                      <span className="flex-shrink-0 px-2 py-0.5 rounded text-[10px] font-medium bg-surface-secondary text-text-secondary">
+                        Coming Soon
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-text-secondary truncate">
                     @{account.platform_username}
                   </p>
