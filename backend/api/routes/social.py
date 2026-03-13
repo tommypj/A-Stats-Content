@@ -1114,13 +1114,17 @@ async def create_scheduled_post(
     else:
         post_status = PostStatus.DRAFT.value
 
-    # Create scheduled post
+    # Create scheduled post — set scheduled_at to now for publish_now so it appears on the calendar
+    effective_scheduled_at = body.scheduled_at
+    if body.publish_now and not effective_scheduled_at:
+        effective_scheduled_at = datetime.now(UTC)
+
     scheduled_post = ScheduledPost(
         user_id=current_user.id,
         content=body.content,
         media_urls=body.media_urls,
         link_url=body.link_url,
-        scheduled_at=body.scheduled_at,
+        scheduled_at=effective_scheduled_at,
         status=post_status,
         article_id=body.article_id,
     )
@@ -1182,10 +1186,16 @@ async def list_scheduled_posts(
         query = query.where(ScheduledPost.status == status)
 
     if start_date:
-        query = query.where(ScheduledPost.scheduled_at >= start_date)
+        # Use scheduled_at, falling back to published_at or created_at for publish-now posts
+        effective_date = func.coalesce(ScheduledPost.scheduled_at, ScheduledPost.published_at, ScheduledPost.created_at)
+        query = query.where(effective_date >= start_date)
 
     if end_date:
-        query = query.where(ScheduledPost.scheduled_at <= end_date)
+        # If end_date has no time component (midnight), extend to end of day
+        if end_date.hour == 0 and end_date.minute == 0 and end_date.second == 0:
+            end_date = end_date.replace(hour=23, minute=59, second=59)
+        effective_date = func.coalesce(ScheduledPost.scheduled_at, ScheduledPost.published_at, ScheduledPost.created_at)
+        query = query.where(effective_date <= end_date)
 
     # Platform filter requires join
     if platform:
