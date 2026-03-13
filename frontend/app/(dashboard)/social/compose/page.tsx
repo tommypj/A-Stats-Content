@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, SocialAccount, parseApiError } from "@/lib/api";
+import { api, SocialAccount, SocialPlatform, SocialPostsData, parseApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PlatformSelector } from "@/components/social/platform-selector";
@@ -17,6 +17,9 @@ import {
   Send,
   Clock,
   Loader2,
+  FileText,
+  Sparkles,
+  Image as ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { TierGate } from "@/components/ui/tier-gate";
@@ -50,6 +53,13 @@ export default function ComposePage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [accountsInitialised, setAccountsInitialised] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- Article-to-social state ---
+  const [selectedArticleId, setSelectedArticleId] = useState("");
+  const [generatedPosts, setGeneratedPosts] = useState<SocialPostsData | null>(null);
+  const [activePlatformTab, setActivePlatformTab] = useState<SocialPlatform>("facebook");
+  const [generating, setGenerating] = useState(false);
+  const [articleImageAttached, setArticleImageAttached] = useState(false);
 
   // Revoke all blob URLs on unmount
   useEffect(() => {
@@ -102,6 +112,26 @@ export default function ComposePage() {
 
   const accounts: SocialAccount[] = accountsData ?? [];
 
+  // --- React Query: fetch articles for selector ---
+
+  const { data: articlesData, isLoading: loadingArticles } = useQuery({
+    queryKey: ["articles", "list", { page_size: 100 }],
+    queryFn: () => api.articles.list({ page_size: 100 }),
+    staleTime: 30_000,
+  });
+
+  const articles = useMemo(
+    () => (articlesData?.items ?? []).filter(
+      (a) => a.status === "completed" || a.status === "published"
+    ),
+    [articlesData]
+  );
+
+  const selectedArticle = useMemo(
+    () => articles.find((a) => a.id === selectedArticleId),
+    [articles, selectedArticleId]
+  );
+
   // Initialise selectedAccountIds once accounts arrive
   useEffect(() => {
     if (accountsInitialised || accounts.length === 0) return;
@@ -128,6 +158,76 @@ export default function ComposePage() {
     }
     setSelectedAccountIds(connectedIds);
   }, [accounts, accountsInitialised]);
+
+  // --- Handle article selection: generate posts + attach image ---
+
+  const handleArticleSelect = async (articleId: string) => {
+    setSelectedArticleId(articleId);
+    setGeneratedPosts(null);
+    setArticleImageAttached(false);
+
+    if (!articleId) return;
+
+    const article = articles.find((a) => a.id === articleId);
+    if (!article) return;
+
+    // Generate AI social posts
+    setGenerating(true);
+    setError(null);
+    try {
+      // Try to load existing social posts first, generate if empty
+      let posts: SocialPostsData;
+      const existing = article.social_posts;
+      if (existing && (existing.twitter?.text || existing.linkedin?.text || existing.facebook?.text)) {
+        posts = existing;
+        toast.info("Loaded existing social posts for this article");
+      } else {
+        posts = await api.articles.generateSocialPosts(articleId);
+        toast.success("Social posts generated from article!");
+      }
+      setGeneratedPosts(posts);
+
+      // Set the first available platform's content into the editor
+      const firstPlatform = (["facebook", "twitter", "linkedin", "instagram"] as SocialPlatform[])
+        .find((p) => posts[p]?.text);
+      if (firstPlatform) {
+        setContent(posts[firstPlatform]!.text);
+        setActivePlatformTab(firstPlatform);
+      }
+    } catch (err) {
+      const msg = parseApiError(err).message;
+      setError(`Failed to generate social posts: ${msg}`);
+      toast.error(msg);
+    } finally {
+      setGenerating(false);
+    }
+
+    // Attach featured image if available
+    if (article.featured_image_id) {
+      try {
+        const image = await api.images.get(article.featured_image_id);
+        if (image.url && image.status === "completed") {
+          setMediaItems([{
+            previewUrl: image.url,
+            remoteUrl: image.url,
+            uploading: false,
+            error: null,
+          }]);
+          setArticleImageAttached(true);
+        }
+      } catch {
+        // Image fetch failed — not critical
+      }
+    }
+  };
+
+  // Switch content when platform tab changes (only in article mode)
+  const handlePlatformTabChange = (platform: SocialPlatform) => {
+    setActivePlatformTab(platform);
+    if (generatedPosts && generatedPosts[platform]?.text) {
+      setContent(generatedPosts[platform]!.text);
+    }
+  };
 
   // --- React Query: create post mutation ---
 
@@ -267,6 +367,9 @@ export default function ComposePage() {
       URL.revokeObjectURL(removed.previewUrl);
     }
     setMediaItems(mediaItems.filter((_, i) => i !== index));
+    if (articleImageAttached && index === 0) {
+      setArticleImageAttached(false);
+    }
   };
 
   if (loading) {
@@ -300,6 +403,13 @@ export default function ComposePage() {
     );
   }
 
+  const PLATFORM_TABS: { key: SocialPlatform; label: string }[] = [
+    { key: "facebook", label: "Facebook" },
+    { key: "twitter", label: "Twitter/X" },
+    { key: "linkedin", label: "LinkedIn" },
+    { key: "instagram", label: "Instagram" },
+  ];
+
   return (
     <TierGate minimum="starter" feature="Social Media">
     <div className="space-y-6">
@@ -323,7 +433,7 @@ export default function ComposePage() {
             <Button
               type="submit"
               variant="outline"
-              disabled={submitting || anyUploading}
+              disabled={submitting || anyUploading || generating}
               isLoading={submitting && !createPostMutation.variables?.publish_now}
               leftIcon={<Clock className="h-4 w-4" />}
             >
@@ -332,7 +442,7 @@ export default function ComposePage() {
             <Button
               type="button"
               onClick={handlePublishNow}
-              disabled={submitting || anyUploading}
+              disabled={submitting || anyUploading || generating}
               isLoading={submitting && createPostMutation.variables?.publish_now === true}
               leftIcon={<Send className="h-4 w-4" />}
             >
@@ -368,6 +478,91 @@ export default function ComposePage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Composer */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Article Selector */}
+            <Card className="p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <FileText className="h-5 w-5 text-primary-500" />
+                <h2 className="text-lg font-semibold text-text-primary">
+                  Generate from Article
+                </h2>
+              </div>
+              <p className="text-sm text-text-secondary mb-3">
+                Select an article to auto-generate platform-optimized social posts with the article&apos;s featured image.
+              </p>
+              <select
+                value={selectedArticleId}
+                onChange={(e) => handleArticleSelect(e.target.value)}
+                disabled={loadingArticles || generating}
+                className="w-full px-4 py-3 border border-surface-tertiary rounded-xl bg-surface-primary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="">Write manually (no article)</option>
+                {articles.map((article) => (
+                  <option key={article.id} value={article.id}>
+                    {article.title}
+                  </option>
+                ))}
+              </select>
+              {loadingArticles && (
+                <div className="flex items-center gap-2 mt-2 text-sm text-text-secondary">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading articles...
+                </div>
+              )}
+              {generating && (
+                <div className="flex items-center gap-2 mt-3 p-3 bg-primary-500/5 border border-primary-500/20 rounded-lg">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary-500" />
+                  <span className="text-sm text-primary-600 font-medium">
+                    Generating social posts from article...
+                  </span>
+                </div>
+              )}
+              {selectedArticle && articleImageAttached && (
+                <div className="flex items-center gap-2 mt-2 text-sm text-green-600">
+                  <ImageIcon className="h-4 w-4" />
+                  Featured image attached
+                </div>
+              )}
+            </Card>
+
+            {/* Platform Tabs (when article is selected) */}
+            {generatedPosts && (
+              <Card className="p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Sparkles className="h-5 w-5 text-primary-500" />
+                  <h2 className="text-lg font-semibold text-text-primary">
+                    Generated Posts
+                  </h2>
+                </div>
+                <p className="text-xs text-text-secondary mb-3">
+                  Switch between platforms to see and edit each generated post. The content below updates when you switch tabs.
+                </p>
+                <div className="flex gap-2 flex-wrap">
+                  {PLATFORM_TABS.map(({ key, label }) => {
+                    const hasContent = !!generatedPosts[key]?.text;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => handlePlatformTabChange(key)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          activePlatformTab === key
+                            ? "bg-primary-500 text-white"
+                            : hasContent
+                            ? "bg-surface-secondary text-text-primary hover:bg-surface-tertiary"
+                            : "bg-surface-secondary text-text-tertiary"
+                        }`}
+                      >
+                        {label}
+                        {hasContent && activePlatformTab !== key && (
+                          <span className="ml-2 inline-block w-2 h-2 rounded-full bg-green-500" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </Card>
+            )}
+
             {/* Content Input */}
             <Card className="p-6">
               <h2 className="text-lg font-semibold text-text-primary mb-4">
@@ -422,6 +617,12 @@ export default function ComposePage() {
                       {item.remoteUrl && !item.uploading && (
                         <div className="absolute top-2 left-2">
                           <CheckCircle className="h-5 w-5 text-green-500 drop-shadow" />
+                        </div>
+                      )}
+                      {/* Article image badge */}
+                      {articleImageAttached && index === 0 && (
+                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 rounded text-xs text-white">
+                          Article image
                         </div>
                       )}
                       <button
