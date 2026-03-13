@@ -491,7 +491,31 @@ class InstagramAdapter(BaseSocialAdapter):
                 if not creation_id:
                     raise SocialAPIError("Instagram container creation response missing 'id'")
 
-                # Step 2: Publish the container
+                # Step 2: Wait for container to be ready (Instagram processes the image async)
+                import asyncio
+                for attempt in range(10):
+                    status_resp = await client.get(
+                        f"{self.API_BASE_URL}/{creation_id}",
+                        params={
+                            "fields": "status_code",
+                            "access_token": access_token,
+                        },
+                    )
+                    if status_resp.status_code == 200:
+                        container_status = status_resp.json().get("status_code")
+                        logger.info(
+                            "Container %s status: %s (attempt %d)",
+                            creation_id, container_status, attempt + 1,
+                        )
+                        if container_status == "FINISHED":
+                            break
+                        if container_status == "ERROR":
+                            raise SocialAPIError("Instagram media container processing failed")
+                    await asyncio.sleep(2)
+                else:
+                    logger.warning("Container %s not ready after 20s, attempting publish anyway", creation_id)
+
+                # Step 3: Publish the container
                 logger.info("Publishing Instagram media container %s", creation_id)
                 publish_resp = await client.post(
                     f"{self.API_BASE_URL}/{user_id}/media_publish",
