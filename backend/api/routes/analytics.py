@@ -2022,6 +2022,19 @@ async def get_revenue_overview_endpoint(
     from services.revenue_attribution import get_revenue_overview
 
     data = await get_revenue_overview(current_user.id, db, start_date, end_date)
+    # Flatten nested period into top-level fields expected by schema
+    period = data.pop("period", {})
+    comparison = data.pop("comparison", {})
+    data["start_date"] = period.get("start_date")
+    data["end_date"] = period.get("end_date")
+    # Map comparison data to TrendData fields (current, previous, change_percent, trend)
+    def _trend(current_val, prev_val, change_pct):
+        trend = "up" if change_pct > 0 else ("down" if change_pct < 0 else "stable")
+        return {"current": current_val, "previous": prev_val, "change_percent": change_pct, "trend": trend}
+    if comparison:
+        data["visits_trend"] = _trend(data.get("total_organic_visits", 0), comparison.get("previous_visits", 0), comparison.get("visits_change_pct", 0))
+        data["conversions_trend"] = _trend(data.get("total_conversions", 0), comparison.get("previous_conversions", 0), comparison.get("conversions_change_pct", 0))
+        data["revenue_trend"] = _trend(data.get("total_revenue", 0), comparison.get("previous_revenue", 0), comparison.get("revenue_change_pct", 0))
     return RevenueOverviewResponse(**data)
 
 
@@ -2039,6 +2052,13 @@ async def get_revenue_by_article_endpoint(
     from services.revenue_attribution import get_revenue_by_article
 
     data = await get_revenue_by_article(current_user.id, db, start_date, end_date, page, page_size)
+    # Flatten nested pagination into top-level fields expected by schema
+    pagination = data.pop("pagination", {})
+    data.pop("period", None)
+    data["total"] = pagination.get("total_items", 0)
+    data["page"] = pagination.get("page", 1)
+    data["page_size"] = pagination.get("page_size", 20)
+    data["pages"] = pagination.get("pages", 1)
     return RevenueByArticleListResponse(**data)
 
 
@@ -2056,6 +2076,13 @@ async def get_revenue_by_keyword_endpoint(
     from services.revenue_attribution import get_revenue_by_keyword
 
     data = await get_revenue_by_keyword(current_user.id, db, start_date, end_date, page, page_size)
+    # Flatten nested pagination into top-level fields expected by schema
+    pagination = data.pop("pagination", {})
+    data.pop("period", None)
+    data["total"] = pagination.get("total_items", 0)
+    data["page"] = pagination.get("page", 1)
+    data["page_size"] = pagination.get("page_size", 20)
+    data["pages"] = pagination.get("pages", 1)
     return RevenueByKeywordListResponse(**data)
 
 

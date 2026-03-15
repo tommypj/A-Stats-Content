@@ -388,7 +388,10 @@ async def update_brand_voice(
     # AUTH-06: Require admin/owner role to modify brand voice.
     await require_project_admin(project_id, current_user, db)
 
-    # PROJ-42: Use with_for_update() to prevent TOCTOU race conditions on concurrent updates
+    # PROJ-42: Row-level lock for concurrent update safety.
+    # Note: with_for_update(of=Project) removed — it causes
+    # "FOR UPDATE cannot be applied to the nullable side of an outer join"
+    # when SQLAlchemy eager-loads the Project.owner relationship.
     stmt = (
         select(Project)
         .where(
@@ -397,7 +400,7 @@ async def update_brand_voice(
                 Project.deleted_at.is_(None),
             )
         )
-        .with_for_update(of=Project)
+        .with_for_update()
     )
     result = await db.execute(stmt)
     project = result.scalar_one_or_none()
