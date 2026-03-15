@@ -88,7 +88,7 @@ export default function ScrollWorkflow() {
   const goPrev = () => setActiveStep((s) => Math.max(s - 1, 0));
 
   return (
-    <section id="how-it-works" className="bg-primary-950 py-20 lg:py-28">
+    <section id="how-it-works" className="bg-primary-950 py-20 lg:py-28 overflow-hidden">
       <div className="page-container">
         {/* Header */}
         <div className="text-center mb-12 lg:mb-16">
@@ -110,9 +110,9 @@ export default function ScrollWorkflow() {
         </div>
 
         {/* Main content */}
-        <div className="grid lg:grid-cols-[1fr_1.15fr] gap-8 lg:gap-12 items-start">
+        <div className="grid lg:grid-cols-[1fr_1.15fr] gap-8 lg:gap-12 items-start min-w-0">
           {/* Left — step selector */}
-          <div className="relative">
+          <div className="relative min-w-0">
             {/* Progress line (desktop) */}
             <div className="absolute left-[15px] top-0 bottom-0 w-px bg-primary-800/60 hidden lg:block">
               <motion.div
@@ -163,9 +163,9 @@ export default function ScrollWorkflow() {
                       >
                         <Icon className="h-4 w-4" />
                       </div>
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 overflow-hidden">
                         <div
-                          className={`text-sm font-display font-semibold transition-colors duration-300 ${
+                          className={`text-sm font-display font-semibold transition-colors duration-300 truncate ${
                             isActive
                               ? "text-cream-100"
                               : "text-cream-100/60"
@@ -200,9 +200,9 @@ export default function ScrollWorkflow() {
           </div>
 
           {/* Right — detail panel */}
-          <div>
-            <div className="relative rounded-2xl border border-primary-800/60 bg-primary-900/95 shadow-[0_16px_60px_rgba(23,28,23,0.4)] overflow-hidden">
-              <div className="p-6 sm:p-8">
+          <div className="min-w-0">
+            <div className="relative rounded-2xl border border-primary-800/60 bg-primary-900/95 shadow-[0_16px_60px_rgba(23,28,23,0.4)] overflow-hidden min-w-0">
+              <div className="p-5 sm:p-8">
                 {/* Panel header */}
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
