@@ -24,6 +24,7 @@ import {
 import { useTranslations } from "next-intl";
 import PublicNav from "./PublicNav";
 import PublicFooter from "./PublicFooter";
+import ScrollWorkflow from "./ScrollWorkflow";
 import { api, type BlogPostCard } from "@/lib/api";
 
 /* ───────────────────────── Scroll-reveal hook ───────────────────────── */
@@ -390,24 +391,6 @@ export default function LandingPageClient() {
     },
   ];
 
-  const steps = [
-    {
-      number: "1",
-      title: t("howItWorks.step1Title"),
-      description: t("howItWorks.step1Description"),
-    },
-    {
-      number: "2",
-      title: t("howItWorks.step2Title"),
-      description: t("howItWorks.step2Description"),
-    },
-    {
-      number: "3",
-      title: t("howItWorks.step3Title"),
-      description: t("howItWorks.step3Description"),
-    },
-  ];
-
   const showcases = [
     {
       title: t("showcases.showcase1Title"),
@@ -735,43 +718,8 @@ export default function LandingPageClient() {
         </div>
       </section>
 
-      {/* ─── 5. How It Works ─── */}
-      <section
-        id="how-it-works"
-        className="py-20 lg:py-28 bg-surface-secondary"
-      >
-        <div className="page-container">
-          <RevealSection className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-display font-bold text-text-primary">
-              {t("howItWorks.title")}
-            </h2>
-            <p className="mt-4 text-text-secondary max-w-2xl mx-auto">
-              {t("howItWorks.description")}
-            </p>
-          </RevealSection>
-
-          <RevealSection>
-            <div className="grid md:grid-cols-3 gap-8 lg:gap-12 relative">
-              {/* Connecting line (desktop) */}
-              <div className="hidden md:block absolute top-10 left-[20%] right-[20%] h-px bg-surface-tertiary" />
-
-              {steps.map((step) => (
-                <div key={step.number} className="stagger-child text-center relative">
-                  <div className="inline-flex items-center justify-center h-14 w-14 rounded-full bg-primary-500 text-white text-xl font-display font-bold mb-5 relative z-10">
-                    {step.number}
-                  </div>
-                  <h3 className="font-display text-lg font-semibold text-text-primary mb-2">
-                    {step.title}
-                  </h3>
-                  <p className="text-sm text-text-secondary leading-relaxed max-w-xs mx-auto">
-                    {step.description}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </RevealSection>
-        </div>
-      </section>
+      {/* ─── 5. Scroll-Driven Workflow ─── */}
+      <ScrollWorkflow />
 
       {/* ─── 6. Feature Showcase (alternating rows) ─── */}
       <section className="py-20 lg:py-28 bg-white">
